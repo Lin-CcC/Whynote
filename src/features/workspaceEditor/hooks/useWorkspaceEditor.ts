@@ -16,6 +16,7 @@ import {
   type PlanStepNode,
   shouldConvertToModuleAtRoot,
   type TreeNode,
+  type WorkspaceSnapshot,
 } from '../../nodeDomain';
 import type {
   EditorActionAvailability,
@@ -50,7 +51,10 @@ export function useWorkspaceEditor({
   initialSnapshot = createDemoWorkspaceSnapshot(),
   initialModuleId = DEMO_MODULE_ID,
   initialSelectedNodeId = DEMO_SELECTED_NODE_ID,
+  isInteractionLocked = false,
   operations = defaultWorkspaceEditorOperations,
+  onSnapshotChange,
+  onSelectionChange,
 }: WorkspaceEditorProps) {
   const [tree, setTree] = useState(initialSnapshot.tree);
   const [currentModuleId, setCurrentModuleId] = useState<string | null>(() =>
@@ -88,7 +92,9 @@ export function useWorkspaceEditor({
     currentModuleId && tree.nodes[currentModuleId]
       ? getNodeOrThrow(tree, currentModuleId)
       : null;
-  const actionAvailability = getActionAvailability(tree, selectedNodeId);
+  const actionAvailability = isInteractionLocked
+    ? getLockedActionAvailability()
+    : getActionAvailability(tree, selectedNodeId);
 
   useEffect(() => {
     if (!selectedNodeId) {
@@ -100,7 +106,18 @@ export function useWorkspaceEditor({
     nodeElement?.focus();
   }, [selectedNodeId, tree]);
 
+  useEffect(() => {
+    onSelectionChange?.({
+      currentModuleId,
+      selectedNodeId,
+    });
+  }, [currentModuleId, onSelectionChange, selectedNodeId]);
+
   function switchModule(moduleId: string) {
+    if (isInteractionLocked) {
+      return;
+    }
+
     if (!tree.nodes[moduleId]) {
       return;
     }
@@ -116,6 +133,10 @@ export function useWorkspaceEditor({
   }
 
   function selectNode(nodeId: string) {
+    if (isInteractionLocked) {
+      return;
+    }
+
     if (!tree.nodes[nodeId]) {
       return;
     }
@@ -136,6 +157,10 @@ export function useWorkspaceEditor({
   }
 
   function toggleNodeExpanded(nodeId: string) {
+    if (isInteractionLocked) {
+      return;
+    }
+
     setExpandedNodeIds((previousExpandedNodeIds) => {
       const nextExpandedNodeIds = new Set(previousExpandedNodeIds);
 
@@ -150,10 +175,28 @@ export function useWorkspaceEditor({
   }
 
   function updateNode(nodeId: string, patch: NodeContentPatch) {
-    setTree((previousTree) => applyNodePatch(previousTree, nodeId, patch));
+    if (isInteractionLocked) {
+      return;
+    }
+
+    setTree((previousTree) => {
+      const nextTree = applyNodePatch(previousTree, nodeId, patch);
+
+      if (nextTree !== previousTree) {
+        onSnapshotChange?.(
+          createNextSnapshot(initialSnapshot, nextTree),
+        );
+      }
+
+      return nextTree;
+    });
   }
 
   function insertChildAtSelection() {
+    if (isInteractionLocked) {
+      return;
+    }
+
     if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
       return;
     }
@@ -182,6 +225,10 @@ export function useWorkspaceEditor({
   }
 
   function insertSiblingAtSelection() {
+    if (isInteractionLocked) {
+      return;
+    }
+
     if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
       return;
     }
@@ -213,6 +260,10 @@ export function useWorkspaceEditor({
   }
 
   function deleteSelection() {
+    if (isInteractionLocked) {
+      return;
+    }
+
     if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
       return;
     }
@@ -236,6 +287,10 @@ export function useWorkspaceEditor({
   }
 
   function liftSelection() {
+    if (isInteractionLocked) {
+      return;
+    }
+
     if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
       return;
     }
@@ -255,6 +310,10 @@ export function useWorkspaceEditor({
   }
 
   function lowerSelection() {
+    if (isInteractionLocked) {
+      return;
+    }
+
     if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
       return;
     }
@@ -333,6 +392,7 @@ export function useWorkspaceEditor({
         ),
       );
       setOperationError(null);
+      onSnapshotChange?.(createNextSnapshot(initialSnapshot, nextTree));
     } catch (error) {
       setOperationError(
         error instanceof Error ? error.message : '结构操作失败，请检查当前节点。',
@@ -361,6 +421,19 @@ export function useWorkspaceEditor({
     deleteSelection,
     liftSelection,
     lowerSelection,
+  };
+}
+
+function createNextSnapshot(
+  snapshot: WorkspaceSnapshot,
+  tree: NodeTree,
+): WorkspaceSnapshot {
+  return {
+    workspace: {
+      ...snapshot.workspace,
+      updatedAt: new Date().toISOString(),
+    },
+    tree,
   };
 }
 
@@ -488,6 +561,16 @@ export function getActionAvailability(
     canDelete: true,
     canLift: canLiftNode(tree, node),
     canLower: canLowerNode(tree, node),
+  };
+}
+
+function getLockedActionAvailability(): EditorActionAvailability {
+  return {
+    canDelete: false,
+    canInsertChild: false,
+    canInsertSibling: false,
+    canLift: false,
+    canLower: false,
   };
 }
 

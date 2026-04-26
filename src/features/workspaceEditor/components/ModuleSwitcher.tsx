@@ -2,12 +2,14 @@ import type { ModuleNode } from '../../nodeDomain';
 
 type ModuleSwitcherProps = {
   currentModuleId: string | null;
+  isInteractionLocked: boolean;
   modules: ModuleNode[];
   onSwitchModule: (moduleId: string) => void;
 };
 
 export default function ModuleSwitcher({
   currentModuleId,
+  isInteractionLocked,
   modules,
   onSwitchModule,
 }: ModuleSwitcherProps) {
@@ -26,6 +28,7 @@ export default function ModuleSwitcher({
             aria-pressed={moduleNode.id === currentModuleId}
             className="workspace-moduleButton"
             data-active={moduleNode.id === currentModuleId}
+            disabled={isInteractionLocked}
             key={moduleNode.id}
             onClick={() => onSwitchModule(moduleNode.id)}
             type="button"

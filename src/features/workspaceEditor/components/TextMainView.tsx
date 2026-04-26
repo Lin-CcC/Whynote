@@ -6,6 +6,8 @@ import EditorNodeSection from './EditorNodeSection';
 
 type TextMainViewProps = {
   currentModuleId: string | null;
+  interactionLockReason: string | null;
+  isInteractionLocked: boolean;
   onSelectNode: (nodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
@@ -15,6 +17,8 @@ type TextMainViewProps = {
 
 export default function TextMainView({
   currentModuleId,
+  interactionLockReason,
+  isInteractionLocked,
   onSelectNode,
   onUpdateNode,
   registerNodeElement,
@@ -47,9 +51,15 @@ export default function TextMainView({
         <p className="workspace-helpText">
           文本区是主舞台。结构视图只负责帮助你切模块、定位节点和做层级调整。
         </p>
+        {isInteractionLocked && interactionLockReason ? (
+          <p className="workspace-lockText" role="status">
+            {interactionLockReason}
+          </p>
+        ) : null}
       </SectionCard>
       <EditorNodeSection
         depth={0}
+        isInteractionLocked={isInteractionLocked}
         nodeId={currentModule.id}
         onSelectNode={onSelectNode}
         onUpdateNode={onUpdateNode}

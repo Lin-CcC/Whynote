@@ -2,11 +2,13 @@ import { render, screen } from '@testing-library/react';
 
 import App from './App';
 
-test('renders the workspace editor shell', () => {
+test('renders the workspace editor shell', async () => {
   render(<App />);
 
   expect(screen.getByRole('banner', { name: /whynote/i })).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '当前学习模块' })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('heading', { name: '当前学习模块' }),
+  ).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '文本主视图' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '当前焦点' })).toBeInTheDocument();
 });

@@ -1,5 +1,5 @@
-import WorkspaceEditor from '../features/workspaceEditor/WorkspaceEditor';
+import WorkspaceRuntimeScreen from '../features/workspaceRuntime/WorkspaceRuntimeScreen';
 
 export default function HomePage() {
-  return <WorkspaceEditor />;
+  return <WorkspaceRuntimeScreen />;
 }

@@ -8,6 +8,7 @@ import {
 
 type StructureTreeItemProps = {
   expandedNodeIds: Set<string>;
+  isInteractionLocked: boolean;
   nodeId: string;
   onSelectNode: (nodeId: string) => void;
   onToggleNode: (nodeId: string) => void;
@@ -17,6 +18,7 @@ type StructureTreeItemProps = {
 
 export default function StructureTreeItem({
   expandedNodeIds,
+  isInteractionLocked,
   nodeId,
   onSelectNode,
   onToggleNode,
@@ -40,6 +42,7 @@ export default function StructureTreeItem({
           <button
             aria-label={`${isExpanded ? '折叠' : '展开'} ${node.title}`}
             className="workspace-treeToggle"
+            disabled={isInteractionLocked}
             onClick={() => onToggleNode(node.id)}
             type="button"
           >
@@ -51,6 +54,7 @@ export default function StructureTreeItem({
         <button
           aria-current={isSelected ? 'true' : undefined}
           className="workspace-treeButton"
+          disabled={isInteractionLocked}
           onClick={() => onSelectNode(node.id)}
           type="button"
         >
@@ -63,6 +67,7 @@ export default function StructureTreeItem({
           {childNodes.map((childNode) => (
             <StructureTreeItem
               expandedNodeIds={expandedNodeIds}
+              isInteractionLocked={isInteractionLocked}
               key={childNode.id}
               nodeId={childNode.id}
               onSelectNode={onSelectNode}

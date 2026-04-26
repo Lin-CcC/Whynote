@@ -11,6 +11,13 @@ import './workspaceEditor.css';
 
 export default function WorkspaceEditor(props: WorkspaceEditorProps) {
   const workspaceEditor = useWorkspaceEditor(props);
+  const renderContext = {
+    currentModule: workspaceEditor.currentModule,
+    currentModuleId: workspaceEditor.currentModuleId,
+    selectedNode: workspaceEditor.selectedNode,
+    selectedNodeId: workspaceEditor.selectedNodeId,
+    tree: workspaceEditor.tree,
+  };
 
   return (
     <AppLayout
@@ -19,6 +26,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           <SectionCard>
             <ModuleSwitcher
               currentModuleId={workspaceEditor.currentModuleId}
+              isInteractionLocked={props.isInteractionLocked ?? false}
               modules={workspaceEditor.moduleNodes}
               onSwitchModule={workspaceEditor.switchModule}
             />
@@ -27,6 +35,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
             <StructureTree
               currentModuleId={workspaceEditor.currentModuleId}
               expandedNodeIds={workspaceEditor.expandedNodeIds}
+              isInteractionLocked={props.isInteractionLocked ?? false}
               onSelectNode={workspaceEditor.selectNode}
               onToggleNode={workspaceEditor.toggleNodeExpanded}
               selectedNodeId={workspaceEditor.selectedNodeId}
@@ -36,6 +45,8 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           <SectionCard>
             <StructureActionBar
               actionAvailability={workspaceEditor.actionAvailability}
+              interactionLockReason={props.interactionLockReason ?? null}
+              isInteractionLocked={props.isInteractionLocked ?? false}
               onDeleteNode={workspaceEditor.deleteSelection}
               onInsertChildNode={workspaceEditor.insertChildAtSelection}
               onInsertSiblingNode={workspaceEditor.insertSiblingAtSelection}
@@ -49,11 +60,14 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
               </p>
             ) : null}
           </SectionCard>
+          {props.renderLeftPanelExtra?.(renderContext)}
         </div>
       }
       mainPanel={
         <TextMainView
           currentModuleId={workspaceEditor.currentModuleId}
+          interactionLockReason={props.interactionLockReason ?? null}
+          isInteractionLocked={props.isInteractionLocked ?? false}
           onSelectNode={workspaceEditor.selectNode}
           onUpdateNode={workspaceEditor.updateNode}
           registerNodeElement={workspaceEditor.registerNodeElement}
@@ -63,6 +77,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
       }
       rightPanel={
         <div className="workspace-panelStack">
+          {props.renderRightPanelExtra?.(renderContext)}
           <SelectedNodeInspector
             currentModuleId={workspaceEditor.currentModuleId}
             selectedNodeId={workspaceEditor.selectedNodeId}

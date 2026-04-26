@@ -2,6 +2,8 @@ import type { EditorActionAvailability } from '../workspaceEditorTypes';
 
 type StructureActionBarProps = {
   actionAvailability: EditorActionAvailability;
+  interactionLockReason: string | null;
+  isInteractionLocked: boolean;
   onDeleteNode: () => void;
   onInsertChildNode: () => void;
   onInsertSiblingNode: () => void;
@@ -12,6 +14,8 @@ type StructureActionBarProps = {
 
 export default function StructureActionBar({
   actionAvailability,
+  interactionLockReason,
+  isInteractionLocked,
   onDeleteNode,
   onInsertChildNode,
   onInsertSiblingNode,
@@ -28,9 +32,11 @@ export default function StructureActionBar({
         </div>
       </div>
       <p className="workspace-helpText">
-        {selectedNodeTitle
-          ? `当前节点：${selectedNodeTitle}`
-          : '先从结构视图或文本主视图中选中一个节点。'}
+        {isInteractionLocked && interactionLockReason
+          ? interactionLockReason
+          : selectedNodeTitle
+            ? `当前节点：${selectedNodeTitle}`
+            : '先从结构视图或文本主视图中选中一个节点。'}
       </p>
       <div className="workspace-actionGrid">
         <button

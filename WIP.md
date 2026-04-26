@@ -40,6 +40,15 @@
 - [x] 为复合问题拆分结果提供显式展示与编辑承接区
 - [x] 补齐 `workspace-editor` 组件与交互测试
 
+## 当前工作树：`codex/workspace-runtime-integration`
+
+- [x] 用真实工作区数据替换 editor demo snapshot
+- [x] 接入 IndexedDB 工作区加载、保存与恢复
+- [x] 提供最小初始工作区创建逻辑
+- [x] 接入 learning-engine 的最小运行时闭环
+- [x] 补齐运行时状态与错误状态反馈
+- [x] 补齐 workspace runtime 集成测试
+
 ## 下一阶段验证重点
 
 ### 结构编辑
