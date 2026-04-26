@@ -1,4 +1,4 @@
-import type { CSSProperties, ChangeEvent } from 'react';
+import { Fragment, type CSSProperties, type ChangeEvent } from 'react';
 
 import type { NodeTree, PlanStepStatus } from '../../nodeDomain';
 import { getNodeOrThrow } from '../../nodeDomain';
@@ -37,15 +37,15 @@ export default function EditorNodeSection({
 }: EditorNodeSectionProps) {
   const node = getNodeOrThrow(tree, nodeId);
   const childNodes = getChildNodes(tree, node.id);
-  const splitQuestionChildren =
-    node.type === 'question'
-      ? childNodes.filter((childNode) => childNode.type === 'question')
-      : [];
-  const regularChildren =
-    node.type === 'question'
-      ? childNodes.filter((childNode) => childNode.type !== 'question')
-      : childNodes;
   const isSelected = node.id === selectedNodeId;
+  const splitQuestionCount =
+    node.type === 'question'
+      ? childNodes.filter((childNode) => childNode.type === 'question').length
+      : 0;
+  const firstSplitQuestionNodeId =
+    node.type === 'question'
+      ? childNodes.find((childNode) => childNode.type === 'question')?.id ?? null
+      : null;
 
   function handleTitleChange(event: ChangeEvent<HTMLInputElement>) {
     onUpdateNode(node.id, { title: event.target.value });
@@ -113,20 +113,24 @@ export default function EditorNodeSection({
         rows={node.type === 'plan-step' ? 3 : 4}
         value={node.content}
       />
-      {node.type === 'question' && splitQuestionChildren.length > 0 ? (
-        <div className="workspace-splitResult">
-          <div className="workspace-splitHeader">
-            <div>
-              <p className="workspace-kicker">自动拆分结果</p>
-              <h3 className="workspace-splitTitle">父问题保留，子问题显式承接</h3>
-            </div>
-            <span className="workspace-counter">{splitQuestionChildren.length} 个子问题</span>
-          </div>
-          <p className="workspace-helpText">
-            子问题可直接编辑；若需要继续升降级、插入或删除，先选中对应节点再用左侧结构操作入口。
-          </p>
-          <div className="workspace-splitChildren">
-            {splitQuestionChildren.map((childNode) => (
+      {childNodes.length > 0 ? (
+        <div className="workspace-nodeChildren">
+          {childNodes.map((childNode) => (
+            <Fragment key={childNode.id}>
+              {childNode.id === firstSplitQuestionNodeId ? (
+                <div className="workspace-splitHint">
+                  <div className="workspace-splitHeader">
+                    <div>
+                      <p className="workspace-kicker">自动拆分结果</p>
+                      <h3 className="workspace-splitTitle">父问题保留，子问题显式承接</h3>
+                    </div>
+                    <span className="workspace-counter">{splitQuestionCount} 个子问题</span>
+                  </div>
+                  <p className="workspace-helpText">
+                    子问题仍按节点真实顺序渲染；若需要继续升降级、插入或删除，先选中对应节点再用左侧结构操作入口。
+                  </p>
+                </div>
+              ) : null}
               <EditorNodeSection
                 depth={depth + 1}
                 key={childNode.id}
@@ -137,23 +141,7 @@ export default function EditorNodeSection({
                 selectedNodeId={selectedNodeId}
                 tree={tree}
               />
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {regularChildren.length > 0 ? (
-        <div className="workspace-nodeChildren">
-          {regularChildren.map((childNode) => (
-            <EditorNodeSection
-              depth={depth + 1}
-              key={childNode.id}
-              nodeId={childNode.id}
-              onSelectNode={onSelectNode}
-              onUpdateNode={onUpdateNode}
-              registerNodeElement={registerNodeElement}
-              selectedNodeId={selectedNodeId}
-              tree={tree}
-            />
+            </Fragment>
           ))}
         </div>
       ) : null}

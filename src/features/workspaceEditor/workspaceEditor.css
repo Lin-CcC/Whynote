@@ -277,7 +277,7 @@
   line-height: 1.6;
 }
 
-.workspace-splitResult {
+.workspace-splitHint {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -292,12 +292,6 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
-}
-
-.workspace-splitChildren {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
 }
 
 .workspace-inspectorList {

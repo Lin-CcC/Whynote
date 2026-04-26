@@ -1,13 +1,17 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import {
+  createNode,
+  createWorkspaceSnapshot,
   deleteNode,
   insertChildNode,
   insertSiblingNode,
   liftNode,
   lowerNode,
+  type WorkspaceSnapshot,
 } from '../nodeDomain';
 import WorkspaceEditor from './WorkspaceEditor';
+import { getActionAvailability } from './hooks/useWorkspaceEditor';
 import {
   DEMO_SELECTED_NODE_ID,
 } from './utils/createDemoWorkspace';
@@ -112,6 +116,70 @@ test('renders plan-step with weaker emphasis than learning nodes', () => {
   ).toBeInTheDocument();
 });
 
+test('disables lower when previous sibling cannot accept the current node', () => {
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-constraints"
+      initialSelectedNodeId="summary-selected"
+      initialSnapshot={createLowerConstraintSnapshot()}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: '降低一级' })).toBeDisabled();
+});
+
+test('marks lift as unavailable when the target parent cannot accept the node', () => {
+  const snapshot = createResourceFragmentSnapshot();
+  const actionAvailability = getActionAvailability(snapshot.tree, 'fragment-selected');
+
+  expect(actionAvailability.canLift).toBe(false);
+});
+
+test.each([
+  ['插入子节点', 'insertChildNode'],
+  ['插入同级', 'insertSiblingNode'],
+  ['删除节点', 'deleteNode'],
+  ['提升一级', 'liftNode'],
+  ['降低一级', 'lowerNode'],
+] as const)('surfaces editor error when %s throws', (buttonLabel, operationName) => {
+  const operations = createOperationSpies();
+  const operationSpy = getOperationSpy(operations, operationName);
+
+  operationSpy.mockImplementation(() => {
+    throw new Error(`${buttonLabel}失败`);
+  });
+
+  render(<WorkspaceEditor operations={operations} />);
+
+  fireEvent.click(screen.getByRole('button', { name: buttonLabel }));
+
+  expect(screen.getByRole('alert')).toHaveTextContent(`${buttonLabel}失败`);
+});
+
+test('keeps text main view in the same order as the underlying question children', () => {
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-order"
+      initialSelectedNodeId="question-parent"
+      initialSnapshot={createQuestionOrderSnapshot()}
+    />,
+  );
+
+  const parentNode = screen.getByTestId('editor-node-question-parent');
+  const renderedNodeIds = Array.from(
+    parentNode.querySelectorAll('[data-testid^="editor-node-"]'),
+  ).map((element) => element.getAttribute('data-testid'));
+
+  expect(renderedNodeIds).toEqual([
+    'editor-node-answer-first',
+    'editor-node-question-child',
+    'editor-node-summary-third',
+  ]);
+  expect(
+    screen.getByRole('heading', { name: '父问题保留，子问题显式承接' }),
+  ).toBeInTheDocument();
+});
+
 function createOperationSpies(): WorkspaceEditorOperations {
   return {
     insertChildNode: vi.fn((tree, parentNodeId, node, index) =>
@@ -147,4 +215,206 @@ function getOperationSpy(
     case 'lowerNode':
       return operations.lowerNode as ReturnType<typeof vi.fn>;
   }
+}
+
+function createLowerConstraintSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '结构约束',
+    workspaceId: 'workspace-constraints',
+    rootId: 'theme-constraints',
+    createdAt: '2026-04-27T09:00:00.000Z',
+    updatedAt: '2026-04-27T09:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-constraints',
+      title: '约束模块',
+      content: '',
+      createdAt: '2026-04-27T09:00:00.000Z',
+      updatedAt: '2026-04-27T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-constraints',
+    createNode({
+      type: 'plan-step',
+      id: 'step-constraints',
+      title: '约束步骤',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-04-27T09:00:00.000Z',
+      updatedAt: '2026-04-27T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-constraints',
+    createNode({
+      type: 'answer',
+      id: 'answer-anchor',
+      title: '前一个回答',
+      content: '',
+      createdAt: '2026-04-27T09:00:00.000Z',
+      updatedAt: '2026-04-27T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-constraints',
+    createNode({
+      type: 'summary',
+      id: 'summary-selected',
+      title: '当前总结',
+      content: '',
+      createdAt: '2026-04-27T09:00:00.000Z',
+      updatedAt: '2026-04-27T09:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createResourceFragmentSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '资源约束',
+    workspaceId: 'workspace-resource',
+    rootId: 'theme-resource',
+    createdAt: '2026-04-27T09:30:00.000Z',
+    updatedAt: '2026-04-27T09:30:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'resource',
+      id: 'resource-parent',
+      title: '资源节点',
+      content: '',
+      createdAt: '2026-04-27T09:30:00.000Z',
+      updatedAt: '2026-04-27T09:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'resource-parent',
+    createNode({
+      type: 'resource-fragment',
+      id: 'fragment-selected',
+      title: '资源摘录',
+      content: '',
+      sourceResourceId: 'resource-parent',
+      excerpt: '摘录内容',
+      createdAt: '2026-04-27T09:30:00.000Z',
+      updatedAt: '2026-04-27T09:30:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createQuestionOrderSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '顺序校验',
+    workspaceId: 'workspace-order',
+    rootId: 'theme-order',
+    createdAt: '2026-04-27T10:00:00.000Z',
+    updatedAt: '2026-04-27T10:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-order',
+      title: '顺序模块',
+      content: '',
+      createdAt: '2026-04-27T10:00:00.000Z',
+      updatedAt: '2026-04-27T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-order',
+    createNode({
+      type: 'plan-step',
+      id: 'step-order',
+      title: '顺序步骤',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-04-27T10:00:00.000Z',
+      updatedAt: '2026-04-27T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-order',
+    createNode({
+      type: 'question',
+      id: 'question-parent',
+      title: '父问题',
+      content: '父问题保留并承接子节点顺序。',
+      createdAt: '2026-04-27T10:00:00.000Z',
+      updatedAt: '2026-04-27T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-parent',
+    createNode({
+      type: 'answer',
+      id: 'answer-first',
+      title: '先有回答',
+      content: '',
+      createdAt: '2026-04-27T10:00:00.000Z',
+      updatedAt: '2026-04-27T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-parent',
+    createNode({
+      type: 'question',
+      id: 'question-child',
+      title: '中间插入子问题',
+      content: '',
+      createdAt: '2026-04-27T10:00:00.000Z',
+      updatedAt: '2026-04-27T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-parent',
+    createNode({
+      type: 'summary',
+      id: 'summary-third',
+      title: '最后总结',
+      content: '',
+      createdAt: '2026-04-27T10:00:00.000Z',
+      updatedAt: '2026-04-27T10:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
 }

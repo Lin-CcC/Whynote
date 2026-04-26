@@ -44,7 +44,9 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
               selectedNodeTitle={workspaceEditor.selectedNode?.title ?? null}
             />
             {workspaceEditor.operationError ? (
-              <p className="workspace-errorText">{workspaceEditor.operationError}</p>
+              <p className="workspace-errorText" role="alert">
+                {workspaceEditor.operationError}
+              </p>
             ) : null}
           </SectionCard>
         </div>

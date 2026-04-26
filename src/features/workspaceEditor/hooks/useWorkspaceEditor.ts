@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+  canParentAcceptChild,
   canNodeHaveChildren,
   createNode,
   deleteNode,
@@ -13,6 +14,8 @@ import {
   type NodeTree,
   type NonRootNode,
   type PlanStepNode,
+  shouldConvertToModuleAtRoot,
+  type TreeNode,
 } from '../../nodeDomain';
 import type {
   EditorActionAvailability,
@@ -163,12 +166,19 @@ export function useWorkspaceEditor({
     }
 
     const nextNode = createEditorNode(nextNodeType, parentNode.id);
-    const nextTree = operations.insertChildNode(tree, parentNode.id, nextNode);
 
-    commitTreeChange(nextTree, {
-      nextSelectedNodeId: nextNode.id,
-      preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
-    });
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.insertChildNode(tree, parentNode.id, nextNode);
+
+        return {
+          nextTree,
+          nextSelectedNodeId: nextNode.id,
+          preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
+        };
+      },
+      '结构操作失败，请检查当前节点。',
+    );
   }
 
   function insertSiblingAtSelection() {
@@ -183,12 +193,23 @@ export function useWorkspaceEditor({
     }
 
     const nextNode = createEditorNode(selectedTreeNode.type, selectedTreeNode.parentId);
-    const nextTree = operations.insertSiblingNode(tree, selectedTreeNode.id, nextNode);
 
-    commitTreeChange(nextTree, {
-      nextSelectedNodeId: nextNode.id,
-      preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
-    });
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.insertSiblingNode(
+          tree,
+          selectedTreeNode.id,
+          nextNode,
+        );
+
+        return {
+          nextTree,
+          nextSelectedNodeId: nextNode.id,
+          preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
+        };
+      },
+      '结构操作失败，请检查当前节点。',
+    );
   }
 
   function deleteSelection() {
@@ -199,12 +220,19 @@ export function useWorkspaceEditor({
     const selectedTreeNode = getNodeOrThrow(tree, selectedNodeId);
     const fallbackNodeId =
       selectedTreeNode.parentId ?? resolveModuleId(tree, selectedNodeId, currentModuleId);
-    const nextTree = operations.deleteNode(tree, selectedTreeNode.id);
 
-    commitTreeChange(nextTree, {
-      nextSelectedNodeId: fallbackNodeId,
-      preferredModuleId: resolveModuleId(nextTree, fallbackNodeId, currentModuleId),
-    });
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.deleteNode(tree, selectedTreeNode.id);
+
+        return {
+          nextTree,
+          nextSelectedNodeId: fallbackNodeId,
+          preferredModuleId: resolveModuleId(nextTree, fallbackNodeId, currentModuleId),
+        };
+      },
+      '结构操作失败，请检查当前节点。',
+    );
   }
 
   function liftSelection() {
@@ -212,12 +240,18 @@ export function useWorkspaceEditor({
       return;
     }
 
-    const nextTree = operations.liftNode(tree, selectedNodeId);
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.liftNode(tree, selectedNodeId);
 
-    commitTreeChange(nextTree, {
-      nextSelectedNodeId: selectedNodeId,
-      preferredModuleId: resolveModuleId(nextTree, selectedNodeId, currentModuleId),
-    });
+        return {
+          nextTree,
+          nextSelectedNodeId: selectedNodeId,
+          preferredModuleId: resolveModuleId(nextTree, selectedNodeId, currentModuleId),
+        };
+      },
+      '结构操作失败，请检查当前节点。',
+    );
   }
 
   function lowerSelection() {
@@ -225,12 +259,18 @@ export function useWorkspaceEditor({
       return;
     }
 
-    const nextTree = operations.lowerNode(tree, selectedNodeId);
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.lowerNode(tree, selectedNodeId);
 
-    commitTreeChange(nextTree, {
-      nextSelectedNodeId: selectedNodeId,
-      preferredModuleId: resolveModuleId(nextTree, selectedNodeId, currentModuleId),
-    });
+        return {
+          nextTree,
+          nextSelectedNodeId: selectedNodeId,
+          preferredModuleId: resolveModuleId(nextTree, selectedNodeId, currentModuleId),
+        };
+      },
+      '结构操作失败，请检查当前节点。',
+    );
   }
 
   function registerNodeElement(nodeId: string, element: HTMLElement | null) {
@@ -240,6 +280,26 @@ export function useWorkspaceEditor({
     }
 
     nodeElementMapRef.current.set(nodeId, element);
+  }
+
+  function runStructuralOperation(
+    executor: () => {
+      nextTree: NodeTree;
+      nextSelectedNodeId?: string | null;
+      preferredModuleId?: string | null;
+    },
+    fallbackMessage: string,
+  ) {
+    try {
+      const result = executor();
+
+      commitTreeChange(result.nextTree, {
+        nextSelectedNodeId: result.nextSelectedNodeId,
+        preferredModuleId: result.preferredModuleId,
+      });
+    } catch (error) {
+      setOperationError(error instanceof Error ? error.message : fallbackMessage);
+    }
   }
 
   function commitTreeChange(
@@ -396,7 +456,7 @@ function syncExpandedNodeIds(
   return nextExpandedNodeIds;
 }
 
-function getActionAvailability(
+export function getActionAvailability(
   tree: NodeTree,
   selectedNodeId: string | null,
 ): EditorActionAvailability {
@@ -422,15 +482,75 @@ function getActionAvailability(
     };
   }
 
-  const parentNode = node.parentId ? getNodeOrThrow(tree, node.parentId) : null;
-
   return {
     canInsertChild: canNodeHaveChildren(node.type),
     canInsertSibling: node.parentId !== null,
     canDelete: true,
-    canLift: parentNode !== null && parentNode.parentId !== null,
-    canLower: node.order > 0,
+    canLift: canLiftNode(tree, node),
+    canLower: canLowerNode(tree, node),
   };
+}
+
+function canLiftNode(tree: NodeTree, node: TreeNode) {
+  if (node.parentId === null) {
+    return false;
+  }
+
+  const parentNode = getNodeOrThrow(tree, node.parentId);
+
+  if (parentNode.parentId === null) {
+    return false;
+  }
+
+  const grandparentNode = getNodeOrThrow(tree, parentNode.parentId);
+
+  return canTargetParentAcceptNode(node, grandparentNode);
+}
+
+function canLowerNode(tree: NodeTree, node: TreeNode) {
+  if (node.parentId === null || node.order === 0) {
+    return false;
+  }
+
+  const parentNode = getNodeOrThrow(tree, node.parentId);
+  const previousSiblingNodeId = parentNode.childIds[node.order - 1];
+
+  if (!previousSiblingNodeId || !tree.nodes[previousSiblingNodeId]) {
+    return false;
+  }
+
+  const previousSiblingNode = getNodeOrThrow(tree, previousSiblingNodeId);
+
+  return canTargetParentAcceptNode(node, previousSiblingNode);
+}
+
+function canTargetParentAcceptNode(node: TreeNode, targetParentNode: TreeNode) {
+  const targetNodeType = getEffectiveTargetNodeType(node, targetParentNode);
+
+  if (!targetNodeType) {
+    return false;
+  }
+
+  return canParentAcceptChild(targetParentNode.type, targetNodeType);
+}
+
+function getEffectiveTargetNodeType(
+  node: TreeNode,
+  targetParentNode: TreeNode,
+): TreeNode['type'] | null {
+  if (targetParentNode.type !== 'theme-root') {
+    return node.type;
+  }
+
+  if (node.type === 'resource-fragment') {
+    return null;
+  }
+
+  if (shouldConvertToModuleAtRoot(node.type)) {
+    return 'module';
+  }
+
+  return node.type;
 }
 
 function applyNodePatch(tree: NodeTree, nodeId: string, patch: NodeContentPatch) {
