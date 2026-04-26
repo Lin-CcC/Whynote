@@ -23,7 +23,7 @@ test('opens the app and initializes a minimal workspace on first visit', async (
     page.getByRole('heading', { level: 2, name: '当前焦点' }),
   ).toBeVisible();
   await expect(
-    page.getByRole('heading', { level: 2, name: '资料与摘录' }),
+    page.getByRole('heading', { level: 2, name: '资料与摘录', exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { level: 2, name: '搜索与定位' }),
@@ -94,7 +94,7 @@ test('switches modules in a preloaded workspace and keeps support panels rendere
     page.getByLabel('为什么状态更新会触发重渲染？ 标题'),
   ).toHaveCount(0);
   await expect(
-    page.getByRole('heading', { level: 2, name: '资料与摘录' }),
+    page.getByRole('heading', { level: 2, name: '资料与摘录', exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { level: 2, name: '搜索与定位' }),
