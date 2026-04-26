@@ -1,0 +1,332 @@
+.workspace-panelStack,
+.workspace-mainPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.workspace-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.workspace-sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.workspace-kicker {
+  margin: 0 0 0.3rem;
+  color: #0f766e;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-sectionTitle,
+.workspace-splitTitle {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.1rem;
+}
+
+.workspace-counter {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(13, 148, 136, 0.12);
+  color: #0f766e;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.workspace-helpText,
+.workspace-nodeHint,
+.workspace-moduleHint,
+.workspace-errorText {
+  margin: 0;
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.workspace-errorText {
+  color: #b91c1c;
+}
+
+.workspace-moduleList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.workspace-moduleButton,
+.workspace-treeButton,
+.workspace-treeToggle,
+.workspace-actionGrid button,
+.workspace-statusSelect {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 0.9rem;
+  background: #ffffff;
+}
+
+.workspace-moduleButton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.85rem 0.95rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-moduleButton[data-active='true'] {
+  border-color: rgba(15, 118, 110, 0.5);
+  background: linear-gradient(180deg, rgba(240, 253, 250, 0.96), #ffffff);
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.12);
+}
+
+.workspace-moduleName {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.workspace-tree,
+.workspace-treeChildren {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workspace-treeChildren {
+  margin-left: 1rem;
+  padding-left: 0.85rem;
+  border-left: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.workspace-treeItem + .workspace-treeItem {
+  margin-top: 0.45rem;
+}
+
+.workspace-treeRow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.workspace-treeToggle,
+.workspace-treeSpacer {
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+}
+
+.workspace-treeToggle {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.workspace-treeSpacer {
+  display: inline-block;
+}
+
+.workspace-treeButton {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  color: #0f172a;
+  cursor: pointer;
+  text-align: left;
+}
+
+.workspace-treeRow[data-selected='true'] .workspace-treeButton {
+  border-color: rgba(14, 116, 144, 0.5);
+  background: rgba(240, 249, 255, 0.92);
+}
+
+.workspace-treeRow[data-emphasis='supporting'] .workspace-treeButton {
+  opacity: 0.86;
+}
+
+.workspace-treeType {
+  flex: 0 0 auto;
+  min-width: 2.8rem;
+  color: #0f766e;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.workspace-treeText {
+  flex: 1 1 auto;
+}
+
+.workspace-actionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.workspace-actionGrid button {
+  padding: 0.72rem 0.8rem;
+  cursor: pointer;
+}
+
+.workspace-actionGrid button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.workspace-node {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1rem 1rem 1rem calc(1rem + var(--node-depth) * 0.9rem);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+  outline: none;
+}
+
+.workspace-node[data-node-type='module'] {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), #ffffff);
+}
+
+.workspace-node[data-node-emphasis='supporting'] {
+  border-style: dashed;
+  background: rgba(248, 250, 252, 0.86);
+}
+
+.workspace-node[data-node-emphasis='secondary'] {
+  background: rgba(250, 250, 249, 0.9);
+}
+
+.workspace-node[data-node-selected='true'] {
+  border-color: rgba(14, 116, 144, 0.45);
+  box-shadow:
+    0 0 0 2px rgba(14, 116, 144, 0.12),
+    0 16px 28px rgba(15, 23, 42, 0.08);
+}
+
+.workspace-node + .workspace-node,
+.workspace-nodeChildren {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.workspace-nodeHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.workspace-nodeMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.workspace-nodeType,
+.workspace-selectedBadge {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.workspace-nodeType {
+  background: rgba(226, 232, 240, 0.8);
+  color: #334155;
+}
+
+.workspace-selectedBadge {
+  background: rgba(14, 116, 144, 0.12);
+  color: #0e7490;
+}
+
+.workspace-statusSelect {
+  padding: 0.25rem 0.55rem;
+  color: #0f172a;
+}
+
+.workspace-nodeTitleInput,
+.workspace-nodeContentInput {
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+}
+
+.workspace-nodeTitleInput {
+  padding: 0.75rem 0.9rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.workspace-nodeContentInput {
+  padding: 0.85rem 0.95rem;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.workspace-splitHint {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.95), #ffffff);
+}
+
+.workspace-splitHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.workspace-inspectorList {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.workspace-inspectorList div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.workspace-inspectorList dt {
+  color: #0f766e;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.workspace-inspectorList dd {
+  margin: 0;
+  color: #0f172a;
+}
+
+@media (max-width: 900px) {
+  .workspace-actionGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-node {
+    padding-left: 1rem;
+  }
+
+  .workspace-splitHeader,
+  .workspace-sectionHeader {
+    flex-direction: column;
+  }
+}
