@@ -19,6 +19,7 @@ test('routes module hits to editor selection and resource hits to resource focus
     <ResourcesSearchExportPanel
       activeResourceNodeId={null}
       currentModuleId="module-current"
+      onApplyTreeChange={() => {}}
       onFocusResourceNode={handleFocusResourceNode}
       onSelectEditorNode={handleSelectEditorNode}
       selectedEditorNodeId={null}
@@ -55,6 +56,7 @@ test('supports tag filtering, renders the global resource area, and shows focuse
     <ResourcesSearchExportPanel
       activeResourceNodeId="resource-react-docs"
       currentModuleId="module-current"
+      onApplyTreeChange={() => {}}
       onClearResourceFocus={() => {}}
       onFocusResourceNode={() => {}}
       onSelectEditorNode={() => {}}
@@ -94,6 +96,7 @@ test('exports through the browser download flow', () => {
     <ResourcesSearchExportPanel
       activeResourceNodeId={null}
       currentModuleId="module-current"
+      onApplyTreeChange={() => {}}
       onFocusResourceNode={() => {}}
       onSelectEditorNode={() => {}}
       selectedEditorNodeId={null}

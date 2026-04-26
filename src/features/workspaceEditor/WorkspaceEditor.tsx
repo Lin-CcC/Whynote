@@ -12,6 +12,7 @@ import './workspaceEditor.css';
 export default function WorkspaceEditor(props: WorkspaceEditorProps) {
   const workspaceEditor = useWorkspaceEditor(props);
   const renderContext = {
+    applyTreeChange: workspaceEditor.applyTreeChange,
     currentModule: workspaceEditor.currentModule,
     currentModuleId: workspaceEditor.currentModuleId,
     selectNode: workspaceEditor.selectNode,

@@ -1,4 +1,5 @@
 import type { NodeTree } from '../nodeDomain';
+import ResourceEntryPanel from './components/ResourceEntryPanel';
 import ResourceFocusPanel from './components/ResourceFocusPanel';
 import SearchControlPanel from './components/SearchControlPanel';
 import ExportPanel from './components/ExportPanel';
@@ -10,6 +11,7 @@ import './resourcesSearchExport.css';
 type ResourcesSearchExportPanelProps = {
   activeResourceNodeId: string | null;
   currentModuleId: string | null;
+  onApplyTreeChange: (nextTree: NodeTree) => void;
   onFocusResourceNode: (nodeId: string) => void;
   onSelectEditorNode: (nodeId: string) => void;
   onClearResourceFocus?: () => void;
@@ -21,6 +23,7 @@ type ResourcesSearchExportPanelProps = {
 export default function ResourcesSearchExportPanel({
   activeResourceNodeId,
   currentModuleId,
+  onApplyTreeChange,
   onFocusResourceNode,
   onSelectEditorNode,
   onClearResourceFocus,
@@ -44,6 +47,12 @@ export default function ResourcesSearchExportPanel({
 
   return (
     <>
+      <ResourceEntryPanel
+        activeResourceNodeId={activeResourceNodeId}
+        onApplyTreeChange={onApplyTreeChange}
+        onFocusResourceNode={onFocusResourceNode}
+        tree={tree}
+      />
       <ResourceFocusPanel
         activeResourceNodeId={activeResourceNodeId}
         currentModuleTitle={currentModuleTitle}

@@ -23,6 +23,7 @@ import {
 } from '../../nodeDomain';
 import type {
   EditorActionAvailability,
+  ExternalTreeChangeOptions,
   NodeContentPatch,
   WorkspaceEditorOperations,
   WorkspaceEditorProps,
@@ -401,6 +402,16 @@ export function useWorkspaceEditor({
     }
   }
 
+  function applyTreeChange(
+    nextTree: NodeTree,
+    options?: ExternalTreeChangeOptions,
+  ) {
+    commitTreeChange(nextTree, {
+      nextSelectedNodeId: options?.nextSelectedNodeId ?? selectedNodeId,
+      preferredModuleId: options?.preferredModuleId ?? currentModuleId,
+    });
+  }
+
   function commitTreeChange(
     nextTree: NodeTree,
     options: {
@@ -447,6 +458,7 @@ export function useWorkspaceEditor({
     expandedNodeIds,
     moduleNodes,
     operationError,
+    applyTreeChange,
     registerNodeElement,
     selectNode,
     selectedNode,

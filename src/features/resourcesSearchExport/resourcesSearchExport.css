@@ -1,4 +1,5 @@
 .resources-panelField,
+.resources-entrySection,
 .resources-exportLayout,
 .resources-tagFilter {
   display: grid;
@@ -23,6 +24,45 @@
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.96);
   color: #0f172a;
+}
+
+.resources-panelTextarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.resources-panelSelect {
+  appearance: none;
+}
+
+.resources-entryLayout {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.95rem;
+}
+
+.resources-entrySection {
+  padding-top: 0.95rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.resources-entryButton {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 1rem;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.resources-entryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.resources-entryFeedback {
+  margin-top: 0.95rem;
 }
 
 .resources-segmentedControl {
