@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.vite/
+
+# Coverage and test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local app / platform state
+.vercel/
+.wrangler/
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
