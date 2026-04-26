@@ -167,6 +167,8 @@ export function validateNodeTree(tree: NodeTree) {
       );
     }
 
+    validateParentNodeInvariant(node, parentNode);
+
     if (node.order !== childIndex) {
       throw new NodeDomainError(
         'INVALID_CHILD_TYPE',
@@ -267,5 +269,33 @@ function validateNodeReferences(tree: NodeTree, node: TreeNode) {
         },
       );
     }
+  }
+}
+
+function validateParentNodeInvariant(node: TreeNode, parentNode: TreeNode) {
+  if (node.type !== 'resource-fragment') {
+    return;
+  }
+
+  if (parentNode.type !== 'resource') {
+    throw new NodeDomainError(
+      'INVALID_CHILD_TYPE',
+      `resource-fragment ${node.id} 的父节点必须是 resource。`,
+      {
+        nodeId: node.id,
+        parentId: parentNode.id,
+      },
+    );
+  }
+
+  if (node.sourceResourceId !== parentNode.id) {
+    throw new NodeDomainError(
+      'INVALID_CHILD_TYPE',
+      `resource-fragment ${node.id} 的 sourceResourceId 必须与父 resource 一致。`,
+      {
+        nodeId: node.id,
+        parentId: parentNode.id,
+      },
+    );
   }
 }

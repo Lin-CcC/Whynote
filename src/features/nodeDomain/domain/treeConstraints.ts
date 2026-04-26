@@ -49,6 +49,12 @@ export function isResourceNodeType(
   return RESOURCE_NODE_TYPES.includes(nodeType as ResourceNodeType);
 }
 
+export function isResourceFragmentNodeType(
+  nodeType: NodeType,
+): nodeType is 'resource-fragment' {
+  return nodeType === 'resource-fragment';
+}
+
 export function isReferenceSourceNodeType(
   nodeType: NodeType,
 ): nodeType is ReferenceSourceNodeType {

@@ -1,4 +1,10 @@
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import {
+  openDB,
+  type DBSchema,
+  type IDBPDatabase,
+  type IDBPObjectStore,
+  type IDBPTransaction,
+} from 'idb';
 
 import type {
   NodeReference,
@@ -52,8 +58,43 @@ interface NodeStorageSchema extends DBSchema {
   };
 }
 
+type WorkspaceStoreName =
+  | 'workspaces'
+  | 'nodes'
+  | 'tags'
+  | 'references'
+  | 'resourceMetadata';
+
+type WorkspaceTransaction = IDBPTransaction<
+  NodeStorageSchema,
+  WorkspaceStoreName[],
+  'readwrite'
+>;
+
+type WorkspaceRecordIds = {
+  nodeIds: Set<string>;
+  tagIds: Set<string>;
+  referenceIds: Set<string>;
+  resourceMetadataIds: Set<string>;
+};
+
+type PersistedWorkspaceSnapshot = {
+  workspace: WorkspaceRecord;
+  nodes: StoredNodeRecord[];
+  tags: StoredTagRecord[];
+  references: StoredReferenceRecord[];
+  resourceMetadata: ResourceMetadataRecord[];
+};
+
 const DEFAULT_DATABASE_NAME = 'whynote-node-domain';
 const DATABASE_VERSION = 1;
+const WORKSPACE_STORE_NAMES: WorkspaceStoreName[] = [
+  'workspaces',
+  'nodes',
+  'tags',
+  'references',
+  'resourceMetadata',
+];
 
 export function createIndexedDbStorage(options?: {
   databaseName?: string;
@@ -109,41 +150,14 @@ class IndexedDbNodeStorage implements StructuredDataStorage {
   }
 
   async saveWorkspace(snapshot: WorkspaceSnapshot) {
-    await this.deleteWorkspace(snapshot.workspace.id);
+    validateNodeTree(snapshot.tree);
 
+    const persistedSnapshot = materializeWorkspaceSnapshot(snapshot);
     const database = await this.databasePromise;
-    const transaction = database.transaction(
-      ['workspaces', 'nodes', 'tags', 'references', 'resourceMetadata'],
-      'readwrite',
-    );
+    const existingRecordIds = await collectWorkspaceRecordIds(database, snapshot.workspace.id);
+    const transaction = database.transaction(WORKSPACE_STORE_NAMES, 'readwrite');
 
-    void transaction.objectStore('workspaces').put(snapshot.workspace);
-
-    for (const node of Object.values(snapshot.tree.nodes)) {
-      void transaction.objectStore('nodes').put({
-        ...node,
-        workspaceId: snapshot.workspace.id,
-      });
-    }
-
-    for (const tag of Object.values(snapshot.tree.tags)) {
-      void transaction.objectStore('tags').put({
-        ...tag,
-        workspaceId: snapshot.workspace.id,
-      });
-    }
-
-    for (const reference of Object.values(snapshot.tree.references)) {
-      void transaction.objectStore('references').put({
-        ...reference,
-        workspaceId: snapshot.workspace.id,
-      });
-    }
-
-    for (const resourceMetadata of toResourceMetadataRecords(snapshot)) {
-      void transaction.objectStore('resourceMetadata').put(resourceMetadata);
-    }
-
+    await replaceWorkspaceRecords(transaction, persistedSnapshot, existingRecordIds);
     await transaction.done;
   }
 
@@ -178,14 +192,11 @@ class IndexedDbNodeStorage implements StructuredDataStorage {
 
   async deleteWorkspace(workspaceId: string) {
     const database = await this.databasePromise;
+    const existingRecordIds = await collectWorkspaceRecordIds(database, workspaceId);
+    const transaction = database.transaction(WORKSPACE_STORE_NAMES, 'readwrite');
 
-    await Promise.all([
-      database.delete('workspaces', workspaceId),
-      deleteStoreRecordsByWorkspaceId(database, 'nodes', workspaceId),
-      deleteStoreRecordsByWorkspaceId(database, 'tags', workspaceId),
-      deleteStoreRecordsByWorkspaceId(database, 'references', workspaceId),
-      deleteStoreRecordsByWorkspaceId(database, 'resourceMetadata', workspaceId),
-    ]);
+    await deleteWorkspaceRecords(transaction, workspaceId, existingRecordIds);
+    await transaction.done;
   }
 
   async listWorkspaces() {
@@ -211,28 +222,126 @@ class IndexedDbNodeStorage implements StructuredDataStorage {
   }
 }
 
-async function deleteStoreRecordsByWorkspaceId(
-  database: IDBPDatabase<NodeStorageSchema>,
-  storeName: 'nodes' | 'tags' | 'references' | 'resourceMetadata',
-  workspaceId: string,
+async function replaceWorkspaceRecords(
+  transaction: WorkspaceTransaction,
+  snapshot: PersistedWorkspaceSnapshot,
+  existingRecordIds: WorkspaceRecordIds,
 ) {
-  const keys = await database.getAllKeysFromIndex(
-    storeName,
-    'by-workspaceId',
-    workspaceId,
+  const nextNodeIds = new Set(snapshot.nodes.map((node) => node.id));
+  const nextTagIds = new Set(snapshot.tags.map((tag) => tag.id));
+  const nextReferenceIds = new Set(
+    snapshot.references.map((reference) => reference.id),
   );
+  const nextResourceMetadataIds = new Set(
+    snapshot.resourceMetadata.map((metadata) => metadata.id),
+  );
+  const requests: Array<Promise<unknown>> = [];
 
-  if (keys.length === 0) {
-    return;
+  for (const node of snapshot.nodes) {
+    requests.push(transaction.objectStore('nodes').put(node));
   }
 
-  const transaction = database.transaction(storeName, 'readwrite');
-
-  for (const key of keys) {
-    void transaction.store.delete(key);
+  for (const tag of snapshot.tags) {
+    requests.push(transaction.objectStore('tags').put(tag));
   }
 
-  await transaction.done;
+  for (const reference of snapshot.references) {
+    requests.push(transaction.objectStore('references').put(reference));
+  }
+
+  for (const resourceMetadata of snapshot.resourceMetadata) {
+    requests.push(
+      transaction.objectStore('resourceMetadata').put(resourceMetadata),
+    );
+  }
+
+  requests.push(
+    ...deleteMissingRecords(
+      transaction.objectStore('nodes'),
+      existingRecordIds.nodeIds,
+      nextNodeIds,
+    ),
+    ...deleteMissingRecords(
+      transaction.objectStore('tags'),
+      existingRecordIds.tagIds,
+      nextTagIds,
+    ),
+    ...deleteMissingRecords(
+      transaction.objectStore('references'),
+      existingRecordIds.referenceIds,
+      nextReferenceIds,
+    ),
+    ...deleteMissingRecords(
+      transaction.objectStore('resourceMetadata'),
+      existingRecordIds.resourceMetadataIds,
+      nextResourceMetadataIds,
+    ),
+  );
+  requests.push(transaction.objectStore('workspaces').put(snapshot.workspace));
+
+  await Promise.all(requests);
+}
+
+async function deleteWorkspaceRecords(
+  transaction: WorkspaceTransaction,
+  workspaceId: string,
+  existingRecordIds: WorkspaceRecordIds,
+) {
+  const requests: Array<Promise<unknown>> = [
+    transaction.objectStore('workspaces').delete(workspaceId),
+    ...deleteRecordsByIds(transaction.objectStore('nodes'), existingRecordIds.nodeIds),
+    ...deleteRecordsByIds(transaction.objectStore('tags'), existingRecordIds.tagIds),
+    ...deleteRecordsByIds(
+      transaction.objectStore('references'),
+      existingRecordIds.referenceIds,
+    ),
+    ...deleteRecordsByIds(
+      transaction.objectStore('resourceMetadata'),
+      existingRecordIds.resourceMetadataIds,
+    ),
+  ];
+
+  await Promise.all(requests);
+}
+
+async function collectWorkspaceRecordIds(
+  database: IDBPDatabase<NodeStorageSchema>,
+  workspaceId: string,
+): Promise<WorkspaceRecordIds> {
+  const [nodeIds, tagIds, referenceIds, resourceMetadataIds] = await Promise.all([
+    database.getAllKeysFromIndex('nodes', 'by-workspaceId', workspaceId),
+    database.getAllKeysFromIndex('tags', 'by-workspaceId', workspaceId),
+    database.getAllKeysFromIndex('references', 'by-workspaceId', workspaceId),
+    database.getAllKeysFromIndex('resourceMetadata', 'by-workspaceId', workspaceId),
+  ]);
+
+  return {
+    nodeIds: new Set(nodeIds),
+    tagIds: new Set(tagIds),
+    referenceIds: new Set(referenceIds),
+    resourceMetadataIds: new Set(resourceMetadataIds),
+  };
+}
+
+function deleteMissingRecords<
+  StoreName extends 'nodes' | 'tags' | 'references' | 'resourceMetadata',
+>(
+  store: IDBPObjectStore<NodeStorageSchema, WorkspaceStoreName[], StoreName, 'readwrite'>,
+  existingIds: Set<string>,
+  nextIds: Set<string>,
+) {
+  const staleIds = [...existingIds].filter((id) => !nextIds.has(id));
+
+  return deleteRecordsByIds(store, staleIds);
+}
+
+function deleteRecordsByIds<
+  StoreName extends 'nodes' | 'tags' | 'references' | 'resourceMetadata',
+>(
+  store: IDBPObjectStore<NodeStorageSchema, WorkspaceStoreName[], StoreName, 'readwrite'>,
+  recordIds: Iterable<string>,
+) {
+  return [...recordIds].map((recordId) => store.delete(recordId));
 }
 
 function toResourceMetadataRecords(snapshot: WorkspaceSnapshot) {
@@ -268,6 +377,29 @@ function toResourceMetadataRecords(snapshot: WorkspaceSnapshot) {
   }
 
   return records;
+}
+
+function materializeWorkspaceSnapshot(
+  snapshot: WorkspaceSnapshot,
+): PersistedWorkspaceSnapshot {
+  return {
+    workspace: structuredClone(snapshot.workspace),
+    nodes: Object.values(snapshot.tree.nodes).map((node) => ({
+      ...structuredClone(node),
+      workspaceId: snapshot.workspace.id,
+    })),
+    tags: Object.values(snapshot.tree.tags).map((tag) => ({
+      ...structuredClone(tag),
+      workspaceId: snapshot.workspace.id,
+    })),
+    references: Object.values(snapshot.tree.references).map((reference) => ({
+      ...structuredClone(reference),
+      workspaceId: snapshot.workspace.id,
+    })),
+    resourceMetadata: toResourceMetadataRecords(snapshot).map((record) =>
+      structuredClone(record),
+    ),
+  };
 }
 
 function toNodeMap(storedNodes: StoredNodeRecord[]) {

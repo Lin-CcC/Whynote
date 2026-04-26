@@ -1,5 +1,8 @@
 import { NodeDomainError } from './nodeErrors';
-import { canParentAcceptChild, shouldConvertToModuleAtRoot } from './treeConstraints';
+import {
+  canParentAcceptChild,
+  shouldConvertToModuleAtRoot,
+} from './treeConstraints';
 import {
   cloneNodeTree,
   getNodeOrThrow,
@@ -35,12 +38,11 @@ export function insertChildNode(
     );
   }
 
-  const nextNode = {
-    ...structuredClone(node),
-    parentId: parentNode.id,
-    order: insertIndex,
-    updatedAt: createTimestamp(),
-  };
+  const nextNode = normalizeNodeForParent(node, parentNode);
+
+  nextNode.parentId = parentNode.id;
+  nextNode.order = insertIndex;
+  nextNode.updatedAt = createTimestamp();
 
   nextTree.nodes[nextNode.id] = nextNode;
   parentNode.childIds.splice(insertIndex, 0, nextNode.id);
@@ -166,7 +168,7 @@ export function moveNode(
   currentParentNode.updatedAt = createTimestamp();
   reindexChildren(nextTree, currentParentNode.id);
 
-  const nextNode = normalizeNodeForParent(node, targetParentNode.type);
+  const nextNode = normalizeNodeForParent(node, targetParentNode);
 
   if (!canParentAcceptChild(targetParentNode.type, nextNode.type)) {
     throw new NodeDomainError(
@@ -256,10 +258,17 @@ export function lowerNode(tree: NodeTree, nodeId: string) {
 
 function normalizeNodeForParent(
   node: NonRootNode,
-  parentType: TreeNode['type'],
+  parentNode: TreeNode,
 ): NonRootNode {
-  if (parentType !== 'theme-root') {
-    return node;
+  if (node.type === 'resource-fragment' && parentNode.type === 'resource') {
+    return {
+      ...structuredClone(node),
+      sourceResourceId: parentNode.id,
+    };
+  }
+
+  if (parentNode.type !== 'theme-root') {
+    return structuredClone(node);
   }
 
   if (node.type === 'resource-fragment') {
@@ -273,7 +282,7 @@ function normalizeNodeForParent(
   }
 
   if (!shouldConvertToModuleAtRoot(node.type)) {
-    return node;
+    return structuredClone(node);
   }
 
   return convertNodeToModule(node);
