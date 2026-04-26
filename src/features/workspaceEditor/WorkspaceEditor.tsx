@@ -26,6 +26,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           <SectionCard>
             <ModuleSwitcher
               currentModuleId={workspaceEditor.currentModuleId}
+              isInteractionLocked={props.isInteractionLocked ?? false}
               modules={workspaceEditor.moduleNodes}
               onSwitchModule={workspaceEditor.switchModule}
             />
@@ -34,6 +35,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
             <StructureTree
               currentModuleId={workspaceEditor.currentModuleId}
               expandedNodeIds={workspaceEditor.expandedNodeIds}
+              isInteractionLocked={props.isInteractionLocked ?? false}
               onSelectNode={workspaceEditor.selectNode}
               onToggleNode={workspaceEditor.toggleNodeExpanded}
               selectedNodeId={workspaceEditor.selectedNodeId}
@@ -43,6 +45,8 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           <SectionCard>
             <StructureActionBar
               actionAvailability={workspaceEditor.actionAvailability}
+              interactionLockReason={props.interactionLockReason ?? null}
+              isInteractionLocked={props.isInteractionLocked ?? false}
               onDeleteNode={workspaceEditor.deleteSelection}
               onInsertChildNode={workspaceEditor.insertChildAtSelection}
               onInsertSiblingNode={workspaceEditor.insertSiblingAtSelection}
@@ -62,6 +66,8 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
       mainPanel={
         <TextMainView
           currentModuleId={workspaceEditor.currentModuleId}
+          interactionLockReason={props.interactionLockReason ?? null}
+          isInteractionLocked={props.isInteractionLocked ?? false}
           onSelectNode={workspaceEditor.selectNode}
           onUpdateNode={workspaceEditor.updateNode}
           registerNodeElement={workspaceEditor.registerNodeElement}

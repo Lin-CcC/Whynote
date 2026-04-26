@@ -12,6 +12,7 @@ import type { NodeContentPatch } from '../workspaceEditorTypes';
 
 type EditorNodeSectionProps = {
   depth: number;
+  isInteractionLocked: boolean;
   nodeId: string;
   onSelectNode: (nodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
@@ -28,6 +29,7 @@ const PLAN_STEP_STATUS_LABELS: Record<PlanStepStatus, string> = {
 
 export default function EditorNodeSection({
   depth,
+  isInteractionLocked,
   nodeId,
   onSelectNode,
   onUpdateNode,
@@ -78,6 +80,7 @@ export default function EditorNodeSection({
             <select
               aria-label={`${node.title} 的步骤状态`}
               className="workspace-statusSelect"
+              disabled={isInteractionLocked}
               onChange={handleStatusChange}
               onClick={(event) => event.stopPropagation()}
               value={node.status}
@@ -100,6 +103,7 @@ export default function EditorNodeSection({
       <input
         aria-label={`${node.title || getNodeTypeLabel(node.type)} 标题`}
         className="workspace-nodeTitleInput"
+        disabled={isInteractionLocked}
         onChange={handleTitleChange}
         onClick={(event) => event.stopPropagation()}
         value={node.title}
@@ -107,6 +111,7 @@ export default function EditorNodeSection({
       <textarea
         aria-label={`${node.title || getNodeTypeLabel(node.type)} 内容`}
         className="workspace-nodeContentInput"
+        disabled={isInteractionLocked}
         onChange={handleContentChange}
         onClick={(event) => event.stopPropagation()}
         placeholder={getNodeInputPlaceholder(node.type, 'content')}
@@ -133,6 +138,7 @@ export default function EditorNodeSection({
               ) : null}
               <EditorNodeSection
                 depth={depth + 1}
+                isInteractionLocked={isInteractionLocked}
                 key={childNode.id}
                 nodeId={childNode.id}
                 onSelectNode={onSelectNode}

@@ -56,16 +56,34 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
   }, []);
 
   function handleSnapshotChange(snapshot: WorkspaceSnapshot) {
+    if (state.isAiRunning) {
+      return;
+    }
+
     snapshotRef.current = snapshot;
     setState((previousState) => ({
       ...previousState,
+      completionSuggestion: null,
       snapshot,
     }));
     queueSave(snapshot, selectionRef.current);
   }
 
   function handleSelectionChange(selection: WorkspaceRuntimeSelectionState) {
+    if (state.isAiRunning) {
+      return;
+    }
+
+    const previousSelection = selectionRef.current;
+
     selectionRef.current = selection;
+
+    if (hasSelectionChanged(previousSelection, selection)) {
+      setState((previousState) => ({
+        ...previousState,
+        completionSuggestion: null,
+      }));
+    }
 
     if (snapshotRef.current) {
       runtimeService.rememberSelectionState(
@@ -140,6 +158,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
       };
       setState((previousState) => ({
         ...previousState,
+        completionSuggestion: null,
         editorSessionKey: previousState.editorSessionKey + 1,
         initialModuleId: result.initialModuleId,
         initialSelectedNodeId: result.initialSelectedNodeId,
@@ -275,4 +294,14 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
       }));
     }
   }
+}
+
+function hasSelectionChanged(
+  previousSelection: WorkspaceRuntimeSelectionState,
+  nextSelection: WorkspaceRuntimeSelectionState,
+) {
+  return (
+    previousSelection.currentModuleId !== nextSelection.currentModuleId ||
+    previousSelection.selectedNodeId !== nextSelection.selectedNodeId
+  );
 }

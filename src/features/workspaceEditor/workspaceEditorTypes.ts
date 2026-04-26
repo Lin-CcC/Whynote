@@ -56,6 +56,8 @@ export interface WorkspaceEditorProps {
   initialSnapshot?: WorkspaceSnapshot;
   initialModuleId?: string;
   initialSelectedNodeId?: string;
+  interactionLockReason?: string | null;
+  isInteractionLocked?: boolean;
   operations?: WorkspaceEditorOperations;
   onSnapshotChange?: (snapshot: WorkspaceSnapshot) => void;
   onSelectionChange?: (selection: WorkspaceEditorSelectionState) => void;

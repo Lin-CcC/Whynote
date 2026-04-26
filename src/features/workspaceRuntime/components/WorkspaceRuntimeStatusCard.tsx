@@ -31,6 +31,11 @@ export default function WorkspaceRuntimeStatusCard({
           <dd>{isAiRunning ? activeAiActionLabel ?? '处理中' : '空闲'}</dd>
         </div>
       </dl>
+      {isAiRunning ? (
+        <p className="workspace-lockText" role="status">
+          AI 正在运行，文本编辑和结构操作已临时锁定，避免旧快照覆盖新修改。
+        </p>
+      ) : null}
       {runtimeMessage ? <p className="workspace-helpText">{runtimeMessage}</p> : null}
       {loadError ? (
         <p className="workspace-errorText" role="alert">

@@ -22,6 +22,9 @@ export default function WorkspaceRuntimeScreen({
     () => dependencies ?? createDefaultWorkspaceRuntimeDependencies(),
   );
   const runtime = useWorkspaceRuntime(resolvedDependencies);
+  const interactionLockReason = runtime.isAiRunning
+    ? `${runtime.activeAiActionLabel ?? 'AI 正在运行'}，编辑已临时锁定，避免工作区快照被旧结果覆盖。`
+    : null;
 
   if (runtime.isInitializing || runtime.loadError || !runtime.snapshot) {
     return (
@@ -73,6 +76,8 @@ export default function WorkspaceRuntimeScreen({
       initialModuleId={runtime.initialModuleId ?? undefined}
       initialSelectedNodeId={runtime.initialSelectedNodeId ?? undefined}
       initialSnapshot={runtime.snapshot}
+      interactionLockReason={interactionLockReason}
+      isInteractionLocked={runtime.isAiRunning}
       key={`${runtime.snapshot.workspace.id}:${String(runtime.editorSessionKey)}`}
       onSelectionChange={runtime.handleSelectionChange}
       onSnapshotChange={runtime.handleSnapshotChange}

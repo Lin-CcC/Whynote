@@ -5,6 +5,7 @@ import StructureTreeItem from './StructureTreeItem';
 type StructureTreeProps = {
   currentModuleId: string | null;
   expandedNodeIds: Set<string>;
+  isInteractionLocked: boolean;
   onSelectNode: (nodeId: string) => void;
   onToggleNode: (nodeId: string) => void;
   selectedNodeId: string | null;
@@ -14,6 +15,7 @@ type StructureTreeProps = {
 export default function StructureTree({
   currentModuleId,
   expandedNodeIds,
+  isInteractionLocked,
   onSelectNode,
   onToggleNode,
   selectedNodeId,
@@ -50,6 +52,7 @@ export default function StructureTree({
       <ul aria-label="当前模块结构" className="workspace-tree" role="tree">
         <StructureTreeItem
           expandedNodeIds={expandedNodeIds}
+          isInteractionLocked={isInteractionLocked}
           nodeId={currentModuleId}
           onSelectNode={onSelectNode}
           onToggleNode={onToggleNode}

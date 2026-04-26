@@ -13,9 +13,13 @@ import type {
   AiProviderObjectResponse,
 } from '../learningEngine';
 import {
+  createNode,
   createIndexedDbStorage,
   createLocalStorageStore,
+  createWorkspaceSnapshot,
+  insertChildNode,
   type StructuredDataStorage,
+  type WorkspaceSnapshot,
 } from '../nodeDomain';
 import WorkspaceRuntimeScreen from './WorkspaceRuntimeScreen';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
@@ -128,6 +132,53 @@ test('runs learning-engine plan-step generation from UI and materializes the res
   expect(screen.getByText('已为模块生成 3 个 plan-step。')).toBeInTheDocument();
 });
 
+test('locks editor mutations while an AI action is running and keeps manual edits from slipping in', async () => {
+  const deferredProvider = createDeferredProviderClient();
+  const dependencies = createTestDependencies({
+    providerClient: deferredProvider.providerClient,
+  });
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(
+    screen.getByRole('button', { name: '为当前模块生成 plan-step' }),
+  );
+
+  const moduleTitleInput = await screen.findByDisplayValue('默认模块');
+
+  expect(
+    await screen.findByText(/文本编辑和结构操作已临时锁定/),
+  ).toBeInTheDocument();
+  expect(moduleTitleInput).toBeDisabled();
+  expect(screen.getByRole('button', { name: '插入子节点' })).toBeDisabled();
+  expect(
+    screen.getByRole('button', {
+      name: /默认模块先定义当前主题下的第一个学习方向。/,
+    }),
+  ).toBeDisabled();
+
+  fireEvent.change(moduleTitleInput, {
+    target: {
+      value: '请求期间手动改名',
+    },
+  });
+
+  expect(moduleTitleInput).toHaveValue('默认模块');
+
+  deferredProvider.resolve('plan-step-generation', {
+    planSteps: [
+      {
+        title: 'AI 生成步骤',
+        content: '由延迟响应返回。',
+      },
+    ],
+  });
+
+  expect(await screen.findByDisplayValue('AI 生成步骤')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('默认模块')).toBeInTheDocument();
+});
+
 test('shows a visible error when workspace autosave fails', async () => {
   const baseStorage = createIndexedDbStorage({
     databaseName: `whynote-runtime-save-failure-${crypto.randomUUID()}`,
@@ -169,6 +220,68 @@ test('shows a visible error when the provider call fails', async () => {
   });
 });
 
+test('clears completion suggestion after switching to another node', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createCompletionSuggestionSnapshot(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(
+    screen.getByRole('button', { name: /^步骤理解闭环$/ }),
+  );
+  fireEvent.click(
+    screen.getByRole('button', { name: '建议完成当前步骤' }),
+  );
+
+  expect(
+    await screen.findByRole('heading', { name: '当前步骤可以考虑标记完成' }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('button', { name: /^问题什么是闭环？$/ }),
+  );
+
+  await waitFor(() => {
+    expect(
+      screen.queryByRole('heading', { name: '当前步骤可以考虑标记完成' }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+test('clears completion suggestion after editing the related workspace content', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createCompletionSuggestionSnapshot(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(
+    screen.getByRole('button', { name: /^步骤理解闭环$/ }),
+  );
+  fireEvent.click(
+    screen.getByRole('button', { name: '建议完成当前步骤' }),
+  );
+
+  expect(
+    await screen.findByRole('heading', { name: '当前步骤可以考虑标记完成' }),
+  ).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText('理解闭环 内容'), {
+    target: {
+      value: '补充后需要重新判断建议是否仍然成立。',
+    },
+  });
+
+  await waitFor(() => {
+    expect(
+      screen.queryByRole('heading', { name: '当前步骤可以考虑标记完成' }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 function createTestDependencies(options?: {
   providerClient?: AiProviderClient;
   storage?: StructuredDataStorage;
@@ -194,6 +307,18 @@ function createTestDependencies(options?: {
   };
 }
 
+async function createPreloadedDependencies(snapshot: WorkspaceSnapshot) {
+  const storage = createIndexedDbStorage({
+    databaseName: `whynote-runtime-preloaded-${crypto.randomUUID()}`,
+  });
+
+  await storage.saveWorkspace(snapshot);
+
+  return createTestDependencies({
+    storage,
+  });
+}
+
 function createMockProviderClient(
   payloadByTaskName: Record<string, unknown>,
   _config?: AiConfig,
@@ -214,6 +339,41 @@ function createMockProviderClient(
         providerLabel: 'mock-provider',
         rawText,
       };
+    },
+  };
+}
+
+function createDeferredProviderClient() {
+  const resolvers = new Map<string, (payload: unknown) => void>();
+
+  return {
+    providerClient: {
+      async generateObject<T>(
+        request: AiProviderObjectRequest<T>,
+      ): Promise<AiProviderObjectResponse<T>> {
+        const payload = await new Promise<unknown>((resolve) => {
+          resolvers.set(request.taskName, resolve);
+        });
+        const rawText = JSON.stringify(payload);
+
+        return {
+          taskName: request.taskName,
+          content: request.parse(rawText) as T,
+          model: 'mock-model',
+          providerLabel: 'mock-provider',
+          rawText,
+        };
+      },
+    } satisfies AiProviderClient,
+    resolve(taskName: string, payload: unknown) {
+      const resolve = resolvers.get(taskName);
+
+      if (!resolve) {
+        throw new Error(`Task ${taskName} is not pending.`);
+      }
+
+      resolvers.delete(taskName);
+      resolve(payload);
     },
   };
 }
@@ -258,5 +418,84 @@ function createFailingSaveStorage(
 
       await storage.saveWorkspace(snapshot);
     },
+  };
+}
+
+function createCompletionSuggestionSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '建议测试主题',
+    workspaceId: 'workspace-completion-suggestion',
+    rootId: 'theme-completion-suggestion',
+    createdAt: '2026-04-28T00:00:00.000Z',
+    updatedAt: '2026-04-28T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-completion',
+      title: '理解闭环模块',
+      content: '用于验证步骤完成建议。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-completion',
+    createNode({
+      type: 'plan-step',
+      id: 'step-completion',
+      title: '理解闭环',
+      content: '确认问题已经形成回答和总结。',
+      status: 'doing',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-completion',
+    createNode({
+      type: 'question',
+      id: 'question-completion',
+      title: '什么是闭环？',
+      content: '围绕问题、回答和总结之间的关系解释。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-completion',
+    createNode({
+      type: 'answer',
+      id: 'answer-completion',
+      title: '回答草稿',
+      content: '当问题已经得到回答并被总结时，就形成了学习闭环。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-completion',
+    createNode({
+      type: 'summary',
+      id: 'summary-completion',
+      title: '阶段总结',
+      content: '当前步骤已经有问题、回答和总结，可用于完成建议。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
   };
 }
