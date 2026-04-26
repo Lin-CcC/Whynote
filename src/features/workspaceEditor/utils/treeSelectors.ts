@@ -1,0 +1,213 @@
+import {
+  getAllowedChildTypes,
+  getNodeOrThrow,
+  getModuleScopeId,
+  type ModuleNode,
+  type NodeTree,
+  type NodeType,
+  type NonRootNode,
+  type TreeNode,
+} from '../../nodeDomain';
+
+type NodeField = 'title' | 'content';
+
+export function getModuleNodes(tree: NodeTree): ModuleNode[] {
+  const rootNode = getNodeOrThrow(tree, tree.rootId);
+
+  return rootNode.childIds
+    .map((childId) => tree.nodes[childId])
+    .filter((node): node is ModuleNode => node?.type === 'module')
+    .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
+}
+
+export function getChildNodes(tree: NodeTree, nodeId: string): TreeNode[] {
+  const node = getNodeOrThrow(tree, nodeId);
+
+  return node.childIds
+    .map((childId) => getNodeOrThrow(tree, childId))
+    .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
+}
+
+export function getNodePath(tree: NodeTree, nodeId: string): TreeNode[] {
+  const path: TreeNode[] = [];
+  let currentNode: TreeNode | undefined = tree.nodes[nodeId];
+
+  while (currentNode) {
+    path.unshift(currentNode);
+    currentNode =
+      currentNode.parentId === null
+        ? undefined
+        : tree.nodes[currentNode.parentId];
+  }
+
+  return path;
+}
+
+export function isNodeWithinModule(
+  tree: NodeTree,
+  nodeId: string | null,
+  moduleId: string | null,
+) {
+  if (!nodeId || !moduleId || !tree.nodes[nodeId] || !tree.nodes[moduleId]) {
+    return false;
+  }
+
+  if (nodeId === moduleId) {
+    return true;
+  }
+
+  return getModuleScopeId(tree, nodeId) === moduleId;
+}
+
+export function getDefaultSelectedNodeId(
+  tree: NodeTree,
+  moduleId: string | null,
+) {
+  if (!moduleId || !tree.nodes[moduleId]) {
+    return null;
+  }
+
+  let currentNodeId = moduleId;
+
+  while (tree.nodes[currentNodeId].childIds.length > 0) {
+    currentNodeId = tree.nodes[currentNodeId].childIds[0];
+  }
+
+  return currentNodeId;
+}
+
+export function buildExpandedNodeIds(
+  tree: NodeTree,
+  moduleId: string | null,
+) {
+  const expandedNodeIds = new Set<string>();
+
+  if (!moduleId || !tree.nodes[moduleId]) {
+    return expandedNodeIds;
+  }
+
+  const pendingNodeIds = [moduleId];
+
+  while (pendingNodeIds.length > 0) {
+    const currentNodeId = pendingNodeIds.pop();
+
+    if (!currentNodeId) {
+      continue;
+    }
+
+    const currentNode = tree.nodes[currentNodeId];
+
+    if (!currentNode || currentNode.childIds.length === 0) {
+      continue;
+    }
+
+    expandedNodeIds.add(currentNodeId);
+    pendingNodeIds.push(...currentNode.childIds);
+  }
+
+  return expandedNodeIds;
+}
+
+export function getNodeTypeLabel(nodeType: NodeType) {
+  switch (nodeType) {
+    case 'theme-root':
+      return '主题';
+    case 'module':
+      return '模块';
+    case 'plan-step':
+      return '步骤';
+    case 'question':
+      return '问题';
+    case 'answer':
+      return '回答';
+    case 'summary':
+      return '总结';
+    case 'judgment':
+      return '判断';
+    case 'resource':
+      return '资料';
+    case 'resource-fragment':
+      return '摘录';
+  }
+}
+
+export function getNodeEmphasis(node: TreeNode) {
+  if (node.type === 'plan-step') {
+    return 'supporting';
+  }
+
+  if (node.type === 'summary' || node.type === 'judgment') {
+    return 'secondary';
+  }
+
+  return 'primary';
+}
+
+export function getNodeInputPlaceholder(
+  nodeType: NodeType,
+  field: NodeField,
+) {
+  if (field === 'title') {
+    return `填写${getNodeTypeLabel(nodeType)}标题`;
+  }
+
+  switch (nodeType) {
+    case 'module':
+      return '补充该模块的学习目标、边界或导读。';
+    case 'plan-step':
+      return '记录这一步的关注点、完成标准或提示。';
+    case 'question':
+      return '在这里承接问题正文、补充条件或拆分说明。';
+    case 'answer':
+      return '在这里承接回答正文。';
+    case 'summary':
+      return '在这里承接阶段总结。';
+    case 'judgment':
+      return '在这里承接判断、评估或纠偏意见。';
+    case 'resource':
+      return '资料区能力暂未在本工作树展开。';
+    case 'resource-fragment':
+      return '在这里承接摘录正文。';
+    case 'theme-root':
+      return '在这里承接主题说明。';
+  }
+}
+
+export function getDefaultChildType(parentType: NodeType) {
+  const allowedChildTypes = getAllowedChildTypes(parentType);
+
+  if (allowedChildTypes.includes('plan-step')) {
+    return 'plan-step';
+  }
+
+  if (allowedChildTypes.includes('question')) {
+    return 'question';
+  }
+
+  if (allowedChildTypes.includes('resource-fragment')) {
+    return 'resource-fragment';
+  }
+
+  return (allowedChildTypes[0] as NonRootNode['type'] | undefined) ?? null;
+}
+
+export function getDefaultTitleForType(nodeType: NonRootNode['type']) {
+  switch (nodeType) {
+    case 'module':
+      return '新模块';
+    case 'plan-step':
+      return '新步骤';
+    case 'question':
+      return '新问题';
+    case 'answer':
+      return '新回答';
+    case 'summary':
+      return '新总结';
+    case 'judgment':
+      return '新判断';
+    case 'resource':
+      return '新资料';
+    case 'resource-fragment':
+      return '新摘录';
+  }
+}
