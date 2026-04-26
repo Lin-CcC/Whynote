@@ -54,13 +54,24 @@
 
 ## 5. 工程选型
 
-核心技术栈保持既定基线不变，仅补足最小依赖：
+核心技术栈保持既定基线不变，依赖口径分为两层：
+
+### 5.1 最小核心依赖
 
 - 运行时：`react`、`react-dom`
 - 构建：`vite`、`@vitejs/plugin-react-swc`
 - 类型：`typescript`
 - 测试：`vitest`、`jsdom`
 - 组件测试：`@testing-library/react`、`@testing-library/jest-dom`
+
+### 5.2 为满足验收所允许补充的工程依赖
+
+以下依赖允许在本工作树内补齐，只用于满足 `typecheck / build / coverage` 与 React 工程初始化要求：
+
+- React 类型：`@types/react`、`@types/react-dom`
+- Node 类型：`@types/node`
+- Coverage provider：`@vitest/coverage-v8`
+- 其他与 Vite / Vitest / TypeScript 官方初始化直接相关、且不引入业务含义的配套工程依赖
 
 当前不额外引入路径别名、全局状态方案、格式化或 lint 规则，避免在基建工作树内提前拍板过多公共约定。
 
@@ -72,7 +83,6 @@
 src/
 ├─ assets/
 ├─ features/
-│  └─ workspace/
 ├─ hooks/
 ├─ pages/
 │  └─ HomePage.tsx
@@ -93,7 +103,7 @@ src/
 补充说明：
 
 - `features/`、`services/`、`hooks/`、`utils/` 先建立稳定挂载点，不提前塞入业务实现
-- `features/workspace/` 仅作为后续功能树接入主工作区能力的预留位置
+- `features/` 当前只作为空挂载点存在，必要时可用 `.gitkeep` 保留目录
 - 当前不建立 `atoms/`，待主树明确是否采用 Jotai/Recoil 后再补
 
 ## 7. 壳层组件边界

@@ -46,6 +46,22 @@ Whynote 是一个面向提问式学习的节点化笔记系统。它把学习过
 - AI 接入：用户自填 OpenAI-compatible 配置
 - 部署：静态前端优先，默认以 Vercel 为示例平台
 
+## 工程启动
+
+```bash
+pnpm install
+pnpm run dev
+```
+
+常用验证命令：
+
+```bash
+pnpm run test
+pnpm run coverage
+pnpm run typecheck
+pnpm run build
+```
+
 ## 产品心智模型
 
 Whynote 首版使用统一节点模型，但节点带有明确语义：
@@ -90,6 +106,6 @@ theme-root
 
 ## 当前状态
 
-- 仓库当前处于文档基线阶段
-- 还没有业务代码与初始化工程
-- 当前目标是先把产品模型、范围边界和执行文档写清楚，再进入原型与实现阶段
+- 仓库已完成最小工程初始化与应用壳层
+- 当前仅提供基础目录骨架、构建链路与最小占位页面
+- 业务模型与功能实现仍待后续工作树接入
