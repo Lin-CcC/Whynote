@@ -3,6 +3,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 
@@ -282,6 +283,117 @@ test('clears completion suggestion after editing the related workspace content',
   });
 });
 
+test('focuses a resource entry through the library without resetting the editor selection', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createResourceFocusSnapshot(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  expect(await screen.findByDisplayValue('资源定位模块')).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('button', { name: /^步骤构建理解$/ }),
+  );
+  await waitFor(() => {
+    expect(
+      getSectionByHeading('当前焦点').getByText('步骤 · 构建理解'),
+    ).toBeInTheDocument();
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: '定位资料 React 官方文档' }),
+  );
+
+  const resourceFocusCard = await findSectionByHeading('当前资料焦点');
+  const editorFocusCard = getSectionByHeading('当前焦点');
+
+  expect(resourceFocusCard.getByText('资料 · React 官方文档')).toBeInTheDocument();
+  expect(
+    resourceFocusCard.getByText('步骤 · 构建理解'),
+  ).toBeInTheDocument();
+  expect(
+    resourceFocusCard.getByText('https://react.dev/reference/react/useState'),
+  ).toBeInTheDocument();
+  expect(
+    editorFocusCard.getByText('步骤 · 构建理解'),
+  ).toBeInTheDocument();
+});
+
+test('focuses a resource fragment through the library and shows its excerpt details', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createResourceFocusSnapshot(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  expect(await screen.findByDisplayValue('资源定位模块')).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('button', { name: /^步骤构建理解$/ }),
+  );
+  await waitFor(() => {
+    expect(
+      getSectionByHeading('当前焦点').getByText('步骤 · 构建理解'),
+    ).toBeInTheDocument();
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: '定位摘录 批处理摘录' }),
+  );
+
+  const resourceFocusCard = await findSectionByHeading('当前资料焦点');
+  const editorFocusCard = getSectionByHeading('当前焦点');
+
+  expect(resourceFocusCard.getByText('摘录 · 批处理摘录')).toBeInTheDocument();
+  expect(
+    resourceFocusCard.getByText('React 会把多个 state 更新批处理后再统一提交。'),
+  ).toBeInTheDocument();
+  expect(resourceFocusCard.getByText('useState > batching')).toBeInTheDocument();
+  expect(
+    resourceFocusCard.getByText('步骤 · 构建理解'),
+  ).toBeInTheDocument();
+  expect(
+    editorFocusCard.getByText('步骤 · 构建理解'),
+  ).toBeInTheDocument();
+});
+
+test('focuses a resource hit from search results without falling back to the module default node', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createResourceFocusSnapshot(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  expect(await screen.findByDisplayValue('资源定位模块')).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('button', { name: /^步骤构建理解$/ }),
+  );
+  await waitFor(() => {
+    expect(
+      getSectionByHeading('当前焦点').getByText('步骤 · 构建理解'),
+    ).toBeInTheDocument();
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: '切换到资料区搜索' }),
+  );
+  fireEvent.change(screen.getByLabelText('搜索关键词'), {
+    target: {
+      value: '批处理',
+    },
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: '跳转到 批处理摘录' }),
+  );
+
+  const resourceFocusCard = await findSectionByHeading('当前资料焦点');
+  const editorFocusCard = getSectionByHeading('当前焦点');
+
+  expect(resourceFocusCard.getByText('摘录 · 批处理摘录')).toBeInTheDocument();
+  expect(
+    resourceFocusCard.getByText('步骤 · 构建理解'),
+  ).toBeInTheDocument();
+  expect(
+    editorFocusCard.getByText('步骤 · 构建理解'),
+  ).toBeInTheDocument();
+});
+
 function createTestDependencies(options?: {
   providerClient?: AiProviderClient;
   storage?: StructuredDataStorage;
@@ -498,4 +610,122 @@ function createCompletionSuggestionSnapshot(): WorkspaceSnapshot {
     ...snapshot,
     tree,
   };
+}
+
+function createResourceFocusSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '资料定位主题',
+    workspaceId: 'workspace-resource-focus',
+    rootId: 'theme-resource-focus',
+    createdAt: '2026-04-28T00:00:00.000Z',
+    updatedAt: '2026-04-28T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-resource-focus',
+      title: '资源定位模块',
+      content: '用于验证资料焦点和模块内 editor 选区可以并存。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-resource-focus',
+    createNode({
+      type: 'plan-step',
+      id: 'step-resource-focus',
+      title: '构建理解',
+      content: '先固定一个非默认 editor 焦点，再验证资源定位不会把它冲掉。',
+      status: 'doing',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-resource-focus',
+    createNode({
+      type: 'question',
+      id: 'question-resource-focus',
+      title: '什么是批处理？',
+      content: '理解 React 为什么会把多次状态更新合并处理。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-resource-focus',
+    createNode({
+      type: 'answer',
+      id: 'answer-resource-focus',
+      title: '批处理答案',
+      content: 'React 会把一轮事件里的多次更新合并后再提交。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'resource',
+      id: 'resource-react-docs',
+      title: 'React 官方文档',
+      content: '关于 state 更新与 Hook 的参考资料。',
+      sourceUri: 'https://react.dev/reference/react/useState',
+      mimeType: 'text/html',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'resource-react-docs',
+    createNode({
+      type: 'resource-fragment',
+      id: 'fragment-batching',
+      title: '批处理摘录',
+      content: '用来解释批处理的上下文。',
+      excerpt: 'React 会把多个 state 更新批处理后再统一提交。',
+      locator: 'useState > batching',
+      sourceResourceId: 'resource-react-docs',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function getSectionByHeading(name: string) {
+  const heading = screen.getByRole('heading', { name });
+  const section = heading.closest('section');
+
+  if (!section) {
+    throw new Error(`Unable to find section for heading "${name}".`);
+  }
+
+  return within(section);
+}
+
+async function findSectionByHeading(name: string) {
+  const heading = await screen.findByRole('heading', { name });
+  const section = heading.closest('section');
+
+  if (!section) {
+    throw new Error(`Unable to find section for heading "${name}".`);
+  }
+
+  return within(section);
 }
