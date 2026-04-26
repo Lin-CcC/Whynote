@@ -1,4 +1,5 @@
 import type {
+  AiExecutionMetadata,
   AiProviderClient,
   ChildQuestionDraft,
   CompoundQuestionSplitInput,
@@ -17,6 +18,11 @@ interface RawQuestionDraft {
   confidence?: unknown;
 }
 
+const LOCAL_FALLBACK_METADATA: AiExecutionMetadata = {
+  providerLabel: 'local-fallback',
+  model: 'heuristic-splitter',
+};
+
 export function createCompoundQuestionSplitService(options: {
   providerClient: AiProviderClient;
   confidenceThreshold?: number;
@@ -25,23 +31,14 @@ export function createCompoundQuestionSplitService(options: {
     async split(
       input: CompoundQuestionSplitInput,
     ): Promise<CompoundQuestionSplitResult> {
-      const response = await options.providerClient.generateObject({
-        taskName: 'compound-question-split',
-        messages: buildCompoundQuestionSplitMessages(input),
-        responseFormat: 'json_object',
-        parse: parseJsonObject,
-      });
-      const normalizedChildQuestions = normalizeChildQuestions(
-        response.content,
-        input.question,
-      );
-      const fallbackChildQuestions =
-        normalizedChildQuestions.length > 0
-          ? normalizedChildQuestions
-          : splitQuestionHeuristically(input.question);
+      const executionResult = await executeSplit(input, options.providerClient);
       const orderedChildQuestions = orderChildQuestions(
-        fallbackChildQuestions,
+        executionResult.childQuestions,
         options.confidenceThreshold,
+      );
+      const fallbackReason = joinFallbackReasons(
+        executionResult.fallbackReason,
+        orderedChildQuestions.fallbackReason,
       );
 
       return {
@@ -52,14 +49,55 @@ export function createCompoundQuestionSplitService(options: {
         },
         childQuestions: orderedChildQuestions.childQuestions,
         orderingStrategy: orderedChildQuestions.orderingStrategy,
-        fallbackReason: orderedChildQuestions.fallbackReason,
+        fallbackReason,
+        metadata: executionResult.metadata,
+      };
+    },
+  };
+}
+
+async function executeSplit(
+  input: CompoundQuestionSplitInput,
+  providerClient: AiProviderClient,
+) {
+  try {
+    const response = await providerClient.generateObject({
+      taskName: 'compound-question-split',
+      messages: buildCompoundQuestionSplitMessages(input),
+      responseFormat: 'json_object',
+      parse: parseJsonObject,
+    });
+    const normalizedChildQuestions = normalizeChildQuestions(
+      response.content,
+      input.question,
+    );
+
+    if (normalizedChildQuestions.length > 0) {
+      return {
+        childQuestions: normalizedChildQuestions,
         metadata: {
           providerLabel: response.providerLabel,
           model: response.model,
         },
+        fallbackReason: undefined,
       };
-    },
-  };
+    }
+
+    return {
+      childQuestions: buildHeuristicFallbackChildQuestions(input.question),
+      metadata: {
+        providerLabel: response.providerLabel,
+        model: response.model,
+      },
+      fallbackReason: 'AI 未返回有效子问题，已回退到本地启发式拆分。',
+    };
+  } catch (error) {
+    return {
+      childQuestions: buildHeuristicFallbackChildQuestions(input.question),
+      metadata: LOCAL_FALLBACK_METADATA,
+      fallbackReason: getProviderFallbackReason(error),
+    };
+  }
 }
 
 function normalizeChildQuestions(
@@ -138,6 +176,10 @@ function splitQuestionHeuristically(question: string): ChildQuestionDraft[] {
   }));
 }
 
+function buildHeuristicFallbackChildQuestions(question: string) {
+  return splitQuestionHeuristically(question);
+}
+
 function normalizeDependencyIndices(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
@@ -178,4 +220,24 @@ function getText(value: unknown) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function getProviderFallbackReason(error: unknown) {
+  if (error instanceof Error && error.message.includes('JSON')) {
+    return 'AI 返回不是合法 JSON，已回退到本地启发式拆分。';
+  }
+
+  return 'AI provider 调用失败，已回退到本地启发式拆分。';
+}
+
+function joinFallbackReasons(...reasons: Array<string | undefined>) {
+  const normalizedReasons = reasons.filter(
+    (reason): reason is string => Boolean(reason),
+  );
+
+  if (normalizedReasons.length === 0) {
+    return undefined;
+  }
+
+  return normalizedReasons.join('；');
 }

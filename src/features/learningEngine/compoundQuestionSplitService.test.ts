@@ -26,6 +26,28 @@ function createMockProvider(payloadByTaskName: Record<string, unknown>): AiProvi
   };
 }
 
+function createThrowingProvider(message: string): AiProviderClient {
+  return {
+    async generateObject<T>(
+      _request: AiProviderObjectRequest<T>,
+    ): Promise<AiProviderObjectResponse<T>> {
+      throw new Error(message);
+    },
+  };
+}
+
+function createInvalidJsonProvider(): AiProviderClient {
+  return {
+    async generateObject<T>(
+      request: AiProviderObjectRequest<T>,
+    ): Promise<AiProviderObjectResponse<T>> {
+      request.parse('{invalid-json');
+
+      throw new Error('unreachable');
+    },
+  };
+}
+
 describe('compoundQuestionSplitService', () => {
   it('reorders child questions by dependency when confidence is high', async () => {
     const providerClient = createMockProvider({
@@ -97,5 +119,78 @@ describe('compoundQuestionSplitService', () => {
       '它和闭包有什么关系？',
       '什么是闭包？',
     ]);
+  });
+
+  it('falls back to heuristic split when the provider throws instead of rejecting', async () => {
+    const service = createCompoundQuestionSplitService({
+      providerClient: createThrowingProvider('network timeout'),
+    });
+
+    const result = await service.split({
+      question: '什么是事件循环，它为什么重要？',
+    });
+
+    expect(result.childQuestions).not.toHaveLength(0);
+    expect(result.childQuestions.map((item) => item.title)).toEqual([
+      '什么是事件循环',
+      '它为什么重要',
+    ]);
+    expect(result.fallbackReason).toBe(
+      'AI provider 调用失败，已回退到本地启发式拆分。',
+    );
+    expect(result.metadata).toEqual({
+      providerLabel: 'local-fallback',
+      model: 'heuristic-splitter',
+    });
+  });
+
+  it('falls back to heuristic split when the provider returns invalid JSON instead of rejecting', async () => {
+    const service = createCompoundQuestionSplitService({
+      providerClient: createInvalidJsonProvider(),
+    });
+
+    const result = await service.split({
+      question: '什么是闭包，它为什么会保留外部作用域？',
+    });
+
+    expect(result.childQuestions).not.toHaveLength(0);
+    expect(result.childQuestions.map((item) => item.title)).toEqual([
+      '什么是闭包',
+      '它为什么会保留外部作用域',
+    ]);
+    expect(result.fallbackReason).toBe(
+      'AI 返回不是合法 JSON，已回退到本地启发式拆分。',
+    );
+    expect(result.metadata).toEqual({
+      providerLabel: 'local-fallback',
+      model: 'heuristic-splitter',
+    });
+  });
+
+  it('keeps the existing heuristic fallback when the provider returns empty questions', async () => {
+    const service = createCompoundQuestionSplitService({
+      providerClient: createMockProvider({
+        'compound-question-split': {
+          questions: [],
+        },
+      }),
+    });
+
+    const result = await service.split({
+      question: '什么是微任务，它和宏任务有什么区别？',
+    });
+
+    expect(result.childQuestions).not.toHaveLength(0);
+    expect(result.childQuestions.map((item) => item.title)).toEqual([
+      '什么是微任务',
+      '它和宏任务有什么区别',
+    ]);
+    expect(result.fallbackReason).toBe(
+      'AI 未返回有效子问题，已回退到本地启发式拆分。',
+    );
+    expect(result.metadata).toEqual({
+      providerLabel: 'mock-provider',
+      model: 'mock-model',
+    });
   });
 });

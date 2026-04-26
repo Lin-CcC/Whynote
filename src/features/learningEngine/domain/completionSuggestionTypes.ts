@@ -7,6 +7,7 @@ export interface PlanStepCompletionEvidence {
   answeredQuestionCount: number;
   summaryCount: number;
   judgmentCount: number;
+  directClosureCount: number;
   blockingJudgmentCount: number;
   unresolvedQuestionTitles: string[];
   blockingTagNames: string[];

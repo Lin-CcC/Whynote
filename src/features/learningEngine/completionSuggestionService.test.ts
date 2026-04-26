@@ -124,4 +124,176 @@ describe('completionSuggestionService', () => {
     expect(result.reasonSummary).toContain('仍有未闭环问题');
     expect(result.reasonSummary).toContain('存在阻塞标签');
   });
+
+  it('does not suggest completion when an unresolved question is only accompanied by a direct summary', () => {
+    const snapshot = createWorkspaceSnapshot({
+      title: 'Completion unresolved with direct summary',
+      workspaceId: 'workspace-completion-direct-summary',
+      rootId: 'root-completion-direct-summary',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const moduleNode = createNode({
+      type: 'module',
+      id: 'module-direct-summary',
+      title: 'Module',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const planStepNode = createNode({
+      type: 'plan-step',
+      id: 'plan-step-direct-summary',
+      title: 'Step',
+      status: 'doing',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const questionNode = createNode({
+      type: 'question',
+      id: 'question-direct-summary',
+      title: '这个问题还没闭环吗？',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const summaryNode = createNode({
+      type: 'summary',
+      id: 'summary-direct-summary',
+      title: '步骤总结',
+      content: '先有一个阶段总结。',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+
+    let tree = insertChildNode(snapshot.tree, snapshot.tree.rootId, moduleNode);
+    tree = insertChildNode(tree, 'module-direct-summary', planStepNode);
+    tree = insertChildNode(tree, 'plan-step-direct-summary', questionNode);
+    tree = insertChildNode(tree, 'plan-step-direct-summary', summaryNode);
+
+    const result = suggestPlanStepCompletion(tree, 'plan-step-direct-summary');
+
+    expect(result.shouldSuggestComplete).toBe(false);
+    expect(result.evidence.answeredQuestionCount).toBe(0);
+    expect(result.evidence.directClosureCount).toBe(1);
+    expect(result.evidence.unresolvedQuestionTitles).toEqual([
+      '这个问题还没闭环吗？',
+    ]);
+    expect(result.reasonSummary).toContain('仍有未闭环问题');
+    expect(result.reasonSummary).toContain('不能替代 question 自身闭环');
+  });
+
+  it('keeps unresolved questions visible even when another question is closed and direct closure nodes exist', () => {
+    const snapshot = createWorkspaceSnapshot({
+      title: 'Completion partially unresolved',
+      workspaceId: 'workspace-completion-partial',
+      rootId: 'root-completion-partial',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const moduleNode = createNode({
+      type: 'module',
+      id: 'module-partial',
+      title: 'Module',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const planStepNode = createNode({
+      type: 'plan-step',
+      id: 'plan-step-partial',
+      title: 'Step',
+      status: 'doing',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const closedQuestionNode = createNode({
+      type: 'question',
+      id: 'question-partial-closed',
+      title: '已闭环问题',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const openQuestionNode = createNode({
+      type: 'question',
+      id: 'question-partial-open',
+      title: '未闭环问题',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const answerNode = createNode({
+      type: 'answer',
+      id: 'answer-partial',
+      title: '回答',
+      content: '这个问题已经回答。',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const judgmentNode = createNode({
+      type: 'judgment',
+      id: 'judgment-partial',
+      title: '步骤判断',
+      content: '已有阶段性判断。',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+
+    let tree = insertChildNode(snapshot.tree, snapshot.tree.rootId, moduleNode);
+    tree = insertChildNode(tree, 'module-partial', planStepNode);
+    tree = insertChildNode(tree, 'plan-step-partial', closedQuestionNode);
+    tree = insertChildNode(tree, 'plan-step-partial', openQuestionNode);
+    tree = insertChildNode(tree, 'question-partial-closed', answerNode);
+    tree = insertChildNode(tree, 'plan-step-partial', judgmentNode);
+
+    const result = suggestPlanStepCompletion(tree, 'plan-step-partial');
+
+    expect(result.shouldSuggestComplete).toBe(false);
+    expect(result.evidence.answeredQuestionCount).toBe(1);
+    expect(result.evidence.directClosureCount).toBe(1);
+    expect(result.evidence.unresolvedQuestionTitles).toEqual(['未闭环问题']);
+    expect(result.reasonSummary).toContain('仍有未闭环问题');
+  });
+
+  it('does not treat direct summary or judgment as question closure', () => {
+    const snapshot = createWorkspaceSnapshot({
+      title: 'Completion direct closure only',
+      workspaceId: 'workspace-completion-direct-only',
+      rootId: 'root-completion-direct-only',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const moduleNode = createNode({
+      type: 'module',
+      id: 'module-direct-only',
+      title: 'Module',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const planStepNode = createNode({
+      type: 'plan-step',
+      id: 'plan-step-direct-only',
+      title: 'Step',
+      status: 'doing',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const questionNode = createNode({
+      type: 'question',
+      id: 'question-direct-only',
+      title: '还没有回答的问题',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const summaryNode = createNode({
+      type: 'summary',
+      id: 'summary-direct-only',
+      title: '步骤总结',
+      content: '先给一个总结。',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const judgmentNode = createNode({
+      type: 'judgment',
+      id: 'judgment-direct-only',
+      title: '步骤判断',
+      content: '先给一个判断。',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+
+    let tree = insertChildNode(snapshot.tree, snapshot.tree.rootId, moduleNode);
+    tree = insertChildNode(tree, 'module-direct-only', planStepNode);
+    tree = insertChildNode(tree, 'plan-step-direct-only', questionNode);
+    tree = insertChildNode(tree, 'plan-step-direct-only', summaryNode);
+    tree = insertChildNode(tree, 'plan-step-direct-only', judgmentNode);
+
+    const result = suggestPlanStepCompletion(tree, 'plan-step-direct-only');
+
+    expect(result.shouldSuggestComplete).toBe(false);
+    expect(result.evidence.answeredQuestionCount).toBe(0);
+    expect(result.evidence.directClosureCount).toBe(2);
+    expect(result.evidence.unresolvedQuestionTitles).toEqual([
+      '还没有回答的问题',
+    ]);
+    expect(result.reasonSummary).toContain('仍有未闭环问题');
+  });
 });

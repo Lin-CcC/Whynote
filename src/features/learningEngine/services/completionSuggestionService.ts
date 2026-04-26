@@ -67,14 +67,10 @@ function buildPlanStepCompletionEvidence(
         node.type === 'summary' ||
         node.type === 'judgment',
     ).length;
-  const answeredQuestionCount = Math.min(
-    questionNodes.length,
-    resolvedQuestionIds.size + directClosureCount,
-  );
+  const answeredQuestionCount = resolvedQuestionIds.size;
   const unresolvedQuestionTitles = questionNodes
     .filter((questionNode) => !resolvedQuestionIds.has(questionNode.id))
-    .map((questionNode) => questionNode.title)
-    .slice(Math.max(0, answeredQuestionCount - resolvedQuestionIds.size));
+    .map((questionNode) => questionNode.title);
   const blockingJudgmentCount = judgmentNodes.filter((judgmentNode) =>
     containsBlockingJudgmentSignal(judgmentNode),
   ).length;
@@ -86,6 +82,7 @@ function buildPlanStepCompletionEvidence(
     answeredQuestionCount,
     summaryCount: summaryNodes.length,
     judgmentCount: judgmentNodes.length,
+    directClosureCount,
     blockingJudgmentCount,
     unresolvedQuestionTitles,
     blockingTagNames,
@@ -115,6 +112,13 @@ function evaluateCompletionEvidence(evidence: PlanStepCompletionEvidence) {
     reasons.push(
       `仍有未闭环问题：${evidence.unresolvedQuestionTitles.join('、')}`,
     );
+  }
+
+  if (
+    evidence.unresolvedQuestionTitles.length > 0 &&
+    evidence.directClosureCount > 0
+  ) {
+    reasons.push('直属于 plan-step 的回答 / 总结 / 判断只能作为补充证据，不能替代 question 自身闭环。');
   }
 
   if (evidence.blockingTagNames.length > 0) {
