@@ -1,7 +1,7 @@
 import SectionCard from '../../../ui/SectionCard';
-import type { NodeTree } from '../../nodeDomain';
-import { getNodeOrThrow } from '../../nodeDomain';
+import { getNodeOrThrow, type NodeTree } from '../../nodeDomain';
 import type { NodeContentPatch } from '../workspaceEditorTypes';
+import { getNodeTypeLabel } from '../utils/treeSelectors';
 import EditorNodeSection from './EditorNodeSection';
 
 type TextMainViewProps = {
@@ -30,12 +30,16 @@ export default function TextMainView({
       <SectionCard>
         <p className="workspace-kicker">文本主视图</p>
         <h2 className="workspace-sectionTitle">还没有可编辑的模块</h2>
-        <p className="workspace-helpText">模块切换会驱动文本区与结构区同步渲染。</p>
+        <p className="workspace-helpText">先创建或切换到一个模块，再进入真实节点内容。</p>
       </SectionCard>
     );
   }
 
   const currentModule = getNodeOrThrow(tree, currentModuleId);
+  const selectedNode =
+    selectedNodeId && tree.nodes[selectedNodeId]
+      ? getNodeOrThrow(tree, selectedNodeId)
+      : null;
 
   return (
     <div className="workspace-mainPanel">
@@ -44,13 +48,22 @@ export default function TextMainView({
           <div>
             <p className="workspace-kicker">文本主视图</p>
             <h2 className="workspace-sectionTitle">文本主视图</h2>
-            <p className="workspace-helpText">{currentModule.title}</p>
+            <p className="workspace-moduleTitle">{currentModule.title}</p>
           </div>
-          <span className="workspace-counter">{currentModule.childIds.length} 个顶层节点</span>
+          <span className="workspace-counter">
+            {currentModule.childIds.length} 个顶层节点
+          </span>
         </div>
-        <p className="workspace-helpText">
-          文本区是主舞台。结构视图只负责帮助你切模块、定位节点和做层级调整。
-        </p>
+        <dl className="workspace-summaryList">
+          <div>
+            <dt>当前焦点</dt>
+            <dd>
+              {selectedNode
+                ? `${getNodeTypeLabel(selectedNode.type)} · ${selectedNode.title}`
+                : '未选中节点'}
+            </dd>
+          </div>
+        </dl>
         {isInteractionLocked && interactionLockReason ? (
           <p className="workspace-lockText" role="status">
             {interactionLockReason}

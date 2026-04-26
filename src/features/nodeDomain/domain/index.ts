@@ -1,3 +1,4 @@
+export * from './builtinTags';
 export * from './nodeErrors';
 export * from './nodeFactories';
 export * from './nodeTypes';

@@ -34,6 +34,12 @@
   font-size: 1.1rem;
 }
 
+.workspace-moduleTitle {
+  margin: 0.2rem 0 0;
+  color: #0f172a;
+  font-size: 1.35rem;
+}
+
 .workspace-counter {
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
@@ -43,10 +49,38 @@
   white-space: nowrap;
 }
 
+.workspace-summaryList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.workspace-summaryList div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.workspace-summaryList dt {
+  color: #0f766e;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.workspace-summaryList dd {
+  margin: 0;
+  color: #0f172a;
+}
+
 .workspace-helpText,
 .workspace-nodeHint,
 .workspace-moduleHint,
 .workspace-lockText,
+.workspace-tagMeta,
 .workspace-errorText {
   margin: 0;
   color: #475569;
@@ -358,6 +392,40 @@
 .workspace-inspectorList dd {
   margin: 0;
   color: #0f172a;
+}
+
+.workspace-tagSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.workspace-tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.workspace-tagButton {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.workspace-tagButton[data-active='true'] {
+  border-color: rgba(15, 118, 110, 0.48);
+  background: rgba(240, 253, 250, 0.96);
+  color: #0f766e;
+}
+
+.workspace-tagButton:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
 }
 
 @media (max-width: 900px) {

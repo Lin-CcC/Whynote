@@ -82,6 +82,8 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           {props.renderRightPanelExtra?.(renderContext)}
           <SelectedNodeInspector
             currentModuleId={workspaceEditor.currentModuleId}
+            isInteractionLocked={props.isInteractionLocked ?? false}
+            onToggleSelectedNodeTag={workspaceEditor.toggleSelectedNodeTag}
             selectedNodeId={workspaceEditor.selectedNodeId}
             tree={workspaceEditor.tree}
             workspaceTitle={workspaceEditor.workspaceTitle}

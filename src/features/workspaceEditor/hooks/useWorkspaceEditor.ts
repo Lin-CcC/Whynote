@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+  attachTagToNode,
   canParentAcceptChild,
   canNodeHaveChildren,
   createNode,
   deleteNode,
+  detachTagFromNode,
+  ensureBuiltinTags,
   getModuleScopeId,
   getNodeOrThrow,
   insertChildNode,
@@ -56,29 +59,33 @@ export function useWorkspaceEditor({
   onSnapshotChange,
   onSelectionChange,
 }: WorkspaceEditorProps) {
-  const [tree, setTree] = useState(initialSnapshot.tree);
+  const initialTreeRef = useRef<NodeTree | null>(null);
+  const initialTree =
+    initialTreeRef.current ??
+    (initialTreeRef.current = ensureBuiltinTags(initialSnapshot.tree));
+  const [tree, setTree] = useState(initialTree);
   const [currentModuleId, setCurrentModuleId] = useState<string | null>(() =>
     resolveModuleId(
-      initialSnapshot.tree,
+      initialTree,
       initialSelectedNodeId,
       initialModuleId,
     ),
   );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(() => {
     const resolvedModuleId = resolveModuleId(
-      initialSnapshot.tree,
+      initialTree,
       initialSelectedNodeId,
       initialModuleId,
     );
 
     return resolveSelectedNodeId(
-      initialSnapshot.tree,
+      initialTree,
       initialSelectedNodeId,
       resolvedModuleId,
     );
   });
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() =>
-    buildExpandedNodeIds(initialSnapshot.tree, initialModuleId),
+    buildExpandedNodeIds(initialTree, initialModuleId),
   );
   const [operationError, setOperationError] = useState<string | null>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -107,8 +114,13 @@ export function useWorkspaceEditor({
     }
 
     const nodeElement = nodeElementMapRef.current.get(selectedNodeId);
+    const activeElement = document.activeElement;
 
-    nodeElement?.focus();
+    if (!nodeElement || nodeElement.contains(activeElement)) {
+      return;
+    }
+
+    nodeElement.focus();
   }, [selectedNodeId, tree]);
 
   useEffect(() => {
@@ -195,6 +207,29 @@ export function useWorkspaceEditor({
 
       return nextTree;
     });
+  }
+
+  function toggleSelectedNodeTag(tagId: string) {
+    if (isInteractionLocked || !selectedNodeId) {
+      return;
+    }
+
+    setTree((previousTree) => {
+      if (!previousTree.nodes[selectedNodeId]) {
+        return previousTree;
+      }
+
+      const normalizedTree = ensureBuiltinTags(previousTree);
+      const selectedNode = getNodeOrThrow(normalizedTree, selectedNodeId);
+      const nextTree = selectedNode.tagIds.includes(tagId)
+        ? detachTagFromNode(normalizedTree, selectedNodeId, tagId)
+        : attachTagToNode(normalizedTree, selectedNodeId, tagId);
+
+      onSnapshotChange?.(createNextSnapshot(initialSnapshot, nextTree));
+
+      return nextTree;
+    });
+    setOperationError(null);
   }
 
   function insertChildAtSelection() {
@@ -419,6 +454,7 @@ export function useWorkspaceEditor({
     switchModule,
     toggleNodeExpanded,
     tree,
+    toggleSelectedNodeTag,
     updateNode,
     workspaceTitle: initialSnapshot.workspace.title,
     insertChildAtSelection,
