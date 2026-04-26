@@ -1,4 +1,7 @@
+import type { ReactNode } from 'react';
+
 import type {
+  TreeNode,
   NonRootNode,
   NodeTree,
   PlanStepStatus,
@@ -37,9 +40,29 @@ export interface EditorActionAvailability {
   canLower: boolean;
 }
 
+export interface WorkspaceEditorSelectionState {
+  currentModuleId: string | null;
+  selectedNodeId: string | null;
+}
+
+export interface WorkspaceEditorRenderContext
+  extends WorkspaceEditorSelectionState {
+  currentModule: TreeNode | null;
+  selectedNode: TreeNode | null;
+  tree: NodeTree;
+}
+
 export interface WorkspaceEditorProps {
   initialSnapshot?: WorkspaceSnapshot;
   initialModuleId?: string;
   initialSelectedNodeId?: string;
   operations?: WorkspaceEditorOperations;
+  onSnapshotChange?: (snapshot: WorkspaceSnapshot) => void;
+  onSelectionChange?: (selection: WorkspaceEditorSelectionState) => void;
+  renderLeftPanelExtra?: (
+    context: WorkspaceEditorRenderContext,
+  ) => ReactNode;
+  renderRightPanelExtra?: (
+    context: WorkspaceEditorRenderContext,
+  ) => ReactNode;
 }

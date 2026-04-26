@@ -11,6 +11,13 @@ import './workspaceEditor.css';
 
 export default function WorkspaceEditor(props: WorkspaceEditorProps) {
   const workspaceEditor = useWorkspaceEditor(props);
+  const renderContext = {
+    currentModule: workspaceEditor.currentModule,
+    currentModuleId: workspaceEditor.currentModuleId,
+    selectedNode: workspaceEditor.selectedNode,
+    selectedNodeId: workspaceEditor.selectedNodeId,
+    tree: workspaceEditor.tree,
+  };
 
   return (
     <AppLayout
@@ -49,6 +56,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
               </p>
             ) : null}
           </SectionCard>
+          {props.renderLeftPanelExtra?.(renderContext)}
         </div>
       }
       mainPanel={
@@ -63,6 +71,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
       }
       rightPanel={
         <div className="workspace-panelStack">
+          {props.renderRightPanelExtra?.(renderContext)}
           <SelectedNodeInspector
             currentModuleId={workspaceEditor.currentModuleId}
             selectedNodeId={workspaceEditor.selectedNodeId}

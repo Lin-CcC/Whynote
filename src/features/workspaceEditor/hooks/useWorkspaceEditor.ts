@@ -16,6 +16,7 @@ import {
   type PlanStepNode,
   shouldConvertToModuleAtRoot,
   type TreeNode,
+  type WorkspaceSnapshot,
 } from '../../nodeDomain';
 import type {
   EditorActionAvailability,
@@ -51,6 +52,8 @@ export function useWorkspaceEditor({
   initialModuleId = DEMO_MODULE_ID,
   initialSelectedNodeId = DEMO_SELECTED_NODE_ID,
   operations = defaultWorkspaceEditorOperations,
+  onSnapshotChange,
+  onSelectionChange,
 }: WorkspaceEditorProps) {
   const [tree, setTree] = useState(initialSnapshot.tree);
   const [currentModuleId, setCurrentModuleId] = useState<string | null>(() =>
@@ -99,6 +102,13 @@ export function useWorkspaceEditor({
 
     nodeElement?.focus();
   }, [selectedNodeId, tree]);
+
+  useEffect(() => {
+    onSelectionChange?.({
+      currentModuleId,
+      selectedNodeId,
+    });
+  }, [currentModuleId, onSelectionChange, selectedNodeId]);
 
   function switchModule(moduleId: string) {
     if (!tree.nodes[moduleId]) {
@@ -150,7 +160,17 @@ export function useWorkspaceEditor({
   }
 
   function updateNode(nodeId: string, patch: NodeContentPatch) {
-    setTree((previousTree) => applyNodePatch(previousTree, nodeId, patch));
+    setTree((previousTree) => {
+      const nextTree = applyNodePatch(previousTree, nodeId, patch);
+
+      if (nextTree !== previousTree) {
+        onSnapshotChange?.(
+          createNextSnapshot(initialSnapshot, nextTree),
+        );
+      }
+
+      return nextTree;
+    });
   }
 
   function insertChildAtSelection() {
@@ -333,6 +353,7 @@ export function useWorkspaceEditor({
         ),
       );
       setOperationError(null);
+      onSnapshotChange?.(createNextSnapshot(initialSnapshot, nextTree));
     } catch (error) {
       setOperationError(
         error instanceof Error ? error.message : '结构操作失败，请检查当前节点。',
@@ -361,6 +382,19 @@ export function useWorkspaceEditor({
     deleteSelection,
     liftSelection,
     lowerSelection,
+  };
+}
+
+function createNextSnapshot(
+  snapshot: WorkspaceSnapshot,
+  tree: NodeTree,
+): WorkspaceSnapshot {
+  return {
+    workspace: {
+      ...snapshot.workspace,
+      updatedAt: new Date().toISOString(),
+    },
+    tree,
   };
 }
 
