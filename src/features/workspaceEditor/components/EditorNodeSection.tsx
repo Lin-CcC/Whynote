@@ -1,7 +1,6 @@
 import { Fragment, type CSSProperties, type ChangeEvent } from 'react';
 
-import type { NodeTree, PlanStepStatus } from '../../nodeDomain';
-import { getNodeOrThrow } from '../../nodeDomain';
+import { getNodeOrThrow, type NodeTree, type PlanStepStatus } from '../../nodeDomain';
 import {
   getChildNodes,
   getNodeEmphasis,
@@ -49,6 +48,12 @@ export default function EditorNodeSection({
       ? childNodes.find((childNode) => childNode.type === 'question')?.id ?? null
       : null;
 
+  function handleEditableFocus() {
+    if (!isSelected) {
+      onSelectNode(node.id);
+    }
+  }
+
   function handleTitleChange(event: ChangeEvent<HTMLInputElement>) {
     onUpdateNode(node.id, { title: event.target.value });
   }
@@ -83,6 +88,7 @@ export default function EditorNodeSection({
               disabled={isInteractionLocked}
               onChange={handleStatusChange}
               onClick={(event) => event.stopPropagation()}
+              onFocus={handleEditableFocus}
               value={node.status}
             >
               {Object.entries(PLAN_STEP_STATUS_LABELS).map(([status, label]) => (
@@ -94,11 +100,11 @@ export default function EditorNodeSection({
           ) : null}
           {isSelected ? <span className="workspace-selectedBadge">已聚焦</span> : null}
         </div>
-        <p className="workspace-nodeHint">
-          {node.type === 'plan-step'
-            ? '正式步骤节点，视觉上弱于正文内容。'
-            : '当前卡片承接基础文本编辑，后续可继续接富文本能力。'}
-        </p>
+        {node.type === 'plan-step' ? (
+          <p className="workspace-nodeHint">
+            正式步骤节点会继续按真实内容展开，不再额外伪装成说明正文。
+          </p>
+        ) : null}
       </div>
       <input
         aria-label={`${node.title || getNodeTypeLabel(node.type)} 标题`}
@@ -106,6 +112,7 @@ export default function EditorNodeSection({
         disabled={isInteractionLocked}
         onChange={handleTitleChange}
         onClick={(event) => event.stopPropagation()}
+        onFocus={handleEditableFocus}
         value={node.title}
       />
       <textarea
@@ -114,6 +121,7 @@ export default function EditorNodeSection({
         disabled={isInteractionLocked}
         onChange={handleContentChange}
         onClick={(event) => event.stopPropagation()}
+        onFocus={handleEditableFocus}
         placeholder={getNodeInputPlaceholder(node.type, 'content')}
         rows={node.type === 'plan-step' ? 3 : 4}
         value={node.content}
@@ -127,12 +135,14 @@ export default function EditorNodeSection({
                   <div className="workspace-splitHeader">
                     <div>
                       <p className="workspace-kicker">自动拆分结果</p>
-                      <h3 className="workspace-splitTitle">父问题保留，子问题显式承接</h3>
+                      <h3 className="workspace-splitTitle">
+                        父问题保留，子问题显式承接
+                      </h3>
                     </div>
                     <span className="workspace-counter">{splitQuestionCount} 个子问题</span>
                   </div>
                   <p className="workspace-helpText">
-                    子问题仍按节点真实顺序渲染；若需要继续升降级、插入或删除，先选中对应节点再用左侧结构操作入口。
+                    子问题仍按节点真实顺序展开；若需要继续升降级、插入或删除，先选中对应节点再用左侧结构操作入口。
                   </p>
                 </div>
               ) : null}

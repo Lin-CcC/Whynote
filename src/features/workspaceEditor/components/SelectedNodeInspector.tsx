@@ -1,13 +1,16 @@
 import SectionCard from '../../../ui/SectionCard';
-import type { NodeTree } from '../../nodeDomain';
-import { getAllowedChildTypes, getNodeOrThrow } from '../../nodeDomain';
 import {
-  getNodePath,
-  getNodeTypeLabel,
-} from '../utils/treeSelectors';
+  getAllowedChildTypes,
+  getNodeOrThrow,
+  resolveBuiltinTags,
+  type NodeTree,
+} from '../../nodeDomain';
+import { getNodePath, getNodeTypeLabel } from '../utils/treeSelectors';
 
 type SelectedNodeInspectorProps = {
   currentModuleId: string | null;
+  isInteractionLocked: boolean;
+  onToggleSelectedNodeTag: (tagId: string) => void;
   selectedNodeId: string | null;
   tree: NodeTree;
   workspaceTitle: string;
@@ -15,6 +18,8 @@ type SelectedNodeInspectorProps = {
 
 export default function SelectedNodeInspector({
   currentModuleId,
+  isInteractionLocked,
+  onToggleSelectedNodeTag,
   selectedNodeId,
   tree,
   workspaceTitle,
@@ -28,6 +33,13 @@ export default function SelectedNodeInspector({
       ? getNodeOrThrow(tree, currentModuleId)
       : null;
   const selectedNodePath = selectedNode ? getNodePath(tree, selectedNode.id) : [];
+  const selectedTagNames = selectedNode
+    ? selectedNode.tagIds
+        .map((tagId) => tree.tags[tagId]?.name)
+        .filter((tagName): tagName is string => Boolean(tagName))
+        .sort((leftTag, rightTag) => leftTag.localeCompare(rightTag, 'zh-Hans-CN'))
+    : [];
+  const builtinTags = resolveBuiltinTags(tree);
 
   return (
     <>
@@ -73,7 +85,38 @@ export default function SelectedNodeInspector({
                 : '暂无'}
             </dd>
           </div>
+          <div>
+            <dt>标签</dt>
+            <dd>{selectedTagNames.length > 0 ? selectedTagNames.join('、') : '暂无'}</dd>
+          </div>
         </dl>
+        <div className="workspace-tagSection">
+          <p className="workspace-kicker">节点标签</p>
+          <p className="workspace-tagMeta">
+            {selectedNode
+              ? '给当前选中节点快速挂载或移除内建标签。'
+              : '先选中一个节点，再挂载内建标签。'}
+          </p>
+          <div className="workspace-tagList">
+            {builtinTags.map((tag) => {
+              const isActive = selectedNode?.tagIds.includes(tag.id) ?? false;
+
+              return (
+                <button
+                  aria-pressed={isActive}
+                  className="workspace-tagButton"
+                  data-active={isActive}
+                  disabled={!selectedNode || isInteractionLocked}
+                  key={tag.id}
+                  onClick={() => onToggleSelectedNodeTag(tag.id)}
+                  type="button"
+                >
+                  {tag.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </SectionCard>
       <SectionCard>
         <div className="workspace-sectionHeader">
