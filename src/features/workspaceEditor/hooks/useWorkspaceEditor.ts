@@ -81,6 +81,7 @@ export function useWorkspaceEditor({
     buildExpandedNodeIds(initialSnapshot.tree, initialModuleId),
   );
   const [operationError, setOperationError] = useState<string | null>(null);
+  const onSelectionChangeRef = useRef(onSelectionChange);
   const nodeElementMapRef = useRef(new Map<string, HTMLElement>());
 
   const moduleNodes = getModuleNodes(tree);
@@ -97,6 +98,10 @@ export function useWorkspaceEditor({
     : getActionAvailability(tree, selectedNodeId);
 
   useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
+
+  useEffect(() => {
     if (!selectedNodeId) {
       return;
     }
@@ -107,11 +112,11 @@ export function useWorkspaceEditor({
   }, [selectedNodeId, tree]);
 
   useEffect(() => {
-    onSelectionChange?.({
+    onSelectionChangeRef.current?.({
       currentModuleId,
       selectedNodeId,
     });
-  }, [currentModuleId, onSelectionChange, selectedNodeId]);
+  }, [currentModuleId, selectedNodeId]);
 
   function switchModule(moduleId: string) {
     if (isInteractionLocked) {

@@ -79,12 +79,12 @@ export default function SelectedNodeInspector({
         <div className="workspace-sectionHeader">
           <div>
             <p className="workspace-kicker">范围说明</p>
-            <h2 className="workspace-sectionTitle">本工作树未展开的部分</h2>
+            <h2 className="workspace-sectionTitle">当前边界</h2>
           </div>
         </div>
         <p className="workspace-helpText">
-          AI 编排、模块生成、搜索、导出和完整资料区仍留给其他工作树。本次只把文本主视图、
-          结构视图、节点操作入口和拆分结果承接位做成最小可用。
+          当前界面已覆盖文本主视图、结构视图、全局资料区、搜索、定位、标签筛选和基础导出；
+          仍不扩展云同步、PDF / DOC、完整资料对照阅读区和新的 AI 能力。
         </p>
       </SectionCard>
     </>

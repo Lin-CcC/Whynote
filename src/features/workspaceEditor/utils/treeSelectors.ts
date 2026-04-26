@@ -165,7 +165,7 @@ export function getNodeInputPlaceholder(
     case 'judgment':
       return '在这里承接判断、评估或纠偏意见。';
     case 'resource':
-      return '资料区能力暂未在本工作树展开。';
+      return '补充资料摘要、来源备注或导入说明。';
     case 'resource-fragment':
       return '在这里承接摘录正文。';
     case 'theme-root':

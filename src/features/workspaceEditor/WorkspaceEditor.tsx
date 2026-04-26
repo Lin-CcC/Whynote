@@ -14,9 +14,11 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
   const renderContext = {
     currentModule: workspaceEditor.currentModule,
     currentModuleId: workspaceEditor.currentModuleId,
+    selectNode: workspaceEditor.selectNode,
     selectedNode: workspaceEditor.selectedNode,
     selectedNodeId: workspaceEditor.selectedNodeId,
     tree: workspaceEditor.tree,
+    workspaceTitle: workspaceEditor.workspaceTitle,
   };
 
   return (

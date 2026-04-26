@@ -49,7 +49,9 @@ export interface WorkspaceEditorRenderContext
   extends WorkspaceEditorSelectionState {
   currentModule: TreeNode | null;
   selectedNode: TreeNode | null;
+  selectNode: (nodeId: string) => void;
   tree: NodeTree;
+  workspaceTitle: string;
 }
 
 export interface WorkspaceEditorProps {

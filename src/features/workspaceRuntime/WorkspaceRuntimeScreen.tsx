@@ -3,7 +3,11 @@ import { useState } from 'react';
 import AppLayout from '../../ui/AppLayout';
 import SectionCard from '../../ui/SectionCard';
 import WorkspaceEditor from '../workspaceEditor/WorkspaceEditor';
-import type { WorkspaceEditorRenderContext } from '../workspaceEditor/workspaceEditorTypes';
+import type {
+  WorkspaceEditorRenderContext,
+  WorkspaceEditorSelectionState,
+} from '../workspaceEditor/workspaceEditorTypes';
+import ResourcesSearchExportPanel from '../resourcesSearchExport/ResourcesSearchExportPanel';
 import WorkspaceRuntimeActionCard from './components/WorkspaceRuntimeActionCard';
 import WorkspaceRuntimeAiConfigCard from './components/WorkspaceRuntimeAiConfigCard';
 import WorkspaceRuntimeStatusCard from './components/WorkspaceRuntimeStatusCard';
@@ -20,6 +24,9 @@ export default function WorkspaceRuntimeScreen({
 }: WorkspaceRuntimeScreenProps) {
   const [resolvedDependencies] = useState(
     () => dependencies ?? createDefaultWorkspaceRuntimeDependencies(),
+  );
+  const [activeResourceNodeId, setActiveResourceNodeId] = useState<string | null>(
+    null,
   );
   const runtime = useWorkspaceRuntime(resolvedDependencies);
   const interactionLockReason = runtime.isAiRunning
@@ -79,7 +86,7 @@ export default function WorkspaceRuntimeScreen({
       interactionLockReason={interactionLockReason}
       isInteractionLocked={runtime.isAiRunning}
       key={`${runtime.snapshot.workspace.id}:${String(runtime.editorSessionKey)}`}
-      onSelectionChange={runtime.handleSelectionChange}
+      onSelectionChange={handleEditorSelectionChange}
       onSnapshotChange={runtime.handleSnapshotChange}
       renderLeftPanelExtra={renderLeftPanelExtra}
       renderRightPanelExtra={renderRightPanelExtra}
@@ -105,9 +112,24 @@ export default function WorkspaceRuntimeScreen({
     );
   }
 
-  function renderRightPanelExtra(_context: WorkspaceEditorRenderContext) {
+  function renderRightPanelExtra(context: WorkspaceEditorRenderContext) {
     return (
       <>
+        <ResourcesSearchExportPanel
+          activeResourceNodeId={activeResourceNodeId}
+          currentModuleId={context.currentModuleId}
+          onClearResourceFocus={() => {
+            setActiveResourceNodeId(null);
+          }}
+          onFocusResourceNode={setActiveResourceNodeId}
+          onSelectEditorNode={(nodeId) => {
+            setActiveResourceNodeId(null);
+            context.selectNode(nodeId);
+          }}
+          selectedEditorNodeId={context.selectedNodeId}
+          tree={context.tree}
+          workspaceTitle={context.workspaceTitle}
+        />
         <WorkspaceRuntimeStatusCard
           activeAiActionLabel={runtime.activeAiActionLabel}
           aiError={runtime.aiError}
@@ -126,5 +148,12 @@ export default function WorkspaceRuntimeScreen({
         />
       </>
     );
+  }
+
+  function handleEditorSelectionChange(
+    selection: WorkspaceEditorSelectionState,
+  ) {
+    setActiveResourceNodeId(null);
+    runtime.handleSelectionChange(selection);
   }
 }
