@@ -45,8 +45,17 @@ export interface WorkspaceEditorSelectionState {
   selectedNodeId: string | null;
 }
 
+export interface ExternalTreeChangeOptions {
+  nextSelectedNodeId?: string | null;
+  preferredModuleId?: string | null;
+}
+
 export interface WorkspaceEditorRenderContext
   extends WorkspaceEditorSelectionState {
+  applyTreeChange: (
+    nextTree: NodeTree,
+    options?: ExternalTreeChangeOptions,
+  ) => void;
   currentModule: TreeNode | null;
   selectedNode: TreeNode | null;
   selectNode: (nodeId: string) => void;

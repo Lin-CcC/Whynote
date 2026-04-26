@@ -118,6 +118,7 @@ export default function WorkspaceRuntimeScreen({
         <ResourcesSearchExportPanel
           activeResourceNodeId={activeResourceNodeId}
           currentModuleId={context.currentModuleId}
+          onApplyTreeChange={context.applyTreeChange}
           onClearResourceFocus={() => {
             setActiveResourceNodeId(null);
           }}
