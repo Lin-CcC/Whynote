@@ -3,4 +3,5 @@ export * from './compoundQuestionSplitService';
 export * from './moduleGenerationService';
 export * from './planStepRuntimeStatusService';
 export * from './planStepGenerationService';
+export * from './questionClosureService';
 export * from './subQuestionOrderingService';

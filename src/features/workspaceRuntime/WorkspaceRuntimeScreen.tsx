@@ -13,6 +13,10 @@ import WorkspaceRuntimeAiConfigCard from './components/WorkspaceRuntimeAiConfigC
 import WorkspaceRuntimeStatusCard from './components/WorkspaceRuntimeStatusCard';
 import { useWorkspaceRuntime } from './hooks/useWorkspaceRuntime';
 import { createDefaultWorkspaceRuntimeDependencies } from './services/createDefaultWorkspaceRuntimeDependencies';
+import {
+  hasQuestionAnswerEvidence,
+  isLeafQuestion,
+} from './services/learningRuntimeContext';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 
 type WorkspaceRuntimeScreenProps = {
@@ -73,7 +77,7 @@ export default function WorkspaceRuntimeScreen({
             <p className="section-label">范围说明</p>
             <h2 className="section-title">当前工作树目标</h2>
             <p className="section-description">
-              只负责把真实工作区、持久化和 learning-engine 闭环接起来，不扩展新产品功能。
+              只负责把真实工作区、持久化和 learning-engine 闭环接起来，不扩展新产品能力。
             </p>
           </SectionCard>
         }
@@ -97,11 +101,21 @@ export default function WorkspaceRuntimeScreen({
   );
 
   function renderLeftPanelExtra(context: WorkspaceEditorRenderContext) {
+    const canEvaluateQuestionAnswer =
+      context.selectedNode?.type === 'question' &&
+      isLeafQuestion(context.tree, context.selectedNode.id) &&
+      hasQuestionAnswerEvidence(context.tree, context.selectedNode.id) &&
+      !runtime.isAiRunning;
+
     return (
       <WorkspaceRuntimeActionCard
+        canEvaluateQuestionAnswer={canEvaluateQuestionAnswer}
         currentModule={context.currentModule}
         isAiRunning={runtime.isAiRunning}
         onCreateModule={context.createModule}
+        onEvaluateQuestionAnswer={(questionNodeId) => {
+          void runtime.runQuestionEvaluation(questionNodeId);
+        }}
         onGeneratePlanSteps={(moduleNodeId) => {
           void runtime.runPlanStepGeneration(moduleNodeId);
         }}

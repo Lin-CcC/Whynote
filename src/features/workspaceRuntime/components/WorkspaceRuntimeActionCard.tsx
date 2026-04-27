@@ -2,9 +2,11 @@ import SectionCard from '../../../ui/SectionCard';
 import type { TreeNode } from '../../nodeDomain';
 
 type WorkspaceRuntimeActionCardProps = {
+  canEvaluateQuestionAnswer: boolean;
   currentModule: TreeNode | null;
   isAiRunning: boolean;
   onCreateModule: () => void;
+  onEvaluateQuestionAnswer: (questionNodeId: string) => void;
   onGeneratePlanSteps: (moduleNodeId: string) => void;
   onSplitQuestion: (questionNodeId: string) => void;
   onSuggestCompletion: (planStepNodeId: string) => void;
@@ -12,9 +14,11 @@ type WorkspaceRuntimeActionCardProps = {
 };
 
 export default function WorkspaceRuntimeActionCard({
+  canEvaluateQuestionAnswer,
   currentModule,
   isAiRunning,
   onCreateModule,
+  onEvaluateQuestionAnswer,
   onGeneratePlanSteps,
   onSplitQuestion,
   onSuggestCompletion,
@@ -41,6 +45,14 @@ export default function WorkspaceRuntimeActionCard({
     onSplitQuestion(selectedNode.id);
   }
 
+  function handleEvaluateQuestionAnswer() {
+    if (selectedNode?.type !== 'question') {
+      return;
+    }
+
+    onEvaluateQuestionAnswer(selectedNode.id);
+  }
+
   function handleSuggestCompletion() {
     if (selectedNode?.type !== 'plan-step') {
       return;
@@ -60,7 +72,8 @@ export default function WorkspaceRuntimeActionCard({
         </div>
         <div className="workspace-emptyState">
           <p className="workspace-helpText">
-            当前还没有可供 AI 操作的学习模块。先新建一个模块，再规划学习路径或继续后续 AI 动作。
+            当前还没有可供 AI 操作的学习模块。先新建一个模块，再规划学习路径或继续后续
+            AI 动作。
           </p>
           <button
             className="workspace-inlineAction"
@@ -84,7 +97,7 @@ export default function WorkspaceRuntimeActionCard({
         </div>
       </div>
       <p className="workspace-helpText">
-        当前只接最小学习闭环：为模块规划学习路径、拆分复合问题、补看步骤完成依据。
+        当前接的是最小学习闭环：规划步骤与铺垫讲解、拆分问题、评估回答、查看步骤完成依据。
       </p>
       <div className="workspace-actionGrid">
         <button
@@ -100,6 +113,13 @@ export default function WorkspaceRuntimeActionCard({
           type="button"
         >
           拆分当前问题
+        </button>
+        <button
+          disabled={!canEvaluateQuestionAnswer}
+          onClick={handleEvaluateQuestionAnswer}
+          type="button"
+        >
+          评估当前回答
         </button>
         <button
           disabled={!canSuggestCompletion}

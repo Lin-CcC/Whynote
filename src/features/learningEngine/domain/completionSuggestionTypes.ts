@@ -3,10 +3,13 @@ import type { PlanStepStatus } from '../../nodeDomain';
 export interface PlanStepCompletionEvidence {
   stepStatus: PlanStepStatus;
   questionCount: number;
+  leafQuestionCount: number;
   answerCount: number;
   answeredQuestionCount: number;
+  closedLeafQuestionCount: number;
   summaryCount: number;
   judgmentCount: number;
+  scaffoldSummaryCount: number;
   directClosureCount: number;
   blockingJudgmentCount: number;
   refinedQuestionCount: number;

@@ -58,8 +58,8 @@ describe('moduleGenerationService', () => {
               content: `步骤说明 ${String(planStepIndex + 1)}`,
               prerequisites: [
                 {
-                  title: `前置问题 ${String(planStepIndex + 1)}`,
-                  content: '先确认背景。',
+                  title: `前置讲解 ${String(planStepIndex + 1)}`,
+                  content: '先确认背景和核心概念。',
                 },
               ],
               questions: [
@@ -95,11 +95,14 @@ describe('moduleGenerationService', () => {
             (planStep) =>
               planStep.type === 'plan-step' &&
               planStep.status === 'todo' &&
-              planStep.questions.length >= 2,
+              planStep.introductions.length >= 1 &&
+              planStep.questions.length >= 1,
           ),
         ),
       ).toBe(true);
-      expect(result.modules[0].planSteps[0].questions[0].title).toContain('铺垫：');
+      expect(result.modules[0].planSteps[0].introductions[0].title).toContain(
+        '铺垫：',
+      );
     },
   );
 
@@ -121,6 +124,11 @@ describe('moduleGenerationService', () => {
     expect(result.modules).toHaveLength(4);
     expect(result.modules[0].title).toContain('TypeScript 类型系统');
     expect(result.modules[0].planSteps).toHaveLength(4);
-    expect(result.modules[0].planSteps[0].questions.length).toBeGreaterThanOrEqual(2);
+    expect(result.modules[0].planSteps[0].introductions.length).toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(result.modules[0].planSteps[0].questions.length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 });

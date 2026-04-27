@@ -13,15 +13,15 @@ import type {
 
 const BLOCKING_TAG_NAMES = new Set(['未理解', '待验证']);
 const BLOCKING_JUDGMENT_KEYWORDS = [
-  '未完成',
+  '还不完整',
   '不完整',
   '不准确',
-  '待验证',
-  '仍有问题',
+  '待补充',
   '需要补充',
-  '存在疑问',
+  '需要继续',
+  '仍有问题',
 ];
-const COMPLETION_READY_REASON = '当前步骤已具备完成信号。';
+const COMPLETION_READY_REASON = '当前步骤已满足最小学习闭环。';
 
 export function suggestPlanStepCompletion(
   tree: NodeTree,
@@ -60,11 +60,17 @@ function buildPlanStepCompletionEvidence(
     (node): node is Extract<TreeNode, { type: 'question' }> =>
       node.type === 'question',
   );
+  const leafQuestionNodes = questionNodes.filter(
+    (questionNode) =>
+      !questionNode.childIds.some((childId) => tree.nodes[childId]?.type === 'question'),
+  );
   const answerNodes = subtreeNodes.filter((node) => node.type === 'answer');
-  const summaryNodes = subtreeNodes.filter((node) => node.type === 'summary');
+  const scaffoldSummaryIds = collectScaffoldSummaryIds(tree, planStepNode);
+  const summaryNodes = subtreeNodes.filter(
+    (node) => node.type === 'summary' && !scaffoldSummaryIds.has(node.id),
+  );
   const judgmentNodes = subtreeNodes.filter((node) => node.type === 'judgment');
-  const learningNodes = [
-    ...questionNodes,
+  const referencedLearningEvidenceNodes = [
     ...answerNodes,
     ...summaryNodes,
     ...judgmentNodes,
@@ -73,36 +79,43 @@ function buildPlanStepCompletionEvidence(
     planStepNode,
     ...subtreeNodes,
   ]);
-  const resolvedQuestionIds = collectResolvedQuestionIds(tree, questionNodes);
+  const resolvedLeafQuestionIds = collectResolvedLeafQuestionIds(
+    tree,
+    leafQuestionNodes,
+  );
   const directClosureCount = planStepNode.childIds
     .map((childId) => getNodeOrThrow(tree, childId))
-    .filter(
-      (node) =>
-        node.type === 'answer' ||
-        node.type === 'summary' ||
-        node.type === 'judgment',
-    ).length;
-  const answeredQuestionCount = resolvedQuestionIds.size;
-  const unresolvedQuestionTitles = questionNodes
-    .filter((questionNode) => !resolvedQuestionIds.has(questionNode.id))
-    .map((questionNode) => questionNode.title);
-  const blockingJudgmentCount = judgmentNodes.filter((judgmentNode) =>
-    containsBlockingJudgmentSignal(judgmentNode),
+    .filter((node) => {
+      if (node.type === 'answer' || node.type === 'judgment') {
+        return true;
+      }
+
+      return node.type === 'summary' && !scaffoldSummaryIds.has(node.id);
+    }).length;
+  const answeredQuestionCount = leafQuestionNodes.filter((questionNode) =>
+    hasDirectChildOfType(tree, questionNode, 'answer'),
   ).length;
+  const unresolvedQuestionTitles = leafQuestionNodes
+    .filter((questionNode) => !resolvedLeafQuestionIds.has(questionNode.id))
+    .map((questionNode) => questionNode.title);
+  const blockingJudgmentCount = countBlockingStepLevelJudgments(tree, planStepNode);
   const refinedQuestionCount = questionNodes.filter((questionNode) =>
     questionNode.childIds.some((childId) => tree.nodes[childId]?.type === 'question'),
   ).length;
-  const referencedNodeCount = learningNodes.filter(
+  const referencedNodeCount = referencedLearningEvidenceNodes.filter(
     (node) => node.referenceIds.length > 0,
   ).length;
 
   return {
     stepStatus: planStepNode.status,
     questionCount: questionNodes.length,
+    leafQuestionCount: leafQuestionNodes.length,
     answerCount: answerNodes.length,
     answeredQuestionCount,
+    closedLeafQuestionCount: resolvedLeafQuestionIds.size,
     summaryCount: summaryNodes.length,
     judgmentCount: judgmentNodes.length,
+    scaffoldSummaryCount: scaffoldSummaryIds.size,
     directClosureCount,
     blockingJudgmentCount,
     refinedQuestionCount,
@@ -123,12 +136,25 @@ function evaluateCompletionEvidence(evidence: PlanStepCompletionEvidence) {
     reasons.push('当前步骤还没有 question 节点。');
   }
 
-  if (evidence.answerCount === 0 && evidence.summaryCount === 0) {
-    reasons.push('当前步骤缺少回答或总结。');
+  if (evidence.leafQuestionCount === 0) {
+    reasons.push('当前步骤还没有可直接闭环的叶子问题。');
+  }
+
+  if (
+    evidence.answerCount === 0 &&
+    evidence.summaryCount === 0 &&
+    evidence.judgmentCount === 0 &&
+    evidence.referencedNodeCount === 0
+  ) {
+    reasons.push('当前步骤仍停留在铺垫与问题骨架阶段，尚未出现真实学习证据。');
   }
 
   if (evidence.summaryCount === 0) {
-    reasons.push('当前步骤缺少总结节点。');
+    reasons.push('当前步骤还没有回答后的总结讲解。');
+  }
+
+  if (evidence.judgmentCount === 0) {
+    reasons.push('当前步骤还没有回答后的 judgment 节点。');
   }
 
   if (evidence.unresolvedQuestionTitles.length > 0) {
@@ -142,7 +168,7 @@ function evaluateCompletionEvidence(evidence: PlanStepCompletionEvidence) {
     evidence.directClosureCount > 0
   ) {
     reasons.push(
-      '直属于 plan-step 的回答 / 总结 / 判断只能作为补充证据，不能替代 question 自身闭环。',
+      '直接挂在 plan-step 下的回答、总结或判断只能作为补充证据，不能替代具体 question 的闭环。',
     );
   }
 
@@ -151,7 +177,7 @@ function evaluateCompletionEvidence(evidence: PlanStepCompletionEvidence) {
   }
 
   if (evidence.blockingJudgmentCount > 0) {
-    reasons.push('判断节点仍提示内容未完成或待修正。');
+    reasons.push('步骤层级仍存在阻塞性 judgment，暂时不能完成。');
   }
 
   if (reasons.length === 0) {
@@ -177,32 +203,93 @@ function collectBlockingTagNames(tree: NodeTree, nodes: TreeNode[]) {
   return [...blockingTagNames];
 }
 
-function collectResolvedQuestionIds(
+function collectResolvedLeafQuestionIds(
   tree: NodeTree,
-  questionNodes: Extract<TreeNode, { type: 'question' }>[],
+  leafQuestionNodes: Extract<TreeNode, { type: 'question' }>[],
 ) {
   const resolvedQuestionIds = new Set<string>();
 
-  for (const questionNode of questionNodes) {
-    const descendantNodeIds = getSubtreeNodeIds(tree, questionNode.id);
-
-    descendantNodeIds.delete(questionNode.id);
-
-    const hasClosureNode = [...descendantNodeIds]
-      .map((nodeId) => getNodeOrThrow(tree, nodeId))
-      .some(
-        (node) =>
-          node.type === 'answer' ||
-          node.type === 'summary' ||
-          node.type === 'judgment',
-      );
-
-    if (hasClosureNode) {
+  for (const questionNode of leafQuestionNodes) {
+    if (isLeafQuestionResolved(tree, questionNode)) {
       resolvedQuestionIds.add(questionNode.id);
     }
   }
 
   return resolvedQuestionIds;
+}
+
+function isLeafQuestionResolved(
+  tree: NodeTree,
+  questionNode: Extract<TreeNode, { type: 'question' }>,
+) {
+  if (!hasDirectChildOfType(tree, questionNode, 'answer')) {
+    return false;
+  }
+
+  if (!hasDirectChildOfType(tree, questionNode, 'summary')) {
+    return false;
+  }
+
+  const latestJudgment = getLatestDirectChildNode(tree, questionNode, 'judgment');
+
+  if (!latestJudgment) {
+    return false;
+  }
+
+  return !containsBlockingJudgmentSignal(latestJudgment);
+}
+
+function collectScaffoldSummaryIds(tree: NodeTree, planStepNode: PlanStepNode) {
+  const scaffoldSummaryIds = new Set<string>();
+
+  for (const childId of planStepNode.childIds) {
+    const childNode = tree.nodes[childId];
+
+    if (childNode?.type === 'summary') {
+      scaffoldSummaryIds.add(childId);
+      continue;
+    }
+
+    if (childNode?.type === 'question') {
+      break;
+    }
+  }
+
+  return scaffoldSummaryIds;
+}
+
+function countBlockingStepLevelJudgments(tree: NodeTree, planStepNode: PlanStepNode) {
+  return planStepNode.childIds
+    .map((childId) => tree.nodes[childId])
+    .filter(
+      (node): node is Extract<TreeNode, { type: 'judgment' }> =>
+        node?.type === 'judgment',
+    )
+    .filter((judgmentNode) => containsBlockingJudgmentSignal(judgmentNode)).length;
+}
+
+function hasDirectChildOfType<TNodeType extends TreeNode['type']>(
+  tree: NodeTree,
+  node: Extract<TreeNode, { childIds: string[] }>,
+  nodeType: TNodeType,
+) {
+  return node.childIds.some((childId) => tree.nodes[childId]?.type === nodeType);
+}
+
+function getLatestDirectChildNode<TNodeType extends TreeNode['type']>(
+  tree: NodeTree,
+  node: Extract<TreeNode, { childIds: string[] }>,
+  nodeType: TNodeType,
+) {
+  const matchingNodes = node.childIds
+    .map((childId) => tree.nodes[childId])
+    .filter(
+      (childNode): childNode is Extract<TreeNode, { type: TNodeType }> =>
+        childNode?.type === nodeType,
+    )
+    .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
+
+  return matchingNodes[matchingNodes.length - 1];
 }
 
 function containsBlockingJudgmentSignal(
