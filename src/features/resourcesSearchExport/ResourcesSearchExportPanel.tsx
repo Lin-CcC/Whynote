@@ -7,7 +7,6 @@ import ExportPanel from './components/ExportPanel';
 import ResourceLibraryPanel from './components/ResourceLibraryPanel';
 import SearchLocatorPanel from './components/SearchLocatorPanel';
 import { useResourcesSearchExport } from './hooks/useResourcesSearchExport';
-import type { ResourceImportDraft } from './services/resourceIngestTypes';
 import './resourcesSearchExport.css';
 
 type ResourcesSearchExportPanelProps = {
@@ -15,9 +14,6 @@ type ResourcesSearchExportPanelProps = {
   currentModuleId: string | null;
   onApplyTreeChange: (nextTree: NodeTree) => void;
   onFocusResourceNode: (nodeId: string) => void;
-  onResolveResourceSummary?: (
-    draft: ResourceImportDraft,
-  ) => Promise<ResourceImportDraft>;
   onSelectEditorNode: (nodeId: string) => void;
   onClearResourceFocus?: () => void;
   onUpsertResourceMetadata?: (record: ResourceMetadataRecord) => Promise<void>;
@@ -36,7 +32,6 @@ export default function ResourcesSearchExportPanel({
   currentModuleId,
   onApplyTreeChange,
   onFocusResourceNode,
-  onResolveResourceSummary,
   onSelectEditorNode,
   onClearResourceFocus,
   onUpsertResourceMetadata = NOOP_RESOURCE_METADATA_RECORD_UPSERT,
@@ -66,7 +61,6 @@ export default function ResourcesSearchExportPanel({
         activeResourceNodeId={activeResourceNodeId}
         onApplyTreeChange={onApplyTreeChange}
         onFocusResourceNode={onFocusResourceNode}
-        onResolveResourceSummary={onResolveResourceSummary}
         onUpsertResourceMetadata={onUpsertResourceMetadata}
         tree={tree}
         workspaceId={workspaceId}

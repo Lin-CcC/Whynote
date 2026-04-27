@@ -72,9 +72,15 @@ describe('planStepRuntimeStatusService', () => {
     const tree = createPlanStepTree('done');
 
     const reconciledTree = reconcilePlanStepStatuses(tree);
+    const stepNode = reconciledTree.nodes['step-runtime-status'];
 
-    expect(reconciledTree.nodes['step-runtime-status'].type).toBe('plan-step');
-    expect(reconciledTree.nodes['step-runtime-status'].status).toBe('todo');
+    expect(stepNode.type).toBe('plan-step');
+
+    if (stepNode.type !== 'plan-step') {
+      throw new Error('Expected reconciled node to remain a plan step.');
+    }
+
+    expect(stepNode.status).toBe('todo');
   });
 });
 
