@@ -127,7 +127,6 @@ export default function WorkspaceRuntimeScreen({
             setActiveResourceNodeId(null);
           }}
           onFocusResourceNode={setActiveResourceNodeId}
-          onResolveResourceSummary={runtime.resolveResourceSummary}
           onSelectEditorNode={(nodeId) => {
             setActiveResourceNodeId(null);
             context.selectNode(nodeId);

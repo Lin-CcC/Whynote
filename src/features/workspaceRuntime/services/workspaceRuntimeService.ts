@@ -17,11 +17,8 @@ import {
   type TreeNode,
   type WorkspaceSnapshot,
 } from '../../nodeDomain';
-import type { ResourceImportDraft } from '../../resourcesSearchExport/services/resourceIngestTypes';
-import { createResourceSummaryGenerationService } from '../../resourcesSearchExport/services/resourceSummaryGenerationService';
 import { createInitialWorkspaceSnapshot } from '../utils/createInitialWorkspaceSnapshot';
 import type {
-  ResourceSummaryResolutionResult,
   WorkspaceInitializationResult,
   WorkspaceMutationResult,
   WorkspaceRuntimeDependencies,
@@ -47,7 +44,6 @@ export function createWorkspaceRuntimeService(
     loadAiConfig,
     saveAiConfig,
     saveWorkspace,
-    resolveResourceSummary,
     upsertResourceMetadata,
     rememberSelectionState,
     async generatePlanSteps(
@@ -277,44 +273,6 @@ export function createWorkspaceRuntimeService(
 
   async function upsertResourceMetadata(record: ResourceMetadataRecord) {
     await dependencies.structuredDataStorage.upsertResourceMetadata(record);
-  }
-
-  async function resolveResourceSummary(
-    draft: ResourceImportDraft,
-    config: AiConfig,
-  ): Promise<ResourceSummaryResolutionResult> {
-    if (!draft.ingest.bodyText?.trim()) {
-      return {
-        draft,
-      };
-    }
-
-    const providerClient = providerFactory(config);
-    const summaryGenerationService = createResourceSummaryGenerationService({
-      providerClient,
-    });
-    const summary = await summaryGenerationService.generate({
-      bodyFormat: draft.ingest.bodyFormat,
-      bodyText: draft.ingest.bodyText,
-      fallbackSummary: draft.content,
-      fallbackTitle: draft.title,
-      importMethod: draft.ingest.importMethod,
-      mimeType: draft.ingest.mimeType,
-      sourceUri: draft.sourceUri,
-    });
-
-    return {
-      draft: {
-        ...draft,
-        content: summary.summary,
-        ingest: {
-          ...draft.ingest,
-          summarySource: 'ai-generated',
-          titleSource: 'ai-generated',
-        },
-        title: summary.title,
-      },
-    };
   }
 
   function rememberSelectionState(

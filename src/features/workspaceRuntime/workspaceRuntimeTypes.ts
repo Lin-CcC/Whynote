@@ -10,7 +10,6 @@ import type {
   StructuredDataStorage,
 } from '../nodeDomain';
 import type { WorkspaceSnapshot } from '../nodeDomain';
-import type { ResourceImportDraft } from '../resourcesSearchExport/services/resourceIngestTypes';
 
 export interface WorkspaceRuntimeDependencies {
   structuredDataStorage: StructuredDataStorage;
@@ -49,8 +48,4 @@ export interface WorkspaceRuntimeStatusState {
   aiError: string | null;
   runtimeMessage: string | null;
   completionSuggestion: CompletionSuggestionResult | null;
-}
-
-export interface ResourceSummaryResolutionResult {
-  draft: ResourceImportDraft;
 }

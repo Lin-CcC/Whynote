@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { AiConfig } from '../../learningEngine';
 import type { ResourceMetadataRecord, WorkspaceSnapshot } from '../../nodeDomain';
-import type { ResourceImportDraft } from '../../resourcesSearchExport/services/resourceIngestTypes';
 import { createWorkspaceRuntimeService } from '../services/workspaceRuntimeService';
 import type {
   WorkspaceRuntimeDependencies,
@@ -114,14 +113,6 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     }));
   }
 
-  async function resolveResourceSummary(
-    draft: ResourceImportDraft,
-  ) {
-    const result = await runtimeService.resolveResourceSummary(draft, state.aiConfig);
-
-    return result.draft;
-  }
-
   async function upsertResourceMetadata(record: ResourceMetadataRecord) {
     await runtimeService.upsertResourceMetadata(record);
     setState((previousState) => ({
@@ -160,7 +151,6 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     runCompletionSuggestion,
     runPlanStepGeneration,
     runQuestionSplit,
-    resolveResourceSummary,
     saveAiConfig,
     upsertResourceMetadata,
   };
