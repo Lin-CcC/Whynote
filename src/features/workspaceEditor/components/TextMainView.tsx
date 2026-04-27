@@ -8,6 +8,7 @@ type TextMainViewProps = {
   currentModuleId: string | null;
   interactionLockReason: string | null;
   isInteractionLocked: boolean;
+  onCreateModule: () => void;
   onSelectNode: (nodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
@@ -19,6 +20,7 @@ export default function TextMainView({
   currentModuleId,
   interactionLockReason,
   isInteractionLocked,
+  onCreateModule,
   onSelectNode,
   onUpdateNode,
   registerNodeElement,
@@ -30,7 +32,19 @@ export default function TextMainView({
       <SectionCard>
         <p className="workspace-kicker">文本主视图</p>
         <h2 className="workspace-sectionTitle">还没有可编辑的模块</h2>
-        <p className="workspace-helpText">先创建或切换到一个模块，再进入真实节点内容。</p>
+        <div className="workspace-emptyState">
+          <p className="workspace-helpText">
+            当前没有模块可承接正文内容。先手动创建首个模块，再继续编辑真实节点。
+          </p>
+          <button
+            className="workspace-inlineAction"
+            disabled={isInteractionLocked}
+            onClick={onCreateModule}
+            type="button"
+          >
+            新建模块
+          </button>
+        </div>
       </SectionCard>
     );
   }

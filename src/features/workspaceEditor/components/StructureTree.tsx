@@ -6,6 +6,7 @@ type StructureTreeProps = {
   currentModuleId: string | null;
   expandedNodeIds: Set<string>;
   isInteractionLocked: boolean;
+  onCreateModule: () => void;
   onSelectNode: (nodeId: string) => void;
   onToggleNode: (nodeId: string) => void;
   selectedNodeId: string | null;
@@ -16,6 +17,7 @@ export default function StructureTree({
   currentModuleId,
   expandedNodeIds,
   isInteractionLocked,
+  onCreateModule,
   onSelectNode,
   onToggleNode,
   selectedNodeId,
@@ -27,10 +29,22 @@ export default function StructureTree({
         <div className="workspace-sectionHeader">
           <div>
             <p className="workspace-kicker">结构视图</p>
-            <h2 className="workspace-sectionTitle">当前模块为空</h2>
+            <h2 className="workspace-sectionTitle">还没有可展示的模块结构</h2>
           </div>
         </div>
-        <p className="workspace-helpText">还没有可展示的模块节点。</p>
+        <div className="workspace-emptyState">
+          <p className="workspace-helpText">
+            模块被删空后，结构树会停在这里。先新建一个模块，再继续插入步骤、问题和回答。
+          </p>
+          <button
+            className="workspace-inlineAction"
+            disabled={isInteractionLocked}
+            onClick={onCreateModule}
+            type="button"
+          >
+            新建模块
+          </button>
+        </div>
       </section>
     );
   }

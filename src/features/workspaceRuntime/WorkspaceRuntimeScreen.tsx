@@ -98,6 +98,7 @@ export default function WorkspaceRuntimeScreen({
       <WorkspaceRuntimeActionCard
         currentModule={context.currentModule}
         isAiRunning={runtime.isAiRunning}
+        onCreateModule={context.createModule}
         onGeneratePlanSteps={(moduleNodeId) => {
           void runtime.runPlanStepGeneration(moduleNodeId);
         }}
