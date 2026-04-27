@@ -24,6 +24,7 @@ const openedStorages: StructuredDataStorage[] = [];
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   window.localStorage.clear();
 
   while (openedStorages.length > 0) {
@@ -35,7 +36,31 @@ afterEach(async () => {
   }
 });
 
-test('creates a resource and makes it immediately available to library, search, export, and restore', async () => {
+test('autofills a resource from url, still allows manual edits, and makes it immediately available to library, search, export, and restore', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return `
+          <html>
+            <head>
+              <title>React Rendering Locality</title>
+              <meta
+                name="description"
+                content="解释局部性如何减少无关重渲染，并帮助判断状态应该放在哪里。"
+              />
+            </head>
+            <body>
+              <main>
+                <p>这段正文不应该覆盖 description。</p>
+              </main>
+            </body>
+          </html>
+        `;
+      },
+    }),
+  );
   const exportProbe = createExportProbe();
   const dependencies = createTestDependencies();
   const firstRender = render(
@@ -43,6 +68,16 @@ test('creates a resource and makes it immediately available to library, search, 
   );
 
   await screen.findByRole('heading', { name: '当前学习模块' });
+  expect(
+    screen.getByRole('button', {
+      name: '尝试自动填充（浏览器受限）',
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      /URL 自动填充目前只是浏览器内的受限尝试：只对少数允许浏览器直接读取的网页可用/,
+    ),
+  ).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '切换到资料区搜索' }));
   fireEvent.change(screen.getByLabelText('搜索关键词'), {
@@ -53,19 +88,32 @@ test('creates a resource and makes it immediately available to library, search, 
 
   expect(screen.getByText('资料区无结果')).toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText('资料标题'), {
-    target: {
-      value: 'React 渲染局部性笔记',
-    },
-  });
   fireEvent.change(screen.getByLabelText('资料来源 URI 或说明'), {
     target: {
       value: 'https://example.com/react-locality',
     },
   });
+  fireEvent.click(
+    screen.getByRole('button', { name: '尝试自动填充（浏览器受限）' }),
+  );
+
+  expect(
+    await screen.findByDisplayValue('React Rendering Locality'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByDisplayValue(
+      '解释局部性如何减少无关重渲染，并帮助判断状态应该放在哪里。',
+    ),
+  ).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText('资料标题'), {
+    target: {
+      value: 'React 渲染局部性笔记',
+    },
+  });
   fireEvent.change(screen.getByLabelText('资料概况'), {
     target: {
-      value: '解释局部性如何减少无关重渲染。',
+      value: '解释局部性如何减少无关重渲染，并补一条手动修订说明。',
     },
   });
   fireEvent.click(screen.getByRole('button', { name: '创建资料' }));
@@ -95,7 +143,7 @@ test('creates a resource and makes it immediately available to library, search, 
 
   expect(await exportProbe.readText()).toContain('资料：React 渲染局部性笔记');
   expect(await exportProbe.readText()).toContain(
-    '解释局部性如何减少无关重渲染。',
+    '解释局部性如何减少无关重渲染，并补一条手动修订说明。',
   );
 
   await waitForSaved();
@@ -109,6 +157,108 @@ test('creates a resource and makes it immediately available to library, search, 
     }),
   ).toBeInTheDocument();
 });
+
+test('keeps manual fallback usable when url autofill fails', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+  );
+  const dependencies = createTestDependencies();
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.change(screen.getByLabelText('资料来源 URI 或说明'), {
+    target: {
+      value: 'https://example.com/blocked',
+    },
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: '尝试自动填充（浏览器受限）' }),
+  );
+
+  expect(
+    await screen.findByText(/受限自动填充未完成：这是浏览器内的受限能力/),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(/这不代表链接本身无效；请继续手动填写标题和资料概况。/),
+  ).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText('资料标题'), {
+    target: {
+      value: '手动兜底资料',
+    },
+  });
+  fireEvent.change(screen.getByLabelText('资料概况'), {
+    target: {
+      value: '自动化失败后仍可手动补齐并提交。',
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '创建资料' }));
+
+  expect(
+    await screen.findByRole('button', {
+      name: '定位资料 手动兜底资料',
+    }),
+  ).toBeInTheDocument();
+});
+
+test.each([
+  {
+    content:
+      '每次渲染都会形成独立的闭包快照。\n\n如果在旧闭包里读值，就会看到旧状态。\n',
+    fileName: 'state-snapshot.txt',
+    query: '闭包快照',
+    type: 'text/plain',
+  },
+  {
+    content:
+      '# React 渲染笔记\n\n先梳理渲染边界，再决定局部状态应该放在哪里。\n',
+    fileName: 'rendering-notes.md',
+    query: '渲染边界',
+    type: 'text/markdown',
+  },
+])(
+  'creates a resource from uploaded local file: $fileName',
+  async ({ content, fileName, query, type }) => {
+    const exportProbe = createExportProbe();
+    const dependencies = createTestDependencies();
+
+    render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+    await screen.findByRole('heading', { name: '当前学习模块' });
+
+    fireEvent.change(screen.getByLabelText('本地资料文件'), {
+      target: {
+        files: [new File([content], fileName, { type })],
+      },
+    });
+
+    expect(await screen.findByDisplayValue(`本地文件：${fileName}`)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '创建资料' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '切换到资料区搜索' }));
+    fireEvent.change(screen.getByLabelText('搜索关键词'), {
+      target: {
+        value: query,
+      },
+    });
+
+    expect(
+      await screen.findByRole('button', {
+        name: /跳转到 /,
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '整个主题' }));
+    fireEvent.click(screen.getByRole('button', { name: '导出内容' }));
+
+    expect(await exportProbe.readText()).toContain('资料：');
+    expect(await exportProbe.readText()).toContain(`本地文件：${fileName}`);
+  },
+);
 
 test('creates a fragment under the chosen resource, persists sourceResourceId, and restores it after remount', async () => {
   const dependencies = await createPreloadedDependencies(

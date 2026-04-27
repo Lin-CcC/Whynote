@@ -1,4 +1,5 @@
 .resources-panelField,
+.resources-entryActionRow,
 .resources-entrySection,
 .resources-exportLayout,
 .resources-tagFilter {
@@ -31,6 +32,10 @@
   resize: vertical;
 }
 
+.resources-fileInput {
+  padding: 0.6rem 0.75rem;
+}
+
 .resources-panelSelect {
   appearance: none;
 }
@@ -44,6 +49,10 @@
 .resources-entrySection {
   padding-top: 0.95rem;
   border-top: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.resources-entryActionRow {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, max-content));
 }
 
 .resources-entryButton {
