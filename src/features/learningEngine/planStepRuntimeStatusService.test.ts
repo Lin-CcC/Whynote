@@ -13,18 +13,53 @@ import {
 } from './services';
 
 describe('planStepRuntimeStatusService', () => {
-  it('keeps a freshly planned step in todo when it only has question scaffolding', () => {
-    const tree = createPlanStepTree();
+  it('keeps a freshly planned step in todo when it only has introductions and question scaffolding', () => {
+    const tree = createPlanStepTree({
+      withIntroduction: true,
+    });
 
     const result = resolvePlanStepRuntimeStatus(tree, 'step-runtime-status');
 
     expect(result.suggestedStatus).toBe('todo');
-    expect(result.reasonSummary).toContain('当前仍处于学习路径骨架阶段');
+    expect(result.reasonSummary).toContain('骨架阶段');
   });
 
-  it('moves a step to doing once learning nodes start citing resources', () => {
-    const tree = attachResourceCitation(createPlanStepTree(), {
-      sourceNodeId: 'question-runtime-status',
+  it('keeps a step in todo when only scaffold questions cite resources', () => {
+    const tree = attachResourceCitation(
+      createPlanStepTree({
+        withIntroduction: true,
+      }),
+      {
+        sourceNodeId: 'question-runtime-status',
+        targetNodeId: 'resource-runtime-status',
+      },
+    ).tree;
+
+    const result = resolvePlanStepRuntimeStatus(tree, 'step-runtime-status');
+
+    expect(result.suggestedStatus).toBe('todo');
+    expect(result.evidence.referencedNodeCount).toBe(0);
+  });
+
+  it('moves a step to doing once post-answer learning evidence starts citing resources', () => {
+    let tree = createPlanStepTree({
+      withIntroduction: true,
+    });
+
+    tree = insertChildNode(
+      tree,
+      'question-runtime-status',
+      createNode({
+        type: 'answer',
+        id: 'answer-runtime-status-cited',
+        title: 'Answer',
+        content: 'The learner answered and attached evidence.',
+        createdAt: '2026-04-28T00:00:00.000Z',
+        updatedAt: '2026-04-28T00:00:00.000Z',
+      }),
+    );
+    tree = attachResourceCitation(tree, {
+      sourceNodeId: 'answer-runtime-status-cited',
       targetNodeId: 'resource-runtime-status',
     }).tree;
 
@@ -34,8 +69,10 @@ describe('planStepRuntimeStatusService', () => {
     expect(result.evidence.referencedNodeCount).toBe(1);
   });
 
-  it('moves a step to done when closure evidence is complete', () => {
-    let tree = createPlanStepTree();
+  it('moves a step to done when a leaf question has answer, judgment and summary', () => {
+    let tree = createPlanStepTree({
+      withIntroduction: true,
+    });
 
     tree = insertChildNode(
       tree,
@@ -51,11 +88,23 @@ describe('planStepRuntimeStatusService', () => {
     );
     tree = insertChildNode(
       tree,
-      'step-runtime-status',
+      'question-runtime-status',
+      createNode({
+        type: 'judgment',
+        id: 'judgment-runtime-status',
+        title: '判断：已答到当前问题',
+        content: 'This answer is sufficient for the current question.',
+        createdAt: '2026-04-28T00:00:00.000Z',
+        updatedAt: '2026-04-28T00:00:00.000Z',
+      }),
+    );
+    tree = insertChildNode(
+      tree,
+      'question-runtime-status',
       createNode({
         type: 'summary',
         id: 'summary-runtime-status',
-        title: 'Summary',
+        title: '总结：标准理解',
         content: 'The learner summarized the step clearly.',
         createdAt: '2026-04-28T00:00:00.000Z',
         updatedAt: '2026-04-28T00:00:00.000Z',
@@ -65,11 +114,14 @@ describe('planStepRuntimeStatusService', () => {
     const result = resolvePlanStepRuntimeStatus(tree, 'step-runtime-status');
 
     expect(result.suggestedStatus).toBe('done');
-    expect(result.reasonSummary).toBe('当前步骤已具备完成信号。');
+    expect(result.reasonSummary).toBe('当前步骤已满足最小学习闭环。');
   });
 
   it('reconciles stale manual statuses back to the system-managed value', () => {
-    const tree = createPlanStepTree('done');
+    const tree = createPlanStepTree({
+      stepStatus: 'done',
+      withIntroduction: true,
+    });
 
     const reconciledTree = reconcilePlanStepStatuses(tree);
     const stepNode = reconciledTree.nodes['step-runtime-status'];
@@ -84,7 +136,10 @@ describe('planStepRuntimeStatusService', () => {
   });
 });
 
-function createPlanStepTree(stepStatus: 'todo' | 'doing' | 'done' = 'todo'): NodeTree {
+function createPlanStepTree(options?: {
+  stepStatus?: 'todo' | 'doing' | 'done';
+  withIntroduction?: boolean;
+}): NodeTree {
   const snapshot = createWorkspaceSnapshot({
     title: 'Runtime status',
     workspaceId: 'workspace-runtime-status',
@@ -113,11 +168,27 @@ function createPlanStepTree(stepStatus: 'todo' | 'doing' | 'done' = 'todo'): Nod
       type: 'plan-step',
       id: 'step-runtime-status',
       title: 'Step',
-      status: stepStatus,
+      status: options?.stepStatus ?? 'todo',
       createdAt: '2026-04-28T00:00:00.000Z',
       updatedAt: '2026-04-28T00:00:00.000Z',
     }),
   );
+
+  if (options?.withIntroduction) {
+    tree = insertChildNode(
+      tree,
+      'step-runtime-status',
+      createNode({
+        type: 'summary',
+        id: 'intro-runtime-status',
+        title: '铺垫：先看调用栈和任务队列',
+        content: '这是进入当前问题前的前置讲解。',
+        createdAt: '2026-04-28T00:00:00.000Z',
+        updatedAt: '2026-04-28T00:00:00.000Z',
+      }),
+    );
+  }
+
   tree = insertChildNode(
     tree,
     'step-runtime-status',

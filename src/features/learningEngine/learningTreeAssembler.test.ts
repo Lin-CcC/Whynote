@@ -12,15 +12,26 @@ import {
 } from './adapters';
 
 describe('learningTreeAssembler', () => {
-  it('materializes generated learning paths and child question drafts into the existing node tree', () => {
+  it('materializes introductions, questions and citations into the existing node tree', () => {
     const snapshot = createWorkspaceSnapshot({
       title: 'Assembler',
       workspaceId: 'workspace-assembler',
       rootId: 'root-assembler',
       createdAt: '2026-04-27T00:00:00.000Z',
     });
+    let tree = insertChildNode(
+      snapshot.tree,
+      snapshot.tree.rootId,
+      createNode({
+        type: 'resource',
+        id: 'resource-assembler',
+        title: '事件循环资料',
+        content: '总览事件循环、调用栈和任务队列。',
+        createdAt: '2026-04-27T00:00:00.000Z',
+      }),
+    );
 
-    let tree = appendModuleDraftsToTree(snapshot.tree, [
+    tree = appendModuleDraftsToTree(tree, [
       {
         type: 'module',
         title: '理解事件循环',
@@ -30,29 +41,20 @@ describe('learningTreeAssembler', () => {
             type: 'plan-step',
             title: '明确核心概念',
             content: '先分清任务队列和调用栈。',
-            questions: [
+            introductions: [
               {
-                type: 'question',
-                title: '铺垫：调用栈和任务队列分别做什么？',
-                content: '先补齐事件循环所依赖的基础术语。',
-              },
-              {
-                type: 'question',
-                title: '事件循环如何协调同步代码与异步任务？',
-                content: '围绕一次完整执行过程来理解。',
+                type: 'summary',
+                title: '铺垫：为什么先看调用栈和任务队列',
+                content: '先说明这两个概念分别负责什么，再进入真正的问题。',
+                citations: [{ targetNodeId: 'resource-assembler' }],
               },
             ],
-            status: 'todo',
-          },
-          {
-            type: 'plan-step',
-            title: '验证执行顺序',
-            content: '通过例子确认执行过程。',
             questions: [
               {
                 type: 'question',
-                title: '如何验证宏任务与微任务的先后关系？',
-                content: '选一个最小案例观察输出顺序。',
+                title: '调用栈和任务队列分别负责什么？',
+                content: '请用一段具体执行过程解释它们的分工。',
+                citations: [{ targetNodeId: 'resource-assembler' }],
               },
             ],
             status: 'todo',
@@ -60,9 +62,63 @@ describe('learningTreeAssembler', () => {
         ],
       },
     ]);
-    const moduleId = tree.nodes[tree.rootId].childIds[0];
+
+    const moduleId = tree.nodes[tree.rootId].childIds.find(
+      (childId) => tree.nodes[childId].type === 'module',
+    );
+
+    if (!moduleId) {
+      throw new Error('Expected module to be inserted.');
+    }
+
     const planStepId = tree.nodes[moduleId].childIds[0];
-    const generatedQuestionIds = tree.nodes[planStepId].childIds;
+    const [introductionId, questionId] = tree.nodes[planStepId].childIds;
+    const introductionNode = tree.nodes[introductionId];
+    const questionNode = tree.nodes[questionId];
+
+    expect(introductionNode.type).toBe('summary');
+    expect(questionNode.type).toBe('question');
+    expect(introductionNode.referenceIds).toHaveLength(1);
+    expect(questionNode.referenceIds).toHaveLength(1);
+    expect(
+      tree.references[introductionNode.referenceIds[0]].targetNodeId,
+    ).toBe('resource-assembler');
+    expect(tree.references[questionNode.referenceIds[0]].targetNodeId).toBe(
+      'resource-assembler',
+    );
+    validateNodeTree(tree);
+  });
+
+  it('materializes child question drafts beneath an existing parent question', () => {
+    const snapshot = createWorkspaceSnapshot({
+      title: 'Assembler split',
+      workspaceId: 'workspace-assembler-split',
+      rootId: 'root-assembler-split',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    let tree = insertChildNode(
+      snapshot.tree,
+      snapshot.tree.rootId,
+      createNode({
+        type: 'module',
+        id: 'module-split',
+        title: 'Module',
+        createdAt: '2026-04-27T00:00:00.000Z',
+      }),
+    );
+
+    tree = insertChildNode(
+      tree,
+      'module-split',
+      createNode({
+        type: 'plan-step',
+        id: 'step-split',
+        title: 'Step',
+        status: 'todo',
+        createdAt: '2026-04-27T00:00:00.000Z',
+      }),
+    );
+
     const parentQuestionNode = createNode({
       type: 'question',
       id: 'parent-question',
@@ -70,7 +126,7 @@ describe('learningTreeAssembler', () => {
       createdAt: '2026-04-27T00:00:00.000Z',
     });
 
-    tree = insertChildNode(tree, planStepId, parentQuestionNode);
+    tree = insertChildNode(tree, 'step-split', parentQuestionNode);
     tree = appendChildQuestionsToTree(tree, 'parent-question', {
       parentQuestion: {
         type: 'question',
@@ -102,12 +158,13 @@ describe('learningTreeAssembler', () => {
       },
     });
 
-    expect(tree.nodes[moduleId].type).toBe('module');
-    expect(tree.nodes[planStepId].type).toBe('plan-step');
-    expect(generatedQuestionIds).toHaveLength(2);
-    expect(tree.nodes[generatedQuestionIds[0]].type).toBe('question');
-    expect(tree.nodes[generatedQuestionIds[1]].type).toBe('question');
     expect(tree.nodes['parent-question'].childIds).toHaveLength(2);
+    expect(tree.nodes[tree.nodes['parent-question'].childIds[0]].type).toBe(
+      'question',
+    );
+    expect(tree.nodes[tree.nodes['parent-question'].childIds[1]].type).toBe(
+      'question',
+    );
     validateNodeTree(tree);
   });
 });

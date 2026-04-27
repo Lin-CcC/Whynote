@@ -29,7 +29,7 @@ function createMockProvider(
 }
 
 describe('planStepGenerationService', () => {
-  it('pads learning-path drafts to the current mode minimum and keeps question drafts in-tree ready', async () => {
+  it('pads learning-path drafts to the current mode minimum and keeps introductions/question drafts node-ready', async () => {
     const providerClient = createMockProvider({
       'plan-step-generation': {
         planSteps: [
@@ -38,7 +38,7 @@ describe('planStepGenerationService', () => {
             content: '先知道这个模块要解决什么问题。',
             prerequisites: [
               {
-                title: '什么是并发渲染的基本术语？',
+                title: '什么是并发渲染的基础术语？',
                 content: '先补齐最小前置概念。',
               },
             ],
@@ -68,7 +68,8 @@ describe('planStepGenerationService', () => {
     expect(result.planSteps.every((planStep) => planStep.status === 'todo')).toBe(
       true,
     );
-    expect(result.planSteps[0].questions).toHaveLength(2);
-    expect(result.planSteps[0].questions[0].title).toContain('铺垫：');
+    expect(result.planSteps[0].introductions).toHaveLength(1);
+    expect(result.planSteps[0].questions).toHaveLength(1);
+    expect(result.planSteps[0].introductions[0].title).toContain('铺垫：');
   });
 });

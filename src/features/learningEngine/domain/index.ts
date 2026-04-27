@@ -4,3 +4,4 @@ export * from './completionSuggestionTypes';
 export * from './learningMode';
 export * from './moduleGenerationTypes';
 export * from './planStepGenerationTypes';
+export * from './questionClosureTypes';

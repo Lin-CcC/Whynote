@@ -1,12 +1,16 @@
 import type { AiExecutionMetadata } from './aiTypes';
 import type { LearningMode } from './learningMode';
-import type { PlanStepNodeDraft } from './moduleGenerationTypes';
+import type {
+  LearningReferenceCandidate,
+  PlanStepNodeDraft,
+} from './moduleGenerationTypes';
 
 export interface PlanStepGenerationInput {
   topic: string;
   moduleTitle: string;
   moduleSummary?: string;
   resourceSummary?: string;
+  referenceCandidates?: LearningReferenceCandidate[];
   userPreferences?: string;
   mode?: LearningMode;
 }

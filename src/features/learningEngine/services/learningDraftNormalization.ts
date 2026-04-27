@@ -1,8 +1,11 @@
 import type {
+  JudgmentNodeDraft,
   LearningMode,
   ModuleNodeDraft,
   PlanStepNodeDraft,
+  QuestionClosureResult,
   QuestionNodeDraft,
+  SummaryNodeDraft,
 } from '../domain';
 import { getLearningModeLimits } from '../domain';
 
@@ -25,15 +28,10 @@ const PLAN_STEP_TITLE_SUFFIXES = [
   '总结复盘',
 ] as const;
 
-const CORE_QUESTION_TITLE_SUFFIXES = [
+const QUESTION_TITLE_SUFFIXES = [
   '关键问题',
   '需要解释什么',
-  '如何验证理解',
-] as const;
-
-const PREREQUISITE_QUESTION_TITLE_SUFFIXES = [
-  '铺垫问题',
-  '先确认什么',
+  '如何判断你真的理解了',
 ] as const;
 
 interface RawModuleDraft {
@@ -48,17 +46,32 @@ interface RawPlanStepDraft {
   title?: unknown;
   content?: unknown;
   description?: unknown;
-  keyQuestions?: unknown;
+  introductions?: unknown;
   prerequisiteQuestions?: unknown;
   prerequisites?: unknown;
+  keyQuestions?: unknown;
   questions?: unknown;
 }
 
-interface RawQuestionDraft {
+interface RawLearningNodeDraft {
   title?: unknown;
   content?: unknown;
   description?: unknown;
   prompt?: unknown;
+  citations?: unknown;
+  references?: unknown;
+}
+
+interface RawQuestionClosurePayload {
+  isAnswerSufficient?: unknown;
+  answerSufficient?: unknown;
+  judgment?: unknown;
+  evaluation?: unknown;
+  summary?: unknown;
+  explanation?: unknown;
+  followUpQuestions?: unknown;
+  followUps?: unknown;
+  nextQuestions?: unknown;
 }
 
 export function parseJsonObject(rawText: string): unknown {
@@ -67,7 +80,7 @@ export function parseJsonObject(rawText: string): unknown {
   try {
     return JSON.parse(normalizedText) as unknown;
   } catch {
-    throw new Error('AI 返回不是合法 JSON。');
+    throw new Error('AI 返回的内容不是合法 JSON。');
   }
 }
 
@@ -131,6 +144,35 @@ export function normalizePlanStepDrafts(
   return normalizedPlanSteps;
 }
 
+export function normalizeQuestionClosure(
+  payload: unknown,
+): QuestionClosureResult {
+  const rawPayload = isRecord(payload) ? (payload as RawQuestionClosurePayload) : {};
+  const isAnswerSufficient = resolveAnswerSufficiency(rawPayload);
+  const judgment = normalizeJudgmentDraft(
+    rawPayload.judgment ?? rawPayload.evaluation,
+    isAnswerSufficient,
+  );
+  const summary = normalizeClosureSummaryDraft(
+    rawPayload.summary ?? rawPayload.explanation,
+  );
+  const followUpQuestions = normalizeFollowUpQuestionDrafts(
+    rawPayload,
+    isAnswerSufficient,
+  );
+
+  return {
+    isAnswerSufficient,
+    judgment,
+    summary,
+    followUpQuestions,
+    metadata: {
+      model: '',
+      providerLabel: '',
+    },
+  };
+}
+
 function normalizeModuleDraft(
   rawModule: RawModuleDraft,
   index: number,
@@ -169,6 +211,7 @@ function normalizePlanStepDraft(
     type: 'plan-step',
     title: normalizedTitle,
     content,
+    introductions: normalizeIntroductionDrafts(rawPlanStep, normalizedTitle),
     questions: normalizeQuestionDrafts(rawPlanStep, normalizedTitle),
     status: 'todo',
   };
@@ -205,29 +248,44 @@ function createFallbackPlanStepDraft(
     type: 'plan-step',
     title,
     content: '',
+    introductions: createFallbackIntroductionDrafts(title),
     questions: createFallbackQuestionDrafts(title),
     status: 'todo',
   };
+}
+
+function normalizeIntroductionDrafts(
+  rawPlanStep: RawPlanStepDraft,
+  planStepTitle: string,
+) {
+  const rawIntroductions = extractRawLearningNodeDrafts(
+    rawPlanStep.introductions ??
+      rawPlanStep.prerequisites ??
+      rawPlanStep.prerequisiteQuestions,
+  );
+  const normalizedIntroductions = rawIntroductions.map((rawIntroduction, index) =>
+    normalizeIntroductionDraft(rawIntroduction, index, planStepTitle),
+  );
+
+  if (normalizedIntroductions.length === 0) {
+    return createFallbackIntroductionDrafts(planStepTitle);
+  }
+
+  ensureUniqueTitles(normalizedIntroductions);
+
+  return normalizedIntroductions;
 }
 
 function normalizeQuestionDrafts(
   rawPlanStep: RawPlanStepDraft,
   planStepTitle: string,
 ) {
-  const rawPrerequisiteQuestions = extractRawQuestionDrafts(
-    rawPlanStep.prerequisiteQuestions ?? rawPlanStep.prerequisites,
-  );
-  const rawCoreQuestions = extractRawQuestionDrafts(
+  const rawQuestions = extractRawLearningNodeDrafts(
     rawPlanStep.questions ?? rawPlanStep.keyQuestions,
   );
-  const normalizedQuestions = [
-    ...rawPrerequisiteQuestions.map((rawQuestion, index) =>
-      normalizeQuestionDraft(rawQuestion, index, planStepTitle, 'prerequisite'),
-    ),
-    ...rawCoreQuestions.map((rawQuestion, index) =>
-      normalizeQuestionDraft(rawQuestion, index, planStepTitle, 'core'),
-    ),
-  ];
+  const normalizedQuestions = rawQuestions.map((rawQuestion, index) =>
+    normalizeQuestionDraft(rawQuestion, index, planStepTitle),
+  );
 
   if (normalizedQuestions.length === 0) {
     return createFallbackQuestionDrafts(planStepTitle);
@@ -238,49 +296,217 @@ function normalizeQuestionDrafts(
   return normalizedQuestions;
 }
 
-function normalizeQuestionDraft(
-  rawQuestion: RawQuestionDraft,
+function normalizeIntroductionDraft(
+  rawIntroduction: RawLearningNodeDraft,
   index: number,
   planStepTitle: string,
-  kind: 'core' | 'prerequisite',
+): SummaryNodeDraft {
+  const rawTitle =
+    getText(rawIntroduction.title) ||
+    getText(rawIntroduction.prompt) ||
+    `建立前置理解 ${String(index + 1)}`;
+  const content =
+    getText(rawIntroduction.content) ||
+    getText(rawIntroduction.description) ||
+    '先说明这个 step 在解决什么问题、涉及哪些关键概念，再进入后续问题。';
+
+  return {
+    type: 'summary',
+    title: normalizeIntroductionTitle(rawTitle, planStepTitle, index),
+    content,
+    citations: normalizeCitationDrafts(
+      rawIntroduction.citations ?? rawIntroduction.references,
+    ),
+  };
+}
+
+function normalizeQuestionDraft(
+  rawQuestion: RawLearningNodeDraft,
+  index: number,
+  planStepTitle: string,
 ): QuestionNodeDraft {
   const title =
     getText(rawQuestion.title) ||
     getText(rawQuestion.prompt) ||
-    createQuestionTitle(planStepTitle, index, kind);
+    createQuestionTitle(planStepTitle, index);
   const content =
-    getText(rawQuestion.content) || getText(rawQuestion.description);
+    getText(rawQuestion.content) ||
+    getText(rawQuestion.description) ||
+    '请结合当前 step，用自己的话回答这个具体问题。';
 
   return {
     type: 'question',
-    title:
-      kind === 'prerequisite' ? normalizePrerequisiteTitle(title) : title,
-    content:
-      kind === 'prerequisite' ? normalizePrerequisiteContent(content) : content,
+    title,
+    content,
+    citations: normalizeCitationDrafts(
+      rawQuestion.citations ?? rawQuestion.references,
+    ),
   };
 }
 
-function createFallbackQuestionDrafts(planStepTitle: string): QuestionNodeDraft[] {
+function normalizeJudgmentDraft(
+  rawJudgment: unknown,
+  isAnswerSufficient: boolean,
+): JudgmentNodeDraft {
+  const rawNode = isRecord(rawJudgment)
+    ? (rawJudgment as RawLearningNodeDraft)
+    : {};
+  const title = getText(rawNode.title);
+  const content =
+    getText(rawNode.content) ||
+    getText(rawNode.description) ||
+    (isAnswerSufficient
+      ? '你的回答已经覆盖当前问题的关键点，可以进入下一步。'
+      : '你的回答还不完整，关键点没有全部答到，需要继续补充。');
+
+  return {
+    type: 'judgment',
+    title: normalizeJudgmentTitle(title, isAnswerSufficient),
+    content,
+    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+  };
+}
+
+function normalizeClosureSummaryDraft(rawSummary: unknown): SummaryNodeDraft {
+  const rawNode = isRecord(rawSummary)
+    ? (rawSummary as RawLearningNodeDraft)
+    : {};
+  const title = getText(rawNode.title);
+  const content =
+    getText(rawNode.content) ||
+    getText(rawNode.description) ||
+    '请把更准确的标准理解补全为一段可以直接复用的讲解。';
+
+  return {
+    type: 'summary',
+    title: title || '总结：标准理解',
+    content,
+    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+  };
+}
+
+function normalizeFollowUpQuestionDrafts(
+  rawPayload: RawQuestionClosurePayload,
+  isAnswerSufficient: boolean,
+) {
+  if (isAnswerSufficient) {
+    return [] satisfies QuestionNodeDraft[];
+  }
+
+  const rawQuestions = extractRawLearningNodeDrafts(
+    rawPayload.followUpQuestions ??
+      rawPayload.followUps ??
+      rawPayload.nextQuestions,
+  );
+  const normalizedQuestions = rawQuestions.map((rawQuestion, index) => ({
+    ...normalizeQuestionDraft(rawQuestion, index, '补充回答'),
+    title: normalizeFollowUpQuestionTitle(
+      getText(rawQuestion.title) ||
+        getText(rawQuestion.prompt) ||
+        `补充问题 ${String(index + 1)}`,
+    ),
+  }));
+
+  if (normalizedQuestions.length === 0) {
+    return [
+      {
+        type: 'question',
+        title: '追问：补上缺失的关键点',
+        content: '请只补充这次判断里指出的缺失点，不需要重复已经答对的部分。',
+        citations: [],
+      },
+    ] satisfies QuestionNodeDraft[];
+  }
+
+  ensureUniqueTitles(normalizedQuestions);
+
+  return normalizedQuestions;
+}
+
+function createFallbackIntroductionDrafts(
+  planStepTitle: string,
+): SummaryNodeDraft[] {
   return [
     {
-      type: 'question',
-      title: createQuestionTitle(planStepTitle, 0, 'prerequisite'),
-      content: '先确认理解这个步骤所需的前置概念或背景条件。',
-    },
-    {
-      type: 'question',
-      title: createQuestionTitle(planStepTitle, 0, 'core'),
-      content: '围绕这个步骤的核心问题展开回答、总结与判断。',
+      type: 'summary',
+      title: normalizeIntroductionTitle('建立当前问题的基本图景', planStepTitle, 0),
+      content:
+        '先交代这个 step 为什么重要、需要抓住哪两个核心概念，再进入后面的具体问题。',
+      citations: [],
     },
   ];
 }
 
-function extractRawModules(payload: unknown): RawModuleDraft[] {
-  if (!isRecord(payload)) {
+function createFallbackQuestionDrafts(
+  planStepTitle: string,
+): QuestionNodeDraft[] {
+  return [
+    {
+      type: 'question',
+      title: createQuestionTitle(planStepTitle, 0),
+      content: '请围绕当前 step，用自己的话解释最关键的因果关系、判断标准或使用边界。',
+      citations: [],
+    },
+  ];
+}
+
+function resolveAnswerSufficiency(rawPayload: RawQuestionClosurePayload) {
+  const explicitBoolean =
+    getBoolean(rawPayload.isAnswerSufficient) ??
+    getBoolean(rawPayload.answerSufficient);
+
+  if (explicitBoolean !== null) {
+    return explicitBoolean;
+  }
+
+  const fallbackText = extractSignalText(
+    rawPayload.judgment ?? rawPayload.evaluation,
+  );
+
+  if (containsBlockingSignal(fallbackText)) {
+    return false;
+  }
+
+  if (containsReadySignal(fallbackText)) {
+    return true;
+  }
+
+  return false;
+}
+
+function normalizeCitationDrafts(payload: unknown) {
+  if (!Array.isArray(payload)) {
     return [];
   }
 
-  return Array.isArray(payload.modules) ? payload.modules : [];
+  const citations = payload
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        return entry.trim();
+      }
+
+      if (!isRecord(entry)) {
+        return '';
+      }
+
+      return (
+        getText(entry.targetNodeId) ||
+        getText(entry.nodeId) ||
+        getText(entry.id)
+      );
+    })
+    .filter(Boolean)
+    .map((targetNodeId) => ({ targetNodeId }));
+
+  return dedupeCitations(citations);
+}
+
+function extractRawModules(payload: unknown): RawModuleDraft[] {
+  if (!isRecord(payload) || !Array.isArray(payload.modules)) {
+    return [];
+  }
+
+  return payload.modules as RawModuleDraft[];
 }
 
 function extractRawPlanSteps(payload: unknown): RawPlanStepDraft[] {
@@ -289,18 +515,54 @@ function extractRawPlanSteps(payload: unknown): RawPlanStepDraft[] {
   }
 
   if (Array.isArray(payload.planSteps)) {
-    return payload.planSteps;
+    return payload.planSteps as RawPlanStepDraft[];
   }
 
-  return Array.isArray(payload.steps) ? payload.steps : [];
+  if (Array.isArray(payload.steps)) {
+    return payload.steps as RawPlanStepDraft[];
+  }
+
+  return [];
 }
 
-function extractRawQuestionDrafts(payload: unknown): RawQuestionDraft[] {
-  return Array.isArray(payload) ? payload : [];
+function extractRawLearningNodeDrafts(payload: unknown): RawLearningNodeDraft[] {
+  return Array.isArray(payload) ? (payload as RawLearningNodeDraft[]) : [];
+}
+
+function extractSignalText(payload: unknown) {
+  if (!isRecord(payload)) {
+    return '';
+  }
+
+  return [getText(payload.title), getText(payload.content), getText(payload.description)]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function containsBlockingSignal(text: string) {
+  return [
+    '还不完整',
+    '不完整',
+    '不准确',
+    '需要补充',
+    '需要继续',
+    '待补充',
+    '未答到',
+  ].some((keyword) => text.includes(keyword));
+}
+
+function containsReadySignal(text: string) {
+  return ['已答到', '可以进入下一步', '回答充分', '回答到位', '已经闭环'].some(
+    (keyword) => text.includes(keyword),
+  );
 }
 
 function getText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function getBoolean(value: unknown) {
+  return typeof value === 'boolean' ? value : null;
 }
 
 function createModuleTitle(topic: string, index: number) {
@@ -317,45 +579,75 @@ function createPlanStepTitle(moduleTitle: string, index: number) {
   return `${moduleTitle.trim()} - ${suffix}`;
 }
 
-function createQuestionTitle(
-  planStepTitle: string,
-  index: number,
-  kind: 'core' | 'prerequisite',
-) {
-  const suffixes =
-    kind === 'prerequisite'
-      ? PREREQUISITE_QUESTION_TITLE_SUFFIXES
-      : CORE_QUESTION_TITLE_SUFFIXES;
-  const suffix = suffixes[index] ?? `${kind === 'prerequisite' ? '铺垫问题' : '关键问题'} ${String(index + 1)}`;
+function createQuestionTitle(planStepTitle: string, index: number) {
+  const suffix = QUESTION_TITLE_SUFFIXES[index] ?? `关键问题 ${String(index + 1)}`;
 
   return `${planStepTitle.trim()}：${suffix}`;
 }
 
-function normalizePrerequisiteTitle(title: string) {
-  return /^铺垫[:：]/u.test(title) ? title : `铺垫：${title}`;
-}
+function normalizeIntroductionTitle(
+  title: string,
+  planStepTitle: string,
+  index: number,
+) {
+  const normalizedTitle = title || `建立前置理解 ${String(index + 1)}`;
 
-function normalizePrerequisiteContent(content: string) {
-  if (!content) {
-    return '先确认这个步骤依赖的基础概念、术语或背景。';
+  if (/^(铺垫|前置|讲解)[:：]/u.test(normalizedTitle)) {
+    return normalizedTitle;
   }
 
-  return content;
+  if (normalizedTitle.includes(planStepTitle)) {
+    return `铺垫：${normalizedTitle}`;
+  }
+
+  return `铺垫：${normalizedTitle}`;
+}
+
+function normalizeJudgmentTitle(title: string, isAnswerSufficient: boolean) {
+  const normalizedTitle =
+    title ||
+    (isAnswerSufficient ? '判断：已答到当前问题' : '判断：回答还不完整');
+
+  if (/^判断[:：]/u.test(normalizedTitle)) {
+    return normalizedTitle;
+  }
+
+  return `判断：${normalizedTitle}`;
+}
+
+function normalizeFollowUpQuestionTitle(title: string) {
+  if (/^(追问|补充问题)[:：]/u.test(title)) {
+    return title;
+  }
+
+  return `追问：${title}`;
 }
 
 function ensureUniqueTitles<T extends { title: string }>(items: T[]) {
   const counts = new Map<string, number>();
 
   for (const item of items) {
-    const baseTitle = item.title.replace(/（\d+）$/u, '');
-    const currentCount = counts.get(baseTitle) ?? 0;
+    const currentCount = counts.get(item.title) ?? 0;
 
     if (currentCount > 0) {
-      item.title = `${baseTitle}（${String(currentCount + 1)}）`;
+      item.title = `${item.title}（${String(currentCount + 1)}）`;
     }
 
-    counts.set(baseTitle, currentCount + 1);
+    counts.set(item.title.replace(/（\d+）$/u, ''), currentCount + 1);
   }
+}
+
+function dedupeCitations<T extends { targetNodeId: string }>(items: T[]) {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    if (seen.has(item.targetNodeId)) {
+      return false;
+    }
+
+    seen.add(item.targetNodeId);
+    return true;
+  });
 }
 
 function clamp(value: number, min: number, max: number) {

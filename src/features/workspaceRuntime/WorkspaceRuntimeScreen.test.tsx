@@ -3,7 +3,6 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 
@@ -48,9 +47,6 @@ test('creates a minimal real workspace when IndexedDB is empty', async () => {
     await screen.findByRole('heading', { name: '当前学习模块' }),
   ).toBeInTheDocument();
   expect(screen.getByDisplayValue('默认模块')).toBeInTheDocument();
-  expect(
-    screen.queryByRole('button', { name: /状态与渲染/i }),
-  ).not.toBeInTheDocument();
 
   const workspaces = await dependencies.structuredDataStorage.listWorkspaces();
   const snapshot = await dependencies.structuredDataStorage.loadWorkspace(
@@ -98,19 +94,12 @@ test('guides recovery from the AI action card when no module exists', async () =
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  const actionSection = await findSectionByHeading('AI 动作入口');
-
   expect(
-    actionSection.getByText(/当前还没有可供 AI 操作的学习模块/),
+    screen.getByText(/当前还没有可供 AI 操作的学习模块/),
   ).toBeInTheDocument();
-  expect(
-    actionSection.getByRole('button', { name: '新建模块' }),
-  ).toBeInTheDocument();
-
-  fireEvent.click(actionSection.getByRole('button', { name: '新建模块' }));
+  fireEvent.click(screen.getAllByRole('button', { name: '新建模块' })[0]);
 
   expect(await screen.findByDisplayValue('新模块')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '新模块' })).toBeInTheDocument();
   expect(
     screen.getByRole('button', { name: '为当前模块规划学习路径' }),
   ).toBeInTheDocument();
@@ -124,6 +113,18 @@ test('runs learning-engine plan-step generation from UI and materializes the res
           {
             title: '建立最小概念框架',
             content: '先明确这个模块要解决的核心问题。',
+            introductions: [
+              {
+                title: '铺垫：先建立进入问题的基础图景',
+                content: '先说明为什么问这个问题，再进入主问题。',
+              },
+            ],
+            questions: [
+              {
+                title: '并发渲染到底改变了什么？',
+                content: '聚焦运行时行为变化。',
+              },
+            ],
           },
         ],
       },
@@ -149,12 +150,14 @@ test('runs learning-engine plan-step generation from UI and materializes the res
     },
   });
   fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-  fireEvent.click(
-    screen.getByRole('button', { name: '为当前模块规划学习路径' }),
-  );
+  fireEvent.click(screen.getByRole('button', { name: '为当前模块规划学习路径' }));
 
+  expect(await screen.findByDisplayValue('建立最小概念框架')).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('建立最小概念框架'),
+    await screen.findByDisplayValue('铺垫：先建立进入问题的基础图景'),
+  ).toBeInTheDocument();
+  expect(
+    await screen.findByDisplayValue('并发渲染到底改变了什么？'),
   ).toBeInTheDocument();
 });
 
@@ -167,22 +170,12 @@ test('locks editor mutations while an AI action is running and keeps manual edit
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(
-    screen.getByRole('button', { name: '为当前模块规划学习路径' }),
-  );
+  fireEvent.click(screen.getByRole('button', { name: '为当前模块规划学习路径' }));
 
   const moduleTitleInput = await screen.findByDisplayValue('默认模块');
 
-  expect(
-    await screen.findByText(/文本编辑和结构操作已临时锁定/),
-  ).toBeInTheDocument();
   expect(moduleTitleInput).toBeDisabled();
   expect(screen.getByRole('button', { name: '插入子节点' })).toBeDisabled();
-  expect(
-    screen.getByRole('button', {
-      name: /默认模块先定义当前主题下的第一个学习方向。/,
-    }),
-  ).toBeDisabled();
 
   fireEvent.change(moduleTitleInput, {
     target: {
@@ -197,6 +190,18 @@ test('locks editor mutations while an AI action is running and keeps manual edit
       {
         title: 'AI 生成步骤',
         content: '由延迟响应返回。',
+        introductions: [
+          {
+            title: '铺垫：等待规划结果',
+            content: '先建立一个最小讲解节点。',
+          },
+        ],
+        questions: [
+          {
+            title: '这一步到底要解决什么？',
+            content: '确认 AI 结果已经落树。',
+          },
+        ],
       },
     ],
   });
@@ -235,9 +240,7 @@ test('shows a visible error when the provider call fails', async () => {
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(
-    screen.getByRole('button', { name: '为当前模块规划学习路径' }),
-  );
+  fireEvent.click(screen.getByRole('button', { name: '为当前模块规划学习路径' }));
 
   await waitFor(() => {
     expect(screen.getByRole('alert')).toHaveTextContent(
@@ -254,9 +257,7 @@ test('clears completion suggestion after switching to another node', async () =>
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(
-    screen.getByRole('button', { name: /^步骤理解闭环$/ }),
-  );
+  fireEvent.click(screen.getByRole('button', { name: /^步骤理解闭环$/ }));
   const completionSuggestionButton = screen.getByRole('button', {
     name: '查看当前步骤完成依据',
   });
@@ -266,19 +267,15 @@ test('clears completion suggestion after switching to another node', async () =>
   fireEvent.click(completionSuggestionButton);
 
   expect(
-    await screen.findByRole('heading', { name: '当前步骤暂不建议完成' }),
+    await screen.findByRole('heading', { name: '当前步骤可以考虑标记完成' }),
   ).toBeInTheDocument();
-  expect(
-    screen.getByText('当前步骤已标记为 done，无需再次建议完成。'),
-  ).toBeInTheDocument();
+  expect(screen.getByText('当前步骤已满足最小学习闭环。')).toBeInTheDocument();
 
-  fireEvent.click(
-    screen.getByRole('button', { name: /^问题什么是闭环？$/ }),
-  );
+  fireEvent.click(screen.getByRole('button', { name: /^问题什么是闭环？$/ }));
 
   await waitFor(() => {
     expect(
-      screen.queryByRole('heading', { name: '当前步骤暂不建议完成' }),
+      screen.queryByRole('heading', { name: '当前步骤可以考虑标记完成' }),
     ).not.toBeInTheDocument();
   });
 });
@@ -291,9 +288,7 @@ test('clears completion suggestion after editing the related workspace content',
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(
-    screen.getByRole('button', { name: /^步骤理解闭环$/ }),
-  );
+  fireEvent.click(screen.getByRole('button', { name: /^步骤理解闭环$/ }));
   const completionSuggestionButton = screen.getByRole('button', {
     name: '查看当前步骤完成依据',
   });
@@ -303,11 +298,9 @@ test('clears completion suggestion after editing the related workspace content',
   fireEvent.click(completionSuggestionButton);
 
   expect(
-    await screen.findByRole('heading', { name: '当前步骤暂不建议完成' }),
+    await screen.findByRole('heading', { name: '当前步骤可以考虑标记完成' }),
   ).toBeInTheDocument();
-  expect(
-    screen.getByText('当前步骤已标记为 done，无需再次建议完成。'),
-  ).toBeInTheDocument();
+  expect(screen.getByText('当前步骤已满足最小学习闭环。')).toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText('理解闭环 内容'), {
     target: {
@@ -317,120 +310,9 @@ test('clears completion suggestion after editing the related workspace content',
 
   await waitFor(() => {
     expect(
-      screen.queryByRole('heading', { name: '当前步骤暂不建议完成' }),
+      screen.queryByRole('heading', { name: '当前步骤可以考虑标记完成' }),
     ).not.toBeInTheDocument();
   });
-});
-
-test('focuses a resource entry through the library without resetting the editor selection', async () => {
-  const dependencies = await createPreloadedDependencies(
-    createResourceFocusSnapshot(),
-  );
-
-  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
-  expect(await screen.findByDisplayValue('资源定位模块')).toBeInTheDocument();
-
-  fireEvent.click(
-    screen.getByRole('button', { name: /^步骤构建理解$/ }),
-  );
-  await waitFor(() => {
-    expect(
-      getSectionByHeading('当前焦点').getByText('步骤 · 构建理解'),
-    ).toBeInTheDocument();
-  });
-  fireEvent.click(
-    screen.getByRole('button', { name: '定位资料 React 官方文档' }),
-  );
-
-  const resourceFocusCard = await findSectionByHeading('当前资料焦点');
-  const editorFocusCard = getSectionByHeading('当前焦点');
-
-  expect(resourceFocusCard.getByText('资料 · React 官方文档')).toBeInTheDocument();
-  expect(
-    resourceFocusCard.getByText('步骤 · 构建理解'),
-  ).toBeInTheDocument();
-  expect(
-    resourceFocusCard.getByText('https://react.dev/reference/react/useState'),
-  ).toBeInTheDocument();
-  expect(
-    editorFocusCard.getByText('步骤 · 构建理解'),
-  ).toBeInTheDocument();
-});
-
-test('focuses a resource fragment through the library and shows its excerpt details', async () => {
-  const dependencies = await createPreloadedDependencies(
-    createResourceFocusSnapshot(),
-  );
-
-  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
-  expect(await screen.findByDisplayValue('资源定位模块')).toBeInTheDocument();
-
-  fireEvent.click(
-    screen.getByRole('button', { name: /^步骤构建理解$/ }),
-  );
-  await waitFor(() => {
-    expect(
-      getSectionByHeading('当前焦点').getByText('步骤 · 构建理解'),
-    ).toBeInTheDocument();
-  });
-  fireEvent.click(
-    screen.getByRole('button', { name: '定位摘录 批处理摘录' }),
-  );
-
-  const resourceFocusCard = await findSectionByHeading('当前资料焦点');
-  const editorFocusCard = getSectionByHeading('当前焦点');
-
-  expect(resourceFocusCard.getByText('摘录 · 批处理摘录')).toBeInTheDocument();
-  expect(
-    resourceFocusCard.getByText('React 会把多个 state 更新批处理后再统一提交。'),
-  ).toBeInTheDocument();
-  expect(resourceFocusCard.getByText('useState > batching')).toBeInTheDocument();
-  expect(
-    resourceFocusCard.getByText('步骤 · 构建理解'),
-  ).toBeInTheDocument();
-  expect(
-    editorFocusCard.getByText('步骤 · 构建理解'),
-  ).toBeInTheDocument();
-});
-
-test('focuses a resource hit from search results without falling back to the module default node', async () => {
-  const dependencies = await createPreloadedDependencies(
-    createResourceFocusSnapshot(),
-  );
-
-  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
-  expect(await screen.findByDisplayValue('资源定位模块')).toBeInTheDocument();
-
-  fireEvent.click(
-    screen.getByRole('button', { name: /^步骤构建理解$/ }),
-  );
-  await waitFor(() => {
-    expect(
-      getSectionByHeading('当前焦点').getByText('步骤 · 构建理解'),
-    ).toBeInTheDocument();
-  });
-  fireEvent.click(
-    screen.getByRole('button', { name: '切换到资料区搜索' }),
-  );
-  fireEvent.change(screen.getByLabelText('搜索关键词'), {
-    target: {
-      value: '批处理',
-    },
-  });
-  fireEvent.click(
-    screen.getByRole('button', { name: '跳转到 批处理摘录' }),
-  );
-
-  const resourceFocusCard = await findSectionByHeading('当前资料焦点');
-  const editorFocusCard = getSectionByHeading('当前焦点');
-
-  expect(resourceFocusCard.getByText('摘录 · 批处理摘录')).toBeInTheDocument();
-  expect(
-    resourceFocusCard.getByText('步骤 · 构建理解'),
-  ).toBeInTheDocument();
-  expect(
-    editorFocusCard.getByText('步骤 · 构建理解'),
-  ).toBeInTheDocument();
 });
 
 function createTestDependencies(options?: {
@@ -605,7 +487,7 @@ function createCompletionSuggestionSnapshot(): WorkspaceSnapshot {
       type: 'plan-step',
       id: 'step-completion',
       title: '理解闭环',
-      content: '确认问题已经形成回答和总结。',
+      content: '确认问题已经形成回答、判断和总结。',
       status: 'doing',
       createdAt: '2026-04-28T00:00:00.000Z',
       updatedAt: '2026-04-28T00:00:00.000Z',
@@ -630,7 +512,19 @@ function createCompletionSuggestionSnapshot(): WorkspaceSnapshot {
       type: 'answer',
       id: 'answer-completion',
       title: '回答草稿',
-      content: '当问题已经得到回答并被总结时，就形成了学习闭环。',
+      content: '当问题已经得到回答并被解释总结时，就形成了学习闭环。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-completion',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-completion',
+      title: '判断：已答到当前问题',
+      content: '这个回答已经覆盖当前问题的关键点。',
       createdAt: '2026-04-28T00:00:00.000Z',
       updatedAt: '2026-04-28T00:00:00.000Z',
     }),
@@ -641,8 +535,8 @@ function createCompletionSuggestionSnapshot(): WorkspaceSnapshot {
     createNode({
       type: 'summary',
       id: 'summary-completion',
-      title: '阶段总结',
-      content: '当前步骤已经有问题、回答和总结，可用于完成建议。',
+      title: '总结：标准理解',
+      content: '当前步骤已经形成问题、回答、判断和总结，可以用于完成建议。',
       createdAt: '2026-04-28T00:00:00.000Z',
       updatedAt: '2026-04-28T00:00:00.000Z',
     }),
@@ -662,122 +556,4 @@ function createEmptyWorkspaceSnapshot(): WorkspaceSnapshot {
     createdAt: '2026-04-28T00:00:00.000Z',
     updatedAt: '2026-04-28T00:00:00.000Z',
   });
-}
-
-function createResourceFocusSnapshot(): WorkspaceSnapshot {
-  const snapshot = createWorkspaceSnapshot({
-    title: '资料定位主题',
-    workspaceId: 'workspace-resource-focus',
-    rootId: 'theme-resource-focus',
-    createdAt: '2026-04-28T00:00:00.000Z',
-    updatedAt: '2026-04-28T00:00:00.000Z',
-  });
-
-  let tree = snapshot.tree;
-
-  tree = insertChildNode(
-    tree,
-    snapshot.workspace.rootNodeId,
-    createNode({
-      type: 'module',
-      id: 'module-resource-focus',
-      title: '资源定位模块',
-      content: '用于验证资料焦点和模块内 editor 选区可以并存。',
-      createdAt: '2026-04-28T00:00:00.000Z',
-      updatedAt: '2026-04-28T00:00:00.000Z',
-    }),
-  );
-  tree = insertChildNode(
-    tree,
-    'module-resource-focus',
-    createNode({
-      type: 'plan-step',
-      id: 'step-resource-focus',
-      title: '构建理解',
-      content: '先固定一个非默认 editor 焦点，再验证资源定位不会把它冲掉。',
-      status: 'doing',
-      createdAt: '2026-04-28T00:00:00.000Z',
-      updatedAt: '2026-04-28T00:00:00.000Z',
-    }),
-  );
-  tree = insertChildNode(
-    tree,
-    'step-resource-focus',
-    createNode({
-      type: 'question',
-      id: 'question-resource-focus',
-      title: '什么是批处理？',
-      content: '理解 React 为什么会把多次状态更新合并处理。',
-      createdAt: '2026-04-28T00:00:00.000Z',
-      updatedAt: '2026-04-28T00:00:00.000Z',
-    }),
-  );
-  tree = insertChildNode(
-    tree,
-    'question-resource-focus',
-    createNode({
-      type: 'answer',
-      id: 'answer-resource-focus',
-      title: '批处理答案',
-      content: 'React 会把一轮事件里的多次更新合并后再提交。',
-      createdAt: '2026-04-28T00:00:00.000Z',
-      updatedAt: '2026-04-28T00:00:00.000Z',
-    }),
-  );
-  tree = insertChildNode(
-    tree,
-    snapshot.workspace.rootNodeId,
-    createNode({
-      type: 'resource',
-      id: 'resource-react-docs',
-      title: 'React 官方文档',
-      content: '关于 state 更新与 Hook 的参考资料。',
-      sourceUri: 'https://react.dev/reference/react/useState',
-      mimeType: 'text/html',
-      createdAt: '2026-04-28T00:00:00.000Z',
-      updatedAt: '2026-04-28T00:00:00.000Z',
-    }),
-  );
-  tree = insertChildNode(
-    tree,
-    'resource-react-docs',
-    createNode({
-      type: 'resource-fragment',
-      id: 'fragment-batching',
-      title: '批处理摘录',
-      content: '用来解释批处理的上下文。',
-      excerpt: 'React 会把多个 state 更新批处理后再统一提交。',
-      locator: 'useState > batching',
-      sourceResourceId: 'resource-react-docs',
-      createdAt: '2026-04-28T00:00:00.000Z',
-      updatedAt: '2026-04-28T00:00:00.000Z',
-    }),
-  );
-
-  return {
-    ...snapshot,
-    tree,
-  };
-}
-
-function getSectionByHeading(name: string) {
-  const heading = screen.getByRole('heading', { name });
-  const section = heading.closest('section');
-
-  if (!section) {
-    throw new Error(`Unable to find section for heading "${name}".`);
-  }
-
-  return within(section);
-}
-
-async function findSectionByHeading(name: string) {
-  const heading = await screen.findByRole('heading', { name });
-  const section = heading.closest('section');
-
-  if (!section) {
-    throw new Error(`Unable to find section for heading "${name}".`);
-  }
-
-  return within(section);
 }

@@ -1,9 +1,11 @@
 import {
   appendChildQuestionsToTree,
   appendPlanStepDraftsToModule,
+  appendQuestionClosureToTree,
   createCompoundQuestionSplitService,
   createOpenAiCompatibleProviderClient,
   createPlanStepGenerationService,
+  createQuestionClosureService,
   reconcilePlanStepStatuses,
   suggestPlanStepCompletion,
   type AiConfig,
@@ -18,6 +20,14 @@ import {
   type WorkspaceSnapshot,
 } from '../../nodeDomain';
 import { createInitialWorkspaceSnapshot } from '../utils/createInitialWorkspaceSnapshot';
+import {
+  buildQuestionClosureRuntimeContext,
+  collectLeafQuestionIdsUnderPlanStep,
+  collectLearningReferenceCandidates,
+  hasQuestionAnswerEvidence,
+  isLeafQuestion,
+  summarizeLearningReferenceCandidates,
+} from './learningRuntimeContext';
 import type {
   WorkspaceInitializationResult,
   WorkspaceMutationResult,
@@ -57,7 +67,11 @@ export function createWorkspaceRuntimeService(
         throw new Error(`节点 ${moduleNodeId} 不是 module。`);
       }
 
-      if (moduleNode.childIds.some((childId) => snapshot.tree.nodes[childId]?.type === 'plan-step')) {
+      if (
+        moduleNode.childIds.some(
+          (childId) => snapshot.tree.nodes[childId]?.type === 'plan-step',
+        )
+      ) {
         throw new Error('当前模块已经包含学习路径步骤，首版不做覆盖规划。');
       }
 
@@ -65,11 +79,14 @@ export function createWorkspaceRuntimeService(
       const generationService = createPlanStepGenerationService({
         providerClient,
       });
+      const referenceCandidates = collectLearningReferenceCandidates(snapshot.tree);
       const result = await generationService.generate({
         topic: snapshot.workspace.title,
         moduleTitle: moduleNode.title,
         moduleSummary: moduleNode.content,
         mode: learningMode,
+        referenceCandidates,
+        resourceSummary: summarizeLearningReferenceCandidates(referenceCandidates),
       });
       const previousChildIds = new Set(moduleNode.childIds);
       const nextTree = appendPlanStepDraftsToModule(
@@ -85,7 +102,7 @@ export function createWorkspaceRuntimeService(
         snapshot: createSnapshot(nextTree, snapshot),
         nextModuleId: moduleNode.id,
         nextSelectedNodeId: generatedPlanStepId ?? moduleNode.id,
-        message: `已为模块规划 ${String(result.planSteps.length)} 个学习步骤，并补齐关键问题。`,
+        message: `已为模块规划 ${String(result.planSteps.length)} 个学习步骤，并落下铺垫讲解与关键问题。`,
       } satisfies WorkspaceMutationResult;
     },
     async splitQuestion(
@@ -99,7 +116,11 @@ export function createWorkspaceRuntimeService(
         throw new Error(`节点 ${questionNodeId} 不是 question。`);
       }
 
-      if (questionNode.childIds.some((childId) => snapshot.tree.nodes[childId]?.type === 'question')) {
+      if (
+        questionNode.childIds.some(
+          (childId) => snapshot.tree.nodes[childId]?.type === 'question',
+        )
+      ) {
         throw new Error('当前问题已经存在子问题，首版不重复拆分。');
       }
 
@@ -134,6 +155,67 @@ export function createWorkspaceRuntimeService(
           `已为当前问题补充 ${String(result.childQuestions.length)} 个子问题。`,
       } satisfies WorkspaceMutationResult;
     },
+    async evaluateQuestionAnswer(
+      snapshot: WorkspaceSnapshot,
+      questionNodeId: string,
+      config: AiConfig,
+    ) {
+      const questionNode = getNodeOrThrow(snapshot.tree, questionNodeId);
+
+      if (questionNode.type !== 'question') {
+        throw new Error(`节点 ${questionNodeId} 不是 question。`);
+      }
+
+      if (!isLeafQuestion(snapshot.tree, questionNodeId)) {
+        throw new Error('当前问题已经派生出追问，请先在最末级问题上继续完成闭环。');
+      }
+
+      if (!hasQuestionAnswerEvidence(snapshot.tree, questionNodeId)) {
+        throw new Error('当前问题还没有回答，无法生成判断与讲解。');
+      }
+
+      const providerClient = providerFactory(config);
+      const questionClosureService = createQuestionClosureService({
+        providerClient,
+      });
+      const context = buildQuestionClosureRuntimeContext(
+        snapshot.tree,
+        questionNodeId,
+      );
+      const previousChildIds = new Set(questionNode.childIds);
+      const closureResult = await questionClosureService.generate({
+        topic: snapshot.workspace.title,
+        moduleTitle: context.moduleNode?.title,
+        planStepSummary: context.planStepNode?.content,
+        planStepTitle: context.planStepNode?.title,
+        introductions: context.introductions,
+        learnerAnswer: context.learnerAnswer,
+        questionPath: context.questionPath,
+        referenceCandidates: context.referenceCandidates,
+      });
+      const nextTree = appendQuestionClosureToTree(
+        snapshot.tree,
+        questionNodeId,
+        closureResult,
+      );
+      const nextSnapshot = createSnapshot(nextTree, snapshot);
+
+      return {
+        snapshot: nextSnapshot,
+        nextModuleId: context.moduleNode?.id ?? null,
+        nextSelectedNodeId: resolveNextSelectionAfterQuestionClosure(
+          nextSnapshot.tree,
+          questionNodeId,
+          previousChildIds,
+          closureResult.followUpQuestions.length > 0,
+        ),
+        message: buildQuestionClosureMessage(
+          nextSnapshot.tree,
+          questionNodeId,
+          closureResult.isAnswerSufficient,
+        ),
+      } satisfies WorkspaceMutationResult;
+    },
     suggestPlanStepCompletion(
       snapshot: WorkspaceSnapshot,
       planStepNodeId: string,
@@ -156,20 +238,19 @@ export function createWorkspaceRuntimeService(
       );
 
       if (recentSnapshot) {
-        const normalizedSnapshot = reconcileSnapshot(recentSnapshot);
         const resourceMetadataRecords =
           await dependencies.structuredDataStorage.listResourceMetadata(
-            normalizedSnapshot.workspace.id,
+            recentSnapshot.workspace.id,
           );
 
         return {
-          snapshot: normalizedSnapshot,
+          snapshot: recentSnapshot,
           initialModuleId: resolveInitialModuleId(
-            normalizedSnapshot.tree,
+            recentSnapshot.tree,
             recentState.moduleId,
           ),
           initialSelectedNodeId: resolveInitialSelectedNodeId(
-            normalizedSnapshot.tree,
+            recentSnapshot.tree,
             recentState.focusedNodeId,
           ),
           resourceMetadataRecords,
@@ -191,31 +272,28 @@ export function createWorkspaceRuntimeService(
         throw new Error(`工作区 ${latestWorkspace.id} 读取为空。`);
       }
 
-      const normalizedSnapshot = reconcileSnapshot(snapshot);
       const resourceMetadataRecords =
         await dependencies.structuredDataStorage.listResourceMetadata(
           latestWorkspace.id,
         );
 
-      const initialModuleId = resolveInitialModuleId(normalizedSnapshot.tree);
-      const initialSelectedNodeId = resolveInitialSelectedNodeId(
-        normalizedSnapshot.tree,
-      );
+      const initialModuleId = resolveInitialModuleId(snapshot.tree);
+      const initialSelectedNodeId = resolveInitialSelectedNodeId(snapshot.tree);
 
-      rememberSelectionState(normalizedSnapshot.workspace.id, {
+      rememberSelectionState(snapshot.workspace.id, {
         currentModuleId: initialModuleId,
         selectedNodeId: initialSelectedNodeId,
       });
 
       return {
-        snapshot: normalizedSnapshot,
+        snapshot,
         initialModuleId,
         initialSelectedNodeId,
         resourceMetadataRecords,
       };
     }
 
-    const snapshot = reconcileSnapshot(createInitialWorkspaceSnapshot());
+    const snapshot = createInitialWorkspaceSnapshot();
     const initialModuleId = resolveInitialModuleId(snapshot.tree);
     const initialSelectedNodeId = resolveInitialSelectedNodeId(snapshot.tree);
 
@@ -265,10 +343,8 @@ export function createWorkspaceRuntimeService(
     snapshot: WorkspaceSnapshot,
     selection: WorkspaceRuntimeSelectionState,
   ) {
-    const nextSnapshot = reconcileSnapshot(snapshot);
-
-    await dependencies.structuredDataStorage.saveWorkspace(nextSnapshot);
-    rememberSelectionState(nextSnapshot.workspace.id, selection);
+    await dependencies.structuredDataStorage.saveWorkspace(snapshot);
+    rememberSelectionState(snapshot.workspace.id, selection);
   }
 
   async function upsertResourceMetadata(record: ResourceMetadataRecord) {
@@ -301,27 +377,16 @@ function createSnapshot(
   };
 }
 
-function reconcileSnapshot(snapshot: WorkspaceSnapshot): WorkspaceSnapshot {
-  const nextTree = reconcilePlanStepStatuses(snapshot.tree);
-
-  if (nextTree === snapshot.tree) {
-    return snapshot;
-  }
-
-  return {
-    ...snapshot,
-    tree: nextTree,
-  };
-}
-
 function resolveInitialModuleId(tree: NodeTree, preferredModuleId?: string | null) {
   if (preferredModuleId && tree.nodes[preferredModuleId]?.type === 'module') {
     return preferredModuleId;
   }
 
-  return tree.nodes[tree.rootId].childIds.find(
-    (childId) => tree.nodes[childId]?.type === 'module',
-  ) ?? null;
+  return (
+    tree.nodes[tree.rootId].childIds.find(
+      (childId) => tree.nodes[childId]?.type === 'module',
+    ) ?? null
+  );
 }
 
 function resolveInitialSelectedNodeId(
@@ -382,6 +447,95 @@ function findAncestorNode<TNodeType extends TreeNode['type']>(
   }
 
   return null;
+}
+
+function resolveNextSelectionAfterQuestionClosure(
+  tree: NodeTree,
+  questionNodeId: string,
+  previousChildIds: Set<string>,
+  hasFollowUpQuestion: boolean,
+) {
+  if (hasFollowUpQuestion) {
+    const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+    if (questionNode.type !== 'question') {
+      return questionNodeId;
+    }
+
+    const followUpQuestionId = questionNode.childIds.find(
+      (childId) =>
+        !previousChildIds.has(childId) && tree.nodes[childId]?.type === 'question',
+    );
+
+    if (followUpQuestionId) {
+      return followUpQuestionId;
+    }
+  }
+
+  const planStepNode = findAncestorNode(tree, questionNodeId, 'plan-step');
+
+  if (!planStepNode) {
+    return questionNodeId;
+  }
+
+  const leafQuestionIds = collectLeafQuestionIdsUnderPlanStep(tree, planStepNode.id);
+  const currentQuestionIndex = leafQuestionIds.indexOf(questionNodeId);
+  const nextQuestionId =
+    currentQuestionIndex >= 0 ? leafQuestionIds[currentQuestionIndex + 1] : null;
+
+  if (nextQuestionId) {
+    return nextQuestionId;
+  }
+
+  const moduleNode = findAncestorNode(tree, questionNodeId, 'module');
+
+  if (!moduleNode) {
+    return planStepNode.id;
+  }
+
+  const currentPlanStepIndex = moduleNode.childIds.indexOf(planStepNode.id);
+
+  for (
+    let siblingIndex = currentPlanStepIndex + 1;
+    siblingIndex < moduleNode.childIds.length;
+    siblingIndex += 1
+  ) {
+    const siblingNode = tree.nodes[moduleNode.childIds[siblingIndex]];
+
+    if (siblingNode?.type !== 'plan-step') {
+      continue;
+    }
+
+    return collectLeafQuestionIdsUnderPlanStep(tree, siblingNode.id)[0] ?? siblingNode.id;
+  }
+
+  return planStepNode.id;
+}
+
+function buildQuestionClosureMessage(
+  tree: NodeTree,
+  questionNodeId: string,
+  isAnswerSufficient: boolean,
+) {
+  const planStepNode = findAncestorNode(tree, questionNodeId, 'plan-step');
+  const stepStatusLabel =
+    planStepNode?.type === 'plan-step'
+      ? {
+          todo: 'todo',
+          doing: 'doing',
+          done: 'done',
+        }[planStepNode.status]
+      : null;
+
+  if (!isAnswerSufficient) {
+    return '已生成 judgment、summary 和新的追问，请先补上缺失点后继续回答。';
+  }
+
+  if (stepStatusLabel === 'done') {
+    return '已生成 judgment 与 summary，当前问题闭环，所在 step 也已收敛为 done。';
+  }
+
+  return '已生成 judgment 与 summary，当前问题可以闭环，已推进到下一题或下一步。';
 }
 
 function buildQuestionText(node: Extract<TreeNode, { type: 'question' }>) {

@@ -3,16 +3,42 @@ import type { PlanStepStatus } from '../../nodeDomain';
 import type { AiExecutionMetadata } from './aiTypes';
 import type { LearningMode } from './learningMode';
 
-export interface QuestionNodeDraft {
-  type: 'question';
+export interface LearningNodeCitationDraft {
+  targetNodeId: string;
+}
+
+interface BaseLearningNodeDraft {
   title: string;
   content: string;
+  citations: LearningNodeCitationDraft[];
+}
+
+export interface QuestionNodeDraft extends BaseLearningNodeDraft {
+  type: 'question';
+}
+
+export interface SummaryNodeDraft extends BaseLearningNodeDraft {
+  type: 'summary';
+}
+
+export interface JudgmentNodeDraft extends BaseLearningNodeDraft {
+  type: 'judgment';
+}
+
+export interface LearningReferenceCandidate {
+  targetNodeId: string;
+  targetType: 'resource' | 'resource-fragment';
+  title: string;
+  content: string;
+  locator?: string;
+  sourceResourceTitle?: string;
 }
 
 export interface PlanStepNodeDraft {
   type: 'plan-step';
   title: string;
   content: string;
+  introductions: SummaryNodeDraft[];
   questions: QuestionNodeDraft[];
   status: PlanStepStatus;
 }
@@ -27,6 +53,7 @@ export interface ModuleNodeDraft {
 export interface ModuleGenerationInput {
   topic: string;
   resourceSummary?: string;
+  referenceCandidates?: LearningReferenceCandidate[];
   userPreferences?: string;
   mode?: LearningMode;
 }

@@ -40,7 +40,7 @@ export function resolvePlanStepRuntimeStatus(
   }
 
   const todoReasons = [
-    '当前仍处于学习路径骨架阶段，尚未出现回答、总结、判断、问题细化或资料引用。',
+    '当前仍处于铺垫与问题骨架阶段：已有 step、铺垫或 question，但还没有回答、评估、总结或真实引用证据。',
   ];
 
   return {
@@ -100,9 +100,9 @@ function collectProgressReasons(
   const reasons: string[] = [];
 
   pushCountReason(reasons, result.answerCount, '已有回答节点');
-  pushCountReason(reasons, result.summaryCount, '已有总结节点');
-  pushCountReason(reasons, result.judgmentCount, '已有判断节点');
-  pushCountReason(reasons, result.refinedQuestionCount, '已有 question 被继续拆分');
+  pushCountReason(reasons, result.summaryCount, '已有回答后的总结');
+  pushCountReason(reasons, result.judgmentCount, '已有回答后的 judgment');
+  pushCountReason(reasons, result.refinedQuestionCount, '已有 question 被继续拆分或追问');
   pushCountReason(reasons, result.referencedNodeCount, '已有学习节点挂上资料引用');
 
   return reasons;

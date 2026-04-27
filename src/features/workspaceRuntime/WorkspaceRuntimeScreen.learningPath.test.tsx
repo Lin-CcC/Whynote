@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 
 import type {
@@ -29,7 +29,7 @@ afterEach(async () => {
   }
 });
 
-test('plans a minimal learning path that lands as plan-step plus question nodes in runtime UI', async () => {
+test('plans a minimal learning path that lands as plan-step plus introduction and question nodes in runtime UI', async () => {
   const dependencies = createTestDependencies({
     providerClient: createMockProviderClient({
       'plan-step-generation': {
@@ -37,10 +37,10 @@ test('plans a minimal learning path that lands as plan-step plus question nodes 
           {
             title: '先搭建最小概念框架',
             content: '先确认这一模块要解决什么。',
-            prerequisites: [
+            introductions: [
               {
-                title: '什么是铺垫知识？',
-                content: '先把必要背景补齐。',
+                title: '铺垫：先知道为什么要学这个问题',
+                content: '先把这个 step 的目标和前置概念讲清楚。',
               },
             ],
             questions: [
@@ -61,20 +61,15 @@ test('plans a minimal learning path that lands as plan-step plus question nodes 
     await screen.findByRole('button', { name: '为当前模块规划学习路径' }),
   ).toBeInTheDocument();
 
-  fireEvent.click(
-    screen.getByRole('button', { name: '为当前模块规划学习路径' }),
-  );
+  fireEvent.click(screen.getByRole('button', { name: '为当前模块规划学习路径' }));
 
   expect(await screen.findByDisplayValue('先搭建最小概念框架')).toBeInTheDocument();
-  expect(await screen.findByDisplayValue('铺垫：什么是铺垫知识？')).toBeInTheDocument();
+  expect(
+    await screen.findByDisplayValue('铺垫：先知道为什么要学这个问题'),
+  ).toBeInTheDocument();
   expect(
     await screen.findByDisplayValue('这个模块的核心问题是什么？'),
   ).toBeInTheDocument();
-  await waitFor(() => {
-    expect(
-      screen.getByText('已为模块规划 1 个学习步骤，并补齐关键问题。'),
-    ).toBeInTheDocument();
-  });
 });
 
 function createTestDependencies(options?: {

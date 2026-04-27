@@ -136,6 +136,16 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     );
   }
 
+  async function runQuestionEvaluation(questionNodeId: string) {
+    await runAiAction('正在评估当前回答', async (snapshot) =>
+      runtimeService.evaluateQuestionAnswer(
+        snapshot,
+        questionNodeId,
+        state.aiConfig,
+      ),
+    );
+  }
+
   async function runCompletionSuggestion(planStepNodeId: string) {
     await runAiAction('正在整理步骤完成依据', async (snapshot) =>
       runtimeService.suggestPlanStepCompletion(snapshot, planStepNodeId),
@@ -150,6 +160,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     retryInitialization: initializeWorkspace,
     runCompletionSuggestion,
     runPlanStepGeneration,
+    runQuestionEvaluation,
     runQuestionSplit,
     saveAiConfig,
     upsertResourceMetadata,
@@ -298,8 +309,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     } catch (error) {
       setState((previousState) => ({
         ...previousState,
-        aiError:
-          error instanceof Error ? error.message : 'AI 动作执行失败。',
+        aiError: error instanceof Error ? error.message : 'AI 动作执行失败。',
       }));
     } finally {
       setState((previousState) => ({
@@ -326,7 +336,9 @@ function upsertResourceMetadataRecord(
   nextRecord: ResourceMetadataRecord,
 ) {
   const nextRecords = [...records];
-  const existingIndex = nextRecords.findIndex((record) => record.id === nextRecord.id);
+  const existingIndex = nextRecords.findIndex(
+    (record) => record.id === nextRecord.id,
+  );
 
   if (existingIndex === -1) {
     nextRecords.push(nextRecord);
