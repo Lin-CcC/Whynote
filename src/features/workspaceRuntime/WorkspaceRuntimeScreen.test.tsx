@@ -90,6 +90,32 @@ test('persists workspace edits and restores them on the next mount', async () =>
   expect(await screen.findByDisplayValue('已持久化模块')).toBeInTheDocument();
 });
 
+test('guides recovery from the AI action card when no module exists', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createEmptyWorkspaceSnapshot(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  const actionSection = await findSectionByHeading('AI 动作入口');
+
+  expect(
+    actionSection.getByText(/当前还没有可供 AI 操作的学习模块/),
+  ).toBeInTheDocument();
+  expect(
+    actionSection.getByRole('button', { name: '新建模块' }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(actionSection.getByRole('button', { name: '新建模块' }));
+
+  expect(await screen.findByDisplayValue('新模块')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '新模块' })).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: '为当前模块生成 plan-step' }),
+  ).toBeInTheDocument();
+});
+
 test('runs learning-engine plan-step generation from UI and materializes the result into the tree', async () => {
   const dependencies = createTestDependencies({
     providerClient: createMockProviderClient({
@@ -610,6 +636,16 @@ function createCompletionSuggestionSnapshot(): WorkspaceSnapshot {
     ...snapshot,
     tree,
   };
+}
+
+function createEmptyWorkspaceSnapshot(): WorkspaceSnapshot {
+  return createWorkspaceSnapshot({
+    title: '空模块主题',
+    workspaceId: 'workspace-empty-module',
+    rootId: 'theme-empty-module',
+    createdAt: '2026-04-28T00:00:00.000Z',
+    updatedAt: '2026-04-28T00:00:00.000Z',
+  });
 }
 
 function createResourceFocusSnapshot(): WorkspaceSnapshot {

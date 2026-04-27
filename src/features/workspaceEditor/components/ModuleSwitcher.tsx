@@ -4,6 +4,7 @@ type ModuleSwitcherProps = {
   currentModuleId: string | null;
   isInteractionLocked: boolean;
   modules: ModuleNode[];
+  onCreateModule: () => void;
   onSwitchModule: (moduleId: string) => void;
 };
 
@@ -11,6 +12,7 @@ export default function ModuleSwitcher({
   currentModuleId,
   isInteractionLocked,
   modules,
+  onCreateModule,
   onSwitchModule,
 }: ModuleSwitcherProps) {
   return (
@@ -20,24 +22,42 @@ export default function ModuleSwitcher({
           <p className="workspace-kicker">模块切换</p>
           <h2 className="workspace-sectionTitle">当前学习模块</h2>
         </div>
-        <span className="workspace-counter">{modules.length} 个模块</span>
-      </div>
-      <div aria-label="学习模块列表" className="workspace-moduleList">
-        {modules.map((moduleNode) => (
+        <div className="workspace-sectionActions">
+          <span className="workspace-counter">{modules.length} 个模块</span>
           <button
-            aria-pressed={moduleNode.id === currentModuleId}
-            className="workspace-moduleButton"
-            data-active={moduleNode.id === currentModuleId}
+            className="workspace-inlineAction"
             disabled={isInteractionLocked}
-            key={moduleNode.id}
-            onClick={() => onSwitchModule(moduleNode.id)}
+            onClick={onCreateModule}
             type="button"
           >
-            <span className="workspace-moduleName">{moduleNode.title}</span>
-            <span className="workspace-moduleHint">{moduleNode.content}</span>
+            新建模块
           </button>
-        ))}
+        </div>
       </div>
+      {modules.length === 0 ? (
+        <div className="workspace-emptyState">
+          <p className="workspace-helpText">
+            当前主题下还没有学习模块。先手动创建首个模块，文本区和结构区就会恢复可编辑状态。
+          </p>
+        </div>
+      ) : (
+        <div aria-label="学习模块列表" className="workspace-moduleList">
+          {modules.map((moduleNode) => (
+            <button
+              aria-pressed={moduleNode.id === currentModuleId}
+              className="workspace-moduleButton"
+              data-active={moduleNode.id === currentModuleId}
+              disabled={isInteractionLocked}
+              key={moduleNode.id}
+              onClick={() => onSwitchModule(moduleNode.id)}
+              type="button"
+            >
+              <span className="workspace-moduleName">{moduleNode.title}</span>
+              <span className="workspace-moduleHint">{moduleNode.content}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

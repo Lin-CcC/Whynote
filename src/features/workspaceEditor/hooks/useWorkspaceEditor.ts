@@ -43,6 +43,9 @@ import {
   isNodeWithinModule,
 } from '../utils/treeSelectors';
 
+const FIRST_MODULE_CONTENT = '先定义当前主题下的第一个学习方向。';
+const FOLLOW_UP_MODULE_CONTENT = '补充这个模块的学习目标、边界或导读。';
+
 export const defaultWorkspaceEditorOperations: WorkspaceEditorOperations = {
   insertChildNode,
   insertSiblingNode,
@@ -231,6 +234,39 @@ export function useWorkspaceEditor({
       return nextTree;
     });
     setOperationError(null);
+  }
+
+  function createModule() {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    const nextNode = createNode({
+      type: 'module',
+      title: buildNextModuleTitle(tree),
+      content:
+        moduleNodes.length === 0
+          ? FIRST_MODULE_CONTENT
+          : FOLLOW_UP_MODULE_CONTENT,
+    });
+
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.insertChildNode(
+          tree,
+          tree.rootId,
+          nextNode,
+          getModuleInsertIndex(tree),
+        );
+
+        return {
+          nextTree,
+          nextSelectedNodeId: nextNode.id,
+          preferredModuleId: nextNode.id,
+        };
+      },
+      '创建模块失败，请稍后重试。',
+    );
   }
 
   function insertChildAtSelection() {
@@ -455,6 +491,7 @@ export function useWorkspaceEditor({
     actionAvailability,
     currentModule,
     currentModuleId,
+    createModule,
     expandedNodeIds,
     moduleNodes,
     operationError,
@@ -509,6 +546,29 @@ function createEditorNode(
     title: getDefaultTitleForType(nodeType),
     content: '',
   });
+}
+
+function getModuleInsertIndex(tree: NodeTree) {
+  const rootNode = getNodeOrThrow(tree, tree.rootId);
+  const firstResourceIndex = rootNode.childIds.findIndex(
+    (childId) => tree.nodes[childId]?.type === 'resource',
+  );
+
+  return firstResourceIndex === -1
+    ? rootNode.childIds.length
+    : firstResourceIndex;
+}
+
+function buildNextModuleTitle(tree: NodeTree) {
+  const existingTitles = new Set(getModuleNodes(tree).map((node) => node.title));
+
+  for (let index = 0; ; index += 1) {
+    const candidateTitle = index === 0 ? '新模块' : `新模块 ${String(index + 1)}`;
+
+    if (!existingTitles.has(candidateTitle)) {
+      return candidateTitle;
+    }
+  }
 }
 
 function resolveModuleId(

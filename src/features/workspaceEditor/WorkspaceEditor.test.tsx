@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import {
   createNode,
@@ -154,6 +154,55 @@ test.each([
   fireEvent.click(screen.getByRole('button', { name: buttonLabel }));
 
   expect(screen.getByRole('alert')).toHaveTextContent(`${buttonLabel}失败`);
+});
+
+test('recovers with a new module after deleting the last module', () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-recovery"
+      initialSelectedNodeId="module-recovery"
+      initialSnapshot={createSingleModuleSnapshot()}
+      onSnapshotChange={(snapshot) => {
+        snapshots.push(snapshot);
+      }}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: '删除节点' }));
+
+  expect(
+    within(getSectionByHeading('当前学习模块')).getByText('0 个模块'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('heading', { name: '还没有可展示的模块结构' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('heading', { name: '还没有可编辑的模块' }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    within(getSectionByHeading('还没有可编辑的模块')).getByRole('button', {
+      name: '新建模块',
+    }),
+  );
+
+  expect(screen.getByDisplayValue('新模块')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '新模块' })).toBeInTheDocument();
+  expect(
+    within(getSectionByHeading('当前学习模块')).getByRole('button', {
+      name: /新模块/i,
+    }),
+  ).toBeInTheDocument();
+
+  const latestSnapshot = snapshots[snapshots.length - 1];
+  const rootChildTitles =
+    latestSnapshot?.tree.nodes[latestSnapshot.tree.rootId].childIds.map(
+      (childId) => latestSnapshot.tree.nodes[childId]?.title,
+    ) ?? [];
+
+  expect(rootChildTitles).toContain('新模块');
 });
 
 test('keeps text main view in the same order as the underlying question children', () => {
@@ -417,4 +466,43 @@ function createQuestionOrderSnapshot(): WorkspaceSnapshot {
     ...snapshot,
     tree,
   };
+}
+
+function createSingleModuleSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '恢复主题',
+    workspaceId: 'workspace-recovery',
+    rootId: 'theme-recovery',
+    createdAt: '2026-04-27T10:30:00.000Z',
+    updatedAt: '2026-04-27T10:30:00.000Z',
+  });
+
+  const tree = insertChildNode(
+    snapshot.tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-recovery',
+      title: '唯一模块',
+      content: '用于验证删空后的恢复路径。',
+      createdAt: '2026-04-27T10:30:00.000Z',
+      updatedAt: '2026-04-27T10:30:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function getSectionByHeading(name: string) {
+  const heading = screen.getByRole('heading', { name });
+  const section = heading.closest('section');
+
+  if (!section) {
+    throw new Error(`Unable to find section for heading "${name}".`);
+  }
+
+  return section;
 }

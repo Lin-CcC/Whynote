@@ -4,6 +4,7 @@ import type { TreeNode } from '../../nodeDomain';
 type WorkspaceRuntimeActionCardProps = {
   currentModule: TreeNode | null;
   isAiRunning: boolean;
+  onCreateModule: () => void;
   onGeneratePlanSteps: (moduleNodeId: string) => void;
   onSplitQuestion: (questionNodeId: string) => void;
   onSuggestCompletion: (planStepNodeId: string) => void;
@@ -13,6 +14,7 @@ type WorkspaceRuntimeActionCardProps = {
 export default function WorkspaceRuntimeActionCard({
   currentModule,
   isAiRunning,
+  onCreateModule,
   onGeneratePlanSteps,
   onSplitQuestion,
   onSuggestCompletion,
@@ -45,6 +47,32 @@ export default function WorkspaceRuntimeActionCard({
     }
 
     onSuggestCompletion(selectedNode.id);
+  }
+
+  if (!currentModule) {
+    return (
+      <SectionCard>
+        <div className="workspace-sectionHeader">
+          <div>
+            <p className="workspace-kicker">运行时集成</p>
+            <h2 className="workspace-sectionTitle">AI 动作入口</h2>
+          </div>
+        </div>
+        <div className="workspace-emptyState">
+          <p className="workspace-helpText">
+            当前还没有可供 AI 操作的学习模块。先新建一个模块，再生成 plan-step 或继续后续 AI 动作。
+          </p>
+          <button
+            className="workspace-inlineAction"
+            disabled={isAiRunning}
+            onClick={onCreateModule}
+            type="button"
+          >
+            新建模块
+          </button>
+        </div>
+      </SectionCard>
+    );
   }
 
   return (

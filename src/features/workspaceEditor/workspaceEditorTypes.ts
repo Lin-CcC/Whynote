@@ -56,6 +56,7 @@ export interface WorkspaceEditorRenderContext
     nextTree: NodeTree,
     options?: ExternalTreeChangeOptions,
   ) => void;
+  createModule: () => void;
   currentModule: TreeNode | null;
   selectedNode: TreeNode | null;
   selectNode: (nodeId: string) => void;

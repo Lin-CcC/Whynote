@@ -13,6 +13,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
   const workspaceEditor = useWorkspaceEditor(props);
   const renderContext = {
     applyTreeChange: workspaceEditor.applyTreeChange,
+    createModule: workspaceEditor.createModule,
     currentModule: workspaceEditor.currentModule,
     currentModuleId: workspaceEditor.currentModuleId,
     selectNode: workspaceEditor.selectNode,
@@ -31,6 +32,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
               currentModuleId={workspaceEditor.currentModuleId}
               isInteractionLocked={props.isInteractionLocked ?? false}
               modules={workspaceEditor.moduleNodes}
+              onCreateModule={workspaceEditor.createModule}
               onSwitchModule={workspaceEditor.switchModule}
             />
           </SectionCard>
@@ -39,6 +41,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
               currentModuleId={workspaceEditor.currentModuleId}
               expandedNodeIds={workspaceEditor.expandedNodeIds}
               isInteractionLocked={props.isInteractionLocked ?? false}
+              onCreateModule={workspaceEditor.createModule}
               onSelectNode={workspaceEditor.selectNode}
               onToggleNode={workspaceEditor.toggleNodeExpanded}
               selectedNodeId={workspaceEditor.selectedNodeId}
@@ -71,6 +74,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           currentModuleId={workspaceEditor.currentModuleId}
           interactionLockReason={props.interactionLockReason ?? null}
           isInteractionLocked={props.isInteractionLocked ?? false}
+          onCreateModule={workspaceEditor.createModule}
           onSelectNode={workspaceEditor.selectNode}
           onUpdateNode={workspaceEditor.updateNode}
           registerNodeElement={workspaceEditor.registerNodeElement}
