@@ -70,6 +70,7 @@ test('plans a minimal learning path that lands as plan-step plus introduction an
   expect(
     await screen.findByDisplayValue('这个模块的核心问题是什么？'),
   ).toBeInTheDocument();
+  expect(await screen.findAllByText('铺垫')).not.toHaveLength(0);
 });
 
 function createTestDependencies(options?: {

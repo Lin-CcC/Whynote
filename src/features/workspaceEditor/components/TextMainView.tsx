@@ -1,7 +1,7 @@
 import SectionCard from '../../../ui/SectionCard';
 import { getNodeOrThrow, type NodeTree } from '../../nodeDomain';
 import type { NodeContentPatch } from '../workspaceEditorTypes';
-import { getNodeTypeLabel } from '../utils/treeSelectors';
+import { getDisplayLabelForNode } from '../utils/treeSelectors';
 import EditorNodeSection from './EditorNodeSection';
 
 type TextMainViewProps = {
@@ -73,7 +73,7 @@ export default function TextMainView({
             <dt>当前焦点</dt>
             <dd>
               {selectedNode
-                ? `${getNodeTypeLabel(selectedNode.type)} · ${selectedNode.title}`
+                ? `${getDisplayLabelForNode(tree, selectedNode)} · ${selectedNode.title}`
                 : '未选中节点'}
             </dd>
           </div>

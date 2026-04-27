@@ -42,6 +42,21 @@ test('can switch to theme scope and include resource hits', () => {
   expect(result.results[1]?.sourceSummary).toContain('React 官方文档');
 });
 
+test('labels scaffold summaries as introductions in search results', () => {
+  const snapshot = createResourcesSearchSnapshot();
+
+  const result = searchWorkspaceNodes({
+    currentModuleId: 'module-current',
+    query: '前置讲解',
+    scope: 'current-module',
+    selectedTagIds: [],
+    tree: snapshot.tree,
+  });
+
+  expect(result.results.map((item) => item.nodeId)).toEqual(['summary-introduction']);
+  expect(result.results[0]?.nodeTypeLabel).toBe('铺垫');
+});
+
 test('supports resource-only search by source summary', () => {
   const snapshot = createResourcesSearchSnapshot();
 
@@ -115,6 +130,18 @@ function createResourcesSearchSnapshot(): WorkspaceSnapshot {
       title: '先理解更新流程',
       content: '先看状态更新如何合并。',
       status: 'doing',
+      createdAt: '2026-04-27T11:00:00.000Z',
+      updatedAt: '2026-04-27T11:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-current',
+    createNode({
+      type: 'summary',
+      id: 'summary-introduction',
+      title: '铺垫：先理解状态更新的背景',
+      content: '这段前置讲解帮助进入后续问题。',
       createdAt: '2026-04-27T11:00:00.000Z',
       updatedAt: '2026-04-27T11:00:00.000Z',
     }),

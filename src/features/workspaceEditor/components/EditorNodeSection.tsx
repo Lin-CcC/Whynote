@@ -4,9 +4,9 @@ import { resolvePlanStepRuntimeStatus } from '../../learningEngine';
 import { getNodeOrThrow, type NodeTree, type PlanStepStatus } from '../../nodeDomain';
 import {
   getChildNodes,
+  getDisplayLabelForNode,
   getNodeEmphasis,
-  getNodeInputPlaceholder,
-  getNodeTypeLabel,
+  getNodeInputPlaceholderForNode,
 } from '../utils/treeSelectors';
 import type { NodeContentPatch } from '../workspaceEditorTypes';
 
@@ -89,7 +89,9 @@ export default function EditorNodeSection({
     >
       <div className="workspace-nodeHeader">
         <div className="workspace-nodeMeta">
-          <span className="workspace-nodeType">{getNodeTypeLabel(node.type)}</span>
+          <span className="workspace-nodeType">
+            {getDisplayLabelForNode(tree, node)}
+          </span>
           {node.type === 'plan-step' ? (
             <select
               aria-label={`${node.title} 的步骤状态`}
@@ -123,7 +125,7 @@ export default function EditorNodeSection({
         ) : null}
       </div>
       <input
-        aria-label={`${node.title || getNodeTypeLabel(node.type)} 标题`}
+        aria-label={`${node.title || getDisplayLabelForNode(tree, node)} 标题`}
         className="workspace-nodeTitleInput"
         disabled={isInteractionLocked}
         onChange={handleTitleChange}
@@ -132,13 +134,13 @@ export default function EditorNodeSection({
         value={node.title}
       />
       <textarea
-        aria-label={`${node.title || getNodeTypeLabel(node.type)} 内容`}
+        aria-label={`${node.title || getDisplayLabelForNode(tree, node)} 内容`}
         className="workspace-nodeContentInput"
         disabled={isInteractionLocked}
         onChange={handleContentChange}
         onClick={(event) => event.stopPropagation()}
         onFocus={handleEditableFocus}
-        placeholder={getNodeInputPlaceholder(node.type, 'content')}
+        placeholder={getNodeInputPlaceholderForNode(tree, node, 'content')}
         rows={node.type === 'plan-step' ? 3 : 4}
         value={node.content}
       />

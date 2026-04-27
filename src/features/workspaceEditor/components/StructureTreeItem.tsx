@@ -2,8 +2,8 @@ import type { NodeTree } from '../../nodeDomain';
 import { getNodeOrThrow } from '../../nodeDomain';
 import {
   getChildNodes,
+  getDisplayLabelForNode,
   getNodeEmphasis,
-  getNodeTypeLabel,
 } from '../utils/treeSelectors';
 
 type StructureTreeItemProps = {
@@ -58,7 +58,9 @@ export default function StructureTreeItem({
           onClick={() => onSelectNode(node.id)}
           type="button"
         >
-          <span className="workspace-treeType">{getNodeTypeLabel(node.type)}</span>
+          <span className="workspace-treeType">
+            {getDisplayLabelForNode(tree, node)}
+          </span>
           <span className="workspace-treeText">{node.title}</span>
         </button>
       </div>

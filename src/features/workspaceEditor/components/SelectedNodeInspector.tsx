@@ -5,7 +5,11 @@ import {
   resolveBuiltinTags,
   type NodeTree,
 } from '../../nodeDomain';
-import { getNodePath, getNodeTypeLabel } from '../utils/treeSelectors';
+import {
+  getDisplayLabelForNode,
+  getNodePath,
+  getNodeTypeLabel,
+} from '../utils/treeSelectors';
 
 type SelectedNodeInspectorProps = {
   currentModuleId: string | null;
@@ -61,11 +65,11 @@ export default function SelectedNodeInspector({
           </div>
           <div>
             <dt>节点</dt>
-            <dd>
-              {selectedNode
-                ? `${getNodeTypeLabel(selectedNode.type)} · ${selectedNode.title}`
-                : '未选中节点'}
-            </dd>
+              <dd>
+                {selectedNode
+                  ? `${getDisplayLabelForNode(tree, selectedNode)} · ${selectedNode.title}`
+                  : '未选中节点'}
+              </dd>
           </div>
           <div>
             <dt>路径</dt>

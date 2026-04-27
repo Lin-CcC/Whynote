@@ -36,21 +36,21 @@ export default function LearningCitationPanel({
         <p className="workspace-helpText">
           先在模块编辑区选中一个 `question / answer / summary / judgment` 节点，再查看或建立资料引用。
         </p>
-      ) : !isLearningCitationSourceNode(selectedNode) ? (
-        <>
-          <p className="workspace-helpText">
-            当前焦点是 {formatNodeLabel(selectedNode)}。学习运行时的资料引用入口当前只对
-            `question / answer / summary / judgment` 开放。
-          </p>
+        ) : !isLearningCitationSourceNode(selectedNode) ? (
+          <>
+            <p className="workspace-helpText">
+              当前焦点是 {formatNodeLabel(tree, selectedNode)}。学习运行时的资料引用入口当前只对
+              `question / answer / summary / judgment` 开放。
+            </p>
           <p className="workspace-helpText">
             切到具体学习节点后，这里会显示它已经引用的资料，并支持回跳到 resource 或 fragment。
           </p>
         </>
-      ) : (
-        <>
-          <p className="workspace-helpText">
-            当前焦点：{formatNodeLabel(selectedNode)}
-          </p>
+        ) : (
+          <>
+            <p className="workspace-helpText">
+              当前焦点：{formatNodeLabel(tree, selectedNode)}
+            </p>
           {selectedNode.referenceIds.length === 0 ? (
             <p className="workspace-helpText">
               当前学习节点还没有资料引用。可先在资料区定位到 resource 或 fragment，再在下方资料焦点里建立引用。

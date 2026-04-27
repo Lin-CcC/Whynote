@@ -1,4 +1,5 @@
 import {
+  isScaffoldSummaryNode,
   getNodeOrThrow,
   getSubtreeNodeIds,
   type NodeTree,
@@ -240,22 +241,9 @@ function isLeafQuestionResolved(
 }
 
 function collectScaffoldSummaryIds(tree: NodeTree, planStepNode: PlanStepNode) {
-  const scaffoldSummaryIds = new Set<string>();
-
-  for (const childId of planStepNode.childIds) {
-    const childNode = tree.nodes[childId];
-
-    if (childNode?.type === 'summary') {
-      scaffoldSummaryIds.add(childId);
-      continue;
-    }
-
-    if (childNode?.type === 'question') {
-      break;
-    }
-  }
-
-  return scaffoldSummaryIds;
+  return new Set(
+    planStepNode.childIds.filter((childId) => isScaffoldSummaryNode(tree, childId)),
+  );
 }
 
 function countBlockingStepLevelJudgments(tree: NodeTree, planStepNode: PlanStepNode) {

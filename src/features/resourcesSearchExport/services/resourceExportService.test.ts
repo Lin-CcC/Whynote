@@ -40,6 +40,7 @@ test('can include plan-step titles explicitly during module export', () => {
   });
 
   expect(result.content).toContain('## 步骤：先理解批处理（进行中）');
+  expect(result.content).toContain('### 铺垫：先建立批处理直觉');
   expect(result.content).toContain('### 问题：什么是批处理？');
 });
 
@@ -101,6 +102,18 @@ function createResourcesExportSnapshot(): WorkspaceSnapshot {
       title: '先理解批处理',
       content: '先看状态更新如何合并。',
       status: 'doing',
+      createdAt: '2026-04-27T11:30:00.000Z',
+      updatedAt: '2026-04-27T11:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-batching',
+    createNode({
+      type: 'summary',
+      id: 'summary-introduction',
+      title: '先建立批处理直觉',
+      content: '先用前置讲解建立问题背景。',
       createdAt: '2026-04-27T11:30:00.000Z',
       updatedAt: '2026-04-27T11:30:00.000Z',
     }),

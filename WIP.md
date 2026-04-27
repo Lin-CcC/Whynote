@@ -74,19 +74,19 @@
 - [x] 明确“手动新建摘录”降级为补充入口
 - [ ] 切出首批实现：URL 自动补标题 / 概况、`txt / md` 正文基础、手动 fragment 入口降级
 - [ ] 明确资源正文基础与 ingest 状态的存储草案
-- [ ] 定义学习运行时的 fragment 复用 / 新建引用接口
-- [ ] 补齐 `answer` 作为资料引用源的领域约束
+- [x] 定义学习运行时的 fragment 复用 / 新建引用接口
+- [x] 补齐 `answer` 作为资料引用源的领域约束
 
-## 当前工作树：`codex/learning-runtime-upgrade`
+## 当前工作树：`codex/learning-loop-closure`
 
 - [ ] 把资源标题 / 概况升级为 AI 摘要主路径，并保留规则 / 手动 fallback 与来源标记
 - [ ] 让 runtime 读取并使用 resource ingest metadata，而不是只写不读
-- [ ] 把“为当前模块生成 plan-step”升级成最小学习路径，并真正落到现有节点树
-- [ ] 用现有节点模型表达铺垫知识，优先收敛到 step 下的 question 草案
-- [ ] 打通学习节点到 resource / fragment 的最小引用闭环，支持 answer 引用
-- [ ] 明确 fragment 复用优先、无法稳定定位时退回 resource 级引用
-- [ ] 实现 plan-step 状态自动流转，并保留可解释依据与手动覆盖优先级
-- [ ] 补齐 runtime / storage / service / UI 测试，并回归 typecheck、build
+- [x] 把“为当前模块生成 plan-step”升级成最小学习路径，并真正落到现有节点树
+- [x] 用现有节点模型表达铺垫知识，优先收敛到 step 下的 question 草案
+- [x] 打通学习节点到 resource / fragment 的最小引用闭环，支持 answer 引用
+- [x] 明确 fragment 复用优先、无法稳定定位时退回 resource 级引用
+- [x] 实现 plan-step 状态自动流转，并保留可解释依据与手动覆盖优先级
+- [x] 补齐 runtime / storage / service / UI 测试，并回归 typecheck、build
 
 ## 当前工作树：`codex/resource-citation-runtime`
 
