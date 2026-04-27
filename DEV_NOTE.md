@@ -84,8 +84,9 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 ### 10. 资料区全局化
 
 - 资料源统一放在根节点下的全局资料区
+- `resource` 承接资料标题、概况、来源信息与后续正文基础
 - 模块与学习内容通过引用连接资料，不复制原文
-- `resource-fragment` 仅在需要稳定引用时按需生成
+- `resource-fragment` 作为稳定引用锚点按需生成
 
 优先触发场景：
 
@@ -111,7 +112,7 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 
 ### 13. 存储分工
 
-- `IndexedDB`：工作区、模块、节点树、资料元数据、引用关系、标签状态
+- `IndexedDB`：工作区、模块、节点树、资料元数据、资料正文基础、引用关系、标签状态
 - `localStorage`：设置项、最近打开状态、界面偏好
 
 不要把结构化学习数据放进 `localStorage`。
@@ -124,6 +125,37 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
   - `API key`
   - `model`
 - 界面层不要直接散落模型调用，后续要保留切到后端代理的空间
+
+### 15. 资源自动处理走独立 ingest pipeline
+
+- `resource` / `resource-fragment` 继续作为对用户可见的正式节点，不为了导入阶段临时状态新增更多树节点类型
+- 导入动作先创建 `resource` 壳节点，再由 ingest pipeline 异步补齐标题、概况、来源信息、正文基础与候选 fragment
+- 自动处理结果必须可重试、可回退，且尊重用户手动覆盖；用户改写后的标题 / 概况不能被后台重跑静默覆盖
+- 当前已有 `resourceMetadata` 投影是优先扩展点，可承接 `importMethod / ingestStatus / canonicalSource / contentHash / titleSource / summarySource` 等轻量状态
+- 大体量正文、解析中间结果与索引不要直接塞进节点树或 `localStorage`；如需要持久化，优先走 `IndexedDB` 的独立 resource body / index record
+
+### 16. URL 导入与本地上传分开处理
+
+- URL 导入重点是来源规范化与网页抽取：保存用户输入 URL，尝试补 canonical URL、站点信息、页面标题与可读正文
+- 在当前 Web 优先形态下，URL 抽取要接受浏览器直连、站点可访问性与 CORS 的现实限制；抽取失败时保留 `resource` 壳并退回手动补录，而不是阻塞资料创建
+- 本地上传首版优先 `txt / md`，因为可直接读取正文并建立稳定的正文基础；标题可来自文件名或首级标题，概况可来自正文摘要
+- `PDF / DOCX` 进入后续层，不要为了首版 ingest 方案先把解析链路做复杂
+
+### 17. fragment 去重与复用策略
+
+- `resource-fragment` 不新增并列节点类型；系统生成、用户补录、候选片段的差异优先放在 metadata / provenance 层
+- 学习运行时在创建新 fragment 之前，必须先在同一 `resource` 下尝试按定位信息、规范化 excerpt 和相似文本复用现有 fragment
+- 如果只能确定“引用了这份资料”，但无法稳定定位片段，就退回 `resource` 级引用，不要伪造 fragment 精度
+- fragment 的稳定身份优先由 `sourceResourceId + locator/anchor + normalized excerpt hash` 组合确定，便于去重与回跳
+- 手动补录 fragment 也应走同一去重规则，避免用户一键补出多个语义重复的摘录节点
+
+### 18. 资料自动处理与学习运行流的边界
+
+- ingest pipeline 负责导入、解析、摘要、候选 fragment 生成与资源级索引，不负责 `module / question / answer` 的直接编排
+- learning runtime 只消费已经就绪的 `resource` 摘要、正文基础和 fragment 索引，并在需要时调用“引用解析”服务创建或复用 fragment
+- `answer` 最终应与 `question / summary / judgment` 一样允许引用资料；当前域模型尚未放开这条边界，进入实现阶段时应优先补齐
+- editor / runtime UI 不应直接内嵌文件解析或网页抓取逻辑，避免资料处理时序与学习交互耦合
+- 当某份资料尚未处理完成时，学习流仍可先引用 `resource` 级信息继续工作；fragment 级精确引用是增强，而不是阻塞条件
 
 ## 后续需要重新评估这些决策的触发条件
 
