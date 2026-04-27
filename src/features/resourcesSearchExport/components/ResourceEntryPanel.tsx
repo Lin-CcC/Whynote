@@ -7,6 +7,8 @@ import {
   createResourceFragmentEntry,
   listResourceOptions,
 } from '../services/resourceEntryService';
+import { autoFillResourceDraftFromUrl } from '../services/resourceAutoFillService';
+import { buildResourceDraftFromLocalFile } from '../services/resourceLocalFileService';
 
 type ResourceEntryPanelProps = {
   activeResourceNodeId: string | null;
@@ -21,6 +23,9 @@ type SubmissionFeedback =
       tone: 'error' | 'success';
     }
   | null;
+
+const BROWSER_LIMITED_URL_AUTO_FILL_HELP_TEXT =
+  'URL 自动填充目前只是浏览器内的受限尝试：只对少数允许浏览器直接读取的网页可用，很多第三方站点会被 CORS 或访问策略拦住。失败不代表链接无效，你仍可直接手动补标题和资料概况。';
 
 export default function ResourceEntryPanel({
   activeResourceNodeId,
@@ -37,6 +42,8 @@ export default function ResourceEntryPanel({
   const [resourceTitle, setResourceTitle] = useState('');
   const [resourceSource, setResourceSource] = useState('');
   const [resourceContent, setResourceContent] = useState('');
+  const [isResourceAutoFillRunning, setIsResourceAutoFillRunning] = useState(false);
+  const [isLocalFileImportRunning, setIsLocalFileImportRunning] = useState(false);
   const [fragmentResourceNodeId, setFragmentResourceNodeId] = useState(
     preferredResourceNodeId,
   );
@@ -90,11 +97,12 @@ export default function ResourceEntryPanel({
       <div className="workspace-sectionHeader">
         <div>
           <p className="workspace-kicker">资料入口</p>
-          <h2 className="workspace-sectionTitle">添加资料与摘录</h2>
+          <h2 className="workspace-sectionTitle">资料入口</h2>
         </div>
       </div>
       <p className="workspace-helpText">
-        首版先补手动录入入口，不扩展 PDF / DOC 导入、网页抓取或外部检索。
+        {BROWSER_LIMITED_URL_AUTO_FILL_HELP_TEXT} 同时支持 txt / md 最小本地上传，不扩展
+        PDF / DOCX、完整网页抓取或外部检索。
       </p>
       <div className="resources-entryLayout">
         <form className="resources-entrySection" onSubmit={handleCreateResource}>
@@ -110,7 +118,7 @@ export default function ResourceEntryPanel({
             />
           </label>
           <label className="resources-panelField">
-            <span className="resources-panelFieldLabel">来源 URI / 说明</span>
+            <span className="resources-panelFieldLabel">来源 URL / 说明</span>
             <input
               aria-label="资料来源 URI 或说明"
               className="resources-panelInput"
@@ -119,6 +127,35 @@ export default function ResourceEntryPanel({
               value={resourceSource}
             />
           </label>
+          <div className="resources-entryActionRow">
+            <button
+              className="resources-entryButton"
+              disabled={isLocalFileImportRunning || isResourceAutoFillRunning}
+              onClick={handleAutoFillResourceDraft}
+              type="button"
+            >
+              {isResourceAutoFillRunning
+                ? '尝试读取中...'
+                : '尝试自动填充（浏览器受限）'}
+            </button>
+          </div>
+          <p className="workspace-helpText">
+            这不是通用网页抓取器。浏览器只能尝试读取当前明确允许直接访问的 URL。
+          </p>
+          <label className="resources-panelField">
+            <span className="resources-panelFieldLabel">本地文件（txt / md）</span>
+            <input
+              accept=".txt,.md,text/plain,text/markdown,text/x-markdown"
+              aria-label="本地资料文件"
+              className="resources-panelInput resources-fileInput"
+              disabled={isLocalFileImportRunning || isResourceAutoFillRunning}
+              onChange={handleLocalFileImport}
+              type="file"
+            />
+          </label>
+          <p className="workspace-helpText">
+            上传只做最小文本导入：优先支持 `.txt`、`.md`，不在这版处理 PDF / DOCX 解析。
+          </p>
           <label className="resources-panelField">
             <span className="resources-panelFieldLabel">资料概况</span>
             <textarea
@@ -129,7 +166,11 @@ export default function ResourceEntryPanel({
               value={resourceContent}
             />
           </label>
-          <button className="resources-entryButton" type="submit">
+          <button
+            className="resources-entryButton"
+            disabled={isLocalFileImportRunning || isResourceAutoFillRunning}
+            type="submit"
+          >
             创建资料
           </button>
         </form>
@@ -248,6 +289,71 @@ export default function ResourceEntryPanel({
           error instanceof Error ? error.message : '资料创建失败，请稍后重试。',
         tone: 'error',
       });
+    }
+  }
+
+  async function handleAutoFillResourceDraft() {
+    setIsResourceAutoFillRunning(true);
+
+    try {
+      const draft = await autoFillResourceDraftFromUrl({
+        sourceUrl: resourceSource,
+      });
+
+      setResourceTitle(draft.title);
+      setResourceSource(draft.sourceUri);
+      setResourceContent(draft.content);
+      setFeedback({
+        message:
+          '当前链接允许浏览器直接读取，已预填资料标题和概况；你仍可手动修改后再提交。',
+        tone: 'success',
+      });
+    } catch (error) {
+      setFeedback({
+        message:
+          error instanceof Error
+            ? error.message
+            : '受限自动填充未完成，请直接手动填写标题和资料概况。',
+        tone: 'error',
+      });
+    } finally {
+      setIsResourceAutoFillRunning(false);
+    }
+  }
+
+  async function handleLocalFileImport(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    setIsLocalFileImportRunning(true);
+
+    try {
+      const draft = await buildResourceDraftFromLocalFile(file);
+
+      setResourceTitle(draft.title);
+      setResourceSource(draft.sourceUri);
+      setResourceContent(draft.content);
+      setFeedback({
+        message: `已从 ${file.name} 预填标题和资料概况，确认后可直接创建资料。`,
+        tone: 'success',
+      });
+    } catch (error) {
+      setFeedback({
+        message:
+          error instanceof Error
+            ? error.message
+            : '本地文件导入失败，请改用手动填写。',
+        tone: 'error',
+      });
+    } finally {
+      setIsLocalFileImportRunning(false);
     }
   }
 
