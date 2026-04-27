@@ -289,17 +289,21 @@ describe('nodeDomain', () => {
     expect(getModuleScopeId(tree, 'question-scope')).toBe('module-scope');
     expect(getModuleScopeId(tree, 'resource-fragment-scope')).toBeNull();
     expect(tree.nodes['answer-scope'].tagIds).toEqual(['tag-verify']);
-    expect(() =>
-      addNodeReference(
-        tree,
-        createNodeReference({
-          id: 'reference-illegal-answer',
-          sourceNodeId: 'answer-scope',
-          targetNodeId: 'resource-scope',
-          createdAt: '2026-04-27T00:00:00.000Z',
-        }),
-      ),
-    ).toThrowError(NodeDomainError);
+
+    const withAnswerReference = addNodeReference(
+      tree,
+      createNodeReference({
+        id: 'reference-answer-resource',
+        sourceNodeId: 'answer-scope',
+        targetNodeId: 'resource-scope',
+        createdAt: '2026-04-27T00:00:00.000Z',
+      }),
+    );
+
+    expect(withAnswerReference.nodes['answer-scope'].referenceIds).toEqual([
+      'reference-answer-resource',
+    ]);
+    validateNodeTree(withAnswerReference);
   });
 
   it('deletes subtrees and clears dangling references', () => {

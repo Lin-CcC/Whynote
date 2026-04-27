@@ -1,8 +1,4 @@
-export interface LocalFileResourceDraft {
-  content: string;
-  sourceUri: string;
-  title: string;
-}
+import type { ResourceImportDraft } from './resourceIngestTypes';
 
 const SUPPORTED_EXTENSIONS = ['.txt', '.md'] as const;
 const SUPPORTED_MIME_TYPES = [
@@ -10,22 +6,33 @@ const SUPPORTED_MIME_TYPES = [
   'text/markdown',
   'text/x-markdown',
 ] as const;
+const MAX_SUMMARY_LENGTH = 240;
 
 export async function buildResourceDraftFromLocalFile(
   file: File,
-): Promise<LocalFileResourceDraft> {
-  assertSupportedFile(file);
-
+): Promise<ResourceImportDraft> {
+  const normalizedMimeType = assertSupportedFile(file);
   const rawText = await file.text();
-  const title = extractLocalFileTitle(file.name, rawText);
-  const content =
-    extractLocalFileSummary(rawText, title) ??
-    `导入自本地文件 ${file.name}，请手动补充资料概况。`;
+  const titleResult = extractLocalFileTitle(file.name, rawText);
+  const summaryResult = extractLocalFileSummary(rawText, titleResult.value);
 
   return {
-    content,
+    content:
+      summaryResult.value ??
+      `导入自本地文件 ${file.name}，请手动补充资料概况。`,
+    ingest: {
+      bodyFormat: file.name.toLocaleLowerCase().endsWith('.md')
+        ? 'markdown'
+        : 'plain-text',
+      bodyText: rawText,
+      importMethod: 'local-file',
+      ingestStatus: 'ready',
+      mimeType: normalizedMimeType,
+      summarySource: summaryResult.source ?? 'file-fallback',
+      titleSource: titleResult.source,
+    },
     sourceUri: `本地文件：${file.name}`,
-    title,
+    title: titleResult.value,
   };
 }
 
@@ -39,18 +46,27 @@ function assertSupportedFile(file: File) {
     normalizedType as (typeof SUPPORTED_MIME_TYPES)[number],
   );
 
-  if (isSupportedExtension || isSupportedMimeType) {
-    return;
+  if (!isSupportedExtension && !isSupportedMimeType) {
+    throw new Error(
+      '当前只支持导入 .txt / .md 文件。PDF / DOCX 暂不在这版范围内。',
+    );
   }
 
-  throw new Error('当前只支持导入 .txt / .md 文件。PDF / DOCX 暂不在这版范围内。');
+  if (isSupportedMimeType) {
+    return normalizedType;
+  }
+
+  return normalizedName.endsWith('.md') ? 'text/markdown' : 'text/plain';
 }
 
 function extractLocalFileTitle(fileName: string, rawText: string) {
   const markdownHeading = extractMarkdownHeading(rawText);
 
   if (markdownHeading) {
-    return markdownHeading;
+    return {
+      source: 'file-heading' as const,
+      value: markdownHeading,
+    };
   }
 
   const firstMeaningfulLine = rawText
@@ -59,19 +75,29 @@ function extractLocalFileTitle(fileName: string, rawText: string) {
     .find((line) => line && line.length <= 80);
 
   if (firstMeaningfulLine) {
-    return firstMeaningfulLine;
+    return {
+      source: 'file-first-line' as const,
+      value: firstMeaningfulLine,
+    };
   }
 
-  return normalizeText(
-    fileName.replace(/\.[a-z0-9]{1,8}$/iu, '').replace(/[-_]+/gu, ' '),
-  ) ?? fileName;
+  return {
+    source: 'file-name' as const,
+    value:
+      normalizeText(
+        fileName.replace(/\.[a-z0-9]{1,8}$/iu, '').replace(/[-_]+/gu, ' '),
+      ) ?? fileName,
+  };
 }
 
 function extractLocalFileSummary(rawText: string, title: string) {
   const normalizedText = rawText.trim();
 
   if (!normalizedText) {
-    return null;
+    return {
+      source: null,
+      value: null,
+    };
   }
 
   const summaryParagraphs = normalizedText
@@ -83,16 +109,25 @@ function extractLocalFileSummary(rawText: string, title: string) {
     );
 
   if (summaryParagraphs.length > 0) {
-    return truncateText(summaryParagraphs.slice(0, 2).join(' '), 240);
+    return {
+      source: 'file-body' as const,
+      value: truncateText(summaryParagraphs.slice(0, 2).join(' '), MAX_SUMMARY_LENGTH),
+    };
   }
 
   const collapsedText = normalizeText(stripMarkdownSyntax(normalizedText));
 
   if (!collapsedText || collapsedText === title) {
-    return null;
+    return {
+      source: null,
+      value: null,
+    };
   }
 
-  return truncateText(collapsedText, 240);
+  return {
+    source: 'file-body' as const,
+    value: truncateText(collapsedText, MAX_SUMMARY_LENGTH),
+  };
 }
 
 function extractMarkdownHeading(rawText: string) {
@@ -116,7 +151,11 @@ function stripMarkdownSyntax(value: string) {
     .trim();
 }
 
-function normalizeText(value: string) {
+function normalizeText(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
   const normalizedValue = value.replace(/\s+/gu, ' ').trim();
 
   return normalizedValue.length > 0 ? normalizedValue : null;

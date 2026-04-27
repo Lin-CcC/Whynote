@@ -10,6 +10,7 @@ export const REFERENCE_SOURCE_NODE_TYPES = [
   'module',
   'plan-step',
   'question',
+  'answer',
   'summary',
   'judgment',
 ] as const;

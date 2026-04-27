@@ -7,7 +7,9 @@ import type {
 } from './domain';
 import { createPlanStepGenerationService } from './services';
 
-function createMockProvider(payloadByTaskName: Record<string, unknown>): AiProviderClient {
+function createMockProvider(
+  payloadByTaskName: Record<string, unknown>,
+): AiProviderClient {
   return {
     async generateObject<T>(
       request: AiProviderObjectRequest<T>,
@@ -27,13 +29,25 @@ function createMockProvider(payloadByTaskName: Record<string, unknown>): AiProvi
 }
 
 describe('planStepGenerationService', () => {
-  it('pads plan-step drafts to the current mode minimum and keeps todo status', async () => {
+  it('pads learning-path drafts to the current mode minimum and keeps question drafts in-tree ready', async () => {
     const providerClient = createMockProvider({
       'plan-step-generation': {
         planSteps: [
           {
             title: '建立整体认识',
             content: '先知道这个模块要解决什么问题。',
+            prerequisites: [
+              {
+                title: '什么是并发渲染的基本术语？',
+                content: '先补齐最小前置概念。',
+              },
+            ],
+            questions: [
+              {
+                title: '并发渲染到底改变了什么？',
+                content: '聚焦运行时行为变化。',
+              },
+            ],
           },
         ],
       },
@@ -54,5 +68,7 @@ describe('planStepGenerationService', () => {
     expect(result.planSteps.every((planStep) => planStep.status === 'todo')).toBe(
       true,
     );
+    expect(result.planSteps[0].questions).toHaveLength(2);
+    expect(result.planSteps[0].questions[0].title).toContain('铺垫：');
   });
 });

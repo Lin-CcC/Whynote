@@ -21,9 +21,11 @@ test('routes module hits to editor selection and resource hits to resource focus
       currentModuleId="module-current"
       onApplyTreeChange={() => {}}
       onFocusResourceNode={handleFocusResourceNode}
+      onUpsertResourceMetadata={async () => {}}
       onSelectEditorNode={handleSelectEditorNode}
       selectedEditorNodeId={null}
       tree={createResourcesPanelSnapshot().tree}
+      workspaceId="workspace-resources-panel"
       workspaceTitle="React 学习主题"
     />,
   );
@@ -59,9 +61,11 @@ test('supports tag filtering, renders the global resource area, and shows focuse
       onApplyTreeChange={() => {}}
       onClearResourceFocus={() => {}}
       onFocusResourceNode={() => {}}
+      onUpsertResourceMetadata={async () => {}}
       onSelectEditorNode={() => {}}
       selectedEditorNodeId="question-batching"
       tree={createResourcesPanelSnapshot().tree}
+      workspaceId="workspace-resources-panel"
       workspaceTitle="React 学习主题"
     />,
   );
@@ -79,6 +83,12 @@ test('supports tag filtering, renders the global resource area, and shows focuse
   expect(
     resourceFocusCard.getByText('https://react.dev/reference/react/useState'),
   ).toBeInTheDocument();
+  expect(
+    resourceFocusCard.getByRole('button', { name: '为当前资料补充摘录' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: '创建摘录' }),
+  ).not.toBeInTheDocument();
 });
 
 test('exports through the browser download flow', () => {
@@ -98,9 +108,11 @@ test('exports through the browser download flow', () => {
       currentModuleId="module-current"
       onApplyTreeChange={() => {}}
       onFocusResourceNode={() => {}}
+      onUpsertResourceMetadata={async () => {}}
       onSelectEditorNode={() => {}}
       selectedEditorNodeId={null}
       tree={createResourcesPanelSnapshot().tree}
+      workspaceId="workspace-resources-panel"
       workspaceTitle="React 学习主题"
     />,
   );

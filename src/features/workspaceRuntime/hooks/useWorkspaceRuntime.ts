@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { AiConfig } from '../../learningEngine';
-import type { WorkspaceSnapshot } from '../../nodeDomain';
+import type { ResourceMetadataRecord, WorkspaceSnapshot } from '../../nodeDomain';
+import type { ResourceImportDraft } from '../../resourcesSearchExport/services/resourceIngestTypes';
 import { createWorkspaceRuntimeService } from '../services/workspaceRuntimeService';
 import type {
   WorkspaceRuntimeDependencies,
@@ -15,6 +16,7 @@ interface WorkspaceRuntimeState extends WorkspaceRuntimeStatusState {
   editorSessionKey: number;
   initialModuleId: string | null;
   initialSelectedNodeId: string | null;
+  resourceMetadataRecords: ResourceMetadataRecord[];
   snapshot: WorkspaceSnapshot | null;
 }
 
@@ -39,6 +41,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     isInitializing: true,
     loadError: null,
     runtimeMessage: null,
+    resourceMetadataRecords: [],
     saveError: null,
     saveStatus: 'idle',
     snapshot: null,
@@ -111,8 +114,27 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     }));
   }
 
+  async function resolveResourceSummary(
+    draft: ResourceImportDraft,
+  ) {
+    const result = await runtimeService.resolveResourceSummary(draft, state.aiConfig);
+
+    return result.draft;
+  }
+
+  async function upsertResourceMetadata(record: ResourceMetadataRecord) {
+    await runtimeService.upsertResourceMetadata(record);
+    setState((previousState) => ({
+      ...previousState,
+      resourceMetadataRecords: upsertResourceMetadataRecord(
+        previousState.resourceMetadataRecords,
+        record,
+      ),
+    }));
+  }
+
   async function runPlanStepGeneration(moduleNodeId: string) {
-    await runAiAction('正在生成 plan-step', async (snapshot) =>
+    await runAiAction('正在规划学习路径', async (snapshot) =>
       runtimeService.generatePlanSteps(snapshot, moduleNodeId, state.aiConfig),
     );
   }
@@ -124,7 +146,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
   }
 
   async function runCompletionSuggestion(planStepNodeId: string) {
-    await runAiAction('正在评估步骤完成信号', async (snapshot) =>
+    await runAiAction('正在整理步骤完成依据', async (snapshot) =>
       runtimeService.suggestPlanStepCompletion(snapshot, planStepNodeId),
     );
   }
@@ -138,7 +160,9 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     runCompletionSuggestion,
     runPlanStepGeneration,
     runQuestionSplit,
+    resolveResourceSummary,
     saveAiConfig,
+    upsertResourceMetadata,
   };
 
   async function initializeWorkspace() {
@@ -164,6 +188,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
         initialSelectedNodeId: result.initialSelectedNodeId,
         isInitializing: false,
         loadError: null,
+        resourceMetadataRecords: result.resourceMetadataRecords,
         runtimeMessage: null,
         snapshot: result.snapshot,
       }));
@@ -304,4 +329,20 @@ function hasSelectionChanged(
     previousSelection.currentModuleId !== nextSelection.currentModuleId ||
     previousSelection.selectedNodeId !== nextSelection.selectedNodeId
   );
+}
+
+function upsertResourceMetadataRecord(
+  records: ResourceMetadataRecord[],
+  nextRecord: ResourceMetadataRecord,
+) {
+  const nextRecords = [...records];
+  const existingIndex = nextRecords.findIndex((record) => record.id === nextRecord.id);
+
+  if (existingIndex === -1) {
+    nextRecords.push(nextRecord);
+    return nextRecords;
+  }
+
+  nextRecords[existingIndex] = nextRecord;
+  return nextRecords;
 }

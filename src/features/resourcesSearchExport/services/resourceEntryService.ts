@@ -10,6 +10,7 @@ import { getNodeSourceSummary } from '../utils/resourceTreeUtils';
 
 export interface CreateResourceDraft {
   content: string;
+  mimeType?: string;
   sourceUri: string;
   title: string;
 }
@@ -53,11 +54,14 @@ export function createResourceEntry(
   tree: NodeTree;
 } {
   const title = requireField(draft.title, '资料标题');
+  const mimeType = normalizeOptionalText(draft.mimeType);
+  const sourceUri = normalizeOptionalText(draft.sourceUri);
   const createdNode = createNode({
     type: 'resource',
     content: normalizeOptionalText(draft.content) ?? '',
-    sourceUri: normalizeOptionalText(draft.sourceUri) ?? undefined,
     title,
+    ...(mimeType ? { mimeType } : {}),
+    ...(sourceUri ? { sourceUri } : {}),
   });
 
   if (createdNode.type !== 'resource') {
@@ -78,6 +82,7 @@ export function createResourceFragmentEntry(
   tree: NodeTree;
 } {
   const resourceNode = getNodeOrThrow(tree, draft.resourceNodeId);
+  const locator = normalizeOptionalText(draft.locator);
 
   if (resourceNode.type !== 'resource') {
     throw new Error('摘录必须挂到现有资料节点下。');
@@ -87,9 +92,9 @@ export function createResourceFragmentEntry(
     type: 'resource-fragment',
     content: '',
     excerpt: requireField(draft.excerpt, '摘录正文'),
-    locator: normalizeOptionalText(draft.locator) ?? undefined,
     sourceResourceId: resourceNode.id,
     title: requireField(draft.title, '摘录标题'),
+    ...(locator ? { locator } : {}),
   });
 
   if (createdNode.type !== 'resource-fragment') {
@@ -102,7 +107,11 @@ export function createResourceFragmentEntry(
   };
 }
 
-function normalizeOptionalText(value: string) {
+function normalizeOptionalText(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
   const normalizedValue = value.trim();
 
   return normalizedValue.length > 0 ? normalizedValue : null;

@@ -7,7 +7,9 @@ import type {
 } from './domain';
 import { createModuleGenerationService } from './services';
 
-function createMockProvider(payloadByTaskName: Record<string, unknown>): AiProviderClient {
+function createMockProvider(
+  payloadByTaskName: Record<string, unknown>,
+): AiProviderClient {
   return {
     async generateObject<T>(
       request: AiProviderObjectRequest<T>,
@@ -44,7 +46,7 @@ describe('moduleGenerationService', () => {
       expectedPlanStepCount: 6,
     },
   ])(
-    'keeps module and plan-step counts inside the $mode mode range',
+    'keeps module and learning-path counts inside the $mode mode range',
     async ({ mode, expectedModuleCount, expectedPlanStepCount }) => {
       const providerClient = createMockProvider({
         'module-generation': {
@@ -54,6 +56,18 @@ describe('moduleGenerationService', () => {
             planSteps: Array.from({ length: 8 }, (_, planStepIndex) => ({
               title: `步骤 ${String(planStepIndex + 1)}`,
               content: `步骤说明 ${String(planStepIndex + 1)}`,
+              prerequisites: [
+                {
+                  title: `前置问题 ${String(planStepIndex + 1)}`,
+                  content: '先确认背景。',
+                },
+              ],
+              questions: [
+                {
+                  title: `关键问题 ${String(planStepIndex + 1)}`,
+                  content: '继续展开核心问题。',
+                },
+              ],
             })),
           })),
         },
@@ -78,10 +92,14 @@ describe('moduleGenerationService', () => {
       expect(
         result.modules.every((module) =>
           module.planSteps.every(
-            (planStep) => planStep.type === 'plan-step' && planStep.status === 'todo',
+            (planStep) =>
+              planStep.type === 'plan-step' &&
+              planStep.status === 'todo' &&
+              planStep.questions.length >= 2,
           ),
         ),
       ).toBe(true);
+      expect(result.modules[0].planSteps[0].questions[0].title).toContain('铺垫：');
     },
   );
 
@@ -103,5 +121,6 @@ describe('moduleGenerationService', () => {
     expect(result.modules).toHaveLength(4);
     expect(result.modules[0].title).toContain('TypeScript 类型系统');
     expect(result.modules[0].planSteps).toHaveLength(4);
+    expect(result.modules[0].planSteps[0].questions.length).toBeGreaterThanOrEqual(2);
   });
 });

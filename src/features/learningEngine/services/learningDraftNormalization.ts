@@ -2,6 +2,7 @@ import type {
   LearningMode,
   ModuleNodeDraft,
   PlanStepNodeDraft,
+  QuestionNodeDraft,
 } from '../domain';
 import { getLearningModeLimits } from '../domain';
 
@@ -24,6 +25,17 @@ const PLAN_STEP_TITLE_SUFFIXES = [
   '总结复盘',
 ] as const;
 
+const CORE_QUESTION_TITLE_SUFFIXES = [
+  '关键问题',
+  '需要解释什么',
+  '如何验证理解',
+] as const;
+
+const PREREQUISITE_QUESTION_TITLE_SUFFIXES = [
+  '铺垫问题',
+  '先确认什么',
+] as const;
+
 interface RawModuleDraft {
   title?: unknown;
   content?: unknown;
@@ -36,6 +48,17 @@ interface RawPlanStepDraft {
   title?: unknown;
   content?: unknown;
   description?: unknown;
+  keyQuestions?: unknown;
+  prerequisiteQuestions?: unknown;
+  prerequisites?: unknown;
+  questions?: unknown;
+}
+
+interface RawQuestionDraft {
+  title?: unknown;
+  content?: unknown;
+  description?: unknown;
+  prompt?: unknown;
 }
 
 export function parseJsonObject(rawText: string): unknown {
@@ -140,11 +163,13 @@ function normalizePlanStepDraft(
   const title = getText(rawPlanStep.title);
   const content =
     getText(rawPlanStep.content) || getText(rawPlanStep.description);
+  const normalizedTitle = title || createPlanStepTitle(moduleTitle, index);
 
   return {
     type: 'plan-step',
-    title: title || createPlanStepTitle(moduleTitle, index),
+    title: normalizedTitle,
     content,
+    questions: normalizeQuestionDrafts(rawPlanStep, normalizedTitle),
     status: 'todo',
   };
 }
@@ -174,12 +199,80 @@ function createFallbackPlanStepDraft(
   moduleTitle: string,
   index: number,
 ): PlanStepNodeDraft {
+  const title = createPlanStepTitle(moduleTitle, index);
+
   return {
     type: 'plan-step',
-    title: createPlanStepTitle(moduleTitle, index),
+    title,
     content: '',
+    questions: createFallbackQuestionDrafts(title),
     status: 'todo',
   };
+}
+
+function normalizeQuestionDrafts(
+  rawPlanStep: RawPlanStepDraft,
+  planStepTitle: string,
+) {
+  const rawPrerequisiteQuestions = extractRawQuestionDrafts(
+    rawPlanStep.prerequisiteQuestions ?? rawPlanStep.prerequisites,
+  );
+  const rawCoreQuestions = extractRawQuestionDrafts(
+    rawPlanStep.questions ?? rawPlanStep.keyQuestions,
+  );
+  const normalizedQuestions = [
+    ...rawPrerequisiteQuestions.map((rawQuestion, index) =>
+      normalizeQuestionDraft(rawQuestion, index, planStepTitle, 'prerequisite'),
+    ),
+    ...rawCoreQuestions.map((rawQuestion, index) =>
+      normalizeQuestionDraft(rawQuestion, index, planStepTitle, 'core'),
+    ),
+  ];
+
+  if (normalizedQuestions.length === 0) {
+    return createFallbackQuestionDrafts(planStepTitle);
+  }
+
+  ensureUniqueTitles(normalizedQuestions);
+
+  return normalizedQuestions;
+}
+
+function normalizeQuestionDraft(
+  rawQuestion: RawQuestionDraft,
+  index: number,
+  planStepTitle: string,
+  kind: 'core' | 'prerequisite',
+): QuestionNodeDraft {
+  const title =
+    getText(rawQuestion.title) ||
+    getText(rawQuestion.prompt) ||
+    createQuestionTitle(planStepTitle, index, kind);
+  const content =
+    getText(rawQuestion.content) || getText(rawQuestion.description);
+
+  return {
+    type: 'question',
+    title:
+      kind === 'prerequisite' ? normalizePrerequisiteTitle(title) : title,
+    content:
+      kind === 'prerequisite' ? normalizePrerequisiteContent(content) : content,
+  };
+}
+
+function createFallbackQuestionDrafts(planStepTitle: string): QuestionNodeDraft[] {
+  return [
+    {
+      type: 'question',
+      title: createQuestionTitle(planStepTitle, 0, 'prerequisite'),
+      content: '先确认理解这个步骤所需的前置概念或背景条件。',
+    },
+    {
+      type: 'question',
+      title: createQuestionTitle(planStepTitle, 0, 'core'),
+      content: '围绕这个步骤的核心问题展开回答、总结与判断。',
+    },
+  ];
 }
 
 function extractRawModules(payload: unknown): RawModuleDraft[] {
@@ -202,6 +295,10 @@ function extractRawPlanSteps(payload: unknown): RawPlanStepDraft[] {
   return Array.isArray(payload.steps) ? payload.steps : [];
 }
 
+function extractRawQuestionDrafts(payload: unknown): RawQuestionDraft[] {
+  return Array.isArray(payload) ? payload : [];
+}
+
 function getText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -218,6 +315,32 @@ function createPlanStepTitle(moduleTitle: string, index: number) {
     PLAN_STEP_TITLE_SUFFIXES[index] ?? `学习步骤 ${String(index + 1)}`;
 
   return `${moduleTitle.trim()} - ${suffix}`;
+}
+
+function createQuestionTitle(
+  planStepTitle: string,
+  index: number,
+  kind: 'core' | 'prerequisite',
+) {
+  const suffixes =
+    kind === 'prerequisite'
+      ? PREREQUISITE_QUESTION_TITLE_SUFFIXES
+      : CORE_QUESTION_TITLE_SUFFIXES;
+  const suffix = suffixes[index] ?? `${kind === 'prerequisite' ? '铺垫问题' : '关键问题'} ${String(index + 1)}`;
+
+  return `${planStepTitle.trim()}：${suffix}`;
+}
+
+function normalizePrerequisiteTitle(title: string) {
+  return /^铺垫[:：]/u.test(title) ? title : `铺垫：${title}`;
+}
+
+function normalizePrerequisiteContent(content: string) {
+  if (!content) {
+    return '先确认这个步骤依赖的基础概念、术语或背景。';
+  }
+
+  return content;
 }
 
 function ensureUniqueTitles<T extends { title: string }>(items: T[]) {

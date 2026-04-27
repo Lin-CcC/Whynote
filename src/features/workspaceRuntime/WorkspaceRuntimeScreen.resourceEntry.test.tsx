@@ -14,6 +14,7 @@ import {
   createWorkspaceSnapshot,
   insertChildNode,
   type NodeTree,
+  type ResourceMetadataRecord,
   type StructuredDataStorage,
   type WorkspaceSnapshot,
 } from '../nodeDomain';
@@ -36,7 +37,7 @@ afterEach(async () => {
   }
 });
 
-test('autofills a resource from url, still allows manual edits, and makes it immediately available to library, search, export, and restore', async () => {
+test('autofills a resource from url, still allows manual edits, and keeps metadata plus library/search/export/restore available', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue({
@@ -70,12 +71,12 @@ test('autofills a resource from url, still allows manual edits, and makes it imm
   await screen.findByRole('heading', { name: '当前学习模块' });
   expect(
     screen.getByRole('button', {
-      name: '尝试自动填充（浏览器受限）',
+      name: '尝试自动补全（浏览器受限）',
     }),
   ).toBeInTheDocument();
   expect(
     screen.getByText(
-      /URL 自动填充目前只是浏览器内的受限尝试：只对少数允许浏览器直接读取的网页可用/,
+      /URL 自动补全目前只是浏览器内的受限尝试：只对少数允许浏览器直接读取的网页可用/u,
     ),
   ).toBeInTheDocument();
 
@@ -94,7 +95,7 @@ test('autofills a resource from url, still allows manual edits, and makes it imm
     },
   });
   fireEvent.click(
-    screen.getByRole('button', { name: '尝试自动填充（浏览器受限）' }),
+    screen.getByRole('button', { name: '尝试自动补全（浏览器受限）' }),
   );
 
   expect(
@@ -148,6 +149,30 @@ test('autofills a resource from url, still allows manual edits, and makes it imm
 
   await waitForSaved();
 
+  const restoredSnapshot = await loadOnlyWorkspaceSnapshot(dependencies);
+  const resourceNode = findNodeByTitle(
+    restoredSnapshot.tree,
+    'React 渲染局部性笔记',
+    'resource',
+  );
+  const resourceMetadata = findResourceMetadata(
+    await loadOnlyResourceMetadata(dependencies),
+    resourceNode.id,
+  );
+
+  expect(resourceMetadata).toMatchObject({
+    nodeId: resourceNode.id,
+    importMethod: 'url',
+    ingestStatus: 'ready',
+    titleSource: 'user',
+    summarySource: 'user',
+    canonicalSource: 'https://example.com/react-locality',
+    bodyFormat: 'plain-text',
+    bodyText: '这段正文不应该覆盖 description。',
+    mimeType: 'text/html',
+    sourceUri: 'https://example.com/react-locality',
+  });
+
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
@@ -158,7 +183,7 @@ test('autofills a resource from url, still allows manual edits, and makes it imm
   ).toBeInTheDocument();
 });
 
-test('keeps manual fallback usable when url autofill fails', async () => {
+test('keeps manual fallback usable when url autofill fails and stores a partial ingest draft', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
@@ -175,14 +200,14 @@ test('keeps manual fallback usable when url autofill fails', async () => {
     },
   });
   fireEvent.click(
-    screen.getByRole('button', { name: '尝试自动填充（浏览器受限）' }),
+    screen.getByRole('button', { name: '尝试自动补全（浏览器受限）' }),
   );
 
   expect(
-    await screen.findByText(/受限自动填充未完成：这是浏览器内的受限能力/),
+    await screen.findByText(/受限自动填充未完成：这是浏览器内的受限能力/u),
   ).toBeInTheDocument();
   expect(
-    screen.getByText(/这不代表链接本身无效；请继续手动填写标题和资料概况。/),
+    screen.getByText(/这不代表链接本身无效；请继续手动填写标题和资料概况。/u),
   ).toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText('资料标题'), {
@@ -202,26 +227,73 @@ test('keeps manual fallback usable when url autofill fails', async () => {
       name: '定位资料 手动兜底资料',
     }),
   ).toBeInTheDocument();
+
+  await waitForSaved();
+
+  const restoredSnapshot = await loadOnlyWorkspaceSnapshot(dependencies);
+  const resourceNode = findNodeByTitle(
+    restoredSnapshot.tree,
+    '手动兜底资料',
+    'resource',
+  );
+  const resourceMetadata = findResourceMetadata(
+    await loadOnlyResourceMetadata(dependencies),
+    resourceNode.id,
+  );
+
+  expect(resourceMetadata).toMatchObject({
+    nodeId: resourceNode.id,
+    importMethod: 'url',
+    ingestStatus: 'partial',
+    titleSource: 'user',
+    summarySource: 'user',
+    canonicalSource: 'https://example.com/blocked',
+    sourceUri: 'https://example.com/blocked',
+  });
+  expect(resourceMetadata.bodyText).toBeUndefined();
+  expect(resourceMetadata.bodyFormat).toBeUndefined();
 });
 
 test.each([
   {
-    content:
-      '每次渲染都会形成独立的闭包快照。\n\n如果在旧闭包里读值，就会看到旧状态。\n',
+    bodyText:
+      '状态快照记录\n\n每次渲染都会形成独立的闭包快照。\n如果在旧闭包里读值，就会看到旧状态。\n',
+    expectedBodyFormat: 'plain-text',
+    expectedSummarySource: 'file-body',
+    expectedTitle: '状态快照记录',
+    expectedTitleSource: 'file-first-line',
     fileName: 'state-snapshot.txt',
+    fileText:
+      '状态快照记录\n\n每次渲染都会形成独立的闭包快照。\n如果在旧闭包里读值，就会看到旧状态。\n',
     query: '闭包快照',
     type: 'text/plain',
   },
   {
-    content:
+    bodyText:
       '# React 渲染笔记\n\n先梳理渲染边界，再决定局部状态应该放在哪里。\n',
+    expectedBodyFormat: 'markdown',
+    expectedSummarySource: 'file-body',
+    expectedTitle: 'React 渲染笔记',
+    expectedTitleSource: 'file-heading',
     fileName: 'rendering-notes.md',
+    fileText:
+      '# React 渲染笔记\n\n先梳理渲染边界，再决定局部状态应该放在哪里。\n',
     query: '渲染边界',
     type: 'text/markdown',
   },
 ])(
-  'creates a resource from uploaded local file: $fileName',
-  async ({ content, fileName, query, type }) => {
+  'creates a resource from uploaded local file and persists its body foundation: $fileName',
+  async ({
+    bodyText,
+    expectedBodyFormat,
+    expectedSummarySource,
+    expectedTitle,
+    expectedTitleSource,
+    fileName,
+    fileText,
+    query,
+    type,
+  }) => {
     const exportProbe = createExportProbe();
     const dependencies = createTestDependencies();
 
@@ -231,13 +303,21 @@ test.each([
 
     fireEvent.change(screen.getByLabelText('本地资料文件'), {
       target: {
-        files: [new File([content], fileName, { type })],
+        files: [new File([fileText], fileName, { type })],
       },
     });
 
-    expect(await screen.findByDisplayValue(`本地文件：${fileName}`)).toBeInTheDocument();
+    expect(
+      await screen.findByDisplayValue(`本地文件：${fileName}`),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '创建资料' }));
+
+    expect(
+      await screen.findByRole('button', {
+        name: `定位资料 ${expectedTitle}`,
+      }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '切换到资料区搜索' }));
     fireEvent.change(screen.getByLabelText('搜索关键词'), {
@@ -248,19 +328,44 @@ test.each([
 
     expect(
       await screen.findByRole('button', {
-        name: /跳转到 /,
+        name: `跳转到 ${expectedTitle}`,
       }),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '整个主题' }));
     fireEvent.click(screen.getByRole('button', { name: '导出内容' }));
 
-    expect(await exportProbe.readText()).toContain('资料：');
+    expect(await exportProbe.readText()).toContain(`资料：${expectedTitle}`);
     expect(await exportProbe.readText()).toContain(`本地文件：${fileName}`);
+
+    await waitForSaved();
+
+    const restoredSnapshot = await loadOnlyWorkspaceSnapshot(dependencies);
+    const resourceNode = findNodeByTitle(
+      restoredSnapshot.tree,
+      expectedTitle,
+      'resource',
+    );
+    const resourceMetadata = findResourceMetadata(
+      await loadOnlyResourceMetadata(dependencies),
+      resourceNode.id,
+    );
+
+    expect(resourceMetadata).toMatchObject({
+      nodeId: resourceNode.id,
+      importMethod: 'local-file',
+      ingestStatus: 'ready',
+      titleSource: expectedTitleSource,
+      summarySource: expectedSummarySource,
+      bodyFormat: expectedBodyFormat,
+      bodyText,
+      mimeType: type,
+      sourceUri: `本地文件：${fileName}`,
+    });
   },
 );
 
-test('creates a fragment under the chosen resource, persists sourceResourceId, and restores it after remount', async () => {
+test('demotes fragment creation to a supplementary action in resource focus and keeps it usable from both resource and fragment focus', async () => {
   const dependencies = await createPreloadedDependencies(
     createResourceParentSnapshot(),
   );
@@ -270,22 +375,40 @@ test('creates a fragment under the chosen resource, persists sourceResourceId, a
 
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(screen.getByLabelText('摘录标题'), {
+  expect(
+    screen.queryByRole('button', { name: '创建摘录' }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText('补充摘录')).not.toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('button', { name: '定位资料 React Hooks 参考' }),
+  );
+
+  const resourceFocusCard = await findSectionByHeading('当前资料焦点');
+
+  expect(resourceFocusCard.getByText('资料 · React Hooks 参考')).toBeInTheDocument();
+  expect(
+    resourceFocusCard.getByRole('button', { name: '为当前资料补充摘录' }),
+  ).toBeInTheDocument();
+
+  fireEvent.change(resourceFocusCard.getByLabelText('摘录标题'), {
     target: {
       value: '状态快照摘录',
     },
   });
-  fireEvent.change(screen.getByLabelText('摘录正文'), {
+  fireEvent.change(resourceFocusCard.getByLabelText('摘录正文'), {
     target: {
       value: 'Hooks 会捕获创建该渲染时的状态快照。',
     },
   });
-  fireEvent.change(screen.getByLabelText('摘录定位信息'), {
+  fireEvent.change(resourceFocusCard.getByLabelText('摘录定位信息'), {
     target: {
       value: 'Hooks FAQ > 状态快照',
     },
   });
-  fireEvent.click(screen.getByRole('button', { name: '创建摘录' }));
+  fireEvent.click(
+    resourceFocusCard.getByRole('button', { name: '为当前资料补充摘录' }),
+  );
 
   expect(
     await screen.findByRole('button', { name: '定位摘录 状态快照摘录' }),
@@ -298,182 +421,67 @@ test('creates a fragment under the chosen resource, persists sourceResourceId, a
     },
   });
 
-  expect(
+  fireEvent.click(
     await screen.findByRole('button', { name: '跳转到 状态快照摘录' }),
-  ).toBeInTheDocument();
-
-  await waitForSaved();
-
-  const restoredSnapshot = await loadOnlyWorkspaceSnapshot(dependencies);
-  const fragmentNode = findNodeByTitle(
-    restoredSnapshot.tree,
-    '状态快照摘录',
-    'resource-fragment',
   );
 
-  expect(fragmentNode.parentId).toBe('resource-runtime-parent');
-  expect(fragmentNode.sourceResourceId).toBe('resource-runtime-parent');
+  const fragmentFocusCard = await findSectionByHeading('当前资料焦点');
 
-  firstRender.unmount();
-  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
-
+  expect(fragmentFocusCard.getByText('摘录 · 状态快照摘录')).toBeInTheDocument();
   expect(
-    await screen.findByRole('button', { name: '定位摘录 状态快照摘录' }),
+    fragmentFocusCard.getByText(
+      '当前焦点是摘录，新补充的摘录会继续挂到父资料《React Hooks 参考》下。',
+    ),
   ).toBeInTheDocument();
-});
 
-test('surfaces newly created fragments in the active search scope without refresh and keeps the focus chain usable', async () => {
-  const dependencies = await createPreloadedDependencies(
-    createResourceParentSnapshot(),
-  );
-
-  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
-  await screen.findByRole('heading', { name: '当前学习模块' });
-
-  fireEvent.click(screen.getByRole('button', { name: '切换到资料区搜索' }));
-  fireEvent.change(screen.getByLabelText('搜索关键词'), {
-    target: {
-      value: '闭包快照',
-    },
-  });
-
-  expect(screen.getByText('资料区无结果')).toBeInTheDocument();
-
-  fireEvent.change(screen.getByLabelText('摘录标题'), {
-    target: {
-      value: '闭包快照摘录',
-    },
-  });
-  fireEvent.change(screen.getByLabelText('摘录正文'), {
-    target: {
-      value: '闭包快照会捕获当前渲染里的状态值。',
-    },
-  });
-  fireEvent.change(screen.getByLabelText('摘录定位信息'), {
-    target: {
-      value: 'Hooks FAQ > 闭包',
-    },
-  });
-  fireEvent.click(screen.getByRole('button', { name: '创建摘录' }));
-
-  fireEvent.click(
-    await screen.findByRole('button', { name: '跳转到 闭包快照摘录' }),
-  );
-
-  const resourceFocusCard = await findSectionByHeading('当前资料焦点');
-
-  expect(resourceFocusCard.getByText('摘录 · 闭包快照摘录')).toBeInTheDocument();
-  expect(
-    resourceFocusCard.getByText('闭包快照会捕获当前渲染里的状态值。'),
-  ).toBeInTheDocument();
-  expect(resourceFocusCard.getByText('Hooks FAQ > 闭包')).toBeInTheDocument();
-});
-
-test('updates the default fragment parent when resource focus changes and no manual override exists', async () => {
-  const dependencies = await createPreloadedDependencies(
-    createResourceParentSnapshot(),
-  );
-
-  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
-  await screen.findByRole('heading', { name: '当前学习模块' });
-
-  fireEvent.click(
-    screen.getByRole('button', { name: '定位资料 React 渲染原理' }),
-  );
-  expect(screen.getByLabelText('摘录所属资料')).toHaveValue(
-    'resource-runtime-rendering',
-  );
-
-  fireEvent.click(
-    screen.getByRole('button', { name: '定位资料 React Hooks 参考' }),
-  );
-  expect(screen.getByLabelText('摘录所属资料')).toHaveValue(
-    'resource-runtime-parent',
-  );
-});
-
-test('maps fragment focus back to its parent resource and creates the fragment under that parent', async () => {
-  const dependencies = await createPreloadedDependencies(
-    createResourceParentSnapshot(),
-  );
-
-  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
-  await screen.findByRole('heading', { name: '当前学习模块' });
-
-  fireEvent.click(
-    screen.getByRole('button', { name: '定位摘录 现有状态摘录' }),
-  );
-  expect(screen.getByLabelText('摘录所属资料')).toHaveValue(
-    'resource-runtime-parent',
-  );
-
-  fireEvent.change(screen.getByLabelText('摘录标题'), {
+  fireEvent.change(fragmentFocusCard.getByLabelText('摘录标题'), {
     target: {
       value: '派生状态摘录',
     },
   });
-  fireEvent.change(screen.getByLabelText('摘录正文'), {
+  fireEvent.change(fragmentFocusCard.getByLabelText('摘录正文'), {
     target: {
       value: '派生状态应该尽量在渲染时按需计算。',
     },
   });
-  fireEvent.change(screen.getByLabelText('摘录定位信息'), {
+  fireEvent.change(fragmentFocusCard.getByLabelText('摘录定位信息'), {
     target: {
       value: 'React Docs > derived state',
     },
   });
-  fireEvent.click(screen.getByRole('button', { name: '创建摘录' }));
+  fireEvent.click(
+    fragmentFocusCard.getByRole('button', { name: '为当前资料补充摘录' }),
+  );
+
+  expect(
+    await screen.findByRole('button', { name: '定位摘录 派生状态摘录' }),
+  ).toBeInTheDocument();
 
   await waitForSaved();
 
   const restoredSnapshot = await loadOnlyWorkspaceSnapshot(dependencies);
-  const fragmentNode = findNodeByTitle(
+  const firstFragmentNode = findNodeByTitle(
+    restoredSnapshot.tree,
+    '状态快照摘录',
+    'resource-fragment',
+  );
+  const secondFragmentNode = findNodeByTitle(
     restoredSnapshot.tree,
     '派生状态摘录',
     'resource-fragment',
   );
 
-  expect(fragmentNode.parentId).toBe('resource-runtime-parent');
-  expect(fragmentNode.sourceResourceId).toBe('resource-runtime-parent');
-});
+  expect(firstFragmentNode.parentId).toBe('resource-runtime-parent');
+  expect(firstFragmentNode.sourceResourceId).toBe('resource-runtime-parent');
+  expect(secondFragmentNode.parentId).toBe('resource-runtime-parent');
+  expect(secondFragmentNode.sourceResourceId).toBe('resource-runtime-parent');
 
-test('keeps a manually selected fragment parent when resource focus changes afterwards', async () => {
-  const dependencies = await createPreloadedDependencies(
-    createResourceParentSnapshot(),
-  );
-
+  firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
-  await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(
-    screen.getByRole('button', { name: '定位资料 React 渲染原理' }),
-  );
-  expect(screen.getByLabelText('摘录所属资料')).toHaveValue(
-    'resource-runtime-rendering',
-  );
-
-  fireEvent.change(screen.getByLabelText('摘录所属资料'), {
-    target: {
-      value: 'resource-runtime-parent',
-    },
-  });
-  expect(screen.getByLabelText('摘录所属资料')).toHaveValue(
-    'resource-runtime-parent',
-  );
-
-  fireEvent.click(
-    screen.getByRole('button', { name: '定位资料 React Hooks 参考' }),
-  );
-  expect(screen.getByLabelText('摘录所属资料')).toHaveValue(
-    'resource-runtime-parent',
-  );
-
-  fireEvent.click(
-    screen.getByRole('button', { name: '定位资料 React 渲染原理' }),
-  );
-  expect(screen.getByLabelText('摘录所属资料')).toHaveValue(
-    'resource-runtime-parent',
-  );
+  expect(
+    await screen.findByRole('button', { name: '定位摘录 派生状态摘录' }),
+  ).toBeInTheDocument();
 });
 
 function createTestDependencies(options?: {
@@ -639,7 +647,9 @@ async function loadOnlyWorkspaceSnapshot(
   const workspaces = await dependencies.structuredDataStorage.listWorkspaces();
 
   if (workspaces.length !== 1) {
-    throw new Error(`expected exactly one workspace, received ${String(workspaces.length)}`);
+    throw new Error(
+      `expected exactly one workspace, received ${String(workspaces.length)}`,
+    );
   }
 
   const snapshot = await dependencies.structuredDataStorage.loadWorkspace(
@@ -651,6 +661,33 @@ async function loadOnlyWorkspaceSnapshot(
   }
 
   return snapshot;
+}
+
+async function loadOnlyResourceMetadata(
+  dependencies: WorkspaceRuntimeDependencies,
+) {
+  const workspaces = await dependencies.structuredDataStorage.listWorkspaces();
+
+  if (workspaces.length !== 1) {
+    throw new Error(
+      `expected exactly one workspace, received ${String(workspaces.length)}`,
+    );
+  }
+
+  return dependencies.structuredDataStorage.listResourceMetadata(workspaces[0].id);
+}
+
+function findResourceMetadata(
+  records: ResourceMetadataRecord[],
+  nodeId: string,
+) {
+  const record = records.find((candidate) => candidate.nodeId === nodeId);
+
+  if (!record) {
+    throw new Error(`unable to find resource metadata for node "${nodeId}"`);
+  }
+
+  return record;
 }
 
 function findNodeByTitle<TNodeType extends NodeTree['nodes'][string]['type']>(

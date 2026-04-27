@@ -60,7 +60,7 @@ export default function WorkspaceRuntimeActionCard({
         </div>
         <div className="workspace-emptyState">
           <p className="workspace-helpText">
-            当前还没有可供 AI 操作的学习模块。先新建一个模块，再生成 plan-step 或继续后续 AI 动作。
+            当前还没有可供 AI 操作的学习模块。先新建一个模块，再规划学习路径或继续后续 AI 动作。
           </p>
           <button
             className="workspace-inlineAction"
@@ -84,7 +84,7 @@ export default function WorkspaceRuntimeActionCard({
         </div>
       </div>
       <p className="workspace-helpText">
-        当前只接最小闭环：模块内生成 plan-step、复合问题拆分、步骤完成建议。
+        当前只接最小学习闭环：为模块规划学习路径、拆分复合问题、补看步骤完成依据。
       </p>
       <div className="workspace-actionGrid">
         <button
@@ -92,7 +92,7 @@ export default function WorkspaceRuntimeActionCard({
           onClick={handleGeneratePlanSteps}
           type="button"
         >
-          为当前模块生成 plan-step
+          为当前模块规划学习路径
         </button>
         <button
           disabled={!canSplitQuestion}
@@ -106,7 +106,7 @@ export default function WorkspaceRuntimeActionCard({
           onClick={handleSuggestCompletion}
           type="button"
         >
-          建议完成当前步骤
+          查看当前步骤完成依据
         </button>
       </div>
     </SectionCard>

@@ -1,5 +1,6 @@
 import { Fragment, type CSSProperties, type ChangeEvent } from 'react';
 
+import { resolvePlanStepRuntimeStatus } from '../../learningEngine';
 import { getNodeOrThrow, type NodeTree, type PlanStepStatus } from '../../nodeDomain';
 import {
   getChildNodes,
@@ -47,6 +48,14 @@ export default function EditorNodeSection({
     node.type === 'question'
       ? childNodes.find((childNode) => childNode.type === 'question')?.id ?? null
       : null;
+  const planStepRuntimeStatus =
+    node.type === 'plan-step'
+      ? resolvePlanStepRuntimeStatus(tree, node.id)
+      : null;
+  const hasManualPlanStepStatusOverride =
+    node.type === 'plan-step' &&
+    planStepRuntimeStatus !== null &&
+    node.status !== planStepRuntimeStatus.suggestedStatus;
 
   function handleEditableFocus() {
     if (!isSelected) {
@@ -100,10 +109,17 @@ export default function EditorNodeSection({
           ) : null}
           {isSelected ? <span className="workspace-selectedBadge">已聚焦</span> : null}
         </div>
-        {node.type === 'plan-step' ? (
-          <p className="workspace-nodeHint">
-            正式步骤节点会继续按真实内容展开，不再额外伪装成说明正文。
-          </p>
+        {node.type === 'plan-step' && planStepRuntimeStatus ? (
+          <>
+            <p className="workspace-nodeHint">
+              {`系统判断：${PLAN_STEP_STATUS_LABELS[planStepRuntimeStatus.suggestedStatus]}。依据：${planStepRuntimeStatus.reasonSummary}`}
+            </p>
+            {hasManualPlanStepStatusOverride ? (
+              <p className="workspace-nodeHint">
+                {`当前状态已手动改为 ${PLAN_STEP_STATUS_LABELS[node.status]}。后续内容变化时系统会重新托管。`}
+              </p>
+            ) : null}
+          </>
         ) : null}
       </div>
       <input

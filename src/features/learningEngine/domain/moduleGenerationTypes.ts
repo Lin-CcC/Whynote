@@ -3,10 +3,17 @@ import type { PlanStepStatus } from '../../nodeDomain';
 import type { AiExecutionMetadata } from './aiTypes';
 import type { LearningMode } from './learningMode';
 
+export interface QuestionNodeDraft {
+  type: 'question';
+  title: string;
+  content: string;
+}
+
 export interface PlanStepNodeDraft {
   type: 'plan-step';
   title: string;
   content: string;
+  questions: QuestionNodeDraft[];
   status: PlanStepStatus;
 }
 

@@ -187,6 +187,108 @@ describe('nodeDomain storage', () => {
     await storage.close();
   });
 
+  it('preserves separately upserted resource ingest metadata across later workspace saves', async () => {
+    const snapshot = createWorkspaceSnapshot({
+      title: 'Resource metadata workspace',
+      workspaceId: 'workspace-resource-metadata',
+      rootId: 'root-resource-metadata',
+      createdAt: '2026-04-27T00:00:00.000Z',
+    });
+    const resourceNode = createNode({
+      type: 'resource',
+      id: 'resource-metadata',
+      title: 'Storage markdown resource',
+      content: 'Initial summary',
+      sourceUri: '本地文件：storage.md',
+      mimeType: 'text/markdown',
+      createdAt: '2026-04-27T00:00:00.000Z',
+      updatedAt: '2026-04-27T00:00:00.000Z',
+    });
+    const storage = createIndexedDbStorage({
+      databaseName: `whynote-resource-metadata-${crypto.randomUUID()}`,
+    });
+
+    const initialTree = insertChildNode(
+      snapshot.tree,
+      snapshot.tree.rootId,
+      resourceNode,
+    );
+    const storedResourceNode = initialTree.nodes['resource-metadata'];
+
+    if (storedResourceNode.type !== 'resource') {
+      throw new Error('expected resource node to be materialized as resource');
+    }
+
+    await storage.saveWorkspace({
+      workspace: snapshot.workspace,
+      tree: initialTree,
+    });
+    await storage.upsertResourceMetadata({
+      id: 'resource-metadata',
+      workspaceId: snapshot.workspace.id,
+      nodeId: 'resource-metadata',
+      nodeType: 'resource',
+      title: 'Storage markdown resource',
+      sourceUri: '本地文件：storage.md',
+      mimeType: 'text/markdown',
+      importMethod: 'local-file',
+      ingestStatus: 'ready',
+      titleSource: 'file-heading',
+      summarySource: 'file-body',
+      bodyText: '# Storage markdown resource\n\nFull resource body',
+      bodyFormat: 'markdown',
+      importedAt: '2026-04-27T00:00:00.000Z',
+      updatedAt: '2026-04-27T00:00:00.000Z',
+    });
+
+    const updatedTree = {
+      ...initialTree,
+      nodes: {
+        ...initialTree.nodes,
+        'resource-metadata': {
+          ...storedResourceNode,
+          content: 'Updated summary',
+          sourceUri: '本地文件：storage-updated.md',
+          title: 'Storage markdown resource updated',
+          updatedAt: '2026-04-27T01:00:00.000Z',
+        },
+      },
+    };
+
+    await storage.saveWorkspace({
+      workspace: {
+        ...snapshot.workspace,
+        updatedAt: '2026-04-27T01:00:00.000Z',
+      },
+      tree: updatedTree,
+    });
+
+    const resourceMetadata = await storage.listResourceMetadata(
+      snapshot.workspace.id,
+    );
+
+    expect(resourceMetadata).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'resource-metadata',
+          title: 'Storage markdown resource updated',
+          sourceUri: '本地文件：storage-updated.md',
+          mimeType: 'text/markdown',
+          importMethod: 'local-file',
+          ingestStatus: 'ready',
+          titleSource: 'file-heading',
+          summarySource: 'file-body',
+          bodyText: '# Storage markdown resource\n\nFull resource body',
+          bodyFormat: 'markdown',
+          importedAt: '2026-04-27T00:00:00.000Z',
+          updatedAt: '2026-04-27T01:00:00.000Z',
+        }),
+      ]),
+    );
+
+    await storage.close();
+  });
+
   it('restores moved resource fragments with parent/source invariants intact', async () => {
     const snapshot = createWorkspaceSnapshot({
       title: 'Restore fragment invariant',
