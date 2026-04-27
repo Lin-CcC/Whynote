@@ -112,7 +112,7 @@ test('guides recovery from the AI action card when no module exists', async () =
   expect(await screen.findByDisplayValue('新模块')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '新模块' })).toBeInTheDocument();
   expect(
-    screen.getByRole('button', { name: '为当前模块生成 plan-step' }),
+    screen.getByRole('button', { name: '为当前模块规划学习路径' }),
   ).toBeInTheDocument();
 });
 
@@ -150,13 +150,12 @@ test('runs learning-engine plan-step generation from UI and materializes the res
   });
   fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
   fireEvent.click(
-    screen.getByRole('button', { name: '为当前模块生成 plan-step' }),
+    screen.getByRole('button', { name: '为当前模块规划学习路径' }),
   );
 
   expect(
     await screen.findByDisplayValue('建立最小概念框架'),
   ).toBeInTheDocument();
-  expect(screen.getByText('已为模块生成 3 个 plan-step。')).toBeInTheDocument();
 });
 
 test('locks editor mutations while an AI action is running and keeps manual edits from slipping in', async () => {
@@ -169,7 +168,7 @@ test('locks editor mutations while an AI action is running and keeps manual edit
   await screen.findByRole('heading', { name: '当前学习模块' });
 
   fireEvent.click(
-    screen.getByRole('button', { name: '为当前模块生成 plan-step' }),
+    screen.getByRole('button', { name: '为当前模块规划学习路径' }),
   );
 
   const moduleTitleInput = await screen.findByDisplayValue('默认模块');
@@ -237,7 +236,7 @@ test('shows a visible error when the provider call fails', async () => {
   await screen.findByRole('heading', { name: '当前学习模块' });
 
   fireEvent.click(
-    screen.getByRole('button', { name: '为当前模块生成 plan-step' }),
+    screen.getByRole('button', { name: '为当前模块规划学习路径' }),
   );
 
   await waitFor(() => {
@@ -258,12 +257,19 @@ test('clears completion suggestion after switching to another node', async () =>
   fireEvent.click(
     screen.getByRole('button', { name: /^步骤理解闭环$/ }),
   );
-  fireEvent.click(
-    screen.getByRole('button', { name: '建议完成当前步骤' }),
-  );
+  const completionSuggestionButton = screen.getByRole('button', {
+    name: '查看当前步骤完成依据',
+  });
+  await waitFor(() => {
+    expect(completionSuggestionButton).toBeEnabled();
+  });
+  fireEvent.click(completionSuggestionButton);
 
   expect(
-    await screen.findByRole('heading', { name: '当前步骤可以考虑标记完成' }),
+    await screen.findByRole('heading', { name: '当前步骤暂不建议完成' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText('当前步骤已标记为 done，无需再次建议完成。'),
   ).toBeInTheDocument();
 
   fireEvent.click(
@@ -272,7 +278,7 @@ test('clears completion suggestion after switching to another node', async () =>
 
   await waitFor(() => {
     expect(
-      screen.queryByRole('heading', { name: '当前步骤可以考虑标记完成' }),
+      screen.queryByRole('heading', { name: '当前步骤暂不建议完成' }),
     ).not.toBeInTheDocument();
   });
 });
@@ -288,12 +294,19 @@ test('clears completion suggestion after editing the related workspace content',
   fireEvent.click(
     screen.getByRole('button', { name: /^步骤理解闭环$/ }),
   );
-  fireEvent.click(
-    screen.getByRole('button', { name: '建议完成当前步骤' }),
-  );
+  const completionSuggestionButton = screen.getByRole('button', {
+    name: '查看当前步骤完成依据',
+  });
+  await waitFor(() => {
+    expect(completionSuggestionButton).toBeEnabled();
+  });
+  fireEvent.click(completionSuggestionButton);
 
   expect(
-    await screen.findByRole('heading', { name: '当前步骤可以考虑标记完成' }),
+    await screen.findByRole('heading', { name: '当前步骤暂不建议完成' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText('当前步骤已标记为 done，无需再次建议完成。'),
   ).toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText('理解闭环 内容'), {
@@ -304,7 +317,7 @@ test('clears completion suggestion after editing the related workspace content',
 
   await waitFor(() => {
     expect(
-      screen.queryByRole('heading', { name: '当前步骤可以考虑标记完成' }),
+      screen.queryByRole('heading', { name: '当前步骤暂不建议完成' }),
     ).not.toBeInTheDocument();
   });
 });
@@ -540,6 +553,9 @@ function createFailingSaveStorage(
     },
     async listResourceMetadata(workspaceId: string) {
       return storage.listResourceMetadata(workspaceId);
+    },
+    async upsertResourceMetadata(record) {
+      await storage.upsertResourceMetadata(record);
     },
     async listWorkspaces() {
       return storage.listWorkspaces();

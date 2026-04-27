@@ -51,6 +51,16 @@ export function appendPlanStepDraftsToModule(
     });
 
     nextTree = insertChildNode(nextTree, moduleNodeId, planStepNode);
+
+    for (const questionDraft of planStepDraft.questions) {
+      const questionNode = createNode({
+        type: 'question',
+        title: questionDraft.title,
+        content: questionDraft.content,
+      });
+
+      nextTree = insertChildNode(nextTree, planStepNode.id, questionNode);
+    }
   }
 
   return nextTree;

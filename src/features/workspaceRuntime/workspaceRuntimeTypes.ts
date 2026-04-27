@@ -6,9 +6,11 @@ import type {
 } from '../learningEngine';
 import type {
   LocalPreferenceStorage,
+  ResourceMetadataRecord,
   StructuredDataStorage,
 } from '../nodeDomain';
 import type { WorkspaceSnapshot } from '../nodeDomain';
+import type { ResourceImportDraft } from '../resourcesSearchExport/services/resourceIngestTypes';
 
 export interface WorkspaceRuntimeDependencies {
   structuredDataStorage: StructuredDataStorage;
@@ -26,6 +28,7 @@ export interface WorkspaceInitializationResult {
   snapshot: WorkspaceSnapshot;
   initialModuleId: string | null;
   initialSelectedNodeId: string | null;
+  resourceMetadataRecords: ResourceMetadataRecord[];
 }
 
 export interface WorkspaceMutationResult {
@@ -46,4 +49,8 @@ export interface WorkspaceRuntimeStatusState {
   aiError: string | null;
   runtimeMessage: string | null;
   completionSuggestion: CompletionSuggestionResult | null;
+}
+
+export interface ResourceSummaryResolutionResult {
+  draft: ResourceImportDraft;
 }

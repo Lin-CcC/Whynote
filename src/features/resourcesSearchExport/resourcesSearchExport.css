@@ -180,7 +180,8 @@
 }
 
 .resources-resultList,
-.resources-libraryList {
+.resources-libraryList,
+.resources-referenceList {
   display: grid;
   gap: 0.7rem;
   margin: 0;
@@ -189,16 +190,31 @@
 }
 
 .resources-resultButton,
-.resources-libraryItem {
+.resources-libraryItem,
+.resources-referenceItem {
   display: grid;
   gap: 0.3rem;
   width: 100%;
   padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 1rem;
+  background: #ffffff;
+}
+
+.resources-resultButton,
+.resources-libraryItem {
   cursor: pointer;
   text-align: left;
 }
 
 .resources-resultHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.resources-referenceHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;

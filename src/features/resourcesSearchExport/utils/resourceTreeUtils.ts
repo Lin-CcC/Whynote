@@ -117,6 +117,29 @@ export function getNodePathLabel(tree: NodeTree, nodeId: string) {
   return titles.join(' / ');
 }
 
+export function formatNodeLabel(node: TreeNode) {
+  switch (node.type) {
+    case 'resource':
+      return `资料 · ${node.title}`;
+    case 'resource-fragment':
+      return `摘录 · ${node.title}`;
+    case 'module':
+      return `模块 · ${node.title}`;
+    case 'plan-step':
+      return `步骤 · ${node.title}`;
+    case 'question':
+      return `问题 · ${node.title}`;
+    case 'answer':
+      return `回答 · ${node.title}`;
+    case 'summary':
+      return `总结 · ${node.title}`;
+    case 'judgment':
+      return `判断 · ${node.title}`;
+    case 'theme-root':
+      return `主题 · ${node.title}`;
+  }
+}
+
 export function getNodeSourceSummary(tree: NodeTree, node: TreeNode) {
   if (node.type === 'resource') {
     return (

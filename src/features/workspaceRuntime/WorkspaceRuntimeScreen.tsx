@@ -29,6 +29,9 @@ export default function WorkspaceRuntimeScreen({
     null,
   );
   const runtime = useWorkspaceRuntime(resolvedDependencies);
+  const resourceMetadataByNodeId = Object.fromEntries(
+    runtime.resourceMetadataRecords.map((record) => [record.nodeId, record]),
+  );
   const interactionLockReason = runtime.isAiRunning
     ? `${runtime.activeAiActionLabel ?? 'AI 正在运行'}，编辑已临时锁定，避免工作区快照被旧结果覆盖。`
     : null;
@@ -124,12 +127,16 @@ export default function WorkspaceRuntimeScreen({
             setActiveResourceNodeId(null);
           }}
           onFocusResourceNode={setActiveResourceNodeId}
+          onResolveResourceSummary={runtime.resolveResourceSummary}
           onSelectEditorNode={(nodeId) => {
             setActiveResourceNodeId(null);
             context.selectNode(nodeId);
           }}
+          onUpsertResourceMetadata={runtime.upsertResourceMetadata}
+          resourceMetadataByNodeId={resourceMetadataByNodeId}
           selectedEditorNodeId={context.selectedNodeId}
           tree={context.tree}
+          workspaceId={runtime.snapshot!.workspace.id}
           workspaceTitle={context.workspaceTitle}
         />
         <WorkspaceRuntimeStatusCard

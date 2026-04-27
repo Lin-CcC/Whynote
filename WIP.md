@@ -77,6 +77,25 @@
 - [ ] 定义学习运行时的 fragment 复用 / 新建引用接口
 - [ ] 补齐 `answer` 作为资料引用源的领域约束
 
+## 当前工作树：`codex/learning-runtime-upgrade`
+
+- [ ] 把资源标题 / 概况升级为 AI 摘要主路径，并保留规则 / 手动 fallback 与来源标记
+- [ ] 让 runtime 读取并使用 resource ingest metadata，而不是只写不读
+- [ ] 把“为当前模块生成 plan-step”升级成最小学习路径，并真正落到现有节点树
+- [ ] 用现有节点模型表达铺垫知识，优先收敛到 step 下的 question 草案
+- [ ] 打通学习节点到 resource / fragment 的最小引用闭环，支持 answer 引用
+- [ ] 明确 fragment 复用优先、无法稳定定位时退回 resource 级引用
+- [ ] 实现 plan-step 状态自动流转，并保留可解释依据与手动覆盖优先级
+- [ ] 补齐 runtime / storage / service / UI 测试，并回归 typecheck、build
+
+## 当前工作树：`codex/resource-citation-runtime`
+
+- [x] 补齐 `answer` 作为合法资料引用源的领域约束
+- [x] 在学习运行时接通 `question / answer / summary / judgment` 的资料引用显示与回跳
+- [x] 引用解析先复用已有 fragment，无法稳定命中时退回 `resource` 级引用
+- [x] 为后续自动 fragment 保留最小运行时解析接口，但当前不扩展为完整自动摘录系统
+- [x] 补齐 `answer`、fragment 复用、resource 回退、刷新恢复与资料焦点链路测试
+
 ## 下一阶段验证重点
 
 ### 结构编辑

@@ -4,6 +4,7 @@ import {
   createCompoundQuestionSplitService,
   createOpenAiCompatibleProviderClient,
   createPlanStepGenerationService,
+  reconcilePlanStepStatuses,
   suggestPlanStepCompletion,
   type AiConfig,
 } from '../../learningEngine';
@@ -12,11 +13,15 @@ import {
   getNodeOrThrow,
   type ModuleNode,
   type NodeTree,
+  type ResourceMetadataRecord,
   type TreeNode,
   type WorkspaceSnapshot,
 } from '../../nodeDomain';
+import type { ResourceImportDraft } from '../../resourcesSearchExport/services/resourceIngestTypes';
+import { createResourceSummaryGenerationService } from '../../resourcesSearchExport/services/resourceSummaryGenerationService';
 import { createInitialWorkspaceSnapshot } from '../utils/createInitialWorkspaceSnapshot';
 import type {
+  ResourceSummaryResolutionResult,
   WorkspaceInitializationResult,
   WorkspaceMutationResult,
   WorkspaceRuntimeDependencies,
@@ -38,9 +43,12 @@ export function createWorkspaceRuntimeService(
 
   return {
     initializeWorkspace,
+    listResourceMetadata,
     loadAiConfig,
     saveAiConfig,
     saveWorkspace,
+    resolveResourceSummary,
+    upsertResourceMetadata,
     rememberSelectionState,
     async generatePlanSteps(
       snapshot: WorkspaceSnapshot,
@@ -54,7 +62,7 @@ export function createWorkspaceRuntimeService(
       }
 
       if (moduleNode.childIds.some((childId) => snapshot.tree.nodes[childId]?.type === 'plan-step')) {
-        throw new Error('当前模块已经包含 plan-step，首版不做覆盖生成。');
+        throw new Error('当前模块已经包含学习路径步骤，首版不做覆盖规划。');
       }
 
       const providerClient = providerFactory(config);
@@ -81,7 +89,7 @@ export function createWorkspaceRuntimeService(
         snapshot: createSnapshot(nextTree, snapshot),
         nextModuleId: moduleNode.id,
         nextSelectedNodeId: generatedPlanStepId ?? moduleNode.id,
-        message: `已为模块生成 ${String(result.planSteps.length)} 个 plan-step。`,
+        message: `已为模块规划 ${String(result.planSteps.length)} 个学习步骤，并补齐关键问题。`,
       } satisfies WorkspaceMutationResult;
     },
     async splitQuestion(
@@ -152,16 +160,23 @@ export function createWorkspaceRuntimeService(
       );
 
       if (recentSnapshot) {
+        const normalizedSnapshot = reconcileSnapshot(recentSnapshot);
+        const resourceMetadataRecords =
+          await dependencies.structuredDataStorage.listResourceMetadata(
+            normalizedSnapshot.workspace.id,
+          );
+
         return {
-          snapshot: recentSnapshot,
+          snapshot: normalizedSnapshot,
           initialModuleId: resolveInitialModuleId(
-            recentSnapshot.tree,
+            normalizedSnapshot.tree,
             recentState.moduleId,
           ),
           initialSelectedNodeId: resolveInitialSelectedNodeId(
-            recentSnapshot.tree,
+            normalizedSnapshot.tree,
             recentState.focusedNodeId,
           ),
+          resourceMetadataRecords,
         };
       }
     }
@@ -180,22 +195,31 @@ export function createWorkspaceRuntimeService(
         throw new Error(`工作区 ${latestWorkspace.id} 读取为空。`);
       }
 
-      const initialModuleId = resolveInitialModuleId(snapshot.tree);
-      const initialSelectedNodeId = resolveInitialSelectedNodeId(snapshot.tree);
+      const normalizedSnapshot = reconcileSnapshot(snapshot);
+      const resourceMetadataRecords =
+        await dependencies.structuredDataStorage.listResourceMetadata(
+          latestWorkspace.id,
+        );
 
-      rememberSelectionState(snapshot.workspace.id, {
+      const initialModuleId = resolveInitialModuleId(normalizedSnapshot.tree);
+      const initialSelectedNodeId = resolveInitialSelectedNodeId(
+        normalizedSnapshot.tree,
+      );
+
+      rememberSelectionState(normalizedSnapshot.workspace.id, {
         currentModuleId: initialModuleId,
         selectedNodeId: initialSelectedNodeId,
       });
 
       return {
-        snapshot,
+        snapshot: normalizedSnapshot,
         initialModuleId,
         initialSelectedNodeId,
+        resourceMetadataRecords,
       };
     }
 
-    const snapshot = createInitialWorkspaceSnapshot();
+    const snapshot = reconcileSnapshot(createInitialWorkspaceSnapshot());
     const initialModuleId = resolveInitialModuleId(snapshot.tree);
     const initialSelectedNodeId = resolveInitialSelectedNodeId(snapshot.tree);
 
@@ -209,7 +233,12 @@ export function createWorkspaceRuntimeService(
       snapshot,
       initialModuleId,
       initialSelectedNodeId,
+      resourceMetadataRecords: [],
     };
+  }
+
+  async function listResourceMetadata(workspaceId: string) {
+    return dependencies.structuredDataStorage.listResourceMetadata(workspaceId);
   }
 
   function loadAiConfig(): AiConfig {
@@ -240,8 +269,52 @@ export function createWorkspaceRuntimeService(
     snapshot: WorkspaceSnapshot,
     selection: WorkspaceRuntimeSelectionState,
   ) {
-    await dependencies.structuredDataStorage.saveWorkspace(snapshot);
-    rememberSelectionState(snapshot.workspace.id, selection);
+    const nextSnapshot = reconcileSnapshot(snapshot);
+
+    await dependencies.structuredDataStorage.saveWorkspace(nextSnapshot);
+    rememberSelectionState(nextSnapshot.workspace.id, selection);
+  }
+
+  async function upsertResourceMetadata(record: ResourceMetadataRecord) {
+    await dependencies.structuredDataStorage.upsertResourceMetadata(record);
+  }
+
+  async function resolveResourceSummary(
+    draft: ResourceImportDraft,
+    config: AiConfig,
+  ): Promise<ResourceSummaryResolutionResult> {
+    if (!draft.ingest.bodyText?.trim()) {
+      return {
+        draft,
+      };
+    }
+
+    const providerClient = providerFactory(config);
+    const summaryGenerationService = createResourceSummaryGenerationService({
+      providerClient,
+    });
+    const summary = await summaryGenerationService.generate({
+      bodyFormat: draft.ingest.bodyFormat,
+      bodyText: draft.ingest.bodyText,
+      fallbackSummary: draft.content,
+      fallbackTitle: draft.title,
+      importMethod: draft.ingest.importMethod,
+      mimeType: draft.ingest.mimeType,
+      sourceUri: draft.sourceUri,
+    });
+
+    return {
+      draft: {
+        ...draft,
+        content: summary.summary,
+        ingest: {
+          ...draft.ingest,
+          summarySource: 'ai-generated',
+          titleSource: 'ai-generated',
+        },
+        title: summary.title,
+      },
+    };
   }
 
   function rememberSelectionState(
@@ -266,7 +339,20 @@ function createSnapshot(
       ...snapshot.workspace,
       updatedAt: new Date().toISOString(),
     },
-    tree,
+    tree: reconcilePlanStepStatuses(tree),
+  };
+}
+
+function reconcileSnapshot(snapshot: WorkspaceSnapshot): WorkspaceSnapshot {
+  const nextTree = reconcilePlanStepStatuses(snapshot.tree);
+
+  if (nextTree === snapshot.tree) {
+    return snapshot;
+  }
+
+  return {
+    ...snapshot,
+    tree: nextTree,
   };
 }
 

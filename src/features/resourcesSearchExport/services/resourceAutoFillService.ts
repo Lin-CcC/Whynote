@@ -1,8 +1,4 @@
-export interface AutoFillResourceDraft {
-  content: string;
-  sourceUri: string;
-  title: string;
-}
+import type { ResourceImportDraft } from './resourceIngestTypes';
 
 interface AutoFillResourceDraftOptions {
   fetchFn?: typeof fetch;
@@ -22,17 +18,19 @@ const SUMMARY_META_SELECTORS = [
   'meta[name="description:zh"]',
 ] as const;
 
-const BODY_SUMMARY_SELECTORS = [
-  'article p',
-  'main p',
-  'section p',
-  'p',
+const CANONICAL_SELECTORS = [
+  'link[rel="canonical"]',
+  'meta[property="og:url"]',
 ] as const;
+
+const BODY_TEXT_SELECTORS = ['article p', 'main p', 'section p', 'p'] as const;
+const MAX_SUMMARY_LENGTH = 240;
+const MAX_BODY_LENGTH = 20_000;
 
 export async function autoFillResourceDraftFromUrl({
   fetchFn = fetch,
   sourceUrl,
-}: AutoFillResourceDraftOptions): Promise<AutoFillResourceDraft> {
+}: AutoFillResourceDraftOptions): Promise<ResourceImportDraft> {
   const normalizedUrl = normalizeResourceUrl(sourceUrl);
 
   try {
@@ -54,25 +52,39 @@ export async function autoFillResourceDraftFromUrl({
       throw new Error('返回内容为空。');
     }
 
-    return buildAutoFillDraft(rawText, normalizedUrl);
+    return buildAutoFillDraft(rawText, normalizedUrl, response.url);
   } catch (error) {
     throw new Error(buildBrowserLimitedAutoFillFailureMessage(error));
   }
 }
 
-function buildAutoFillDraft(rawText: string, sourceUrl: URL): AutoFillResourceDraft {
+function buildAutoFillDraft(
+  rawText: string,
+  sourceUrl: URL,
+  resolvedUrl?: string,
+): ResourceImportDraft {
   const document = new DOMParser().parseFromString(rawText, 'text/html');
-  const title =
-    extractTitle(document) ?? buildTitleFromUrl(sourceUrl) ?? sourceUrl.hostname;
-  const content =
-    extractSummary(document) ??
-    buildBodySummary(document) ??
-    `来自 ${sourceUrl.hostname} 的网页资料，建议手动补充资料概况。`;
+  const titleResult = extractTitle(document, sourceUrl);
+  const summaryResult = extractSummary(document, sourceUrl);
+  const canonicalSource =
+    extractCanonicalSource(document, sourceUrl) ??
+    tryNormalizeHttpUrl(resolvedUrl) ??
+    sourceUrl.toString();
 
   return {
-    content,
+    content: summaryResult.value,
+    ingest: {
+      bodyFormat: 'plain-text',
+      bodyText: extractBodyText(document),
+      canonicalSource,
+      importMethod: 'url',
+      ingestStatus: 'ready',
+      mimeType: 'text/html',
+      summarySource: summaryResult.source,
+      titleSource: titleResult.source,
+    },
     sourceUri: sourceUrl.toString(),
-    title,
+    title: titleResult.value,
   };
 }
 
@@ -80,7 +92,7 @@ function normalizeResourceUrl(sourceUrl: string) {
   const normalizedSourceUrl = sourceUrl.trim();
 
   if (!normalizedSourceUrl) {
-    throw new Error('请先输入 URL，再触发自动填充。');
+    throw new Error('请先输入 URL，再触发自动补全。');
   }
 
   let parsedUrl: URL;
@@ -92,63 +104,133 @@ function normalizeResourceUrl(sourceUrl: string) {
   }
 
   if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    throw new Error('当前只支持 http(s) URL 自动填充。');
+    throw new Error('当前只支持 http(s) URL 自动补全。');
   }
 
   return parsedUrl;
 }
 
-function extractTitle(document: Document) {
+function extractTitle(document: Document, sourceUrl: URL) {
   for (const selector of TITLE_META_SELECTORS) {
     const value = readMetaContent(document, selector);
 
     if (value) {
-      return value;
+      return {
+        source: 'url-meta' as const,
+        value,
+      };
     }
   }
 
   const headingTitle = normalizeText(document.querySelector('h1')?.textContent ?? '');
 
   if (headingTitle) {
-    return headingTitle;
+    return {
+      source: 'url-heading' as const,
+      value: headingTitle,
+    };
   }
 
-  return normalizeText(document.title);
+  const documentTitle = normalizeText(document.title);
+
+  if (documentTitle) {
+    return {
+      source: 'url-document-title' as const,
+      value: documentTitle,
+    };
+  }
+
+  return {
+    source: 'url-path' as const,
+    value: buildTitleFromUrl(sourceUrl) ?? sourceUrl.hostname,
+  };
 }
 
-function extractSummary(document: Document) {
+function extractSummary(document: Document, sourceUrl: URL) {
   for (const selector of SUMMARY_META_SELECTORS) {
     const value = readMetaContent(document, selector);
 
     if (value) {
-      return truncateText(value, 240);
+      return {
+        source: 'url-meta' as const,
+        value: truncateText(value, MAX_SUMMARY_LENGTH),
+      };
+    }
+  }
+
+  const paragraphTexts = collectBodyParagraphTexts(document);
+
+  if (paragraphTexts.length > 0) {
+    return {
+      source: 'url-body' as const,
+      value: truncateText(
+        paragraphTexts.slice(0, 2).join(' '),
+        MAX_SUMMARY_LENGTH,
+      ),
+    };
+  }
+
+  const fallbackTitle = buildTitleFromUrl(sourceUrl) ?? sourceUrl.hostname;
+
+  return {
+    source: 'url-fallback' as const,
+    value: `来自 ${sourceUrl.hostname} 的网页资料。当前只能做浏览器受限自动补全，建议手动补充标题和资料概况。${fallbackTitle}`,
+  };
+}
+
+function extractCanonicalSource(document: Document, sourceUrl: URL) {
+  for (const selector of CANONICAL_SELECTORS) {
+    const attributeName = selector.startsWith('link[') ? 'href' : 'content';
+    const rawValue =
+      document.querySelector(selector)?.getAttribute(attributeName) ?? '';
+    const normalizedValue = normalizeText(rawValue);
+
+    if (!normalizedValue) {
+      continue;
+    }
+
+    try {
+      return new URL(normalizedValue, sourceUrl).toString();
+    } catch {
+      continue;
     }
   }
 
   return null;
 }
 
-function buildBodySummary(document: Document) {
-  const paragraphTexts = BODY_SUMMARY_SELECTORS.flatMap((selector) =>
-    [...document.querySelectorAll(selector)].map((paragraph) =>
-      normalizeText(paragraph.textContent ?? ''),
-    ),
-  ).filter(
-    (paragraphText): paragraphText is string =>
-      paragraphText !== null && paragraphText.length >= 24,
-  );
+function extractBodyText(document: Document) {
+  const paragraphTexts = collectBodyParagraphTexts(document);
 
   if (paragraphTexts.length > 0) {
-    return truncateText(paragraphTexts.slice(0, 2).join(' '), 240);
+    return truncateText(paragraphTexts.join('\n\n'), MAX_BODY_LENGTH);
   }
 
   const bodyText = normalizeText(document.body?.textContent ?? '');
 
   if (!bodyText) {
-    return null;
+    return undefined;
   }
 
-  return truncateText(bodyText, 240);
+  return truncateText(bodyText, MAX_BODY_LENGTH);
+}
+
+function collectBodyParagraphTexts(document: Document) {
+  const uniqueParagraphTexts = new Set<string>();
+
+  for (const selector of BODY_TEXT_SELECTORS) {
+    for (const paragraph of document.querySelectorAll(selector)) {
+      const normalizedParagraph = normalizeText(paragraph.textContent ?? '');
+
+      if (!normalizedParagraph || normalizedParagraph.length < 24) {
+        continue;
+      }
+
+      uniqueParagraphTexts.add(normalizedParagraph);
+    }
+  }
+
+  return [...uniqueParagraphTexts];
 }
 
 function buildTitleFromUrl(sourceUrl: URL) {
@@ -170,9 +252,7 @@ function buildTitleFromUrl(sourceUrl: URL) {
 }
 
 function readMetaContent(document: Document, selector: string) {
-  const content = document
-    .querySelector(selector)
-    ?.getAttribute('content');
+  const content = document.querySelector(selector)?.getAttribute('content');
 
   return normalizeText(content ?? '');
 }
@@ -189,6 +269,24 @@ function truncateText(value: string, maxLength: number) {
   }
 
   return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function tryNormalizeHttpUrl(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 function buildBrowserLimitedAutoFillFailureMessage(error: unknown) {

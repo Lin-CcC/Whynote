@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+  reconcilePlanStepStatuses,
+  shouldSkipPlanStepStatusReconciliation,
+} from '../../learningEngine';
+
+import {
   attachTagToNode,
   canParentAcceptChild,
   canNodeHaveChildren,
@@ -201,7 +206,10 @@ export function useWorkspaceEditor({
     }
 
     setTree((previousTree) => {
-      const nextTree = applyNodePatch(previousTree, nodeId, patch);
+      const patchedTree = applyNodePatch(previousTree, nodeId, patch);
+      const nextTree = shouldSkipPlanStepStatusReconciliation(patch)
+        ? patchedTree
+        : reconcilePlanStepStatuses(patchedTree);
 
       if (nextTree !== previousTree) {
         onSnapshotChange?.(
@@ -225,9 +233,11 @@ export function useWorkspaceEditor({
 
       const normalizedTree = ensureBuiltinTags(previousTree);
       const selectedNode = getNodeOrThrow(normalizedTree, selectedNodeId);
-      const nextTree = selectedNode.tagIds.includes(tagId)
-        ? detachTagFromNode(normalizedTree, selectedNodeId, tagId)
-        : attachTagToNode(normalizedTree, selectedNodeId, tagId);
+      const nextTree = reconcilePlanStepStatuses(
+        selectedNode.tagIds.includes(tagId)
+          ? detachTagFromNode(normalizedTree, selectedNodeId, tagId)
+          : attachTagToNode(normalizedTree, selectedNodeId, tagId),
+      );
 
       onSnapshotChange?.(createNextSnapshot(initialSnapshot, nextTree));
 
@@ -456,30 +466,31 @@ export function useWorkspaceEditor({
     },
   ) {
     try {
+      const reconciledTree = reconcilePlanStepStatuses(nextTree);
       const nextModuleId = resolveModuleId(
-        nextTree,
+        reconciledTree,
         options.nextSelectedNodeId,
         options.preferredModuleId ?? currentModuleId,
       );
       const nextSelectedNodeId = resolveSelectedNodeId(
-        nextTree,
+        reconciledTree,
         options.nextSelectedNodeId,
         nextModuleId,
       );
 
-      setTree(nextTree);
+      setTree(reconciledTree);
       setCurrentModuleId(nextModuleId);
       setSelectedNodeId(nextSelectedNodeId);
       setExpandedNodeIds((previousExpandedNodeIds) =>
         syncExpandedNodeIds(
           previousExpandedNodeIds,
-          nextTree,
+          reconciledTree,
           nextModuleId,
           nextSelectedNodeId,
         ),
       );
       setOperationError(null);
-      onSnapshotChange?.(createNextSnapshot(initialSnapshot, nextTree));
+      onSnapshotChange?.(createNextSnapshot(initialSnapshot, reconciledTree));
     } catch (error) {
       setOperationError(
         error instanceof Error ? error.message : '结构操作失败，请检查当前节点。',

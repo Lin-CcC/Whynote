@@ -19,6 +19,16 @@ test('builds a resource draft from markdown files', async () => {
   await expect(buildResourceDraftFromLocalFile(file)).resolves.toEqual({
     content:
       '先梳理渲染边界，再决定局部状态应该放在哪里。 避免把所有状态抬到根层 关注实际变化路径',
+    ingest: {
+      bodyFormat: 'markdown',
+      bodyText:
+        '# React 渲染笔记\n\n先梳理渲染边界，再决定局部状态应该放在哪里。\n\n- 避免把所有状态抬到根层\n- 关注实际变化路径\n',
+      importMethod: 'local-file',
+      ingestStatus: 'ready',
+      mimeType: 'text/markdown',
+      summarySource: 'file-body',
+      titleSource: 'file-heading',
+    },
     sourceUri: '本地文件：rendering-notes.md',
     title: 'React 渲染笔记',
   });
@@ -40,6 +50,16 @@ test('builds a resource draft from txt files and falls back to the first line as
 
   await expect(buildResourceDraftFromLocalFile(file)).resolves.toEqual({
     content: '每次渲染都会形成独立的闭包快照。 如果在旧闭包里读值，就会看到旧状态。',
+    ingest: {
+      bodyFormat: 'plain-text',
+      bodyText:
+        '状态快照记录\n\n每次渲染都会形成独立的闭包快照。\n如果在旧闭包里读值，就会看到旧状态。\n',
+      importMethod: 'local-file',
+      ingestStatus: 'ready',
+      mimeType: 'text/plain',
+      summarySource: 'file-body',
+      titleSource: 'file-first-line',
+    },
     sourceUri: '本地文件：state-snapshot.txt',
     title: '状态快照记录',
   });

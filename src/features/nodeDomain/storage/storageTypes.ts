@@ -1,5 +1,27 @@
 import type { WorkspaceRecord, WorkspaceSnapshot } from '../domain';
 
+export type ResourceImportMethod = 'url' | 'local-file' | 'manual';
+export type ResourceIngestStatus = 'ready' | 'partial' | 'manual';
+export type ResourceTitleSource =
+  | 'user'
+  | 'ai-generated'
+  | 'url-meta'
+  | 'url-heading'
+  | 'url-document-title'
+  | 'url-path'
+  | 'file-heading'
+  | 'file-first-line'
+  | 'file-name';
+export type ResourceSummarySource =
+  | 'user'
+  | 'ai-generated'
+  | 'url-meta'
+  | 'url-body'
+  | 'url-fallback'
+  | 'file-body'
+  | 'file-fallback';
+export type ResourceBodyFormat = 'plain-text' | 'markdown';
+
 export interface ResourceMetadataRecord {
   id: string;
   workspaceId: string;
@@ -8,6 +30,14 @@ export interface ResourceMetadataRecord {
   title: string;
   sourceUri?: string;
   mimeType?: string;
+  importMethod?: ResourceImportMethod;
+  ingestStatus?: ResourceIngestStatus;
+  titleSource?: ResourceTitleSource;
+  summarySource?: ResourceSummarySource;
+  canonicalSource?: string;
+  bodyText?: string;
+  bodyFormat?: ResourceBodyFormat;
+  importedAt?: string;
   sourceResourceId?: string;
   locator?: string;
   excerpt?: string;
@@ -39,6 +69,7 @@ export interface StructuredDataStorage {
   deleteWorkspace(workspaceId: string): Promise<void>;
   listWorkspaces(): Promise<WorkspaceRecord[]>;
   listResourceMetadata(workspaceId: string): Promise<ResourceMetadataRecord[]>;
+  upsertResourceMetadata(record: ResourceMetadataRecord): Promise<void>;
   close(): Promise<void>;
 }
 

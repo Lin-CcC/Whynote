@@ -21,6 +21,7 @@ const BLOCKING_JUDGMENT_KEYWORDS = [
   '需要补充',
   '存在疑问',
 ];
+const COMPLETION_READY_REASON = '当前步骤已具备完成信号。';
 
 export function suggestPlanStepCompletion(
   tree: NodeTree,
@@ -37,7 +38,7 @@ export function suggestPlanStepCompletion(
 
   return {
     shouldSuggestComplete:
-      reasons.length === 1 && reasons[0] === '当前步骤已具备完成信号。',
+      reasons.length === 1 && reasons[0] === COMPLETION_READY_REASON,
     reasonSummary: reasons.join('；'),
     reasons,
     evidence,
@@ -49,15 +50,29 @@ function buildPlanStepCompletionEvidence(
   planStepNode: PlanStepNode,
 ): PlanStepCompletionEvidence {
   const subtreeNodeIds = getSubtreeNodeIds(tree, planStepNode.id);
+
   subtreeNodeIds.delete(planStepNode.id);
-  const subtreeNodes = [...subtreeNodeIds].map((nodeId) => getNodeOrThrow(tree, nodeId));
+
+  const subtreeNodes = [...subtreeNodeIds].map((nodeId) =>
+    getNodeOrThrow(tree, nodeId),
+  );
   const questionNodes = subtreeNodes.filter(
-    (node): node is Extract<TreeNode, { type: 'question' }> => node.type === 'question',
+    (node): node is Extract<TreeNode, { type: 'question' }> =>
+      node.type === 'question',
   );
   const answerNodes = subtreeNodes.filter((node) => node.type === 'answer');
   const summaryNodes = subtreeNodes.filter((node) => node.type === 'summary');
   const judgmentNodes = subtreeNodes.filter((node) => node.type === 'judgment');
-  const blockingTagNames = collectBlockingTagNames(tree, [planStepNode, ...subtreeNodes]);
+  const learningNodes = [
+    ...questionNodes,
+    ...answerNodes,
+    ...summaryNodes,
+    ...judgmentNodes,
+  ];
+  const blockingTagNames = collectBlockingTagNames(tree, [
+    planStepNode,
+    ...subtreeNodes,
+  ]);
   const resolvedQuestionIds = collectResolvedQuestionIds(tree, questionNodes);
   const directClosureCount = planStepNode.childIds
     .map((childId) => getNodeOrThrow(tree, childId))
@@ -74,6 +89,12 @@ function buildPlanStepCompletionEvidence(
   const blockingJudgmentCount = judgmentNodes.filter((judgmentNode) =>
     containsBlockingJudgmentSignal(judgmentNode),
   ).length;
+  const refinedQuestionCount = questionNodes.filter((questionNode) =>
+    questionNode.childIds.some((childId) => tree.nodes[childId]?.type === 'question'),
+  ).length;
+  const referencedNodeCount = learningNodes.filter(
+    (node) => node.referenceIds.length > 0,
+  ).length;
 
   return {
     stepStatus: planStepNode.status,
@@ -84,6 +105,8 @@ function buildPlanStepCompletionEvidence(
     judgmentCount: judgmentNodes.length,
     directClosureCount,
     blockingJudgmentCount,
+    refinedQuestionCount,
+    referencedNodeCount,
     unresolvedQuestionTitles,
     blockingTagNames,
   };
@@ -97,7 +120,7 @@ function evaluateCompletionEvidence(evidence: PlanStepCompletionEvidence) {
   }
 
   if (evidence.questionCount === 0) {
-    reasons.push('当前步骤还没有问题节点。');
+    reasons.push('当前步骤还没有 question 节点。');
   }
 
   if (evidence.answerCount === 0 && evidence.summaryCount === 0) {
@@ -118,13 +141,13 @@ function evaluateCompletionEvidence(evidence: PlanStepCompletionEvidence) {
     evidence.unresolvedQuestionTitles.length > 0 &&
     evidence.directClosureCount > 0
   ) {
-    reasons.push('直属于 plan-step 的回答 / 总结 / 判断只能作为补充证据，不能替代 question 自身闭环。');
+    reasons.push(
+      '直属于 plan-step 的回答 / 总结 / 判断只能作为补充证据，不能替代 question 自身闭环。',
+    );
   }
 
   if (evidence.blockingTagNames.length > 0) {
-    reasons.push(
-      `存在阻塞标签：${evidence.blockingTagNames.join('、')}`,
-    );
+    reasons.push(`存在阻塞标签：${evidence.blockingTagNames.join('、')}`);
   }
 
   if (evidence.blockingJudgmentCount > 0) {
@@ -132,7 +155,7 @@ function evaluateCompletionEvidence(evidence: PlanStepCompletionEvidence) {
   }
 
   if (reasons.length === 0) {
-    return ['当前步骤已具备完成信号。'];
+    return [COMPLETION_READY_REASON];
   }
 
   return reasons;
@@ -162,7 +185,9 @@ function collectResolvedQuestionIds(
 
   for (const questionNode of questionNodes) {
     const descendantNodeIds = getSubtreeNodeIds(tree, questionNode.id);
+
     descendantNodeIds.delete(questionNode.id);
+
     const hasClosureNode = [...descendantNodeIds]
       .map((nodeId) => getNodeOrThrow(tree, nodeId))
       .some(
@@ -185,5 +210,7 @@ function containsBlockingJudgmentSignal(
 ) {
   const signalText = `${judgmentNode.title}\n${judgmentNode.content}`;
 
-  return BLOCKING_JUDGMENT_KEYWORDS.some((keyword) => signalText.includes(keyword));
+  return BLOCKING_JUDGMENT_KEYWORDS.some((keyword) =>
+    signalText.includes(keyword),
+  );
 }

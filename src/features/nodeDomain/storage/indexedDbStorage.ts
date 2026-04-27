@@ -8,6 +8,7 @@ import {
 
 import type {
   NodeReference,
+  ResourceNode,
   Tag,
   TreeNode,
   WorkspaceRecord,
@@ -15,7 +16,10 @@ import type {
 } from '../domain';
 import { validateNodeTree } from '../domain';
 import type {
+  ResourceImportMethod,
+  ResourceIngestStatus,
   ResourceMetadataRecord,
+  ResourceSummarySource,
   StructuredDataStorage,
 } from './storageTypes';
 
@@ -152,8 +156,15 @@ class IndexedDbNodeStorage implements StructuredDataStorage {
   async saveWorkspace(snapshot: WorkspaceSnapshot) {
     validateNodeTree(snapshot.tree);
 
-    const persistedSnapshot = materializeWorkspaceSnapshot(snapshot);
     const database = await this.databasePromise;
+    const existingResourceMetadata = await collectWorkspaceResourceMetadata(
+      database,
+      snapshot.workspace.id,
+    );
+    const persistedSnapshot = materializeWorkspaceSnapshot(
+      snapshot,
+      buildResourceMetadataMap(existingResourceMetadata),
+    );
     const existingRecordIds = await collectWorkspaceRecordIds(database, snapshot.workspace.id);
     const transaction = database.transaction(WORKSPACE_STORE_NAMES, 'readwrite');
 
@@ -213,6 +224,12 @@ class IndexedDbNodeStorage implements StructuredDataStorage {
       'by-workspaceId',
       workspaceId,
     );
+  }
+
+  async upsertResourceMetadata(record: ResourceMetadataRecord) {
+    const database = await this.databasePromise;
+
+    await database.put('resourceMetadata', structuredClone(record));
   }
 
   async close() {
@@ -323,6 +340,13 @@ async function collectWorkspaceRecordIds(
   };
 }
 
+async function collectWorkspaceResourceMetadata(
+  database: IDBPDatabase<NodeStorageSchema>,
+  workspaceId: string,
+) {
+  return database.getAllFromIndex('resourceMetadata', 'by-workspaceId', workspaceId);
+}
+
 function deleteMissingRecords<
   StoreName extends 'nodes' | 'tags' | 'references' | 'resourceMetadata',
 >(
@@ -344,11 +368,16 @@ function deleteRecordsByIds<
   return [...recordIds].map((recordId) => store.delete(recordId));
 }
 
-function toResourceMetadataRecords(snapshot: WorkspaceSnapshot) {
+function toResourceMetadataRecords(
+  snapshot: WorkspaceSnapshot,
+  existingMetadataByNodeId: Map<string, ResourceMetadataRecord>,
+) {
   const records: ResourceMetadataRecord[] = [];
 
   for (const node of Object.values(snapshot.tree.nodes)) {
     if (node.type === 'resource') {
+      const existingMetadata = existingMetadataByNodeId.get(node.id);
+
       records.push({
         id: node.id,
         workspaceId: snapshot.workspace.id,
@@ -357,17 +386,36 @@ function toResourceMetadataRecords(snapshot: WorkspaceSnapshot) {
         title: node.title,
         sourceUri: node.sourceUri,
         mimeType: node.mimeType,
+        importMethod: existingMetadata?.importMethod ?? inferResourceImportMethod(node),
+        ingestStatus: existingMetadata?.ingestStatus ?? inferResourceIngestStatus(node),
+        titleSource: existingMetadata?.titleSource ?? 'user',
+        summarySource:
+          existingMetadata?.summarySource ?? inferResourceSummarySource(node),
+        canonicalSource: existingMetadata?.canonicalSource,
+        bodyText: existingMetadata?.bodyText,
+        bodyFormat: existingMetadata?.bodyFormat,
+        importedAt: existingMetadata?.importedAt ?? node.createdAt,
         updatedAt: node.updatedAt,
       });
     }
 
     if (node.type === 'resource-fragment') {
+      const existingMetadata = existingMetadataByNodeId.get(node.id);
+
       records.push({
         id: node.id,
         workspaceId: snapshot.workspace.id,
         nodeId: node.id,
         nodeType: 'resource-fragment',
         title: node.title,
+        importMethod: existingMetadata?.importMethod,
+        ingestStatus: existingMetadata?.ingestStatus,
+        titleSource: existingMetadata?.titleSource,
+        summarySource: existingMetadata?.summarySource,
+        canonicalSource: existingMetadata?.canonicalSource,
+        bodyText: existingMetadata?.bodyText,
+        bodyFormat: existingMetadata?.bodyFormat,
+        importedAt: existingMetadata?.importedAt,
         sourceResourceId: node.sourceResourceId,
         locator: node.locator,
         excerpt: node.excerpt,
@@ -381,6 +429,7 @@ function toResourceMetadataRecords(snapshot: WorkspaceSnapshot) {
 
 function materializeWorkspaceSnapshot(
   snapshot: WorkspaceSnapshot,
+  existingMetadataByNodeId: Map<string, ResourceMetadataRecord>,
 ): PersistedWorkspaceSnapshot {
   return {
     workspace: structuredClone(snapshot.workspace),
@@ -396,10 +445,57 @@ function materializeWorkspaceSnapshot(
       ...structuredClone(reference),
       workspaceId: snapshot.workspace.id,
     })),
-    resourceMetadata: toResourceMetadataRecords(snapshot).map((record) =>
-      structuredClone(record),
-    ),
+    resourceMetadata: toResourceMetadataRecords(
+      snapshot,
+      existingMetadataByNodeId,
+    ).map((record) => structuredClone(record)),
   };
+}
+
+function buildResourceMetadataMap(records: ResourceMetadataRecord[]) {
+  return new Map(records.map((record) => [record.nodeId, record]));
+}
+
+function inferResourceImportMethod(node: ResourceNode): ResourceImportMethod {
+  if (node.sourceUri && /^https?:\/\//u.test(node.sourceUri)) {
+    return 'url';
+  }
+
+  if (
+    node.sourceUri?.startsWith('本地文件：') ||
+    node.mimeType === 'text/plain' ||
+    node.mimeType === 'text/markdown' ||
+    node.mimeType === 'text/x-markdown'
+  ) {
+    return 'local-file';
+  }
+
+  return 'manual';
+}
+
+function inferResourceIngestStatus(node: ResourceNode): ResourceIngestStatus {
+  switch (inferResourceImportMethod(node)) {
+    case 'url':
+      return 'partial';
+    case 'local-file':
+    case 'manual':
+      return 'manual';
+  }
+}
+
+function inferResourceSummarySource(node: ResourceNode): ResourceSummarySource {
+  if (node.content.trim().length > 0) {
+    return 'user';
+  }
+
+  switch (inferResourceImportMethod(node)) {
+    case 'url':
+      return 'url-fallback';
+    case 'local-file':
+      return 'file-fallback';
+    case 'manual':
+      return 'user';
+  }
 }
 
 function toNodeMap(storedNodes: StoredNodeRecord[]) {

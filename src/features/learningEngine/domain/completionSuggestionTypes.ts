@@ -9,6 +9,8 @@ export interface PlanStepCompletionEvidence {
   judgmentCount: number;
   directClosureCount: number;
   blockingJudgmentCount: number;
+  refinedQuestionCount: number;
+  referencedNodeCount: number;
   unresolvedQuestionTitles: string[];
   blockingTagNames: string[];
 }
@@ -18,4 +20,11 @@ export interface CompletionSuggestionResult {
   reasonSummary: string;
   reasons: string[];
   evidence: PlanStepCompletionEvidence;
+}
+
+export interface PlanStepRuntimeStatusResult {
+  evidence: PlanStepCompletionEvidence;
+  reasonSummary: string;
+  reasons: string[];
+  suggestedStatus: PlanStepStatus;
 }

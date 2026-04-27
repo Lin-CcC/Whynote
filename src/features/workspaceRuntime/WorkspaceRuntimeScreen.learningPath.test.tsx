@@ -1,0 +1,124 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, expect, test } from 'vitest';
+
+import type {
+  AiConfig,
+  AiProviderClient,
+  AiProviderObjectRequest,
+  AiProviderObjectResponse,
+} from '../learningEngine';
+import {
+  createIndexedDbStorage,
+  createLocalStorageStore,
+  type StructuredDataStorage,
+} from '../nodeDomain';
+import WorkspaceRuntimeScreen from './WorkspaceRuntimeScreen';
+import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
+
+const openedStorages: StructuredDataStorage[] = [];
+
+afterEach(async () => {
+  window.localStorage.clear();
+
+  while (openedStorages.length > 0) {
+    const storage = openedStorages.pop();
+
+    if (storage) {
+      await storage.close();
+    }
+  }
+});
+
+test('plans a minimal learning path that lands as plan-step plus question nodes in runtime UI', async () => {
+  const dependencies = createTestDependencies({
+    providerClient: createMockProviderClient({
+      'plan-step-generation': {
+        planSteps: [
+          {
+            title: '先搭建最小概念框架',
+            content: '先确认这一模块要解决什么。',
+            prerequisites: [
+              {
+                title: '什么是铺垫知识？',
+                content: '先把必要背景补齐。',
+              },
+            ],
+            questions: [
+              {
+                title: '这个模块的核心问题是什么？',
+                content: '围绕关键问题继续学习。',
+              },
+            ],
+          },
+        ],
+      },
+    }),
+  });
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  expect(
+    await screen.findByRole('button', { name: '为当前模块规划学习路径' }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('button', { name: '为当前模块规划学习路径' }),
+  );
+
+  expect(await screen.findByDisplayValue('先搭建最小概念框架')).toBeInTheDocument();
+  expect(await screen.findByDisplayValue('铺垫：什么是铺垫知识？')).toBeInTheDocument();
+  expect(
+    await screen.findByDisplayValue('这个模块的核心问题是什么？'),
+  ).toBeInTheDocument();
+  await waitFor(() => {
+    expect(
+      screen.getByText('已为模块规划 1 个学习步骤，并补齐关键问题。'),
+    ).toBeInTheDocument();
+  });
+});
+
+function createTestDependencies(options?: {
+  providerClient?: AiProviderClient;
+}): WorkspaceRuntimeDependencies {
+  const storage = createIndexedDbStorage({
+    databaseName: `whynote-runtime-learning-path-${crypto.randomUUID()}`,
+  });
+
+  openedStorages.push(storage);
+
+  return {
+    structuredDataStorage: storage,
+    localPreferenceStorage: createLocalStorageStore({
+      prefix: `whynote-runtime-learning-path-${crypto.randomUUID()}`,
+      storage: window.localStorage,
+    }),
+    createProviderClient(config: AiConfig) {
+      return options?.providerClient ?? createMockProviderClient({}, config);
+    },
+    defaultLearningMode: 'standard',
+  };
+}
+
+function createMockProviderClient(
+  payloadByTaskName: Record<string, unknown>,
+  _config?: AiConfig,
+): AiProviderClient {
+  return {
+    async generateObject<T>(
+      request: AiProviderObjectRequest<T>,
+    ): Promise<AiProviderObjectResponse<T>> {
+      const payload = payloadByTaskName[request.taskName] ?? {
+        planSteps: [],
+      };
+      const rawText = JSON.stringify(payload);
+
+      return {
+        taskName: request.taskName,
+        content: request.parse(rawText) as T,
+        model: 'mock-model',
+        providerLabel: 'mock-provider',
+        rawText,
+      };
+    },
+  };
+}
