@@ -43,7 +43,8 @@ export function buildModuleGenerationMessages(
         '每个 question 尽量只检查一个主要理解点，不要使用“谈谈理解”“总结全部内容”“列举几个方面”这类空泛问法。',
         '不要把 prerequisites 伪装成 question，也不要只列空泛名词。',
         '如果资料候选能支撑 introductions 或 questions，可在 citations 中填精确 targetNodeId；能定位 fragment 时优先 fragment，否则可以退回 resource。',
-        '返回格式：{"modules":[{"title":"","content":"","planSteps":[{"title":"","content":"","introductions":[{"title":"","content":"","citations":[{"targetNodeId":""}]}],"questions":[{"title":"","content":"","citations":[{"targetNodeId":""}]}]}]}]}',
+        buildTeachingCitationInstruction(),
+        `返回格式：{"modules":[{"title":"","content":"","planSteps":[{"title":"","content":"","introductions":[{"title":"","content":"","citations":[${buildCitationJsonShape()}]}],"questions":[{"title":"","content":"","citations":[${buildCitationJsonShape()}]}]}]}]}`,
       ]
         .filter(Boolean)
         .join('\n'),
@@ -84,8 +85,9 @@ export function buildPlanStepGenerationMessages(
         '每个步骤再给 1-3 个具体 questions，问题要围绕当前 step，彼此递进，并且可以根据回答判断是否答到点。',
         '每个 question 尽量只检查一个主要理解点，不要使用“谈谈理解”“总结全部内容”“列举几个方面”这类空泛问法。',
         '如果资料适合支撑讲解或问题，请在 citations 中返回 targetNodeId；无法精确到 fragment 时可以引用 resource。',
+        buildTeachingCitationInstruction(),
         '不要输出 prerequisites 数组来伪装铺垫问题。',
-        '返回格式：{"planSteps":[{"title":"","content":"","introductions":[{"title":"","content":"","citations":[{"targetNodeId":""}]}],"questions":[{"title":"","content":"","citations":[{"targetNodeId":""}]}]}]}',
+        `返回格式：{"planSteps":[{"title":"","content":"","introductions":[{"title":"","content":"","citations":[${buildCitationJsonShape()}]}],"questions":[{"title":"","content":"","citations":[${buildCitationJsonShape()}]}]}]}`,
       ]
         .filter(Boolean)
         .join('\n'),
@@ -134,7 +136,8 @@ export function buildQuestionClosureMessages(
         '如果回答不足，followUpQuestions 返回 1-2 个具体追问；如果回答充分，followUpQuestions 返回空数组。',
         'followUpQuestions 只能补当前回答缺失的关键点，不要把主问题原样重复，也不要要求用户把整道题完整重答一遍。',
         '如果资料候选能支撑 judgment 或 summary，请在 citations 中返回 targetNodeId；能用 fragment 时优先 fragment。',
-        '返回格式：{"isAnswerSufficient":true,"judgment":{"title":"","content":"","citations":[{"targetNodeId":""}]},"summary":{"title":"","content":"","citations":[{"targetNodeId":""}]},"followUpQuestions":[{"title":"","content":"","citations":[{"targetNodeId":""}]}]}',
+        buildTeachingCitationInstruction(),
+        `返回格式：{"isAnswerSufficient":true,"judgment":{"title":"","content":"","citations":[${buildCitationJsonShape()}]},"summary":{"title":"","content":"","citations":[${buildCitationJsonShape()}]},"followUpQuestions":[{"title":"","content":"","citations":[${buildCitationJsonShape()}]}]}`,
       ]
         .filter(Boolean)
         .join('\n'),
@@ -184,7 +187,8 @@ export function buildLearningActionDraftMessages(
         ),
         ...buildLearningActionInstructions(input),
         '如果资料候选能支撑这份草稿，请在 citations 中返回 targetNodeId；能用 fragment 时优先 fragment。',
-        '返回格式：{"title":"","content":"","citations":[{"targetNodeId":""}]}',
+        buildTeachingCitationInstruction(),
+        `返回格式：{"title":"","content":"","citations":[${buildCitationJsonShape()}]}`,
       ]
         .filter(Boolean)
         .join('\n'),
@@ -324,4 +328,12 @@ function buildLearningActionInstructions(input: LearningActionDraftInput) {
         '不要把完整讲解塞进 judgment；判断只负责指出当前掌握情况或待验证点。',
       ];
   }
+}
+
+function buildTeachingCitationInstruction() {
+  return '只给确实承担定义、机制说明、代码行为解释、例子来源、判断支撑或背景补充作用的片段挂 citations，不要给过渡语句挂引用。每条 citation 除 targetNodeId 外，尽量补 focusText（当前讲解里被资料支撑的那一句或那一小段）、purpose（definition / mechanism / behavior / example / judgment / background）、note（为什么该看这段）；如果 citation 要支撑具体讲解片段但 targetNodeId 指向 resource，而不是 fragment，就必须补 sourceExcerpt 或 sourceLocator，否则这条引用不会被当成教学引用展示。';
+}
+
+function buildCitationJsonShape() {
+  return '{"targetNodeId":"","focusText":"","purpose":"mechanism","note":"","sourceExcerpt":"","sourceLocator":""}';
 }

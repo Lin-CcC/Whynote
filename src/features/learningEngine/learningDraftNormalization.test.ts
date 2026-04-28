@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseJsonObject } from './services/learningDraftNormalization';
+import {
+  normalizeQuestionClosure,
+  parseJsonObject,
+} from './services/learningDraftNormalization';
 
 describe('parseJsonObject', () => {
   it('parses JSON wrapped in a code fence', () => {
@@ -45,5 +48,67 @@ describe('parseJsonObject', () => {
     expect(() => parseJsonObject('["ok"]')).toThrow(
       'AI 返回的 JSON 能解析，但根节点不是对象，和当前任务约定不符。',
     );
+  });
+});
+
+describe('normalizeQuestionClosure', () => {
+  it('keeps teaching citation metadata and only dedupes identical citation signatures', () => {
+    const result = normalizeQuestionClosure({
+      followUpQuestions: [],
+      isAnswerSufficient: false,
+      judgment: {
+        title: '判断：还缺关键因果',
+        content: '你还没有解释为什么批处理会减少重复渲染。',
+        citations: [
+          {
+            targetNodeId: 'fragment-batching',
+            focusText: '这里在指出你漏掉了“批处理为什么会减少重复渲染”这条因果链。',
+            purpose: 'judgment',
+            reason: '这里在支撑判断。',
+            excerpt: 'React 会把多个 state 更新批处理后再统一提交。',
+            locator: 'useState > batching',
+          },
+          {
+            targetNodeId: 'fragment-batching',
+            focusText: '这里在指出你漏掉了“批处理为什么会减少重复渲染”这条因果链。',
+            purpose: 'judgment',
+            reason: '这里在支撑判断。',
+            excerpt: 'React 会把多个 state 更新批处理后再统一提交。',
+            locator: 'useState > batching',
+          },
+          {
+            targetNodeId: 'fragment-batching',
+            focusText: '这里在解释“同一轮事件里先收集更新，再统一提交”。',
+            purpose: 'mechanism',
+            note: '这里在说明机制。',
+            sourceExcerpt: 'React 会把多个 state 更新批处理后再统一提交。',
+            sourceLocator: 'useState > batching',
+          },
+        ],
+      },
+      summary: {
+        title: '标准理解',
+        content: '批处理会先合并同一轮事件中的更新，再统一提交。',
+      },
+    });
+
+    expect(result.judgment.citations).toEqual([
+      {
+        targetNodeId: 'fragment-batching',
+        focusText: '这里在指出你漏掉了“批处理为什么会减少重复渲染”这条因果链。',
+        purpose: 'judgment',
+        note: '这里在支撑判断。',
+        sourceExcerpt: 'React 会把多个 state 更新批处理后再统一提交。',
+        sourceLocator: 'useState > batching',
+      },
+      {
+        targetNodeId: 'fragment-batching',
+        focusText: '这里在解释“同一轮事件里先收集更新，再统一提交”。',
+        purpose: 'mechanism',
+        note: '这里在说明机制。',
+        sourceExcerpt: 'React 会把多个 state 更新批处理后再统一提交。',
+        sourceLocator: 'useState > batching',
+      },
+    ]);
   });
 });

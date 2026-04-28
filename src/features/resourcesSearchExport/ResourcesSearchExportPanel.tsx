@@ -101,6 +101,7 @@ export default function ResourcesSearchExportPanel({
       <ResourceLibraryPanel
         onSelectNode={handleLocateNode}
         resourceGroups={resourcesSearchExport.resourceGroups}
+        resourceMetadataByNodeId={resourceMetadataByNodeId}
         selectedNodeId={highlightedNodeId}
       />
       <ExportPanel

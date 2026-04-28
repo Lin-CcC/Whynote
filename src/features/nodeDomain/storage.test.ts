@@ -83,6 +83,11 @@ describe('nodeDomain storage', () => {
         id: 'reference-storage',
         sourceNodeId: 'summary-storage',
         targetNodeId: 'resource-fragment-storage',
+        focusText: '批处理会把同一轮事件中的多个更新合并后再提交。',
+        note: '这里在解释机制，应该直接对照资料里的原文片段。',
+        purpose: 'mechanism',
+        sourceExcerpt: 'resource fragment excerpt',
+        sourceLocator: 'line:1-2',
         createdAt: '2026-04-27T00:00:00.000Z',
       }),
     );
@@ -114,6 +119,15 @@ describe('nodeDomain storage', () => {
     expect(
       restoredSnapshot?.tree.references['reference-storage'].targetNodeId,
     ).toBe('resource-fragment-storage');
+    expect(
+      restoredSnapshot?.tree.references['reference-storage'].focusText,
+    ).toBe('批处理会把同一轮事件中的多个更新合并后再提交。');
+    expect(restoredSnapshot?.tree.references['reference-storage'].purpose).toBe(
+      'mechanism',
+    );
+    expect(
+      restoredSnapshot?.tree.references['reference-storage'].sourceLocator,
+    ).toBe('line:1-2');
     expect(
       restoredSnapshot?.tree.nodes['resource-fragment-storage'].type ===
         'resource-fragment' &&

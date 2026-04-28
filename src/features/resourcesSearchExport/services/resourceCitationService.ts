@@ -4,6 +4,8 @@ import {
   createNodeReference,
   getNodeOrThrow,
   insertChildNode,
+  updateNodeReference,
+  type CitationPurpose,
   type NodeReference,
   type NodeTree,
   type ResourceFragmentNode,
@@ -20,6 +22,14 @@ const MIN_PARTIAL_EXCERPT_MATCH_LENGTH = 12;
 
 type LearningCitationSourceNodeType =
   (typeof LEARNING_CITATION_SOURCE_NODE_TYPES)[number];
+
+type NormalizedReferenceDraft = {
+  focusText: string | null;
+  note: string | null;
+  purpose: CitationPurpose | null;
+  sourceExcerpt: string | null;
+  sourceLocator: string | null;
+};
 
 export type LearningCitationSourceNode = Extract<
   TreeNode,
@@ -40,9 +50,18 @@ export interface ResourceCitationFragmentDraft {
   title?: string;
 }
 
+export interface ResourceCitationReferenceDraft {
+  focusText?: string;
+  note?: string;
+  purpose?: CitationPurpose;
+  sourceExcerpt?: string;
+  sourceLocator?: string;
+}
+
 export interface AttachResourceCitationInput {
   allowFragmentCreation?: boolean;
   fragmentDraft?: ResourceCitationFragmentDraft;
+  referenceDraft?: ResourceCitationReferenceDraft;
   sourceNodeId: string;
   targetNodeId: string;
 }
@@ -93,9 +112,9 @@ export function attachResourceCitation(
     targetNodeId = initialTargetNode.id;
   } else {
     resourceNodeId = initialTargetNode.id;
-    const normalizedDraft = normalizeFragmentDraft(input.fragmentDraft);
-    const reusableFragmentNode = normalizedDraft
-      ? findReusableFragment(tree, initialTargetNode.id, normalizedDraft)
+    const normalizedFragmentDraft = normalizeFragmentDraft(input.fragmentDraft);
+    const reusableFragmentNode = normalizedFragmentDraft
+      ? findReusableFragment(tree, initialTargetNode.id, normalizedFragmentDraft)
       : null;
 
     if (reusableFragmentNode) {
@@ -103,14 +122,14 @@ export function attachResourceCitation(
       targetNodeId = reusableFragmentNode.id;
     } else if (
       input.allowFragmentCreation &&
-      canCreateStableFragment(normalizedDraft)
+      canCreateStableFragment(normalizedFragmentDraft)
     ) {
       const createdFragmentNode = createNode({
         type: 'resource-fragment',
-        excerpt: normalizedDraft.excerpt,
-        locator: normalizedDraft.locator,
+        excerpt: normalizedFragmentDraft.excerpt,
+        locator: normalizedFragmentDraft.locator,
         sourceResourceId: initialTargetNode.id,
-        title: buildFragmentTitle(initialTargetNode.title, normalizedDraft),
+        title: buildFragmentTitle(initialTargetNode.title, normalizedFragmentDraft),
       });
 
       if (createdFragmentNode.type !== 'resource-fragment') {
@@ -126,26 +145,66 @@ export function attachResourceCitation(
     }
   }
 
-  const existingReference = findExistingReference(
+  const normalizedReferenceDraft = normalizeReferenceDraft(
+    input.referenceDraft,
+    resolution === 'resource' ? input.fragmentDraft : undefined,
+  );
+  const exactReference = findExactReference(
     nextTree,
     sourceNode.id,
     targetNodeId,
+    normalizedReferenceDraft.focusText,
   );
 
-  if (existingReference) {
+  if (exactReference) {
+    const updatedReferenceResult = mergeReferenceDraft(
+      nextTree,
+      exactReference.id,
+      normalizedReferenceDraft,
+    );
+
     return {
-      reference: existingReference,
+      reference: updatedReferenceResult.reference,
       referenceAlreadyExisted: true,
       resolution,
       resourceNodeId,
       targetNodeId,
-      tree: nextTree,
+      tree: updatedReferenceResult.tree,
+    };
+  }
+
+  const genericReference = findUpgradeableGenericReference(
+    nextTree,
+    sourceNode.id,
+    targetNodeId,
+    normalizedReferenceDraft,
+  );
+
+  if (genericReference) {
+    const updatedReferenceResult = mergeReferenceDraft(
+      nextTree,
+      genericReference.id,
+      normalizedReferenceDraft,
+    );
+
+    return {
+      reference: updatedReferenceResult.reference,
+      referenceAlreadyExisted: true,
+      resolution,
+      resourceNodeId,
+      targetNodeId,
+      tree: updatedReferenceResult.tree,
     };
   }
 
   const reference = createNodeReference({
     sourceNodeId: sourceNode.id,
     targetNodeId,
+    focusText: normalizedReferenceDraft.focusText ?? undefined,
+    note: normalizedReferenceDraft.note ?? undefined,
+    purpose: normalizedReferenceDraft.purpose ?? undefined,
+    sourceExcerpt: normalizedReferenceDraft.sourceExcerpt ?? undefined,
+    sourceLocator: normalizedReferenceDraft.sourceLocator ?? undefined,
   });
 
   return {
@@ -166,7 +225,7 @@ function findReusableFragment(
   const resourceNode = getNodeOrThrow(tree, resourceNodeId);
 
   if (resourceNode.type !== 'resource') {
-    throw new Error('fragment 复用只能发生在 resource 下。');
+    throw new Error('fragment 复用只能发生在 resource 下面。');
   }
 
   const fragmentCandidates = resourceNode.childIds
@@ -215,16 +274,93 @@ function scoreFragmentCandidate(
   return score;
 }
 
-function findExistingReference(
+function findExactReference(
   tree: NodeTree,
   sourceNodeId: string,
   targetNodeId: string,
+  focusText: string | null,
 ) {
+  return Object.values(tree.references).find((reference) => {
+    if (
+      reference.sourceNodeId !== sourceNodeId ||
+      reference.targetNodeId !== targetNodeId
+    ) {
+      return false;
+    }
+
+    return normalizeMatchText(reference.focusText) === normalizeMatchText(focusText);
+  });
+}
+
+function findUpgradeableGenericReference(
+  tree: NodeTree,
+  sourceNodeId: string,
+  targetNodeId: string,
+  draft: NormalizedReferenceDraft,
+) {
+  if (!hasReferenceDraftMetadata(draft)) {
+    return null;
+  }
+
   return Object.values(tree.references).find(
     (reference) =>
       reference.sourceNodeId === sourceNodeId &&
-      reference.targetNodeId === targetNodeId,
+      reference.targetNodeId === targetNodeId &&
+      !normalizeDisplayText(reference.focusText),
   );
+}
+
+function mergeReferenceDraft(
+  tree: NodeTree,
+  referenceId: string,
+  draft: NormalizedReferenceDraft,
+) {
+  const reference = tree.references[referenceId];
+
+  if (!reference) {
+    throw new Error(`引用 ${referenceId} 不存在。`);
+  }
+
+  const patch: Partial<
+    Pick<
+      NodeReference,
+      'focusText' | 'note' | 'purpose' | 'sourceExcerpt' | 'sourceLocator'
+    >
+  > = {};
+
+  if (draft.focusText && draft.focusText !== reference.focusText) {
+    patch.focusText = draft.focusText;
+  }
+
+  if (draft.note && draft.note !== reference.note) {
+    patch.note = draft.note;
+  }
+
+  if (draft.purpose && draft.purpose !== reference.purpose) {
+    patch.purpose = draft.purpose;
+  }
+
+  if (draft.sourceExcerpt && draft.sourceExcerpt !== reference.sourceExcerpt) {
+    patch.sourceExcerpt = draft.sourceExcerpt;
+  }
+
+  if (draft.sourceLocator && draft.sourceLocator !== reference.sourceLocator) {
+    patch.sourceLocator = draft.sourceLocator;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return {
+      reference,
+      tree,
+    };
+  }
+
+  const nextTree = updateNodeReference(tree, referenceId, patch);
+
+  return {
+    reference: nextTree.references[referenceId],
+    tree: nextTree,
+  };
 }
 
 type NormalizedFragmentDraft = {
@@ -253,6 +389,39 @@ function normalizeFragmentDraft(
     locator,
     title,
   };
+}
+
+function normalizeReferenceDraft(
+  draft: ResourceCitationReferenceDraft | undefined,
+  fallbackFragmentDraft?: ResourceCitationFragmentDraft,
+): NormalizedReferenceDraft {
+  const focusText = normalizeDisplayText(draft?.focusText);
+  const note = normalizeDisplayText(draft?.note);
+  const purpose = draft?.purpose ?? null;
+  const sourceExcerpt = normalizeDisplayText(
+    draft?.sourceExcerpt ?? fallbackFragmentDraft?.excerpt,
+  );
+  const sourceLocator = normalizeDisplayText(
+    draft?.sourceLocator ?? fallbackFragmentDraft?.locator,
+  );
+
+  return {
+    focusText,
+    note,
+    purpose,
+    sourceExcerpt,
+    sourceLocator,
+  };
+}
+
+function hasReferenceDraftMetadata(draft: NormalizedReferenceDraft) {
+  return Boolean(
+    draft.focusText ||
+      draft.note ||
+      draft.purpose ||
+      draft.sourceExcerpt ||
+      draft.sourceLocator,
+  );
 }
 
 function canCreateStableFragment(

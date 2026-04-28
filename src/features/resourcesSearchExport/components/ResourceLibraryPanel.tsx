@@ -1,17 +1,21 @@
 import { useEffect, useRef } from 'react';
 
 import SectionCard from '../../../ui/SectionCard';
+import type { ResourceMetadataRecord } from '../../nodeDomain';
 import type { ResourceGroup } from '../resourceSearchExportTypes';
+import { getResourceProvenanceSummary } from '../utils/resourceMetadataPresentation';
 
 type ResourceLibraryPanelProps = {
   onSelectNode: (nodeId: string) => void;
   resourceGroups: ResourceGroup[];
+  resourceMetadataByNodeId: Record<string, ResourceMetadataRecord>;
   selectedNodeId: string | null;
 };
 
 export default function ResourceLibraryPanel({
   onSelectNode,
   resourceGroups,
+  resourceMetadataByNodeId,
   selectedNodeId,
 }: ResourceLibraryPanelProps) {
   const itemElementMapRef = useRef(new Map<string, HTMLButtonElement>());
@@ -41,51 +45,75 @@ export default function ResourceLibraryPanel({
         </p>
       ) : (
         <div className="resources-libraryList">
-          {resourceGroups.map((group) => (
-            <article className="resources-libraryGroup" key={group.resourceNode.id}>
-              <button
-                aria-label={`定位资料 ${group.resourceNode.title}`}
-                className="resources-libraryItem"
-                data-selected={selectedNodeId === group.resourceNode.id}
-                onClick={() => onSelectNode(group.resourceNode.id)}
-                ref={(element) => registerItemElement(group.resourceNode.id, element)}
-                type="button"
+          {resourceGroups.map((group) => {
+            const resourceMetadata = resourceMetadataByNodeId[group.resourceNode.id];
+
+            return (
+              <article
+                className="resources-libraryGroup"
+                key={group.resourceNode.id}
               >
-                <span className="resources-libraryType">资料</span>
-                <strong className="resources-libraryTitle">{group.resourceNode.title}</strong>
-                <span className="resources-librarySummary">{group.sourceSummary}</span>
-                <span className="resources-libraryMeta">
-                  {group.referenceCount > 0
-                    ? `被引用 ${String(group.referenceCount)} 次`
-                    : '尚未被节点引用'}
-                </span>
-              </button>
-              {group.fragmentNodes.length > 0 ? (
-                <div className="resources-fragmentList">
-                  {group.fragmentNodes.map((fragmentNode) => (
-                    <button
-                      aria-label={`定位摘录 ${fragmentNode.title}`}
-                      className="resources-libraryItem resources-libraryItem-fragment"
-                      data-selected={selectedNodeId === fragmentNode.id}
-                      key={fragmentNode.id}
-                      onClick={() => onSelectNode(fragmentNode.id)}
-                      ref={(element) => registerItemElement(fragmentNode.id, element)}
-                      type="button"
-                    >
-                      <span className="resources-libraryType">摘录</span>
-                      <strong className="resources-libraryTitle">{fragmentNode.title}</strong>
-                      <span className="resources-librarySummary">
-                        {fragmentNode.excerpt || fragmentNode.content || '暂无摘录正文'}
-                      </span>
-                      <span className="resources-libraryMeta">
-                        {fragmentNode.locator ? `定位：${fragmentNode.locator}` : '未记录定位信息'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </article>
-          ))}
+                <button
+                  aria-label={`定位资料 ${group.resourceNode.title}`}
+                  className="resources-libraryItem"
+                  data-selected={selectedNodeId === group.resourceNode.id}
+                  onClick={() => onSelectNode(group.resourceNode.id)}
+                  ref={(element) =>
+                    registerItemElement(group.resourceNode.id, element)
+                  }
+                  type="button"
+                >
+                  <span className="resources-libraryType">资料</span>
+                  <strong className="resources-libraryTitle">
+                    {group.resourceNode.title}
+                  </strong>
+                  <span className="resources-librarySummary">
+                    {group.sourceSummary}
+                  </span>
+                  <span className="resources-libraryMeta">
+                    {getResourceProvenanceSummary(resourceMetadata)}
+                  </span>
+                  <span className="resources-libraryMeta">
+                    {group.referenceCount > 0
+                      ? `被引用 ${String(group.referenceCount)} 次`
+                      : '尚未被学习节点引用'}
+                  </span>
+                </button>
+                {group.fragmentNodes.length > 0 ? (
+                  <div className="resources-fragmentList">
+                    {group.fragmentNodes.map((fragmentNode) => (
+                      <button
+                        aria-label={`定位摘录 ${fragmentNode.title}`}
+                        className="resources-libraryItem resources-libraryItem-fragment"
+                        data-selected={selectedNodeId === fragmentNode.id}
+                        key={fragmentNode.id}
+                        onClick={() => onSelectNode(fragmentNode.id)}
+                        ref={(element) =>
+                          registerItemElement(fragmentNode.id, element)
+                        }
+                        type="button"
+                      >
+                        <span className="resources-libraryType">摘录</span>
+                        <strong className="resources-libraryTitle">
+                          {fragmentNode.title}
+                        </strong>
+                        <span className="resources-librarySummary">
+                          {fragmentNode.excerpt ||
+                            fragmentNode.content ||
+                            '暂无摘录正文'}
+                        </span>
+                        <span className="resources-libraryMeta">
+                          {fragmentNode.locator
+                            ? `定位：${fragmentNode.locator}`
+                            : '未记录定位信息'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
         </div>
       )}
     </SectionCard>

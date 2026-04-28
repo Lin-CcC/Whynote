@@ -68,6 +68,7 @@ test('creates a judgment-linked answer explanation on the first evaluation', asy
     within(judgmentNode).queryByText('当前还没有对应的答案解析。'),
   ).not.toBeInTheDocument();
 
+  fireEvent.click(judgmentNode);
   fireEvent.click(
     within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
   );
@@ -126,6 +127,7 @@ test('matches a manual summary before a manual judgment as the same answer expla
   const judgmentNode = await screen.findByTestId('editor-node-manual-judgment');
   const summaryNode = await screen.findByTestId('editor-node-manual-summary');
 
+  fireEvent.click(judgmentNode);
   expect(
     within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
   ).toBeEnabled();

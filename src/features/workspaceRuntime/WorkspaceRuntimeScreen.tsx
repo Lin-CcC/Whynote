@@ -160,7 +160,7 @@ export default function WorkspaceRuntimeScreen({
   }
 
   function renderNodeInlineActions(context: WorkspaceEditorNodeRenderContext) {
-    if (context.node.type !== 'judgment') {
+    if (context.node.type !== 'judgment' || !context.isSelected) {
       return null;
     }
 

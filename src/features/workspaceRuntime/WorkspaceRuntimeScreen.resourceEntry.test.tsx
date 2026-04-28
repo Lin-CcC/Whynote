@@ -430,7 +430,7 @@ test('demotes fragment creation to a supplementary action in resource focus and 
   expect(fragmentFocusCard.getByText('摘录 · 状态快照摘录')).toBeInTheDocument();
   expect(
     fragmentFocusCard.getByText(
-      '当前焦点是摘录，新补充的摘录会继续挂到父资料《React Hooks 参考》下。',
+      '当前焦点已经是摘录，新补的摘录会继续挂在父资料《React Hooks 参考》下面。',
     ),
   ).toBeInTheDocument();
 
