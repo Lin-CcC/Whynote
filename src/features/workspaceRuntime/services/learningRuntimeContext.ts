@@ -173,7 +173,7 @@ export function getLatestQuestionAnswerNodeId(
 export function getLatestQuestionAnswerExplanationNodeId(
   tree: NodeTree,
   questionNodeId: string,
-  answerNodeId?: string,
+  answerNodeId?: string | null,
 ) {
   const questionNode = getNodeOrThrow(tree, questionNodeId);
 
@@ -223,35 +223,17 @@ export function resolveQuestionAnswerEvaluationTarget(
     return null;
   }
 
-  if (selectedNode.type === 'answer' && selectedNode.parentId !== null) {
-    const parentNode = tree.nodes[selectedNode.parentId];
-
-    if (
-      parentNode?.type === 'question' &&
-      canEvaluateQuestionAnswer(tree, parentNode.id, selectedNode.id)
-    ) {
-      return {
-        answerNodeId: selectedNode.id,
-        questionNodeId: parentNode.id,
-      };
-    }
-  }
-
-  if (selectedNode.type !== 'judgment' || selectedNode.parentId === null) {
-    return null;
-  }
-
-  const parentNode = tree.nodes[selectedNode.parentId];
+  const questionNode = getQuestionContextNode(tree, selectedNode.id);
   const answerNode = resolveScopedAnswerNode(tree, selectedNode.id);
 
   if (
-    parentNode?.type === 'question' &&
+    questionNode?.type === 'question' &&
     answerNode &&
-    canEvaluateQuestionAnswer(tree, parentNode.id, answerNode.id)
+    canEvaluateQuestionAnswer(tree, questionNode.id, answerNode.id)
   ) {
     return {
       answerNodeId: answerNode.id,
-      questionNodeId: parentNode.id,
+      questionNodeId: questionNode.id,
     };
   }
 
@@ -597,27 +579,7 @@ function findAnswerNodeIdForJudgment(
   siblingIds: string[],
   judgmentIndex: number,
 ) {
-  for (let siblingIndex = judgmentIndex - 1; siblingIndex >= 0; siblingIndex -= 1) {
-    const siblingNode = tree.nodes[siblingIds[siblingIndex]];
-
-    if (!siblingNode) {
-      continue;
-    }
-
-    if (siblingNode.type === 'answer') {
-      return siblingNode.id;
-    }
-
-    if (
-      siblingNode.type === 'judgment' ||
-      siblingNode.type === 'question' ||
-      siblingNode.type === 'summary'
-    ) {
-      return null;
-    }
-  }
-
-  return null;
+  return findAnswerNodeIdBeforeIndex(tree, siblingIds, judgmentIndex);
 }
 
 function findSummaryNodeIdForJudgment(
@@ -640,12 +602,40 @@ function findSummaryNodeIdForJudgment(
       return siblingNode.id;
     }
 
-    if (
-      siblingNode.type === 'answer' ||
-      siblingNode.type === 'judgment' ||
-      siblingNode.type === 'question'
-    ) {
+    if (siblingNode.type === 'answer') {
       return null;
+    }
+  }
+
+  for (let siblingIndex = judgmentIndex - 1; siblingIndex >= 0; siblingIndex -= 1) {
+    const siblingNode = tree.nodes[siblingIds[siblingIndex]];
+
+    if (!siblingNode) {
+      continue;
+    }
+
+    if (siblingNode.type === 'summary') {
+      return siblingNode.id;
+    }
+
+    if (siblingNode.type === 'answer') {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function findAnswerNodeIdBeforeIndex(
+  tree: NodeTree,
+  siblingIds: string[],
+  startIndex: number,
+) {
+  for (let siblingIndex = startIndex - 1; siblingIndex >= 0; siblingIndex -= 1) {
+    const siblingNode = tree.nodes[siblingIds[siblingIndex]];
+
+    if (siblingNode?.type === 'answer') {
+      return siblingNode.id;
     }
   }
 

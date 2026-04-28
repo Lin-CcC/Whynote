@@ -148,7 +148,6 @@ export default function WorkspaceRuntimeScreen({
           void runtime.runPlanStepGeneration(moduleNodeId);
         }}
         onSelectNode={context.selectNode}
-        onRunLearningAction={context.runLearningAction}
         onSplitQuestion={(questionNodeId) => {
           void runtime.runQuestionSplit(questionNodeId);
         }}
@@ -161,7 +160,7 @@ export default function WorkspaceRuntimeScreen({
   }
 
   function renderNodeInlineActions(context: WorkspaceEditorNodeRenderContext) {
-    if (context.node.type !== 'judgment') {
+    if (context.node.type !== 'judgment' || !context.isSelected) {
       return null;
     }
 

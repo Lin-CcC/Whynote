@@ -106,6 +106,14 @@
 - [x] 用统一的 learning action draft prompt / runtime 规则承接上述动作，避免分散成多套编排
 - [x] 补齐回答推进、铺垫补讲、插入即草稿的测试，并回归 typecheck / build
 
+## 当前工作树：`codex/testing-ux-and-answer-closure`
+
+- [x] 收紧 question closure 到 UI 的接线，保证首次评估后 judgment 与答案解析同时可见可跳转
+- [x] 让手动插入的 question / summary / judgment 尽量复用同一套学习闭环语义，而不是按节点来源分流
+- [x] 强化文本主视图节点卡片的点击即选中反馈，显式区分“选中”与“进入编辑”
+- [x] 收口工程壳层 CTA 与主路径提示，让 answer / judgment / summary 三种语境都能直接看到下一步
+- [x] 补齐首次评估、手动 question + answer、手动 summary 配对和点击选中的回归测试，并通过 typecheck / test / build
+
 ## 当前工作树：`codex/resource-citation-runtime`
 
 - [x] 补齐 `answer` 作为合法资料引用源的领域约束

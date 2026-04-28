@@ -35,6 +35,7 @@ test('renders inline judgment actions and reveals a hint that stays distinct fro
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   const judgmentNode = await screen.findByTestId('editor-node-judgment-inline-primary');
+  fireEvent.click(judgmentNode);
   const actions = within(judgmentNode).getByTestId(
     'judgment-inline-actions-judgment-inline-primary',
   );
@@ -70,6 +71,7 @@ test('jumps from judgment to the matching summary and shows it as an answer expl
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   const judgmentNode = await screen.findByTestId('editor-node-judgment-inline-primary');
+  fireEvent.click(judgmentNode);
 
   fireEvent.click(
     within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
@@ -94,6 +96,7 @@ test('returns from judgment to the matching answer instead of stopping on the pa
   const currentJudgmentNode = await screen.findByTestId(
     'editor-node-judgment-inline-current',
   );
+  fireEvent.click(currentJudgmentNode);
 
   fireEvent.click(
     within(currentJudgmentNode).getByRole('button', {
