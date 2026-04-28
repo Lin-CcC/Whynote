@@ -15,7 +15,10 @@ import { getActionAvailability } from './hooks/useWorkspaceEditor';
 import {
   DEMO_SELECTED_NODE_ID,
 } from './utils/createDemoWorkspace';
-import type { WorkspaceEditorOperations } from './workspaceEditorTypes';
+import type {
+  WorkspaceEditorLearningActionRequest,
+  WorkspaceEditorOperations,
+} from './workspaceEditorTypes';
 
 test('switches modules and keeps structure and text view in sync', () => {
   render(<WorkspaceEditor />);
@@ -161,6 +164,28 @@ test('inserts an answer into the selected question before closing nodes', () => 
   expect(insertChildSpy.mock.calls[0]?.[3]).toBe(2);
 });
 
+test('shows scaffold teaching follow-up actions when a scaffold node is selected', () => {
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-scaffold-actions"
+      initialSelectedNodeId="summary-scaffold-selected"
+      initialSnapshot={createScaffoldActionSnapshot()}
+    />,
+  );
+
+  const learningActionGrid = screen.getByTestId('learning-action-grid');
+
+  expect(
+    within(learningActionGrid).getByRole('button', { name: '换个说法解释' }),
+  ).toBeInTheDocument();
+  expect(
+    within(learningActionGrid).getByRole('button', { name: '更基础一点' }),
+  ).toBeInTheDocument();
+  expect(
+    within(learningActionGrid).getByRole('button', { name: '举个例子' }),
+  ).toBeInTheDocument();
+});
+
 test('inserts scaffold before the first question when the step is selected', () => {
   const operations = createOperationSpies();
 
@@ -180,6 +205,31 @@ test('inserts scaffold before the first question when the step is selected', () 
   expect(insertChildSpy.mock.calls[0]?.[2].type).toBe('summary');
   expect(insertChildSpy.mock.calls[0]?.[2].title).toBe('新铺垫');
   expect(insertChildSpy.mock.calls[0]?.[3]).toBe(0);
+});
+
+test('delegates a learning action to the runtime hook when an external handler takes over', () => {
+  const operations = createOperationSpies();
+  const onLearningActionRequest = vi.fn(
+    (_request: WorkspaceEditorLearningActionRequest) => true,
+  );
+
+  render(
+    <WorkspaceEditor
+      onLearningActionRequest={onLearningActionRequest}
+      operations={operations}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: '插入问题' }));
+
+  expect(onLearningActionRequest).toHaveBeenCalledTimes(1);
+  const request = onLearningActionRequest.mock.calls[0]?.[0];
+
+  expect(request).toBeDefined();
+  expect(request?.actionId).toBe('insert-question');
+  expect(request?.placement.nodeType).toBe('question');
+  expect(request?.placement.parentNodeId).toBe('step-state-basics');
+  expect(getOperationSpy(operations, 'insertChildNode')).not.toHaveBeenCalled();
 });
 
 test('allows choosing answer and summary when inserting nodes for a learning question', () => {
@@ -438,6 +488,73 @@ function createLowerConstraintSnapshot(): WorkspaceSnapshot {
       content: '',
       createdAt: '2026-04-27T09:00:00.000Z',
       updatedAt: '2026-04-27T09:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createScaffoldActionSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '铺垫动作',
+    workspaceId: 'workspace-scaffold-actions',
+    rootId: 'theme-scaffold-actions',
+    createdAt: '2026-04-27T09:15:00.000Z',
+    updatedAt: '2026-04-27T09:15:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-scaffold-actions',
+      title: '铺垫模块',
+      content: '',
+      createdAt: '2026-04-27T09:15:00.000Z',
+      updatedAt: '2026-04-27T09:15:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-scaffold-actions',
+    createNode({
+      type: 'plan-step',
+      id: 'step-scaffold-actions',
+      title: '铺垫步骤',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-04-27T09:15:00.000Z',
+      updatedAt: '2026-04-27T09:15:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-scaffold-actions',
+    createNode({
+      type: 'summary',
+      id: 'summary-scaffold-selected',
+      title: '铺垫：先建立概念地图',
+      content: '先解释这一步为什么存在，再进入后续问题。',
+      createdAt: '2026-04-27T09:15:00.000Z',
+      updatedAt: '2026-04-27T09:15:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-scaffold-actions',
+    createNode({
+      type: 'question',
+      id: 'question-scaffold-actions',
+      title: '后续问题',
+      content: '验证铺垫后的理解。',
+      createdAt: '2026-04-27T09:15:00.000Z',
+      updatedAt: '2026-04-27T09:15:00.000Z',
     }),
   );
 

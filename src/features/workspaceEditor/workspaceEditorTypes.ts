@@ -48,11 +48,21 @@ export interface EditorInsertTypeOption {
 export type LearningActionId =
   | 'insert-plan-step'
   | 'insert-scaffold'
+  | 'rephrase-scaffold'
+  | 'simplify-scaffold'
+  | 'add-example'
   | 'insert-question'
   | 'insert-answer'
   | 'insert-summary'
   | 'insert-judgment'
   | 'insert-resource-fragment';
+
+export interface LearningActionPlacement {
+  insertIndex: number;
+  nodeType: NonRootNode['type'];
+  parentNodeId: string;
+  title: string;
+}
 
 export interface LearningActionOption {
   hint: string;
@@ -63,6 +73,14 @@ export interface LearningActionOption {
 export interface WorkspaceEditorSelectionState {
   currentModuleId: string | null;
   selectedNodeId: string | null;
+}
+
+export interface WorkspaceEditorLearningActionRequest {
+  actionId: LearningActionId;
+  currentModuleId: string | null;
+  placement: LearningActionPlacement;
+  selectedNodeId: string;
+  tree: NodeTree;
 }
 
 export interface ExternalTreeChangeOptions {
@@ -90,6 +108,9 @@ export interface WorkspaceEditorProps {
   initialSelectedNodeId?: string;
   interactionLockReason?: string | null;
   isInteractionLocked?: boolean;
+  onLearningActionRequest?: (
+    request: WorkspaceEditorLearningActionRequest,
+  ) => boolean | void;
   operations?: WorkspaceEditorOperations;
   onSnapshotChange?: (snapshot: WorkspaceSnapshot) => void;
   onSelectionChange?: (selection: WorkspaceEditorSelectionState) => void;

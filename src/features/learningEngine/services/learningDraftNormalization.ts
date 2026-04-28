@@ -1,4 +1,5 @@
 import type {
+  LearningActionDraftActionId,
   JudgmentNodeDraft,
   LearningMode,
   ModuleNodeDraft,
@@ -184,6 +185,37 @@ export function normalizeQuestionClosure(
       providerLabel: '',
     },
   };
+}
+
+export function normalizeLearningActionDraft(
+  payload: unknown,
+  options: {
+    actionId: LearningActionDraftActionId;
+    currentQuestionTitle?: string;
+    planStepTitle?: string;
+    questionTitles?: string[];
+    hasLearnerAnswer?: boolean;
+  },
+) {
+  const rawNode = isRecord(payload) ? (payload as RawLearningNodeDraft) : {};
+
+  switch (options.actionId) {
+    case 'insert-scaffold':
+    case 'rephrase-scaffold':
+    case 'simplify-scaffold':
+    case 'add-example':
+      return normalizeScaffoldActionDraft(rawNode, {
+        actionId: options.actionId,
+        planStepTitle: options.planStepTitle,
+        questionTitles: options.questionTitles,
+      });
+    case 'insert-question':
+      return normalizeStandaloneQuestionDraft(rawNode, options);
+    case 'insert-summary':
+      return normalizeActionSummaryDraft(rawNode, options);
+    case 'insert-judgment':
+      return normalizeActionJudgmentDraft(rawNode, options);
+  }
 }
 
 function normalizeModuleDraft(
@@ -377,6 +409,72 @@ function normalizeQuestionDraft(
   };
 }
 
+function normalizeScaffoldActionDraft(
+  rawNode: RawLearningNodeDraft,
+  options: {
+    actionId: Extract<
+      LearningActionDraftActionId,
+      'insert-scaffold' | 'rephrase-scaffold' | 'simplify-scaffold' | 'add-example'
+    >;
+    planStepTitle?: string;
+    questionTitles?: string[];
+  },
+): SummaryNodeDraft {
+  const fallbackTitle = getScaffoldActionFallbackTitle(options.actionId);
+  const planStepLabel = options.planStepTitle || '当前步骤';
+  const title =
+    getText(rawNode.title) ||
+    getText(rawNode.prompt) ||
+    fallbackTitle;
+  const rawContent =
+    getText(rawNode.content) ||
+    getText(rawNode.description) ||
+    getScaffoldActionFallbackContent(options.actionId);
+
+  return {
+    type: 'summary',
+    title: normalizeIntroductionTitle(title, planStepLabel, 0),
+    content: normalizeIntroductionContent(
+      rawContent,
+      planStepLabel,
+      options.questionTitles ?? [],
+    ),
+    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+  };
+}
+
+function normalizeStandaloneQuestionDraft(
+  rawNode: RawLearningNodeDraft,
+  options: {
+    currentQuestionTitle?: string;
+    planStepTitle?: string;
+  },
+): QuestionNodeDraft {
+  const title =
+    getText(rawNode.title) ||
+    getText(rawNode.prompt) ||
+    getStandaloneQuestionFallbackTitle(
+      options.currentQuestionTitle,
+      options.planStepTitle,
+    );
+  const rawContent =
+    getText(rawNode.content) ||
+    getText(rawNode.description) ||
+    getStandaloneQuestionFallbackContent(
+      options.currentQuestionTitle,
+      options.planStepTitle,
+    );
+  const planStepLabel =
+    options.planStepTitle || options.currentQuestionTitle || '当前步骤';
+
+  return {
+    type: 'question',
+    title,
+    content: normalizeQuestionContent(rawContent, title, planStepLabel),
+    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+  };
+}
+
 function normalizeJudgmentDraft(
   rawJudgment: unknown,
   isAnswerSufficient: boolean,
@@ -425,6 +523,62 @@ function normalizeClosureSummaryDraft(
     type: 'summary',
     title: title || '总结：标准理解',
     content: normalizeClosureSummaryContent(rawContent, options),
+    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+  };
+}
+
+function normalizeActionSummaryDraft(
+  rawNode: RawLearningNodeDraft,
+  options: {
+    currentQuestionTitle?: string;
+    planStepTitle?: string;
+  },
+): SummaryNodeDraft {
+  const title = normalizeActionSummaryTitle(
+    getText(rawNode.title) || getText(rawNode.prompt),
+  );
+  const rawContent =
+    getText(rawNode.content) || getText(rawNode.description) || '';
+
+  return {
+    type: 'summary',
+    title,
+    content: normalizeActionSummaryContent(rawContent, options),
+    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+  };
+}
+
+function normalizeActionJudgmentDraft(
+  rawNode: RawLearningNodeDraft,
+  options: {
+    currentQuestionTitle?: string;
+    planStepTitle?: string;
+    hasLearnerAnswer?: boolean;
+  },
+): JudgmentNodeDraft {
+  const title = getText(rawNode.title) || getText(rawNode.prompt);
+  const rawContent =
+    getText(rawNode.content) || getText(rawNode.description) || '';
+
+  if (options.hasLearnerAnswer) {
+    const isAnswerSufficient = inferActionJudgmentSufficiency(title, rawContent);
+
+    return {
+      type: 'judgment',
+      title: normalizeJudgmentTitle(title, isAnswerSufficient),
+      content: normalizeJudgmentContent(
+        rawContent,
+        isAnswerSufficient,
+        options.currentQuestionTitle,
+      ),
+      citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+    };
+  }
+
+  return {
+    type: 'judgment',
+    title: normalizeStandaloneJudgmentTitle(title),
+    content: normalizeStandaloneJudgmentContent(rawContent, options),
     citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
   };
 }
@@ -1003,6 +1157,160 @@ function normalizeFollowUpQuestionTitle(title: string) {
   }
 
   return `追问：${title}`;
+}
+
+function normalizeActionSummaryTitle(title: string) {
+  const normalizedTitle = title || '总结：先把标准理解讲清楚';
+
+  if (/^总结[:：]/u.test(normalizedTitle)) {
+    return normalizedTitle;
+  }
+
+  return `总结：${normalizedTitle}`;
+}
+
+function normalizeActionSummaryContent(
+  rawContent: string,
+  options: {
+    currentQuestionTitle?: string;
+    planStepTitle?: string;
+  },
+) {
+  const normalizedContent = rawContent.trim();
+
+  if (isExplanatorySummaryContent(normalizedContent)) {
+    return ensureSentenceEnding(normalizedContent);
+  }
+
+  const reusableSentence =
+    normalizedContent && !looksLikeJudgmentOnlyContent(normalizedContent)
+      ? ensureSentenceEnding(normalizedContent)
+      : '';
+
+  const fallbackSentence = options.currentQuestionTitle
+    ? `围绕“${options.currentQuestionTitle}”，先把核心对象、关键关系和判断线索讲清楚，再把它们串成一条完整说明。`
+    : options.planStepTitle
+      ? `围绕“${options.planStepTitle}”，先把这一步真正要建立的理解地图讲清楚，再把容易混淆的边界补出来。`
+      : '先把当前要说明的对象、关系和判断线索讲清楚，再决定是否补充例子或边界。';
+
+  return [reusableSentence, fallbackSentence].filter(Boolean).join('');
+}
+
+function normalizeStandaloneJudgmentTitle(title: string) {
+  const normalizedTitle = title || '判断：先明确什么算答到';
+
+  if (/^判断[:：]/u.test(normalizedTitle)) {
+    return normalizedTitle;
+  }
+
+  return `判断：${normalizedTitle}`;
+}
+
+function normalizeStandaloneJudgmentContent(
+  rawContent: string,
+  options: {
+    currentQuestionTitle?: string;
+    planStepTitle?: string;
+  },
+) {
+  const normalizedContent = rawContent.trim();
+  const requirementSentence = options.currentQuestionTitle
+    ? `当前还没有现成回答，可以先把“${options.currentQuestionTitle}”什么才算答到、还需要验证什么写清楚。`
+    : options.planStepTitle
+      ? `当前还没有现成回答，可以先把“${options.planStepTitle}”这一步真正要检查的对象、关系和判断边界写清楚。`
+      : '当前还没有现成回答，可以先把什么才算答到、还需要验证什么写清楚。';
+
+  if (!normalizedContent) {
+    return requirementSentence;
+  }
+
+  const completedContent = ensureSentenceEnding(normalizedContent);
+
+  if (completedContent.includes('当前还没有现成回答')) {
+    return completedContent;
+  }
+
+  return `${requirementSentence}${completedContent}`;
+}
+
+function inferActionJudgmentSufficiency(title: string, content: string) {
+  const signalText = [title, content].filter(Boolean).join('\n');
+
+  if (containsBlockingSignal(signalText)) {
+    return false;
+  }
+
+  if (containsReadySignal(signalText)) {
+    return true;
+  }
+
+  return false;
+}
+
+function getScaffoldActionFallbackTitle(
+  actionId: Extract<
+    LearningActionDraftActionId,
+    'insert-scaffold' | 'rephrase-scaffold' | 'simplify-scaffold' | 'add-example'
+  >,
+) {
+  switch (actionId) {
+    case 'insert-scaffold':
+      return '建立当前问题的理解地图';
+    case 'rephrase-scaffold':
+      return '换个说法再解释一次';
+    case 'simplify-scaffold':
+      return '先从更基础的直觉说起';
+    case 'add-example':
+      return '先举一个具体例子';
+  }
+}
+
+function getScaffoldActionFallbackContent(
+  actionId: Extract<
+    LearningActionDraftActionId,
+    'insert-scaffold' | 'rephrase-scaffold' | 'simplify-scaffold' | 'add-example'
+  >,
+) {
+  switch (actionId) {
+    case 'insert-scaffold':
+      return '';
+    case 'rephrase-scaffold':
+      return '换个更直白的说法，把同一件事重新解释一遍，并补上最容易混淆的一处区别。';
+    case 'simplify-scaffold':
+      return '先退回到更基础的直觉或日常语言，再把它接回当前步骤，减少术语堆叠。';
+    case 'add-example':
+      return '给一个贴近当前概念的具体情境，用例子把抽象关系落到能看见的变化上。';
+  }
+}
+
+function getStandaloneQuestionFallbackTitle(
+  currentQuestionTitle?: string,
+  planStepTitle?: string,
+) {
+  if (currentQuestionTitle) {
+    return `围绕“${currentQuestionTitle}”再补一个关键问题`;
+  }
+
+  if (planStepTitle) {
+    return `${planStepTitle}：补一个关键问题`;
+  }
+
+  return '补一个关键理解点';
+}
+
+function getStandaloneQuestionFallbackContent(
+  currentQuestionTitle?: string,
+  planStepTitle?: string,
+) {
+  if (currentQuestionTitle) {
+    return `请围绕“${currentQuestionTitle}”再补一个推进理解的具体问题，优先只检查一个关键点。`;
+  }
+
+  if (planStepTitle) {
+    return `请围绕“${planStepTitle}”再补一个推进理解的具体问题，优先只检查一个关键点。`;
+  }
+
+  return '请补一个真正可判断是否答到的具体问题，优先只检查一个关键理解点。';
 }
 
 function ensureUniqueTitles<T extends { title: string }>(items: T[]) {

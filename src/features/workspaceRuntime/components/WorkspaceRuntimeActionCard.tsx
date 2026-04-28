@@ -33,10 +33,10 @@ export default function WorkspaceRuntimeActionCard({
   const shouldHighlightAnswerEvaluation =
     selectedNode?.type === 'answer' && canEvaluateQuestionAnswer;
   const sectionTitle = shouldHighlightAnswerEvaluation
-    ? '下一步：评估当前回答'
+    ? '下一步：继续学习'
     : '学习推进';
   const helpText = shouldHighlightAnswerEvaluation
-    ? '你已经写到回答节点了。点下面这一步，系统会继续沿现有闭环生成判断、总结和可选追问。'
+    ? '你已经写到回答节点了。点下面这一步，系统会检查理解、补上总结，并在需要时继续追问。'
     : '当前接的是最小学习闭环：规划步骤与铺垫讲解、拆分问题、评估回答、查看步骤完成依据。';
 
   function handleGeneratePlanSteps() {
@@ -109,14 +109,14 @@ export default function WorkspaceRuntimeActionCard({
       <p className="workspace-helpText">{helpText}</p>
       {shouldHighlightAnswerEvaluation ? (
         <div className="workspace-actionCallout" data-testid="answer-evaluation-callout">
-          <p className="workspace-kicker">回答后的主路径</p>
+          <p className="workspace-kicker">回答后的默认下一步</p>
           <button
             className="workspace-primaryAction"
             disabled={!canEvaluateQuestionAnswer}
             onClick={handleEvaluateQuestionAnswer}
             type="button"
           >
-            评估当前回答
+            继续，检查我的理解
           </button>
         </div>
       ) : null}
@@ -141,7 +141,7 @@ export default function WorkspaceRuntimeActionCard({
             onClick={handleEvaluateQuestionAnswer}
             type="button"
           >
-            评估当前回答
+            检查我的理解
           </button>
         ) : null}
         <button

@@ -2,20 +2,13 @@ import {
   getNodeOrThrow,
   isScaffoldSummaryNode,
   type NodeTree,
-  type NonRootNode,
   type TreeNode,
 } from '../../nodeDomain';
 import type {
   LearningActionId,
+  LearningActionPlacement,
   LearningActionOption,
 } from '../workspaceEditorTypes';
-
-type LearningActionPlacement = {
-  insertIndex: number;
-  nodeType: NonRootNode['type'];
-  parentNodeId: string;
-  title: string;
-};
 
 export function getLearningActionOptions(
   tree: NodeTree,
@@ -60,6 +53,10 @@ export function resolveLearningActionPlacement(
       return resolvePlanStepPlacement(selectedNode);
     case 'insert-scaffold':
       return resolveScaffoldPlacement(tree, selectedNode);
+    case 'rephrase-scaffold':
+    case 'simplify-scaffold':
+    case 'add-example':
+      return resolveScaffoldTeachingPlacement(tree, selectedNode, actionId);
     case 'insert-question':
       return resolveQuestionPlacement(tree, selectedNode);
     case 'insert-answer':
@@ -93,7 +90,13 @@ function getCandidateActionIds(
       return ['insert-answer', 'insert-summary', 'insert-judgment'];
     case 'summary':
       return isScaffoldSummaryNode(tree, selectedNode)
-        ? ['insert-question', 'insert-scaffold']
+        ? [
+            'rephrase-scaffold',
+            'simplify-scaffold',
+            'add-example',
+            'insert-question',
+            'insert-scaffold',
+          ]
         : ['insert-answer', 'insert-summary', 'insert-judgment'];
     case 'judgment':
       return ['insert-answer', 'insert-summary', 'insert-judgment'];
@@ -174,6 +177,26 @@ function resolveQuestionPlacement(
     nodeType: 'question',
     parentNodeId: selectedNode.parentId,
     title: '新问题',
+  };
+}
+
+function resolveScaffoldTeachingPlacement(
+  tree: NodeTree,
+  selectedNode: TreeNode,
+  actionId: Extract<
+    LearningActionId,
+    'rephrase-scaffold' | 'simplify-scaffold' | 'add-example'
+  >,
+): LearningActionPlacement | null {
+  if (!isScaffoldSummaryNode(tree, selectedNode) || selectedNode.parentId === null) {
+    return null;
+  }
+
+  return {
+    insertIndex: selectedNode.order + 1,
+    nodeType: 'summary',
+    parentNodeId: selectedNode.parentId,
+    title: getScaffoldTeachingTitle(actionId),
   };
 }
 
@@ -363,6 +386,12 @@ function getLearningActionLabel(actionId: LearningActionId) {
       return '插入学习步骤';
     case 'insert-scaffold':
       return '插入铺垫 / 讲解';
+    case 'rephrase-scaffold':
+      return '换个说法解释';
+    case 'simplify-scaffold':
+      return '更基础一点';
+    case 'add-example':
+      return '举个例子';
     case 'insert-question':
       return '插入问题';
     case 'insert-answer':
@@ -388,6 +417,12 @@ function buildLearningActionHint(
       return selectedNode.type === 'plan-step'
         ? '默认放到当前步骤最前面，并排在问题前。'
         : '默认接在当前铺垫后方。';
+    case 'rephrase-scaffold':
+      return '沿着当前铺垫再补一版更好懂的讲解。';
+    case 'simplify-scaffold':
+      return '先退回更基础的直觉，再接回当前问题。';
+    case 'add-example':
+      return '给这段铺垫补一个更具体的例子。';
     case 'insert-question':
       if (selectedNode.type === 'question') {
         return '默认插在当前问题后方。';
@@ -416,5 +451,21 @@ function buildLearningActionHint(
       return selectedNode.type === 'resource'
         ? '默认放到当前资料下。'
         : '默认接在当前摘录后方。';
+  }
+}
+
+function getScaffoldTeachingTitle(
+  actionId: Extract<
+    LearningActionId,
+    'rephrase-scaffold' | 'simplify-scaffold' | 'add-example'
+  >,
+) {
+  switch (actionId) {
+    case 'rephrase-scaffold':
+      return '换个说法理解';
+    case 'simplify-scaffold':
+      return '先用更基础的话说';
+    case 'add-example':
+      return '先举个具体例子';
   }
 }

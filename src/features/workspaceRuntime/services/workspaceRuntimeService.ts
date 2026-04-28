@@ -1,8 +1,10 @@
 import {
+  appendLearningNodeDraftToTree,
   appendChildQuestionsToTree,
   appendPlanStepDraftsToModule,
   appendQuestionClosureToTree,
   createCompoundQuestionSplitService,
+  createLearningActionDraftService,
   createOpenAiCompatibleProviderClient,
   createPlanStepGenerationService,
   createQuestionClosureService,
@@ -19,8 +21,10 @@ import {
   type TreeNode,
   type WorkspaceSnapshot,
 } from '../../nodeDomain';
+import type { WorkspaceEditorLearningActionRequest } from '../../workspaceEditor/workspaceEditorTypes';
 import { createInitialWorkspaceSnapshot } from '../utils/createInitialWorkspaceSnapshot';
 import {
+  buildLearningActionRuntimeContext,
   buildQuestionClosureRuntimeContext,
   collectLeafQuestionIdsUnderPlanStep,
   collectLearningReferenceCandidates,
@@ -212,8 +216,62 @@ export function createWorkspaceRuntimeService(
         message: buildQuestionClosureMessage(
           nextSnapshot.tree,
           questionNodeId,
+          previousChildIds,
           closureResult.isAnswerSufficient,
         ),
+      } satisfies WorkspaceMutationResult;
+    },
+    async generateLearningActionDraft(
+      snapshot: WorkspaceSnapshot,
+      request: WorkspaceEditorLearningActionRequest,
+      config: AiConfig,
+    ) {
+      const actionId = resolveDraftActionId(request.actionId);
+
+      if (!actionId) {
+        throw new Error('当前学习动作不走 AI 草稿生成链路。');
+      }
+
+      const providerClient = providerFactory(config);
+      const draftService = createLearningActionDraftService({
+        providerClient,
+      });
+      const context = buildLearningActionRuntimeContext(
+        snapshot.tree,
+        request.selectedNodeId,
+      );
+      const parentNode = getNodeOrThrow(snapshot.tree, request.placement.parentNodeId);
+      const previousChildIds = new Set(parentNode.childIds);
+      const result = await draftService.generate({
+        actionId,
+        topic: snapshot.workspace.title,
+        moduleTitle: context.moduleNode?.title,
+        planStepSummary: context.planStepNode?.content,
+        planStepTitle: context.planStepNode?.title,
+        currentNode: context.currentNode,
+        existingQuestionTitles: context.existingQuestionTitles,
+        introductions: context.introductions,
+        learnerAnswer: context.learnerAnswer,
+        questionPath: context.questionPath,
+        referenceCandidates: context.referenceCandidates,
+      });
+      const nextTree = appendLearningNodeDraftToTree(
+        snapshot.tree,
+        request.placement.parentNodeId,
+        result.draft,
+        request.placement.insertIndex,
+      );
+      const nextParentNode = getNodeOrThrow(nextTree, request.placement.parentNodeId);
+      const createdNodeId =
+        nextParentNode.childIds.find((childId) => !previousChildIds.has(childId)) ??
+        request.selectedNodeId;
+      const nextSnapshot = createSnapshot(nextTree, snapshot);
+
+      return {
+        snapshot: nextSnapshot,
+        nextModuleId: resolveCurrentModuleNode(nextSnapshot.tree, createdNodeId)?.id ?? null,
+        nextSelectedNodeId: createdNodeId,
+        message: buildLearningActionDraftMessage(actionId),
       } satisfies WorkspaceMutationResult;
     },
     suggestPlanStepCompletion(
@@ -509,12 +567,19 @@ function resolveNextSelectionAfterQuestionClosure(
     return collectLeafQuestionIdsUnderPlanStep(tree, siblingNode.id)[0] ?? siblingNode.id;
   }
 
+  const summaryNodeId = getLatestInsertedSummaryId(tree, questionNodeId, previousChildIds);
+
+  if (summaryNodeId) {
+    return summaryNodeId;
+  }
+
   return planStepNode.id;
 }
 
 function buildQuestionClosureMessage(
   tree: NodeTree,
   questionNodeId: string,
+  previousChildIds: Set<string>,
   isAnswerSufficient: boolean,
 ) {
   const planStepNode = findAncestorNode(tree, questionNodeId, 'plan-step');
@@ -528,14 +593,20 @@ function buildQuestionClosureMessage(
       : null;
 
   if (!isAnswerSufficient) {
-    return '已生成 judgment、summary 和新的追问，请先补上缺失点后继续回答。';
+    return '系统已检查这次回答，并补出判断、总结和下一问。先顺着新的追问继续。';
   }
+
+  const summaryNodeId = getLatestInsertedSummaryId(tree, questionNodeId, previousChildIds);
 
   if (stepStatusLabel === 'done') {
-    return '已生成 judgment 与 summary，当前问题闭环，所在 step 也已收敛为 done。';
+    return summaryNodeId
+      ? '系统已检查这次回答，并补出判断与总结；当前问题已闭环，这一步也收敛为 done。'
+      : '系统已检查这次回答，当前问题已闭环，这一步也收敛为 done。';
   }
 
-  return '已生成 judgment 与 summary，当前问题可以闭环，已推进到下一题或下一步。';
+  return summaryNodeId
+    ? '系统已检查这次回答，并补出判断与总结；你可以继续看这份总结，或直接进入下一题。'
+    : '系统已检查这次回答；你可以继续下一题或下一步。';
 }
 
 function buildQuestionText(node: Extract<TreeNode, { type: 'question' }>) {
@@ -550,4 +621,63 @@ function buildQuestionText(node: Extract<TreeNode, { type: 'question' }>) {
 
 function readSetting(value: unknown) {
   return typeof value === 'string' ? value : '';
+}
+
+function resolveDraftActionId(actionId: WorkspaceEditorLearningActionRequest['actionId']) {
+  switch (actionId) {
+    case 'insert-scaffold':
+    case 'rephrase-scaffold':
+    case 'simplify-scaffold':
+    case 'add-example':
+    case 'insert-question':
+    case 'insert-summary':
+    case 'insert-judgment':
+      return actionId;
+    default:
+      return null;
+  }
+}
+
+function getLatestInsertedSummaryId(
+  tree: NodeTree,
+  questionNodeId: string,
+  previousChildIds: Set<string>,
+) {
+  const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+  if (questionNode.type !== 'question') {
+    return null;
+  }
+
+  const insertedSummaryNodes = questionNode.childIds
+    .filter((childId) => !previousChildIds.has(childId))
+    .map((childId) => tree.nodes[childId])
+    .filter(
+      (childNode): childNode is Extract<TreeNode, { type: 'summary' }> =>
+        childNode?.type === 'summary',
+    )
+    .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
+
+  return insertedSummaryNodes[insertedSummaryNodes.length - 1]?.id ?? null;
+}
+
+function buildLearningActionDraftMessage(
+  actionId: NonNullable<ReturnType<typeof resolveDraftActionId>>,
+) {
+  switch (actionId) {
+    case 'insert-scaffold':
+      return '已补上一段新的铺垫讲解草稿。';
+    case 'rephrase-scaffold':
+      return '已沿着当前铺垫补上一版换个说法的讲解草稿。';
+    case 'simplify-scaffold':
+      return '已补上一版更基础的讲解草稿。';
+    case 'add-example':
+      return '已补上一个帮助理解的例子草稿。';
+    case 'insert-question':
+      return '已补上一个新的问题草稿。';
+    case 'insert-summary':
+      return '已补上一段可编辑的总结草稿。';
+    case 'insert-judgment':
+      return '已补上一段可编辑的判断草稿。';
+  }
 }
