@@ -60,7 +60,7 @@ export default function SearchLocatorPanel({
                 >
                   <div className="resources-resultHeader">
                     <span className="resources-resultType">
-                      {getNodeTypeText(result.nodeType)}
+                      {result.nodeTypeLabel}
                     </span>
                     <span className="resources-resultScope">
                       {getScopeLabel(scope, currentModuleTitle)}
@@ -87,27 +87,4 @@ export default function SearchLocatorPanel({
       )}
     </SectionCard>
   );
-}
-
-function getNodeTypeText(nodeType: SearchResult['nodeType']) {
-  switch (nodeType) {
-    case 'module':
-      return '模块';
-    case 'plan-step':
-      return '步骤';
-    case 'question':
-      return '问题';
-    case 'answer':
-      return '回答';
-    case 'summary':
-      return '总结';
-    case 'judgment':
-      return '判断';
-    case 'resource':
-      return '资料';
-    case 'resource-fragment':
-      return '摘录';
-    case 'theme-root':
-      return '主题';
-  }
 }

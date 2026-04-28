@@ -1,6 +1,7 @@
 export * from './builtinTags';
 export * from './nodeErrors';
 export * from './nodeFactories';
+export * from './nodeSemantics';
 export * from './nodeTypes';
 export * from './treeConstraints';
 export * from './treeDocument';

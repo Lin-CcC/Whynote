@@ -4,6 +4,7 @@ import type {
 } from '../../learningEngine';
 import {
   getNodeOrThrow,
+  isScaffoldSummaryNode,
   type ModuleNode,
   type NodeTree,
   type PlanStepNode,
@@ -155,7 +156,7 @@ function collectPlanStepIntroductions(tree: NodeTree, planStepNodeId: string) {
   for (const childId of planStepNode.childIds) {
     const childNode = tree.nodes[childId];
 
-    if (childNode?.type === 'summary') {
+    if (isScaffoldSummaryNode(tree, childId) && childNode?.type === 'summary') {
       introductions.push(formatNodeContent(childNode.title, childNode.content));
       continue;
     }

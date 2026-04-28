@@ -41,6 +41,35 @@ describe('planStepRuntimeStatusService', () => {
     expect(result.evidence.referencedNodeCount).toBe(0);
   });
 
+  it('keeps a step in todo when questions are only refined into follow-up structure', () => {
+    let tree = createPlanStepTree({
+      withIntroduction: true,
+    });
+
+    tree = insertChildNode(
+      tree,
+      'question-runtime-status',
+      createNode({
+        type: 'question',
+        id: 'question-runtime-status-follow-up',
+        title: 'Follow-up question',
+        content: 'Still only question scaffolding, without learner evidence.',
+        createdAt: '2026-04-28T00:00:00.000Z',
+        updatedAt: '2026-04-28T00:00:00.000Z',
+      }),
+    );
+
+    const result = resolvePlanStepRuntimeStatus(tree, 'step-runtime-status');
+
+    expect(result.suggestedStatus).toBe('todo');
+    expect(result.evidence.refinedQuestionCount).toBe(1);
+    expect(result.evidence.answerCount).toBe(0);
+    expect(result.evidence.summaryCount).toBe(0);
+    expect(result.evidence.judgmentCount).toBe(0);
+    expect(result.evidence.referencedNodeCount).toBe(0);
+    expect(result.reasonSummary).toContain('骨架阶段');
+  });
+
   it('moves a step to doing once post-answer learning evidence starts citing resources', () => {
     let tree = createPlanStepTree({
       withIntroduction: true,

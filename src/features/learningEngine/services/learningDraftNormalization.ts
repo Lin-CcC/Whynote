@@ -33,6 +33,10 @@ const QUESTION_TITLE_SUFFIXES = [
   '需要解释什么',
   '如何判断你真的理解了',
 ] as const;
+const MIN_INTRODUCTION_LENGTH = 42;
+const MIN_INTRODUCTION_SENTENCE_COUNT = 2;
+const MIN_QUESTION_GUIDANCE_LENGTH = 18;
+const MIN_SUMMARY_EXPLANATION_LENGTH = 20;
 
 interface RawModuleDraft {
   title?: unknown;
@@ -146,19 +150,28 @@ export function normalizePlanStepDrafts(
 
 export function normalizeQuestionClosure(
   payload: unknown,
+  options?: {
+    currentQuestionTitle?: string;
+  },
 ): QuestionClosureResult {
   const rawPayload = isRecord(payload) ? (payload as RawQuestionClosurePayload) : {};
   const isAnswerSufficient = resolveAnswerSufficiency(rawPayload);
   const judgment = normalizeJudgmentDraft(
     rawPayload.judgment ?? rawPayload.evaluation,
     isAnswerSufficient,
+    options?.currentQuestionTitle,
   );
   const summary = normalizeClosureSummaryDraft(
     rawPayload.summary ?? rawPayload.explanation,
+    {
+      currentQuestionTitle: options?.currentQuestionTitle,
+      isAnswerSufficient,
+    },
   );
   const followUpQuestions = normalizeFollowUpQuestionDrafts(
     rawPayload,
     isAnswerSufficient,
+    options?.currentQuestionTitle,
   );
 
   return {
@@ -206,13 +219,18 @@ function normalizePlanStepDraft(
   const content =
     getText(rawPlanStep.content) || getText(rawPlanStep.description);
   const normalizedTitle = title || createPlanStepTitle(moduleTitle, index);
+  const questions = normalizeQuestionDrafts(rawPlanStep, normalizedTitle);
 
   return {
     type: 'plan-step',
     title: normalizedTitle,
     content,
-    introductions: normalizeIntroductionDrafts(rawPlanStep, normalizedTitle),
-    questions: normalizeQuestionDrafts(rawPlanStep, normalizedTitle),
+    introductions: normalizeIntroductionDrafts(
+      rawPlanStep,
+      normalizedTitle,
+      questions.map((question) => question.title),
+    ),
+    questions,
     status: 'todo',
   };
 }
@@ -243,13 +261,17 @@ function createFallbackPlanStepDraft(
   index: number,
 ): PlanStepNodeDraft {
   const title = createPlanStepTitle(moduleTitle, index);
+  const questions = createFallbackQuestionDrafts(title);
 
   return {
     type: 'plan-step',
     title,
     content: '',
-    introductions: createFallbackIntroductionDrafts(title),
-    questions: createFallbackQuestionDrafts(title),
+    introductions: createFallbackIntroductionDrafts(
+      title,
+      questions.map((question) => question.title),
+    ),
+    questions,
     status: 'todo',
   };
 }
@@ -257,6 +279,7 @@ function createFallbackPlanStepDraft(
 function normalizeIntroductionDrafts(
   rawPlanStep: RawPlanStepDraft,
   planStepTitle: string,
+  questionTitles: string[],
 ) {
   const rawIntroductions = extractRawLearningNodeDrafts(
     rawPlanStep.introductions ??
@@ -264,11 +287,16 @@ function normalizeIntroductionDrafts(
       rawPlanStep.prerequisiteQuestions,
   );
   const normalizedIntroductions = rawIntroductions.map((rawIntroduction, index) =>
-    normalizeIntroductionDraft(rawIntroduction, index, planStepTitle),
+    normalizeIntroductionDraft(
+      rawIntroduction,
+      index,
+      planStepTitle,
+      questionTitles,
+    ),
   );
 
   if (normalizedIntroductions.length === 0) {
-    return createFallbackIntroductionDrafts(planStepTitle);
+    return createFallbackIntroductionDrafts(planStepTitle, questionTitles);
   }
 
   ensureUniqueTitles(normalizedIntroductions);
@@ -300,20 +328,25 @@ function normalizeIntroductionDraft(
   rawIntroduction: RawLearningNodeDraft,
   index: number,
   planStepTitle: string,
+  questionTitles: string[],
 ): SummaryNodeDraft {
   const rawTitle =
     getText(rawIntroduction.title) ||
     getText(rawIntroduction.prompt) ||
     `建立前置理解 ${String(index + 1)}`;
-  const content =
+  const rawContent =
     getText(rawIntroduction.content) ||
     getText(rawIntroduction.description) ||
-    '先说明这个 step 在解决什么问题、涉及哪些关键概念，再进入后续问题。';
+    '';
 
   return {
     type: 'summary',
     title: normalizeIntroductionTitle(rawTitle, planStepTitle, index),
-    content,
+    content: normalizeIntroductionContent(
+      rawContent,
+      planStepTitle,
+      questionTitles,
+    ),
     citations: normalizeCitationDrafts(
       rawIntroduction.citations ?? rawIntroduction.references,
     ),
@@ -337,7 +370,7 @@ function normalizeQuestionDraft(
   return {
     type: 'question',
     title,
-    content,
+    content: normalizeQuestionContent(content, title, planStepTitle),
     citations: normalizeCitationDrafts(
       rawQuestion.citations ?? rawQuestion.references,
     ),
@@ -347,40 +380,51 @@ function normalizeQuestionDraft(
 function normalizeJudgmentDraft(
   rawJudgment: unknown,
   isAnswerSufficient: boolean,
+  currentQuestionTitle?: string,
 ): JudgmentNodeDraft {
   const rawNode = isRecord(rawJudgment)
     ? (rawJudgment as RawLearningNodeDraft)
     : {};
   const title = getText(rawNode.title);
-  const content =
+  const rawContent =
     getText(rawNode.content) ||
     getText(rawNode.description) ||
     (isAnswerSufficient
-      ? '你的回答已经覆盖当前问题的关键点，可以进入下一步。'
-      : '你的回答还不完整，关键点没有全部答到，需要继续补充。');
+      ? '可以进入下一步。'
+      : '需要继续补充。');
 
   return {
     type: 'judgment',
     title: normalizeJudgmentTitle(title, isAnswerSufficient),
-    content,
+    content: normalizeJudgmentContent(
+      rawContent,
+      isAnswerSufficient,
+      currentQuestionTitle,
+    ),
     citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
   };
 }
 
-function normalizeClosureSummaryDraft(rawSummary: unknown): SummaryNodeDraft {
+function normalizeClosureSummaryDraft(
+  rawSummary: unknown,
+  options: {
+    currentQuestionTitle?: string;
+    isAnswerSufficient: boolean;
+  },
+): SummaryNodeDraft {
   const rawNode = isRecord(rawSummary)
     ? (rawSummary as RawLearningNodeDraft)
     : {};
   const title = getText(rawNode.title);
-  const content =
+  const rawContent =
     getText(rawNode.content) ||
     getText(rawNode.description) ||
-    '请把更准确的标准理解补全为一段可以直接复用的讲解。';
+    '';
 
   return {
     type: 'summary',
     title: title || '总结：标准理解',
-    content,
+    content: normalizeClosureSummaryContent(rawContent, options),
     citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
   };
 }
@@ -388,6 +432,7 @@ function normalizeClosureSummaryDraft(rawSummary: unknown): SummaryNodeDraft {
 function normalizeFollowUpQuestionDrafts(
   rawPayload: RawQuestionClosurePayload,
   isAnswerSufficient: boolean,
+  currentQuestionTitle?: string,
 ) {
   if (isAnswerSufficient) {
     return [] satisfies QuestionNodeDraft[];
@@ -398,21 +443,16 @@ function normalizeFollowUpQuestionDrafts(
       rawPayload.followUps ??
       rawPayload.nextQuestions,
   );
-  const normalizedQuestions = rawQuestions.map((rawQuestion, index) => ({
-    ...normalizeQuestionDraft(rawQuestion, index, '补充回答'),
-    title: normalizeFollowUpQuestionTitle(
-      getText(rawQuestion.title) ||
-        getText(rawQuestion.prompt) ||
-        `补充问题 ${String(index + 1)}`,
-    ),
-  }));
+  const normalizedQuestions = rawQuestions.map((rawQuestion, index) =>
+    normalizeFollowUpQuestionDraft(rawQuestion, index, currentQuestionTitle),
+  );
 
   if (normalizedQuestions.length === 0) {
     return [
       {
         type: 'question',
         title: '追问：补上缺失的关键点',
-        content: '请只补充这次判断里指出的缺失点，不需要重复已经答对的部分。',
+        content: normalizeFollowUpQuestionContent('', currentQuestionTitle),
         citations: [],
       },
     ] satisfies QuestionNodeDraft[];
@@ -425,13 +465,13 @@ function normalizeFollowUpQuestionDrafts(
 
 function createFallbackIntroductionDrafts(
   planStepTitle: string,
+  questionTitles: string[],
 ): SummaryNodeDraft[] {
   return [
     {
       type: 'summary',
       title: normalizeIntroductionTitle('建立当前问题的基本图景', planStepTitle, 0),
-      content:
-        '先交代这个 step 为什么重要、需要抓住哪两个核心概念，再进入后面的具体问题。',
+      content: normalizeIntroductionContent('', planStepTitle, questionTitles),
       citations: [],
     },
   ];
@@ -601,6 +641,348 @@ function normalizeIntroductionTitle(
   }
 
   return `铺垫：${normalizedTitle}`;
+}
+
+function normalizeIntroductionContent(
+  rawContent: string,
+  planStepTitle: string,
+  questionTitles: string[],
+) {
+  const normalizedContent = rawContent.trim();
+
+  if (isSubstantialIntroductionContent(normalizedContent)) {
+    return ensureIntroductionQuestionBridge(normalizedContent, questionTitles);
+  }
+
+  const focusSentence = normalizedContent
+    ? ensureSentenceEnding(normalizedContent)
+    : '先知道这一步在当前主题里要解决什么问题，而不是直接记零散结论。';
+
+  return ensureIntroductionQuestionBridge(
+    [
+    `这一小步先要建立“${planStepTitle}”的整体图景，知道它在当前主题里处于什么位置、为什么值得先学。`,
+    focusSentence,
+    buildIntroductionQuestionBridge(questionTitles),
+    ].join(''),
+    questionTitles,
+  );
+}
+
+function isSubstantialIntroductionContent(content: string) {
+  if (!content) {
+    return false;
+  }
+
+  return (
+    content.length >= MIN_INTRODUCTION_LENGTH &&
+    countSentences(content) >= MIN_INTRODUCTION_SENTENCE_COUNT
+  );
+}
+
+function countSentences(content: string) {
+  return content
+    .split(/[。！？!?；;]/u)
+    .map((segment) => segment.trim())
+    .filter(Boolean).length;
+}
+
+function ensureSentenceEnding(content: string) {
+  if (!content) {
+    return '';
+  }
+
+  if (/[。！？!?；]$/u.test(content)) {
+    return content;
+  }
+
+  return `${content}。`;
+}
+
+function ensureIntroductionQuestionBridge(
+  content: string,
+  questionTitles: string[],
+) {
+  if (!content) {
+    return content;
+  }
+
+  if (
+    /(接下来|后面会|继续追问|继续讨论|下面会问)/u.test(content) ||
+    questionTitles.some((title) => content.includes(title))
+  ) {
+    return content;
+  }
+
+  return `${ensureSentenceEnding(content)}${buildIntroductionQuestionBridge(questionTitles)}`;
+}
+
+function buildIntroductionQuestionBridge(questionTitles: string[]) {
+  const normalizedQuestionTitles = questionTitles
+    .map((title) => title.trim())
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (normalizedQuestionTitles.length === 0) {
+    return '接下来系统会继续追问这里的关键机制、判断标准和使用边界，所以先把核心对象、关键关系和判断线索放到同一张理解地图里。';
+  }
+
+  if (normalizedQuestionTitles.length === 1) {
+    return `接下来会围绕“${normalizedQuestionTitles[0]}”继续追问，所以先把核心对象、关键关系和判断线索放到同一张理解地图里。`;
+  }
+
+  return `接下来会围绕“${normalizedQuestionTitles[0]}”和“${normalizedQuestionTitles[1]}”继续追问，所以先把这些概念之间的关系、因果线索和判断边界理顺。`;
+}
+
+function normalizeQuestionContent(
+  rawContent: string,
+  questionTitle: string,
+  planStepTitle: string,
+) {
+  const normalizedContent = rawContent.trim();
+
+  if (isSpecificQuestionContent(normalizedContent)) {
+    return ensureSentenceEnding(normalizedContent);
+  }
+
+  const detailSentence =
+    normalizedContent && !looksGenericQuestionContent(normalizedContent)
+      ? ensureSentenceEnding(normalizedContent)
+      : '';
+
+  return [
+    detailSentence,
+    `请围绕“${questionTitle}”，结合“${planStepTitle}”这一步要解决的问题，说明最关键的对象、关系或判断标准，并尽量解释为什么会这样，而不是只复述名词或空泛列项。`,
+  ]
+    .filter(Boolean)
+    .join('');
+}
+
+function isSpecificQuestionContent(content: string) {
+  if (!content) {
+    return false;
+  }
+
+  return (
+    content.length >= MIN_QUESTION_GUIDANCE_LENGTH &&
+    !looksGenericQuestionContent(content)
+  );
+}
+
+function looksGenericQuestionContent(content: string) {
+  const normalizedContent = content.trim();
+
+  if (!normalizedContent) {
+    return true;
+  }
+
+  return (
+    normalizedContent.length < 12 ||
+    normalizedContent === '请结合当前 step，用自己的话回答这个具体问题。' ||
+    [
+      '围绕关键问题继续学习',
+      '谈谈你的理解',
+      '请谈谈理解',
+      '请解释这个问题',
+      '请回答这个问题',
+      '请总结以上内容',
+      '总结全部内容',
+      '列举几个方面',
+      '展开说明',
+      '继续学习',
+      '简单回答',
+    ].some((keyword) => normalizedContent.includes(keyword))
+  );
+}
+
+function normalizeJudgmentContent(
+  rawContent: string,
+  isAnswerSufficient: boolean,
+  currentQuestionTitle?: string,
+) {
+  const normalizedContent = rawContent.trim();
+  const statusSentence = isAnswerSufficient
+    ? buildReadyJudgmentSentence(currentQuestionTitle)
+    : buildBlockingJudgmentSentence(currentQuestionTitle);
+
+  if (!normalizedContent) {
+    return statusSentence;
+  }
+
+  const completedContent = ensureSentenceEnding(normalizedContent);
+  const hasExplicitStatus = isAnswerSufficient
+    ? containsReadySignal(completedContent)
+    : containsBlockingSignal(completedContent);
+
+  if (hasExplicitStatus) {
+    return completedContent;
+  }
+
+  return `${statusSentence}${completedContent}`;
+}
+
+function normalizeClosureSummaryContent(
+  rawContent: string,
+  options: {
+    currentQuestionTitle?: string;
+    isAnswerSufficient: boolean;
+  },
+) {
+  const normalizedContent = rawContent.trim();
+
+  if (isExplanatorySummaryContent(normalizedContent)) {
+    return ensureSentenceEnding(normalizedContent);
+  }
+
+  const reusableSentence =
+    normalizedContent && !looksLikeJudgmentOnlyContent(normalizedContent)
+      ? ensureSentenceEnding(normalizedContent)
+      : '';
+  const questionLabel = options.currentQuestionTitle
+    ? `围绕“${options.currentQuestionTitle}”`
+    : '围绕当前问题';
+  const explanationSentence = options.isAnswerSufficient
+    ? `${questionLabel}，更稳妥的理解是把核心对象、关键关系和判断线索讲清楚，并说明它们为什么成立，而不是只给结论。`
+    : `${questionLabel}，更稳妥的理解是先把还缺的核心对象、关键关系和判断线索补齐，再进入下一步，而不是只停在“答案差不多了”的判断上。`;
+
+  return [reusableSentence, explanationSentence].filter(Boolean).join('');
+}
+
+function isExplanatorySummaryContent(content: string) {
+  if (!content) {
+    return false;
+  }
+
+  return (
+    !looksLikeJudgmentOnlyContent(content) &&
+    (content.length >= MIN_SUMMARY_EXPLANATION_LENGTH ||
+      containsExplanatorySignal(content) ||
+      countSentences(content) >= 2)
+  );
+}
+
+function looksLikeJudgmentOnlyContent(content: string) {
+  if (!content) {
+    return true;
+  }
+
+  return (
+    (containsBlockingSignal(content) || containsReadySignal(content)) &&
+    !containsExplanatorySignal(content)
+  );
+}
+
+function containsExplanatorySignal(content: string) {
+  return [
+    '因为',
+    '所以',
+    '意味着',
+    '关键在于',
+    '本质上',
+    '也就是',
+    '需要把',
+    '可以理解为',
+    '核心是',
+    '换句话说',
+  ].some((keyword) => content.includes(keyword));
+}
+
+function normalizeFollowUpQuestionDraft(
+  rawQuestion: RawLearningNodeDraft,
+  index: number,
+  currentQuestionTitle?: string,
+): QuestionNodeDraft {
+  const title = normalizeFollowUpQuestionTitle(
+    getText(rawQuestion.title) ||
+      getText(rawQuestion.prompt) ||
+      `补充问题 ${String(index + 1)}`,
+  );
+  const rawContent =
+    getText(rawQuestion.content) || getText(rawQuestion.description) || '';
+
+  return {
+    type: 'question',
+    title,
+    content: normalizeFollowUpQuestionContent(rawContent, currentQuestionTitle),
+    citations: normalizeCitationDrafts(
+      rawQuestion.citations ?? rawQuestion.references,
+    ),
+  };
+}
+
+function normalizeFollowUpQuestionContent(
+  rawContent: string,
+  currentQuestionTitle?: string,
+) {
+  const normalizedContent = rawContent.trim();
+
+  if (isSpecificFollowUpQuestionContent(normalizedContent)) {
+    return ensureSentenceEnding(normalizedContent);
+  }
+
+  const detailSentence =
+    normalizedContent && !looksGenericFollowUpQuestionContent(normalizedContent)
+      ? ensureSentenceEnding(normalizedContent)
+      : '';
+  const questionLabel = currentQuestionTitle
+    ? `“${currentQuestionTitle}”`
+    : '当前问题';
+
+  return [
+    detailSentence,
+    `请只补上${questionLabel}里还缺的关键点，优先说明缺失的因果关系、判断条件或使用边界，不需要重复已经答对的部分。`,
+  ]
+    .filter(Boolean)
+    .join('');
+}
+
+function isSpecificFollowUpQuestionContent(content: string) {
+  if (!content) {
+    return false;
+  }
+
+  return (
+    content.length >= MIN_QUESTION_GUIDANCE_LENGTH &&
+    !looksGenericFollowUpQuestionContent(content)
+  );
+}
+
+function looksGenericFollowUpQuestionContent(content: string) {
+  const normalizedContent = content.trim();
+
+  if (!normalizedContent) {
+    return true;
+  }
+
+  return (
+    normalizedContent.length < 14 ||
+    looksGenericQuestionContent(normalizedContent) ||
+    [
+      '继续补充',
+      '再想想',
+      '补充说明',
+      '重新回答',
+      '再回答一次',
+      '继续回答',
+      '补上缺失点',
+      '还有遗漏',
+    ].some((keyword) => normalizedContent.includes(keyword))
+  );
+}
+
+function buildReadyJudgmentSentence(currentQuestionTitle?: string) {
+  if (!currentQuestionTitle) {
+    return '这次回答已答到当前问题，可以进入下一步。';
+  }
+
+  return `这次回答已答到“${currentQuestionTitle}”的关键点，可以进入下一步。`;
+}
+
+function buildBlockingJudgmentSentence(currentQuestionTitle?: string) {
+  if (!currentQuestionTitle) {
+    return '这次回答还不完整，当前问题里仍有关键点没有答到。';
+  }
+
+  return `这次回答还不完整，“${currentQuestionTitle}”里仍有关键点没有答到。`;
 }
 
 function normalizeJudgmentTitle(title: string, isAnswerSufficient: boolean) {

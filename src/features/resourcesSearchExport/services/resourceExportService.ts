@@ -1,4 +1,5 @@
 import {
+  getDisplayNodeTypeLabel,
   getNodeOrThrow,
   type NodeTree,
   type TreeNode,
@@ -312,7 +313,7 @@ function renderNodeBlocks(
       blocks.push({
         kind: 'heading',
         level: options.level,
-        text: `${getExportLabel(node)}：${node.title}`,
+        text: `${getExportLabel(tree, node)}：${node.title}`,
       });
 
       if (node.content.trim()) {
@@ -396,18 +397,14 @@ function sanitizeFileStem(fileStem: string) {
     .replace(/\s+/g, '-');
 }
 
-function getExportLabel(node: TreeNode) {
+function getExportLabel(tree: NodeTree, node: TreeNode) {
   switch (node.type) {
     case 'module':
-      return '模块';
     case 'question':
-      return '问题';
     case 'answer':
-      return '回答';
     case 'summary':
-      return '总结';
     case 'judgment':
-      return '判断';
+      return getDisplayNodeTypeLabel(tree, node);
     default:
       return node.type;
   }
