@@ -351,7 +351,10 @@ export function createWorkspaceRuntimeService(
         snapshot: nextSnapshot,
         nextModuleId: resolveCurrentModuleNode(nextSnapshot.tree, createdNodeId)?.id ?? null,
         nextSelectedNodeId: createdNodeId,
-        message: buildLearningActionDraftMessage(actionId),
+        message: buildLearningActionDraftMessage(
+          actionId,
+          result.metadata.providerLabel === 'local-fallback',
+        ),
       } satisfies WorkspaceMutationResult;
     },
     suggestPlanStepCompletion(
@@ -817,7 +820,27 @@ function indexResourceMetadataByNodeId(
 
 function buildLearningActionDraftMessage(
   actionId: NonNullable<ReturnType<typeof resolveDraftActionId>>,
+  isLocalFallback = false,
 ) {
+  if (isLocalFallback) {
+    switch (actionId) {
+      case 'insert-scaffold':
+        return 'AI 暂时不可用，已先补上一段可编辑的本地铺垫草稿。';
+      case 'rephrase-scaffold':
+        return 'AI 暂时不可用，已先补上一版可编辑的本地改写草稿。';
+      case 'simplify-scaffold':
+        return 'AI 暂时不可用，已先补上一版可编辑的本地简化讲解草稿。';
+      case 'add-example':
+        return 'AI 暂时不可用，已先补上一个可编辑的本地例子草稿。';
+      case 'insert-question':
+        return 'AI 暂时不可用，已先补上一个可编辑的本地问题草稿。';
+      case 'insert-summary':
+        return 'AI 暂时不可用，已先补上一段可编辑的本地总结草稿。';
+      case 'insert-judgment':
+        return 'AI 暂时不可用，已先补上一段可编辑的本地判断草稿。';
+    }
+  }
+
   switch (actionId) {
     case 'insert-scaffold':
       return '已补上一段新的铺垫讲解草稿。';

@@ -167,9 +167,13 @@ function buildHttpErrorMessage(response: Response, rawBody: string) {
   const statusLabel = statusText
     ? `${String(response.status)} ${statusText}`
     : String(response.status);
+  const normalizedBodyMessage = normalizeProviderFailureMessage(
+    response.status,
+    bodyMessage,
+  );
 
-  if (bodyMessage) {
-    return `AI 服务请求失败（${statusLabel}）：${bodyMessage}`;
+  if (normalizedBodyMessage) {
+    return `AI 服务请求失败（${statusLabel}）：${normalizedBodyMessage}`;
   }
 
   return `AI 服务请求失败（${statusLabel}）。`;
@@ -198,6 +202,38 @@ function extractErrorMessageFromBody(rawBody: string) {
   } catch {
     return truncateForError(rawBody);
   }
+}
+
+function normalizeProviderFailureMessage(status: number, bodyMessage: string) {
+  if (!bodyMessage) {
+    return '';
+  }
+
+  const normalizedMessage = bodyMessage.toLowerCase();
+
+  if (
+    status === 429 &&
+    (
+      normalizedMessage.includes('quota') ||
+      normalizedMessage.includes('billing') ||
+      normalizedMessage.includes('insufficient_quota') ||
+      normalizedMessage.includes('exceeded your current quota')
+    )
+  ) {
+    return '当前 AI 配额已用尽，请检查 provider 的 plan / billing，或切换到仍可用的模型与密钥。';
+  }
+
+  if (
+    status === 429 &&
+    (
+      normalizedMessage.includes('rate limit') ||
+      normalizedMessage.includes('too many requests')
+    )
+  ) {
+    return '当前 AI 请求过于频繁，请稍后重试。';
+  }
+
+  return bodyMessage;
 }
 
 function truncateForError(value: string, maxLength = 160) {
