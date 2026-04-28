@@ -284,6 +284,110 @@ test('re-evaluates only the currently selected answer when a question already ha
   ).toHaveAttribute('data-node-selected', 'true');
 });
 
+test('scopes learning-action drafts to the currently selected answer instead of aggregating sibling answers', async () => {
+  let observedLearningActionPrompt = '';
+  const dependencies = await createPreloadedDependencies(
+    createMultiAnswerClosureSnapshot(),
+    createMockProviderClient({
+      'learning-action-draft': (request: AiProviderObjectRequest<unknown>) => {
+        const userMessage = request.messages.find((message) => message.role === 'user');
+
+        observedLearningActionPrompt = userMessage?.content ?? '';
+
+        return {
+          title: '总结：只围绕第一版回答',
+          content: '只围绕第一版回答补上缺失的因果关系。',
+        };
+      },
+    }),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.focus(screen.getByLabelText('第一版回答 标题'));
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: '插入总结' })).toBeEnabled();
+  });
+  fireEvent.click(screen.getByRole('button', { name: '插入总结' }));
+
+  expect(
+    await screen.findByDisplayValue('总结：只围绕第一版回答'),
+  ).toBeInTheDocument();
+  expect(observedLearningActionPrompt).toContain('现有回答');
+  expect(observedLearningActionPrompt).toContain('第一版回答');
+  expect(observedLearningActionPrompt).toContain('因为 React 会先把更新合并起来。');
+  expect(observedLearningActionPrompt).not.toContain('第二版回答');
+  expect(observedLearningActionPrompt).not.toContain(
+    '因为同一轮事件里的更新会统一提交，所以能减少重复渲染。',
+  );
+});
+
+test('views the explanation that belongs to the currently selected answer round', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createMultiRoundClosureSnapshot(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.focus(screen.getByLabelText('第一版回答 标题'));
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: '查看答案解析' })).toBeEnabled();
+  });
+  fireEvent.click(screen.getByRole('button', { name: '查看答案解析' }));
+
+  expect(
+    await screen.findByDisplayValue('标准理解：第一版回答'),
+  ).toBeInTheDocument();
+  expect(
+    screen
+      .getByDisplayValue('标准理解：第一版回答')
+      .closest('[data-testid^="editor-node-"]'),
+  ).toHaveAttribute('data-node-selected', 'true');
+  expect(
+    screen
+      .getByDisplayValue('标准理解：第二版回答')
+      .closest('[data-testid^="editor-node-"]'),
+  ).not.toHaveAttribute('data-node-selected', 'true');
+});
+
+test('keeps judgment nodes actionable within the current answer revision path', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createMultiRoundClosureSnapshot(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(screen.getByRole('button', { name: /第一版回答还不完整/ }));
+
+  expect(await screen.findByTestId('judgment-inline-actions')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '给我提示' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '查看答案解析' })).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: '回到当前回答继续修改' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: '重新评估当前回答' }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '回到当前回答继续修改' }));
+  expect(
+    screen
+      .getByDisplayValue('第一版回答')
+      .closest('[data-testid^="editor-node-"]'),
+  ).toHaveAttribute('data-node-selected', 'true');
+
+  fireEvent.click(screen.getByRole('button', { name: /第一版回答还不完整/ }));
+  fireEvent.click(screen.getByRole('button', { name: '查看答案解析' }));
+  expect(
+    screen
+      .getByDisplayValue('标准理解：第一版回答')
+      .closest('[data-testid^="editor-node-"]'),
+  ).toHaveAttribute('data-node-selected', 'true');
+});
+
 test('extends a scaffold with a simpler follow-up explanation draft', async () => {
   const dependencies = await createPreloadedDependencies(
     createAnswerClosureSnapshot(),
@@ -693,6 +797,79 @@ function createMultiAnswerClosureSnapshot(): WorkspaceSnapshot {
     firstAnswerNode.title = '第一版回答';
     firstAnswerNode.content = '因为 React 会先把更新合并起来。';
   }
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
+  const snapshot = createAnswerClosureSnapshot();
+  let tree = snapshot.tree;
+
+  const firstAnswerNode = tree.nodes['answer-answer-closure'];
+
+  if (firstAnswerNode?.type === 'answer') {
+    firstAnswerNode.title = '第一版回答';
+    firstAnswerNode.content = '因为 React 会先把更新合并起来。';
+  }
+
+  tree = insertChildNode(
+    tree,
+    'question-answer-closure',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-answer-closure-v1',
+      title: '判断：第一版回答还不完整',
+      content: '第一版回答还没有把为什么能减少重复渲染讲清楚。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-answer-closure',
+    createNode({
+      type: 'summary',
+      id: 'summary-answer-closure-v1',
+      title: '标准理解：第一版回答',
+      content: '先补上“合并更新如何减少重复渲染”的因果链条。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-answer-closure',
+    createNode({
+      type: 'answer',
+      id: 'answer-answer-closure-v2',
+      title: '第二版回答',
+      content: '因为同一轮事件里的更新会统一提交，所以能减少重复渲染。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-answer-closure',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-answer-closure-v2',
+      title: '判断：第二版回答已说明因果关系',
+      content: '第二版回答已经把更新节奏和减少重复渲染的关系补全了。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-answer-closure',
+    createNode({
+      type: 'summary',
+      id: 'summary-answer-closure-v2',
+      title: '标准理解：第二版回答',
+      content: '第二版已经覆盖了为什么统一提交能减少重复渲染。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
 
   return {
     ...snapshot,

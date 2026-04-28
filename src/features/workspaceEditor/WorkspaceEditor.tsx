@@ -16,6 +16,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
     createModule: workspaceEditor.createModule,
     currentModule: workspaceEditor.currentModule,
     currentModuleId: workspaceEditor.currentModuleId,
+    runLearningAction: workspaceEditor.runLearningAction,
     selectNode: workspaceEditor.selectNode,
     selectedNode: workspaceEditor.selectedNode,
     selectedNodeId: workspaceEditor.selectedNodeId,

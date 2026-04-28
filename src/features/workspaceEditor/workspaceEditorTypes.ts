@@ -96,6 +96,7 @@ export interface WorkspaceEditorRenderContext
   ) => void;
   createModule: () => void;
   currentModule: TreeNode | null;
+  runLearningAction: (actionId: LearningActionId) => void;
   selectedNode: TreeNode | null;
   selectNode: (nodeId: string) => void;
   tree: NodeTree;

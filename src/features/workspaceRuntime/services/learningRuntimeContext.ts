@@ -166,6 +166,7 @@ export function getLatestQuestionAnswerNodeId(
 export function getLatestQuestionAnswerExplanationNodeId(
   tree: NodeTree,
   questionNodeId: string,
+  answerNodeId?: string,
 ) {
   const questionNode = getNodeOrThrow(tree, questionNodeId);
 
@@ -173,15 +174,11 @@ export function getLatestQuestionAnswerExplanationNodeId(
     return null;
   }
 
-  const summaryNodes = questionNode.childIds
-    .map((childId) => tree.nodes[childId])
-    .filter(
-      (node): node is Extract<TreeNode, { type: 'summary' }> =>
-        node?.type === 'summary',
-    )
-    .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
+  if (!answerNodeId) {
+    return null;
+  }
 
-  return summaryNodes[summaryNodes.length - 1]?.id ?? null;
+  return getLatestSummaryNodeIdForAnswer(tree, questionNode.id, answerNodeId);
 }
 
 export function countQuestionFollowUpNodes(tree: NodeTree, questionNodeId: string) {
@@ -219,18 +216,34 @@ export function resolveQuestionAnswerEvaluationTarget(
     return null;
   }
 
-  if (selectedNode.type !== 'answer' || selectedNode.parentId === null) {
+  if (selectedNode.type === 'answer' && selectedNode.parentId !== null) {
+    const parentNode = tree.nodes[selectedNode.parentId];
+
+    if (
+      parentNode?.type === 'question' &&
+      canEvaluateQuestionAnswer(tree, parentNode.id, selectedNode.id)
+    ) {
+      return {
+        answerNodeId: selectedNode.id,
+        questionNodeId: parentNode.id,
+      };
+    }
+  }
+
+  if (selectedNode.type !== 'judgment' || selectedNode.parentId === null) {
     return null;
   }
 
   const parentNode = tree.nodes[selectedNode.parentId];
+  const answerNode = resolveScopedAnswerNode(tree, selectedNode.id);
 
   if (
     parentNode?.type === 'question' &&
-    canEvaluateQuestionAnswer(tree, parentNode.id, selectedNode.id)
+    answerNode &&
+    canEvaluateQuestionAnswer(tree, parentNode.id, answerNode.id)
   ) {
     return {
-      answerNodeId: selectedNode.id,
+      answerNodeId: answerNode.id,
       questionNodeId: parentNode.id,
     };
   }
@@ -270,6 +283,7 @@ export function buildLearningActionRuntimeContext(
   const selectedNode = getNodeOrThrow(tree, selectedNodeId);
   const planStepNode = findAncestorNode(tree, selectedNodeId, 'plan-step');
   const questionNode = getQuestionContextNode(tree, selectedNodeId);
+  const answerNode = resolveScopedAnswerNode(tree, selectedNodeId);
   const referenceCandidates = collectLearningReferenceCandidates(tree);
 
   return {
@@ -285,7 +299,11 @@ export function buildLearningActionRuntimeContext(
       ? collectDirectQuestionTitles(tree, planStepNode.id)
       : [],
     introductions: planStepNode ? collectPlanStepIntroductions(tree, planStepNode.id) : [],
-    learnerAnswer: questionNode ? collectQuestionAnswerText(tree, questionNode.id) : '',
+    learnerAnswer: answerNode
+      ? formatAnswerForEvaluation(answerNode)
+      : questionNode
+        ? collectQuestionAnswerText(tree, questionNode.id)
+        : '',
     moduleNode: findAncestorNode(tree, selectedNodeId, 'module'),
     planStepNode,
     questionPath: questionNode ? collectQuestionPath(tree, questionNode.id) : [],
@@ -390,6 +408,100 @@ function getQuestionContextNode(tree: NodeTree, selectedNodeId: string) {
   const parentNode = tree.nodes[selectedNode.parentId];
 
   return parentNode?.type === 'question' ? parentNode : null;
+}
+
+function resolveScopedAnswerNode(tree: NodeTree, selectedNodeId: string) {
+  const selectedNode = getNodeOrThrow(tree, selectedNodeId);
+
+  if (selectedNode.type === 'answer') {
+    return selectedNode;
+  }
+
+  if (
+    (selectedNode.type !== 'summary' && selectedNode.type !== 'judgment') ||
+    selectedNode.parentId === null
+  ) {
+    return null;
+  }
+
+  const parentNode = tree.nodes[selectedNode.parentId];
+
+  if (parentNode?.type !== 'question') {
+    return null;
+  }
+
+  return findLatestAnswerBeforeQuestionChild(
+    tree,
+    parentNode.id,
+    selectedNode.id,
+  );
+}
+
+function getLatestSummaryNodeIdForAnswer(
+  tree: NodeTree,
+  questionNodeId: string,
+  answerNodeId: string,
+) {
+  const questionChildNodes = collectQuestionChildNodes(tree, questionNodeId);
+  const answerIndex = questionChildNodes.findIndex(
+    (childNode) => childNode.id === answerNodeId && childNode.type === 'answer',
+  );
+
+  if (answerIndex === -1) {
+    return null;
+  }
+
+  const nextAnswerIndex = questionChildNodes.findIndex(
+    (childNode, index) => index > answerIndex && childNode.type === 'answer',
+  );
+  const scopedChildNodes = questionChildNodes.slice(
+    answerIndex + 1,
+    nextAnswerIndex === -1 ? undefined : nextAnswerIndex,
+  );
+  const summaryNodes = scopedChildNodes.filter(
+    (childNode): childNode is Extract<TreeNode, { type: 'summary' }> =>
+      childNode.type === 'summary',
+  );
+
+  return summaryNodes[summaryNodes.length - 1]?.id ?? null;
+}
+
+function findLatestAnswerBeforeQuestionChild(
+  tree: NodeTree,
+  questionNodeId: string,
+  questionChildNodeId: string,
+) {
+  const questionChildNodes = collectQuestionChildNodes(tree, questionNodeId);
+  const childIndex = questionChildNodes.findIndex(
+    (childNode) => childNode.id === questionChildNodeId,
+  );
+
+  if (childIndex === -1) {
+    return null;
+  }
+
+  for (let index = childIndex - 1; index >= 0; index -= 1) {
+    const childNode = questionChildNodes[index];
+
+    if (childNode.type === 'answer') {
+      return childNode;
+    }
+  }
+
+  return null;
+}
+
+function collectQuestionChildNodes(tree: NodeTree, questionNodeId: string) {
+  const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+  if (questionNode.type !== 'question') {
+    return [];
+  }
+
+  return questionNode.childIds
+    .map((childId) => tree.nodes[childId])
+    .filter((childNode): childNode is TreeNode => Boolean(childNode))
+    .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
 }
 
 function collectDirectQuestionTitles(tree: NodeTree, planStepNodeId: string) {

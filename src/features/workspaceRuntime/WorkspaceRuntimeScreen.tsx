@@ -119,6 +119,7 @@ export default function WorkspaceRuntimeScreen({
       ? getLatestQuestionAnswerExplanationNodeId(
           context.tree,
           evaluationTarget.questionNodeId,
+          evaluationTarget.answerNodeId,
         )
       : null;
     const answerFollowUpCount = evaluationTarget
@@ -140,6 +141,7 @@ export default function WorkspaceRuntimeScreen({
           void runtime.runPlanStepGeneration(moduleNodeId);
         }}
         onSelectNode={context.selectNode}
+        onRunLearningAction={context.runLearningAction}
         onSplitQuestion={(questionNodeId) => {
           void runtime.runQuestionSplit(questionNodeId);
         }}
