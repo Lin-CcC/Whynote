@@ -4,6 +4,7 @@ import {
   appendPlanStepDraftsToModule,
   appendQuestionClosureToTree,
   createCompoundQuestionSplitService,
+  createJudgmentHintService,
   createLearningActionDraftService,
   createOpenAiCompatibleProviderClient,
   createPlanStepGenerationService,
@@ -13,6 +14,7 @@ import {
   type AiConfig,
 } from '../../learningEngine';
 import {
+  cloneNodeTree,
   getModuleScopeId,
   getNodeOrThrow,
   type ModuleNode,
@@ -28,6 +30,7 @@ import type { ResourceImportDraft } from '../../resourcesSearchExport/services/r
 import type { WorkspaceEditorLearningActionRequest } from '../../workspaceEditor/workspaceEditorTypes';
 import { createInitialWorkspaceSnapshot } from '../utils/createInitialWorkspaceSnapshot';
 import {
+  buildJudgmentHintRuntimeContext,
   buildLearningActionRuntimeContext,
   buildQuestionClosureRuntimeContext,
   canEvaluateQuestionAnswer,
@@ -232,6 +235,64 @@ export function createWorkspaceRuntimeService(
           previousChildIds,
           closureResult.isAnswerSufficient,
         ),
+      } satisfies WorkspaceMutationResult;
+    },
+    async generateJudgmentHint(
+      snapshot: WorkspaceSnapshot,
+      judgmentNodeId: string,
+      config: AiConfig,
+      resourceMetadataRecords: ResourceMetadataRecord[] = [],
+    ) {
+      const judgmentNode = getNodeOrThrow(snapshot.tree, judgmentNodeId);
+
+      if (judgmentNode.type !== 'judgment') {
+        throw new Error(`节点 ${judgmentNodeId} 不是 judgment。`);
+      }
+
+      const persistedHint = judgmentNode.hint?.trim();
+
+      if (persistedHint) {
+        return {
+          message: '当前提示已经存在。',
+        } satisfies WorkspaceMutationResult;
+      }
+
+      const providerClient = providerFactory(config);
+      const hintService = createJudgmentHintService({
+        providerClient,
+      });
+      const context = buildJudgmentHintRuntimeContext(snapshot.tree, judgmentNodeId, {
+        resourceMetadataByNodeId: indexResourceMetadataByNodeId(
+          resourceMetadataRecords,
+        ),
+      });
+      const result = await hintService.generate({
+        topic: snapshot.workspace.title,
+        moduleTitle: context.moduleNode?.title,
+        planStepTitle: context.planStepNode?.title,
+        planStepSummary: context.planStepNode?.content,
+        introductions: context.introductions,
+        learnerAnswer: context.learnerAnswer,
+        questionPath: context.questionPath,
+        judgmentContent: context.judgmentContent,
+        summaryContent: context.summaryContent,
+        referenceCandidates: context.referenceCandidates,
+      });
+      const nextTree = cloneNodeTree(snapshot.tree);
+      const nextJudgmentNode = getNodeOrThrow(nextTree, judgmentNodeId);
+
+      if (nextJudgmentNode.type !== 'judgment') {
+        throw new Error(`节点 ${judgmentNodeId} 不是 judgment。`);
+      }
+
+      nextJudgmentNode.hint = result.hint;
+      nextJudgmentNode.updatedAt = new Date().toISOString();
+
+      return {
+        snapshot: createSnapshot(nextTree, snapshot),
+        nextModuleId: context.moduleNode?.id ?? null,
+        nextSelectedNodeId: judgmentNodeId,
+        message: '已补一条围绕当前缺口的思考提示。',
       } satisfies WorkspaceMutationResult;
     },
     async generateLearningActionDraft(

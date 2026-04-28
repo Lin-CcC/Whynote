@@ -28,6 +28,12 @@ interface ClosureHintRenderDetails {
   thinkingQuestion: string;
 }
 
+interface GapInsight {
+  raw: string;
+  focusLabel: string;
+  detail: string;
+}
+
 const HINT_SECTION_LABEL_PATTERNS = {
   focus: [/^(先补哪块|优先补哪块|先补什么)[:：]\s*/u],
   background: [/^(关键背景|最小背景|必要背景)[:：]\s*/u],
@@ -46,7 +52,13 @@ const GENERIC_HINT_PATTERNS = [
   /回到回答修改/u,
 ] as const;
 
-type HintGapKind = 'causal' | 'boundary' | 'mechanism' | 'generic';
+type HintGapKind =
+  | 'combinatorial-explosion'
+  | 'feedback-direction'
+  | 'causal'
+  | 'boundary'
+  | 'mechanism'
+  | 'generic';
 
 export function normalizeClosureHintText(options: {
   rawHint: unknown;
@@ -56,11 +68,19 @@ export function normalizeClosureHintText(options: {
   summaryContent: string;
 }) {
   const sectionDraft = extractHintSectionDraft(options.rawHint);
-  const focus = resolveHintFocus(sectionDraft, options);
-  const background = resolveHintBackground(sectionDraft, focus, options);
+  const primaryGapInsight = buildPrimaryGapInsight(
+    sectionDraft.focus || options.judgmentGapItems[0] || '',
+    options.currentQuestionTitle,
+  );
+  const focus = resolveHintFocus(sectionDraft, options, primaryGapInsight);
+  const background = resolveHintBackground(
+    sectionDraft,
+    primaryGapInsight,
+    options,
+  );
   const thinkingQuestion = resolveHintThinkingQuestion(
     sectionDraft,
-    focus,
+    primaryGapInsight,
     options.currentQuestionTitle,
   );
 
@@ -112,6 +132,12 @@ export function extractJudgmentGapItemsFromText(
     if (structuredItems.length > 0) {
       return structuredItems.slice(0, 3).map(ensureSentenceEnding);
     }
+  }
+
+  const enumeratedGapItems = extractEnumeratedGapItems(content);
+
+  if (enumeratedGapItems.length > 0) {
+    return enumeratedGapItems;
   }
 
   const fallbackGap = sanitizeGapItem(
@@ -215,6 +241,7 @@ function resolveHintFocus(
     currentQuestionTitle?: string;
     judgmentGapItems: string[];
   },
+  primaryGapInsight: GapInsight,
 ) {
   const focusCandidate = normalizeHintFocusCandidate(sectionDraft.focus);
 
@@ -223,7 +250,7 @@ function resolveHintFocus(
   }
 
   const primaryGapCandidate = normalizeHintFocusCandidate(
-    options.judgmentGapItems[0] ?? '',
+    primaryGapInsight.focusLabel,
   );
 
   if (isUsableHintFocus(primaryGapCandidate)) {
@@ -239,7 +266,7 @@ function resolveHintFocus(
 
 function resolveHintBackground(
   sectionDraft: HintSectionDraft,
-  focus: string,
+  primaryGapInsight: GapInsight,
   options: {
     judgmentContent: string;
     summaryContent: string;
@@ -263,12 +290,12 @@ function resolveHintBackground(
     );
   }
 
-  return buildHintBackgroundFromGap(focus);
+  return buildHintBackgroundFromGap(primaryGapInsight);
 }
 
 function resolveHintThinkingQuestion(
   sectionDraft: HintSectionDraft,
-  focus: string,
+  primaryGapInsight: GapInsight,
   currentQuestionTitle?: string,
 ) {
   const questionCandidate = normalizeHintQuestionCandidate(
@@ -279,13 +306,25 @@ function resolveHintThinkingQuestion(
     return ensureQuestionEnding(questionCandidate);
   }
 
-  return buildHintThinkingQuestionFromGap(focus, currentQuestionTitle);
+  return buildHintThinkingQuestionFromGap(
+    primaryGapInsight,
+    currentQuestionTitle,
+  );
 }
 
-function buildHintBackgroundFromGap(focus: string) {
-  const focusLabel = stripTrailingSentencePunctuation(focus);
+function buildHintBackgroundFromGap(gapInsight: GapInsight) {
+  const focusLabel = stripTrailingSentencePunctuation(gapInsight.focusLabel);
+  const gapDetail = stripTrailingSentencePunctuation(gapInsight.detail);
 
-  switch (classifyGapKind(focus)) {
+  switch (classifyGapKind(gapInsight)) {
+    case 'combinatorial-explosion':
+      return ensureSentenceEnding(
+        '这里的关键不是“参数很多所以会慢”这么简单，而是参数一多，可能的组合空间会爆炸式增长。哪怕每个参数只允许极少几种可能，60,000,000 个参数拼在一起也已经远远超出靠逐个试错能覆盖的范围。',
+      );
+    case 'feedback-direction':
+      return ensureSentenceEnding(
+        '训练不是只要知道“这次错了”就够了，而是要有一个连续的方向信号，告诉大量参数各自该往哪边微调。没有方向，下一次尝试和随机乱试在本质上没有区别。',
+      );
     case 'causal':
       return ensureSentenceEnding(
         `围绕“${focusLabel}”，这里缺的不是再换个说法重述结论，而是把“发生了什么变化 -> 为什么会这样 -> 最后带来什么结果”连成因果链`,
@@ -299,6 +338,12 @@ function buildHintBackgroundFromGap(focus: string) {
         `围绕“${focusLabel}”，机制类问题要先分清相关对象各自做什么，再说明它们怎样发生联系；不把角色和顺序摆清楚，后面就只能背结论`,
       );
     default:
+      if (gapDetail) {
+        return ensureSentenceEnding(
+          `这里真正要补的不是再复读评价，而是把“${gapDetail}”背后的对象、关系和判断线索串起来，让这条缺口从标签变成可解释的理解。`,
+        );
+      }
+
       return ensureSentenceEnding(
         `围绕“${focusLabel}”，先别急着补更多结论，当前真正要补的是能把对象、关系和判断线索串起来的最小解释链`,
       );
@@ -306,12 +351,20 @@ function buildHintBackgroundFromGap(focus: string) {
 }
 
 function buildHintThinkingQuestionFromGap(
-  focus: string,
+  gapInsight: GapInsight,
   currentQuestionTitle?: string,
 ) {
-  const focusLabel = stripTrailingSentencePunctuation(focus);
+  const focusLabel = stripTrailingSentencePunctuation(gapInsight.focusLabel);
 
-  switch (classifyGapKind(focus)) {
+  switch (classifyGapKind(gapInsight)) {
+    case 'combinatorial-explosion':
+      return ensureQuestionEnding(
+        '如果每个参数哪怕只看两种可能，60,000,000 个参数一共会有多少种组合，这还可能靠逐个试出来吗',
+      );
+    case 'feedback-direction':
+      return ensureQuestionEnding(
+        '如果系统只告诉你“这次错了”，却不告诉你错在哪、该往哪个方向调，下一次尝试和随机试参数到底差在哪里',
+      );
     case 'causal':
       return ensureQuestionEnding(
         `如果只保留“${focusLabel}”这个结论，你中间到底省略了哪一步变化或结果`,
@@ -345,31 +398,60 @@ function renderHint(details: ClosureHintRenderDetails) {
   ].join('\n');
 }
 
-function classifyGapKind(focus: string): HintGapKind {
+function classifyGapKind(gapInsight: GapInsight): HintGapKind {
+  const combinedText = [
+    gapInsight.raw,
+    gapInsight.focusLabel,
+    gapInsight.detail,
+  ].join(' ');
+
   if (
-    focus.includes('为什么') ||
-    focus.includes('因果') ||
-    focus.includes('结果')
+    combinedText.includes('组合爆炸') ||
+    combinedText.includes('排列组合') ||
+    combinedText.includes('量级') ||
+    combinedText.includes('几辈子') ||
+    combinedText.includes('6000 万') ||
+    combinedText.includes('6000万')
+  ) {
+    return 'combinatorial-explosion';
+  }
+
+  if (
+    combinedText.includes('反馈') ||
+    combinedText.includes('导向') ||
+    combinedText.includes('往哪调') ||
+    combinedText.includes('损失函数') ||
+    combinedText.includes('指南针') ||
+    combinedText.includes('只知道“错了”') ||
+    combinedText.includes('只知道错了')
+  ) {
+    return 'feedback-direction';
+  }
+
+  if (
+    combinedText.includes('为什么') ||
+    combinedText.includes('因果') ||
+    combinedText.includes('结果')
   ) {
     return 'causal';
   }
 
   if (
-    focus.includes('边界') ||
-    focus.includes('条件') ||
-    focus.includes('前提') ||
-    focus.includes('什么时候') ||
-    focus.includes('何时')
+    combinedText.includes('边界') ||
+    combinedText.includes('条件') ||
+    combinedText.includes('前提') ||
+    combinedText.includes('什么时候') ||
+    combinedText.includes('何时')
   ) {
     return 'boundary';
   }
 
   if (
-    focus.includes('机制') ||
-    focus.includes('关系') ||
-    focus.includes('对象') ||
-    focus.includes('流程') ||
-    focus.includes('顺序')
+    combinedText.includes('机制') ||
+    combinedText.includes('关系') ||
+    combinedText.includes('对象') ||
+    combinedText.includes('流程') ||
+    combinedText.includes('顺序')
   ) {
     return 'mechanism';
   }
@@ -378,21 +460,29 @@ function classifyGapKind(focus: string): HintGapKind {
 }
 
 function normalizeHintFocusCandidate(content: string) {
+  const normalizedContent = content
+    .replace(/^(先补哪块|优先补哪块|先补什么)[:：]?\s*/u, '')
+    .replace(/^还缺(?:的关键点)?[:：]?\s*/u, '')
+    .replace(/^当前最关键缺口[:：]?\s*/u, '')
+    .replace(/^你还没有(?:解释|说明|交代)?/u, '')
+    .replace(/^还没有(?:解释|说明|交代)?/u, '')
+    .replace(/^(没有|没)(解释|说明|交代)/u, '')
+    .replace(/^需要继续把/u, '')
+    .replace(/^需要把/u, '')
+    .replace(/^只差把/u, '')
+    .replace(/^(解释|说明)/u, '')
+    .replace(/^把/u, '')
+    .replace(/(?:说清楚|讲清楚|补清楚)$/u, '')
+    .trim();
+
+  if (!normalizedContent) {
+    return '';
+  }
+
+  const insight = buildPrimaryGapInsight(normalizedContent);
+
   return stripTrailingSentencePunctuation(
-    content
-      .replace(/^(先补哪块|优先补哪块|先补什么)[:：]?\s*/u, '')
-      .replace(/^还缺(?:的关键点)?[:：]?\s*/u, '')
-      .replace(/^当前最关键缺口[:：]?\s*/u, '')
-      .replace(/^你还没有(?:解释|说明|交代)?/u, '')
-      .replace(/^还没有(?:解释|说明|交代)?/u, '')
-      .replace(/^(没有|没)(解释|说明|交代)/u, '')
-      .replace(/^需要继续把/u, '')
-      .replace(/^需要把/u, '')
-      .replace(/^只差把/u, '')
-      .replace(/^(解释|说明)/u, '')
-      .replace(/^把/u, '')
-      .replace(/(?:说清楚|讲清楚|补清楚)$/u, '')
-      .trim(),
+    insight.focusLabel || normalizedContent,
   );
 }
 
@@ -480,6 +570,60 @@ function extractStructuredSection(content: string, labels: string[]) {
   return '';
 }
 
+function buildPrimaryGapInsight(
+  content: string,
+  currentQuestionTitle?: string,
+): GapInsight {
+  const normalizedContent = normalizeGapPhrase(content);
+
+  if (!normalizedContent) {
+    return {
+      raw: '',
+      focusLabel: currentQuestionTitle
+        ? `把“${currentQuestionTitle}”里还缺的关键点补清楚`
+        : '把当前问题里还缺的关键点补清楚',
+      detail: '',
+    };
+  }
+
+  const [rawLabel, ...detailParts] = normalizedContent.split(/[:：]/u);
+  const focusLabel = stripMarkdownDecoration(rawLabel);
+  const detail = stripMarkdownDecoration(detailParts.join('：'));
+
+  if (
+    focusLabel &&
+    focusLabel.length <= 22 &&
+    !/[，。！？!?]/u.test(focusLabel) &&
+    detail
+  ) {
+    return {
+      raw: normalizedContent,
+      focusLabel,
+      detail,
+    };
+  }
+
+  return {
+    raw: normalizedContent,
+    focusLabel: normalizedContent,
+    detail: '',
+  };
+}
+
+function extractEnumeratedGapItems(content: string) {
+  const listItems = content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^(\d+[.)、]|[-*•])\s+/u.test(line))
+    .map((line) => sanitizeGapItem(line));
+
+  if (listItems.length > 0) {
+    return listItems.slice(0, 3).map(ensureSentenceEnding);
+  }
+
+  return [] satisfies string[];
+}
+
 function splitStructuredList(content: string) {
   return content
     .split(/\n|[；;]+/u)
@@ -494,8 +638,12 @@ function splitStructuredList(content: string) {
 
 function sanitizeGapItem(item: string) {
   return item
+    .replace(/\*\*/gu, '')
+    .replace(/^\s*[-*•]\s*/u, '')
+    .replace(/^\s*\d+[.)、]\s*/u, '')
     .replace(/^还缺(?:的关键点)?[:：]?\s*/u, '')
     .replace(/^当前最关键缺口[:：]?\s*/u, '')
+    .replace(/^以下(?:两个|几个|这些)?关键点[:：]?\s*/u, '')
     .replace(/^你还没有(?:解释|说明|交代)?/u, '')
     .replace(/^还没有(?:解释|说明|交代)?/u, '')
     .replace(/^需要继续把/u, '')
@@ -533,6 +681,21 @@ function ensureQuestionEnding(content: string) {
 
 function stripTrailingSentencePunctuation(content: string) {
   return content.replace(/[。！？!?；;]+$/u, '').trim();
+}
+
+function normalizeGapPhrase(content: string) {
+  return stripTrailingSentencePunctuation(
+    sanitizeGapItem(content)
+      .replace(/^当前问题里仍有关键点没有说清楚[:：]?\s*/u, '')
+      .replace(/^当前问题里仍有关键点没有答到[:：]?\s*/u, '')
+      .replace(/^这次回答还不完整[,，]?\s*/u, '')
+      .replace(/^目前你已触及问题的表层[,，]但还缺少对以下(?:两个|几个)?关键点的认知[:：]?\s*/u, '')
+      .trim(),
+  );
+}
+
+function stripMarkdownDecoration(content: string) {
+  return content.replace(/\*\*/gu, '').replace(/`/gu, '').trim();
 }
 
 function normalizeCompareText(content: string) {

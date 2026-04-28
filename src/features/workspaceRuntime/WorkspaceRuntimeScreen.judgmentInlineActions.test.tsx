@@ -1,6 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 
+import type {
+  AiProviderClient,
+  AiProviderObjectRequest,
+  AiProviderObjectResponse,
+} from '../learningEngine';
 import {
   createIndexedDbStorage,
   createLocalStorageStore,
@@ -27,9 +32,36 @@ afterEach(async () => {
   }
 });
 
-test('renders inline judgment actions and reveals a hint that stays distinct from the answer explanation', async () => {
+test('renders inline judgment actions and generates a hint that stays distinct from the answer explanation', async () => {
+  let taskCount = 0;
   const dependencies = await createPreloadedDependencies(
     createJudgmentInlineSnapshot(),
+    () => ({
+      async generateObject<T>(
+        request: AiProviderObjectRequest<T>,
+      ): Promise<AiProviderObjectResponse<T>> {
+        taskCount += 1;
+        expect(request.taskName).toBe('judgment-hint');
+
+        const rawText = JSON.stringify({
+          hint: {
+            focus: '为什么会减少重复渲染',
+            background:
+              '关键不只是“更新被放在一起”，而是这些更新会在同一轮里先收集，再一起触发界面计算，所以不必为每次局部变化都单独重跑渲染。',
+            thinkingQuestion:
+              '把“发生了什么变化 -> 为什么会这样 -> 最后带来什么结果”连成一条因果链时，中间少掉的是哪一环？',
+          },
+        });
+
+        return {
+          taskName: request.taskName,
+          content: request.parse(rawText) as T,
+          rawText,
+          model: 'mock-model',
+          providerLabel: 'mock-provider',
+        };
+      },
+    } satisfies AiProviderClient),
   );
 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
@@ -52,21 +84,26 @@ test('renders inline judgment actions and reveals a hint that stays distinct fro
 
   fireEvent.click(within(actions).getByRole('button', { name: '给我提示' }));
 
-  const hintCallout = within(actions).getByTestId(
+  const hintCallout = await screen.findByTestId(
     'judgment-inline-hint-judgment-inline-primary',
   );
 
+  expect(taskCount).toBe(1);
   expect(hintCallout).toHaveTextContent('微型铺垫');
-  expect(hintCallout).toHaveTextContent('先补哪块：');
+  expect(hintCallout).toHaveTextContent('先补哪块：为什么会减少重复渲染。');
   expect(hintCallout).toHaveTextContent('关键背景：');
+  expect(hintCallout).toHaveTextContent(
+    '这些更新会在同一轮里先收集，再一起触发界面计算',
+  );
   expect(hintCallout).toHaveTextContent('可以先想：');
-  expect(hintCallout).toHaveTextContent('为什么会减少重复渲染');
-  expect(hintCallout).toHaveTextContent('发生了什么变化 -> 为什么会这样 -> 最后带来什么结果');
+  expect(hintCallout).toHaveTextContent(
+    '发生了什么变化 -> 为什么会这样 -> 最后带来什么结果',
+  );
   expect(hintCallout).not.toHaveTextContent(
     '还缺“为什么会减少重复渲染”这条因果关系。',
   );
   expect(hintCallout).not.toHaveTextContent(
-    '标准理解：React 会先收拢同一轮事件里的更新，再统一提交，因此可以减少重复渲染。',
+    '标准理解：React 会先收集同一轮事件里的更新，再统一提交，因此可以减少重复渲染。',
   );
 });
 
@@ -123,7 +160,10 @@ test('returns from judgment to the matching answer instead of stopping on the pa
   expect(previousAnswerNode).toHaveAttribute('data-node-selected', 'false');
 });
 
-async function createPreloadedDependencies(snapshot: WorkspaceSnapshot) {
+async function createPreloadedDependencies(
+  snapshot: WorkspaceSnapshot,
+  createProviderClient?: () => AiProviderClient,
+) {
   const storage = createIndexedDbStorage({
     databaseName: `whynote-runtime-judgment-inline-${crypto.randomUUID()}`,
   });
@@ -137,6 +177,7 @@ async function createPreloadedDependencies(snapshot: WorkspaceSnapshot) {
       prefix: `whynote-runtime-judgment-inline-${crypto.randomUUID()}`,
       storage: window.localStorage,
     }),
+    ...(createProviderClient ? { createProviderClient } : {}),
     defaultLearningMode: 'standard',
   } satisfies WorkspaceRuntimeDependencies;
 }
@@ -169,7 +210,7 @@ function createJudgmentInlineSnapshot(): WorkspaceSnapshot {
     createNode({
       type: 'plan-step',
       id: 'step-judgment-inline',
-      title: '先看反馈再修回答',
+      title: '先看反馈再改回答',
       content: '让 judgment 直接承接下一步动作。',
       status: 'doing',
       createdAt: '2026-04-28T00:00:00.000Z',
@@ -216,7 +257,7 @@ function createJudgmentInlineSnapshot(): WorkspaceSnapshot {
       id: 'summary-inline-primary',
       title: '标准理解',
       content:
-        '标准理解：React 会先收拢同一轮事件里的更新，再统一提交，因此可以减少重复渲染。',
+        '标准理解：React 会先收集同一轮事件里的更新，再统一提交，因此可以减少重复渲染。',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -312,7 +353,7 @@ function createMultiAnswerJudgmentSnapshot(): WorkspaceSnapshot {
       type: 'answer',
       id: 'answer-inline-current',
       title: '第二版回答',
-      content: '因为 React 会把同一轮事件里的更新先收拢，再统一提交。',
+      content: '因为 React 会把同一轮事件里的更新先收集，再统一提交。',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );

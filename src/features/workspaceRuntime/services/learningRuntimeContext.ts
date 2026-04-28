@@ -59,6 +59,13 @@ export interface LearningActionRuntimeContext {
   resourceSummary: string;
 }
 
+export interface JudgmentHintRuntimeContext extends QuestionClosureRuntimeContext {
+  judgmentContent: string;
+  judgmentNodeId: string;
+  questionNodeId: string;
+  summaryContent: string;
+}
+
 export function buildQuestionClosureRuntimeContext(
   tree: NodeTree,
   questionNodeId: string,
@@ -315,6 +322,62 @@ export function getJudgmentInlineActionContext(
     hint: buildJudgmentHint(judgmentNode, questionNode, answerNode),
     questionNodeId: questionNode.id,
     summaryNodeId,
+  };
+}
+
+export function buildJudgmentHintRuntimeContext(
+  tree: NodeTree,
+  judgmentNodeId: string,
+  options: LearningReferenceContextOptions = {},
+): JudgmentHintRuntimeContext {
+  const judgmentNode = getNodeOrThrow(tree, judgmentNodeId);
+
+  if (judgmentNode.type !== 'judgment' || judgmentNode.parentId === null) {
+    throw new Error('当前节点不是可生成提示的 judgment。');
+  }
+
+  const questionNode = tree.nodes[judgmentNode.parentId];
+
+  if (questionNode?.type !== 'question') {
+    throw new Error('当前 judgment 没有关联 question，无法生成提示。');
+  }
+
+  const judgmentIndex = questionNode.childIds.indexOf(judgmentNode.id);
+
+  if (judgmentIndex === -1) {
+    throw new Error('当前 judgment 不在所属 question 的子节点序列中。');
+  }
+
+  const answerNodeId = findAnswerNodeIdForJudgment(
+    tree,
+    questionNode.childIds,
+    judgmentIndex,
+  );
+
+  if (!answerNodeId) {
+    throw new Error('当前 judgment 还没有关联回答，暂时无法生成提示。');
+  }
+
+  const summaryNodeId =
+    getLatestSummaryNodeIdForAnswer(tree, questionNode.id, answerNodeId) ??
+    findSummaryNodeIdForJudgment(tree, questionNode.childIds, judgmentIndex);
+  const summaryNode =
+    summaryNodeId && tree.nodes[summaryNodeId]?.type === 'summary'
+      ? tree.nodes[summaryNodeId]
+      : null;
+  const closureContext = buildQuestionClosureRuntimeContext(
+    tree,
+    questionNode.id,
+    answerNodeId,
+    options,
+  );
+
+  return {
+    ...closureContext,
+    judgmentContent: judgmentNode.content,
+    judgmentNodeId: judgmentNode.id,
+    questionNodeId: questionNode.id,
+    summaryContent: summaryNode?.content ?? '',
   };
 }
 

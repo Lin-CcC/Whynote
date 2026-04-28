@@ -27,3 +27,21 @@ export interface QuestionClosureResult {
   followUpQuestions: QuestionNodeDraft[];
   metadata: AiExecutionMetadata;
 }
+
+export interface JudgmentHintInput {
+  topic: string;
+  moduleTitle?: string;
+  planStepTitle?: string;
+  planStepSummary?: string;
+  introductions?: string[];
+  questionPath: QuestionClosureInput['questionPath'];
+  learnerAnswer: string;
+  judgmentContent: string;
+  summaryContent?: string;
+  referenceCandidates?: LearningReferenceCandidate[];
+}
+
+export interface JudgmentHintResult {
+  hint: string;
+  metadata: AiExecutionMetadata;
+}
