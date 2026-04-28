@@ -345,6 +345,71 @@
   color: #0f172a;
 }
 
+.resources-citationSection,
+.resources-citationBlockList,
+.resources-citationEvidenceList,
+.resources-citationDetailList {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.resources-citationSection {
+  margin-top: 1rem;
+}
+
+.resources-citationSectionHeader,
+.resources-citationBlockHeader,
+.resources-citationEvidenceHeader,
+.resources-citationEvidenceActions,
+.resources-citationEvidenceMeta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.resources-citationBlock,
+.resources-citationEvidence {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(255, 255, 255, 0.98));
+}
+
+.resources-citationFocusText {
+  margin: 0;
+  color: #0f172a;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.resources-citationLabel,
+.resources-citationCounter,
+.resources-citationDetailList dt {
+  color: #0f766e;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.resources-citationWhyText,
+.resources-citationDetailList dd {
+  margin: 0;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.resources-citationDetailList {
+  margin: 0;
+}
+
+.resources-citationDetailList div {
+  display: grid;
+  gap: 0.22rem;
+}
+
 @media (max-width: 900px) {
   .resources-locatorLayout {
     grid-template-columns: 1fr;

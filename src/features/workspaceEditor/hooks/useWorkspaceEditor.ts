@@ -113,6 +113,8 @@ export function useWorkspaceEditor({
   >(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const onSnapshotChangeRef = useRef(onSnapshotChange);
+  const pendingSnapshotRef = useRef<WorkspaceSnapshot | null>(null);
   const nodeElementMapRef = useRef(new Map<string, HTMLElement>());
 
   const moduleNodes = getModuleNodes(tree);
@@ -160,6 +162,10 @@ export function useWorkspaceEditor({
   }, [onSelectionChange]);
 
   useEffect(() => {
+    onSnapshotChangeRef.current = onSnapshotChange;
+  }, [onSnapshotChange]);
+
+  useEffect(() => {
     if (!selectedNodeId) {
       return;
     }
@@ -180,6 +186,17 @@ export function useWorkspaceEditor({
       selectedNodeId,
     });
   }, [currentModuleId, selectedNodeId]);
+
+  useEffect(() => {
+    const pendingSnapshot = pendingSnapshotRef.current;
+
+    if (!pendingSnapshot) {
+      return;
+    }
+
+    pendingSnapshotRef.current = null;
+    onSnapshotChangeRef.current?.(pendingSnapshot);
+  }, [tree]);
 
   function switchModule(moduleId: string) {
     if (isInteractionLocked) {
@@ -254,9 +271,7 @@ export function useWorkspaceEditor({
         : reconcilePlanStepStatuses(patchedTree);
 
       if (nextTree !== previousTree) {
-        onSnapshotChange?.(
-          createNextSnapshot(initialSnapshot, nextTree),
-        );
+        pendingSnapshotRef.current = createNextSnapshot(initialSnapshot, nextTree);
       }
 
       return nextTree;
@@ -281,7 +296,7 @@ export function useWorkspaceEditor({
           : attachTagToNode(normalizedTree, selectedNodeId, tagId),
       );
 
-      onSnapshotChange?.(createNextSnapshot(initialSnapshot, nextTree));
+      pendingSnapshotRef.current = createNextSnapshot(initialSnapshot, nextTree);
 
       return nextTree;
     });
@@ -586,7 +601,7 @@ export function useWorkspaceEditor({
         ),
       );
       setOperationError(null);
-      onSnapshotChange?.(createNextSnapshot(initialSnapshot, reconciledTree));
+      pendingSnapshotRef.current = createNextSnapshot(initialSnapshot, reconciledTree);
     } catch (error) {
       setOperationError(
         error instanceof Error ? error.message : '结构操作失败，请检查当前节点。',

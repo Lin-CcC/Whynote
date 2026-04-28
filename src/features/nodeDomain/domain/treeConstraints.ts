@@ -1,10 +1,12 @@
 import type {
+  CitationPurpose,
   NodeType,
   ReferenceSourceNodeType,
   ReferenceTargetNodeType,
   ResourceNodeType,
 } from './nodeTypes';
 import {
+  CITATION_PURPOSES,
   LEARNING_NODE_TYPES,
   REFERENCE_SOURCE_NODE_TYPES,
   REFERENCE_TARGET_NODE_TYPES,
@@ -69,6 +71,16 @@ export function isReferenceTargetNodeType(
   return REFERENCE_TARGET_NODE_TYPES.includes(
     nodeType as ReferenceTargetNodeType,
   );
+}
+
+export function isCitationPurpose(
+  purpose: string | null | undefined,
+): purpose is CitationPurpose {
+  if (!purpose) {
+    return false;
+  }
+
+  return CITATION_PURPOSES.includes(purpose as CitationPurpose);
 }
 
 export function shouldConvertToModuleAtRoot(nodeType: NodeType) {

@@ -3,9 +3,12 @@ import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react';
 import SectionCard from '../../../ui/SectionCard';
 import {
   getNodeOrThrow,
+  isScaffoldSummaryNode,
+  type CitationPurpose,
   type NodeTree,
   type ResourceMetadataRecord,
   type ResourceNode,
+  type TreeNode,
 } from '../../nodeDomain';
 import {
   attachResourceCitation,
@@ -37,6 +40,43 @@ type SubmissionFeedback =
     }
   | null;
 
+const CITATION_PURPOSE_OPTIONS: Array<{
+  description: string;
+  label: string;
+  value: CitationPurpose;
+}> = [
+  {
+    value: 'definition',
+    label: '概念定义',
+    description: '这里是在定义概念或术语。',
+  },
+  {
+    value: 'mechanism',
+    label: '机制说明',
+    description: '这里是在解释为什么会这样运作。',
+  },
+  {
+    value: 'behavior',
+    label: '行为解释',
+    description: '这里是在解释代码或规则会产生什么行为。',
+  },
+  {
+    value: 'example',
+    label: '例子来源',
+    description: '这里是在说明这个例子借自资料里的哪一段。',
+  },
+  {
+    value: 'judgment',
+    label: '支撑判断',
+    description: '这里是在支撑当前判断或指出用户遗漏。',
+  },
+  {
+    value: 'background',
+    label: '补背景说明',
+    description: '这里是在补必要背景，帮助用户理解上下文。',
+  },
+];
+
 export default function ResourceFocusPanel({
   activeResourceNodeId,
   currentModuleTitle,
@@ -55,6 +95,9 @@ export default function ResourceFocusPanel({
   );
   const [citationExcerpt, setCitationExcerpt] = useState('');
   const [citationLocator, setCitationLocator] = useState('');
+  const [citationFocusText, setCitationFocusText] = useState('');
+  const [citationPurpose, setCitationPurpose] =
+    useState<CitationPurpose>('mechanism');
   const [citationFeedback, setCitationFeedback] =
     useState<SubmissionFeedback>(null);
   const activeResourceNode =
@@ -73,7 +116,21 @@ export default function ResourceFocusPanel({
     setCitationExcerpt('');
     setCitationLocator('');
     setCitationFeedback(null);
-  }, [activeResourceNode?.id, selectedEditorNodeId]);
+
+    const selectedNode =
+      selectedEditorNodeId && tree.nodes[selectedEditorNodeId]
+        ? getNodeOrThrow(tree, selectedEditorNodeId)
+        : null;
+
+    if (selectedNode && isTeachingCitationNode(selectedNode)) {
+      setCitationFocusText(buildDefaultCitationFocusText(selectedNode));
+      setCitationPurpose(getDefaultCitationPurpose(tree, selectedNode));
+      return;
+    }
+
+    setCitationFocusText('');
+    setCitationPurpose('mechanism');
+  }, [activeResourceNode?.id, selectedEditorNodeId, tree]);
 
   if (
     !activeResourceNode ||
@@ -98,6 +155,8 @@ export default function ResourceFocusPanel({
     resourceNode.type === 'resource'
       ? activeResourceMetadata
       : targetResourceMetadata;
+  const captureTeachingCitation =
+    editorNode && isTeachingCitationNode(editorNode);
 
   return (
     <SectionCard>
@@ -112,12 +171,12 @@ export default function ResourceFocusPanel({
             onClick={onClearResourceFocus}
             type="button"
           >
-            返回模块编辑焦点
+            回到编辑焦点
           </button>
         ) : null}
       </div>
       <p className="workspace-helpText">
-        资料定位走独立通道，不会覆盖当前模块内 editor 选区。
+        资料焦点是独立通道，不会覆盖当前模块内的编辑选区。
       </p>
       <dl className="resources-focusList">
         <div>
@@ -145,8 +204,8 @@ export default function ResourceFocusPanel({
           </>
         ) : (
           <div>
-            <dt>资料摘要</dt>
-            <dd>{resourceNode.content || '暂无资料摘要'}</dd>
+            <dt>资料概况</dt>
+            <dd>{resourceNode.content || '暂无资料概况'}</dd>
           </div>
         )}
         {provenanceMetadata?.importMethod ? (
@@ -185,11 +244,10 @@ export default function ResourceFocusPanel({
         </div>
         <div>
           <dt>模块内编辑焦点</dt>
-          <dd>
-            {editorNode ? formatNodeLabel(tree, editorNode) : '当前没有模块内焦点'}
-          </dd>
+          <dd>{editorNode ? formatNodeLabel(tree, editorNode) : '当前没有编辑焦点'}</dd>
         </div>
       </dl>
+
       <form className="resources-entrySection" onSubmit={handleCreateFragment}>
         <h3 className="workspace-splitTitle">补充摘录</h3>
         {!targetResourceNode ? (
@@ -199,14 +257,15 @@ export default function ResourceFocusPanel({
         ) : (
           <>
             <p className="workspace-helpText">
-              “新建摘录”已从主入口下沉；这里只作为当前资料焦点的补充动作。
+              “新建摘录”已经降为补充动作，这里只负责给当前资料补一个可稳定回跳的片段。
             </p>
             <p className="workspace-helpText">
               当前挂载资料：{formatNodeLabel(tree, targetResourceNode)}
             </p>
             {resourceNode.type === 'resource-fragment' ? (
               <p className="workspace-helpText">
-                当前焦点是摘录，新补充的摘录会继续挂到父资料《{targetResourceNode.title}》下。
+                当前焦点已经是摘录，新补的摘录会继续挂在父资料《
+                {targetResourceNode.title}》下面。
               </p>
             ) : null}
             <label className="resources-panelField">
@@ -215,7 +274,7 @@ export default function ResourceFocusPanel({
                 aria-label="摘录标题"
                 className="resources-panelInput"
                 onChange={handleFragmentTitleChange}
-                placeholder="例如：局部状态摘录"
+                placeholder="例如：状态快照摘录"
                 value={fragmentTitle}
               />
             </label>
@@ -225,7 +284,7 @@ export default function ResourceFocusPanel({
                 aria-label="摘录正文"
                 className="resources-panelInput resources-panelTextarea"
                 onChange={handleFragmentExcerptChange}
-                placeholder="记录后续可直接引用的稳定正文片段。"
+                placeholder="记录后续会被稳定引用的原文或代码片段。"
                 value={fragmentExcerpt}
               />
             </label>
@@ -258,6 +317,7 @@ export default function ResourceFocusPanel({
           {fragmentFeedback.message}
         </p>
       ) : null}
+
       <div className="resources-entrySection">
         <h3 className="workspace-splitTitle">引用到当前学习节点</h3>
         {!editorNode ? (
@@ -275,19 +335,59 @@ export default function ResourceFocusPanel({
               当前会把 {formatNodeLabel(tree, resourceNode)} 引到{' '}
               {formatNodeLabel(tree, editorNode)}。
             </p>
+            <p className="workspace-helpText">
+              这一步不会把页面变成参考文献列表；只会记录当前解释里确实需要资料支撑的那一段。
+            </p>
+            {captureTeachingCitation ? (
+              <>
+                <label className="resources-panelField">
+                  <span className="resources-panelFieldLabel">对应解释片段</span>
+                  <textarea
+                    aria-label="对应解释片段"
+                    className="resources-panelInput resources-panelTextarea"
+                    onChange={handleCitationFocusTextChange}
+                    placeholder="写清当前哪一句或哪一段解释在用这份资料。"
+                    value={citationFocusText}
+                  />
+                </label>
+                <label className="resources-panelField">
+                  <span className="resources-panelFieldLabel">引用用途</span>
+                  <select
+                    aria-label="引用用途"
+                    className="resources-panelInput resources-panelSelect"
+                    onChange={handleCitationPurposeChange}
+                    value={citationPurpose}
+                  >
+                    {CITATION_PURPOSE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="workspace-helpText">
+                  {getCitationPurposeDescription(citationPurpose)}
+                </p>
+              </>
+            ) : null}
             {resourceNode.type === 'resource' ? (
               <>
+              <p className="workspace-helpText">
+                如果你能给出稳定片段，系统会先尝试复用这份资料下已有的 fragment；
+                如果无法可靠命中，就退回为 resource 级引用，但仍会保留你填的原文片段和定位提示。
+              </p>
+              {captureTeachingCitation ? (
                 <p className="workspace-helpText">
-                  如果你能给出稳定片段，系统会先尝试复用这份资料下已有的 fragment；若无法可靠命中，就退回为
-                  resource 级引用，不会自动创建新的 fragment。
+                  当前是教学引用。为了让引用块稳定回答“这段解释依据资料里的哪一部分”，至少填写引用片段正文或定位信息；否则这条引用只会停留在资料级粗引用。
                 </p>
+              ) : null}
                 <label className="resources-panelField">
                   <span className="resources-panelFieldLabel">引用片段正文</span>
                   <textarea
                     aria-label="引用片段正文"
                     className="resources-panelInput resources-panelTextarea"
                     onChange={handleCitationExcerptChange}
-                    placeholder="如果能稳定定位片段，这里填要优先复用的正文。"
+                    placeholder="尽量填写当前解释真正依据的那一段原文或代码。"
                     value={citationExcerpt}
                   />
                 </label>
@@ -355,6 +455,16 @@ export default function ResourceFocusPanel({
     setCitationLocator(event.target.value);
   }
 
+  function handleCitationFocusTextChange(
+    event: ChangeEvent<HTMLTextAreaElement>,
+  ) {
+    setCitationFocusText(event.target.value);
+  }
+
+  function handleCitationPurposeChange(event: ChangeEvent<HTMLSelectElement>) {
+    setCitationPurpose(event.target.value as CitationPurpose);
+  }
+
   function handleCreateFragment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -395,6 +505,20 @@ export default function ResourceFocusPanel({
       return;
     }
 
+    if (
+      captureTeachingCitation &&
+      resourceNode.type === 'resource' &&
+      !citationExcerpt.trim() &&
+      !citationLocator.trim()
+    ) {
+      setCitationFeedback({
+        message:
+          '教学引用需要落到具体资料片段。请填写“引用片段正文”或“引用片段定位信息”，或先在资料区定位到一个摘录再引用。',
+        tone: 'error',
+      });
+      return;
+    }
+
     try {
       const result = attachResourceCitation(tree, {
         allowFragmentCreation: false,
@@ -405,6 +529,10 @@ export default function ResourceFocusPanel({
                 locator: citationLocator,
               }
             : undefined,
+        referenceDraft: buildReferenceDraft(editorNode, {
+          focusText: citationFocusText,
+          purpose: citationPurpose,
+        }),
         sourceNodeId: editorNode.id,
         targetNodeId: resourceNode.id,
       });
@@ -437,6 +565,63 @@ export default function ResourceFocusPanel({
   }
 }
 
+function buildReferenceDraft(
+  editorNode: Extract<TreeNode, { type: 'question' | 'answer' | 'summary' | 'judgment' }>,
+  draft: {
+    focusText: string;
+    purpose: CitationPurpose;
+  },
+) {
+  if (!isTeachingCitationNode(editorNode)) {
+    return undefined;
+  }
+
+  const normalizedFocusText =
+    draft.focusText.trim() || buildDefaultCitationFocusText(editorNode);
+
+  return {
+    focusText: normalizedFocusText,
+    note: getCitationPurposeDescription(draft.purpose),
+    purpose: draft.purpose,
+  };
+}
+
+function isTeachingCitationNode(
+  node: TreeNode | null | undefined,
+): node is Extract<TreeNode, { type: 'summary' | 'judgment' }> {
+  return node?.type === 'summary' || node?.type === 'judgment';
+}
+
+function buildDefaultCitationFocusText(
+  node: Extract<TreeNode, { type: 'summary' | 'judgment' }>,
+) {
+  const paragraphs = node.content
+    .split(/\n\s*\n/gu)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  if (paragraphs.length > 0) {
+    return paragraphs[0] ?? node.title.trim();
+  }
+
+  return node.title.trim();
+}
+
+function getDefaultCitationPurpose(
+  tree: NodeTree,
+  node: Extract<TreeNode, { type: 'summary' | 'judgment' }>,
+): CitationPurpose {
+  if (node.type === 'judgment') {
+    return 'judgment';
+  }
+
+  if (isScaffoldSummaryNode(tree, node)) {
+    return 'background';
+  }
+
+  return 'mechanism';
+}
+
 function buildCitationFeedbackMessage(
   result: ReturnType<typeof attachResourceCitation>,
   sourceNodeTitle: string,
@@ -450,7 +635,7 @@ function buildCitationFeedbackMessage(
       : `资料《${targetNode.title}》`;
 
   if (result.referenceAlreadyExisted) {
-    return `当前学习节点《${sourceNodeTitle}》已经引用了${targetLabel}，未重复创建。`;
+    return `当前学习节点《${sourceNodeTitle}》已经引用了${targetLabel}；如有新的解释片段或用途说明，也已同步补到原引用上。`;
   }
 
   switch (result.resolution) {
@@ -459,12 +644,19 @@ function buildCitationFeedbackMessage(
     case 'fragment-reused':
       return `已复用已有摘录《${targetNode.title}》，并把它引用到《${sourceNodeTitle}》。`;
     case 'fragment-created':
-      return `当前工作树不允许自动创建新摘录；如果你看到了这条分支，说明实现出现了回归。`;
+      return '当前工作树不允许自动创建新摘录；如果你看到了这条分支，说明实现出现了回归。';
     case 'resource':
       return attemptedFragmentResolution
-        ? `未找到可稳定复用的摘录，已退回为资料级引用《${targetNode.title}》。`
+        ? `没找到可稳定复用的摘录，已退回为资料级引用《${targetNode.title}》，但仍保留了本次填写的原文片段和定位提示。`
         : `已把资料《${targetNode.title}》引用到《${sourceNodeTitle}》。`;
   }
+}
+
+function getCitationPurposeDescription(purpose: CitationPurpose) {
+  return (
+    CITATION_PURPOSE_OPTIONS.find((option) => option.value === purpose)
+      ?.description ?? '这里是在补充当前解释真正依赖的资料依据。'
+  );
 }
 
 function getResourceFieldSourceLabel(source: string | null | undefined) {

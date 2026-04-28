@@ -64,8 +64,11 @@ test('reuses an existing fragment for an answer citation, persists it after remo
   const citationSection = await findSectionByHeading('当前学习节点引用');
   const reusedFocusCard = await findSectionByHeading('当前资料焦点');
 
+  expect(citationSection.getByText('补充来源')).toBeInTheDocument();
   expect(citationSection.getByText('摘录引用')).toBeInTheDocument();
-  expect(citationSection.getByText('批处理摘录')).toBeInTheDocument();
+  expect(
+    citationSection.getByText('React 官方文档 / 批处理摘录'),
+  ).toBeInTheDocument();
   expect(reusedFocusCard.getByText('摘录 · 批处理摘录')).toBeInTheDocument();
   expect(screen.getByText('被引用 1 次')).toBeInTheDocument();
 
@@ -77,7 +80,7 @@ test('reuses an existing fragment for an answer citation, persists it after remo
 
   const restoredCitationSection = await findSectionByHeading('当前学习节点引用');
 
-  expect(restoredCitationSection.getByText('摘录引用')).toBeInTheDocument();
+  expect(restoredCitationSection.getByText('补充来源')).toBeInTheDocument();
   fireEvent.click(
     restoredCitationSection.getByRole('button', { name: '定位到摘录' }),
   );
@@ -120,6 +123,7 @@ test('falls back to a resource-level citation when runtime cannot resolve a stab
   const citationSection = await findSectionByHeading('当前学习节点引用');
   const fallbackFocusCard = await findSectionByHeading('当前资料焦点');
 
+  expect(citationSection.getByText('补充来源')).toBeInTheDocument();
   expect(citationSection.getByText('资料级引用')).toBeInTheDocument();
   expect(citationSection.getAllByText('React 官方文档')).toHaveLength(2);
   expect(

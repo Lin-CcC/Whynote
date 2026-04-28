@@ -1,6 +1,7 @@
 import { NodeDomainError } from './nodeErrors';
 import { cloneNodeTree, getNodeOrThrow } from './treeDocument';
 import {
+  isCitationPurpose,
   isReferenceSourceNodeType,
   isReferenceTargetNodeType,
 } from './treeConstraints';
@@ -110,6 +111,49 @@ export function removeNodeReference(tree: NodeTree, referenceId: string) {
   );
   sourceNode.updatedAt = createTimestamp();
   delete nextTree.references[referenceId];
+
+  return nextTree;
+}
+
+export function updateNodeReference(
+  tree: NodeTree,
+  referenceId: string,
+  patch: Partial<
+    Pick<
+      NodeReference,
+      'focusText' | 'note' | 'purpose' | 'sourceExcerpt' | 'sourceLocator'
+    >
+  >,
+) {
+  const reference = tree.references[referenceId];
+
+  if (!reference) {
+    throw new NodeDomainError(
+      'INVALID_REFERENCE',
+      `引用 ${referenceId} 不存在，无法更新。`,
+      {
+        referenceId,
+      },
+    );
+  }
+
+  if (patch.purpose && !isCitationPurpose(patch.purpose)) {
+    throw new NodeDomainError(
+      'INVALID_REFERENCE',
+      `引用 ${referenceId} 的教学用途 ${patch.purpose} 不合法。`,
+      {
+        referenceId,
+        purpose: patch.purpose,
+      },
+    );
+  }
+
+  const nextTree = cloneNodeTree(tree);
+  nextTree.references[referenceId] = {
+    ...nextTree.references[referenceId],
+    ...patch,
+    updatedAt: createTimestamp(),
+  };
 
   return nextTree;
 }

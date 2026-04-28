@@ -4,7 +4,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import type {
   AiConfig,
@@ -84,6 +84,40 @@ test('persists workspace edits and restores them on the next mount', async () =>
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   expect(await screen.findByDisplayValue('已持久化模块')).toBeInTheDocument();
+});
+
+test('does not trigger a cross-component render update warning while editing workspace content', async () => {
+  const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const dependencies = createTestDependencies();
+
+  try {
+    render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+    await screen.findByRole('heading', { name: '当前学习模块' });
+
+    fireEvent.change(screen.getByDisplayValue('默认模块'), {
+      target: {
+        value: 'render warning fixed',
+      },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByDisplayValue('render warning fixed'),
+      ).toBeInTheDocument();
+    });
+
+    const hasCrossComponentWarning = consoleErrorSpy.mock.calls.some((call) =>
+      call.some(
+        (argument) =>
+          typeof argument === 'string' &&
+          argument.includes('Cannot update a component'),
+      ),
+    );
+
+    expect(hasCrossComponentWarning).toBe(false);
+  } finally {
+    consoleErrorSpy.mockRestore();
+  }
 });
 
 test('guides recovery from the AI action card when no module exists', async () => {
