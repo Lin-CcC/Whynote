@@ -5,17 +5,20 @@ import SectionCard from '../../ui/SectionCard';
 import WorkspaceEditor from '../workspaceEditor/WorkspaceEditor';
 import type {
   LearningActionId,
+  WorkspaceEditorNodeRenderContext,
   WorkspaceEditorRenderContext,
   WorkspaceEditorSelectionState,
 } from '../workspaceEditor/workspaceEditorTypes';
 import ResourcesSearchExportPanel from '../resourcesSearchExport/ResourcesSearchExportPanel';
 import WorkspaceRuntimeActionCard from './components/WorkspaceRuntimeActionCard';
 import WorkspaceRuntimeAiConfigCard from './components/WorkspaceRuntimeAiConfigCard';
+import WorkspaceRuntimeJudgmentActions from './components/WorkspaceRuntimeJudgmentActions';
 import WorkspaceRuntimeStatusCard from './components/WorkspaceRuntimeStatusCard';
 import { useWorkspaceRuntime } from './hooks/useWorkspaceRuntime';
 import { createDefaultWorkspaceRuntimeDependencies } from './services/createDefaultWorkspaceRuntimeDependencies';
 import {
   countQuestionFollowUpNodes,
+  getJudgmentInlineActionContext,
   getLatestQuestionAnswerExplanationNodeId,
   resolveQuestionAnswerEvaluationTarget,
 } from './services/learningRuntimeContext';
@@ -34,6 +37,9 @@ export default function WorkspaceRuntimeScreen({
   const [activeResourceNodeId, setActiveResourceNodeId] = useState<string | null>(
     null,
   );
+  const [activeJudgmentHintNodeId, setActiveJudgmentHintNodeId] = useState<
+    string | null
+  >(null);
   const runtime = useWorkspaceRuntime(resolvedDependencies);
   const resourceMetadataByNodeId = Object.fromEntries(
     runtime.resourceMetadataRecords.map((record) => [record.nodeId, record]),
@@ -106,6 +112,7 @@ export default function WorkspaceRuntimeScreen({
       onSelectionChange={handleEditorSelectionChange}
       onSnapshotChange={runtime.handleSnapshotChange}
       renderLeftPanelExtra={renderLeftPanelExtra}
+      renderNodeInlineActions={renderNodeInlineActions}
       renderRightPanelExtra={renderRightPanelExtra}
     />
   );
@@ -147,6 +154,52 @@ export default function WorkspaceRuntimeScreen({
           void runtime.runCompletionSuggestion(planStepNodeId);
         }}
         selectedNode={context.selectedNode}
+      />
+    );
+  }
+
+  function renderNodeInlineActions(context: WorkspaceEditorNodeRenderContext) {
+    if (context.node.type !== 'judgment') {
+      return null;
+    }
+
+    const actionContext = getJudgmentInlineActionContext(
+      context.tree,
+      context.node.id,
+    );
+
+    if (!actionContext) {
+      return null;
+    }
+
+    return (
+      <WorkspaceRuntimeJudgmentActions
+        answerNodeId={actionContext.answerNodeId}
+        hint={actionContext.hint}
+        isHintVisible={activeJudgmentHintNodeId === context.node.id}
+        judgmentNodeId={context.node.id}
+        onReturnToAnswer={() => {
+          if (!actionContext.answerNodeId) {
+            return;
+          }
+
+          setActiveJudgmentHintNodeId(null);
+          context.selectNode(actionContext.answerNodeId);
+        }}
+        onToggleHint={() => {
+          setActiveJudgmentHintNodeId((previousNodeId) =>
+            previousNodeId === context.node.id ? null : context.node.id,
+          );
+        }}
+        onViewSummary={() => {
+          if (!actionContext.summaryNodeId) {
+            return;
+          }
+
+          setActiveJudgmentHintNodeId(null);
+          context.selectNode(actionContext.summaryNodeId);
+        }}
+        summaryNodeId={actionContext.summaryNodeId}
       />
     );
   }

@@ -1,6 +1,11 @@
+import type { ReactNode } from 'react';
+
 import SectionCard from '../../../ui/SectionCard';
 import { getNodeOrThrow, type NodeTree } from '../../nodeDomain';
-import type { NodeContentPatch } from '../workspaceEditorTypes';
+import type {
+  NodeContentPatch,
+  WorkspaceEditorNodeRenderContext,
+} from '../workspaceEditorTypes';
 import { getDisplayLabelForNode } from '../utils/treeSelectors';
 import EditorNodeSection from './EditorNodeSection';
 
@@ -11,6 +16,9 @@ type TextMainViewProps = {
   onCreateModule: () => void;
   onSelectNode: (nodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
+  renderNodeInlineActions?: (
+    context: WorkspaceEditorNodeRenderContext,
+  ) => ReactNode;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
   selectedNodeId: string | null;
   tree: NodeTree;
@@ -23,6 +31,7 @@ export default function TextMainView({
   onCreateModule,
   onSelectNode,
   onUpdateNode,
+  renderNodeInlineActions,
   registerNodeElement,
   selectedNodeId,
   tree,
@@ -90,6 +99,7 @@ export default function TextMainView({
         nodeId={currentModule.id}
         onSelectNode={onSelectNode}
         onUpdateNode={onUpdateNode}
+        renderNodeInlineActions={renderNodeInlineActions}
         registerNodeElement={registerNodeElement}
         selectedNodeId={selectedNodeId}
         tree={tree}

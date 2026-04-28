@@ -16,7 +16,7 @@ test('treats plan-step summaries before the first question as scaffold introduct
   );
 });
 
-test('treats answer-phase summaries as answer explanations', () => {
+test('treats post-judgment summaries as answer explanations', () => {
   const tree = createSemanticsSnapshot().tree;
 
   expect(isAnswerClosureSummaryNode(tree, 'summary-closure')).toBe(true);
@@ -87,10 +87,34 @@ function createSemanticsSnapshot() {
     tree,
     'question-semantics',
     createNode({
+      type: 'answer',
+      id: 'answer-semantics',
+      title: '回答草稿',
+      content: '先给出一版回答。',
+      createdAt: '2026-04-27T12:00:00.000Z',
+      updatedAt: '2026-04-27T12:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-semantics',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-semantics',
+      title: '判断：还差一点',
+      content: '还缺一个关键因果关系。',
+      createdAt: '2026-04-27T12:00:00.000Z',
+      updatedAt: '2026-04-27T12:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-semantics',
+    createNode({
       type: 'summary',
       id: 'summary-closure',
-      title: '总结：标准理解',
-      content: '这是答题后的总结。',
+      title: '标准理解',
+      content: '这是答题后的答案解析。',
       createdAt: '2026-04-27T12:00:00.000Z',
       updatedAt: '2026-04-27T12:00:00.000Z',
     }),

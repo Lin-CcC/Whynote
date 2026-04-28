@@ -102,6 +102,13 @@ export interface WorkspaceEditorRenderContext
   workspaceTitle: string;
 }
 
+export interface WorkspaceEditorNodeRenderContext {
+  isSelected: boolean;
+  node: TreeNode;
+  selectNode: (nodeId: string) => void;
+  tree: NodeTree;
+}
+
 export interface WorkspaceEditorProps {
   initialSnapshot?: WorkspaceSnapshot;
   initialModuleId?: string;
@@ -119,5 +126,8 @@ export interface WorkspaceEditorProps {
   ) => ReactNode;
   renderRightPanelExtra?: (
     context: WorkspaceEditorRenderContext,
+  ) => ReactNode;
+  renderNodeInlineActions?: (
+    context: WorkspaceEditorNodeRenderContext,
   ) => ReactNode;
 }

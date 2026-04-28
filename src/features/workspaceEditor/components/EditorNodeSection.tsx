@@ -1,4 +1,9 @@
-import { Fragment, type CSSProperties, type ChangeEvent } from 'react';
+import {
+  Fragment,
+  type CSSProperties,
+  type ChangeEvent,
+  type ReactNode,
+} from 'react';
 
 import { resolvePlanStepRuntimeStatus } from '../../learningEngine';
 import { getNodeOrThrow, type NodeTree, type PlanStepStatus } from '../../nodeDomain';
@@ -8,7 +13,10 @@ import {
   getNodeEmphasis,
   getNodeInputPlaceholderForNode,
 } from '../utils/treeSelectors';
-import type { NodeContentPatch } from '../workspaceEditorTypes';
+import type {
+  NodeContentPatch,
+  WorkspaceEditorNodeRenderContext,
+} from '../workspaceEditorTypes';
 
 type EditorNodeSectionProps = {
   depth: number;
@@ -16,6 +24,9 @@ type EditorNodeSectionProps = {
   nodeId: string;
   onSelectNode: (nodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
+  renderNodeInlineActions?: (
+    context: WorkspaceEditorNodeRenderContext,
+  ) => ReactNode;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
   selectedNodeId: string | null;
   tree: NodeTree;
@@ -33,6 +44,7 @@ export default function EditorNodeSection({
   nodeId,
   onSelectNode,
   onUpdateNode,
+  renderNodeInlineActions,
   registerNodeElement,
   selectedNodeId,
   tree,
@@ -56,6 +68,12 @@ export default function EditorNodeSection({
     node.type === 'plan-step' &&
     planStepRuntimeStatus !== null &&
     node.status !== planStepRuntimeStatus.suggestedStatus;
+  const inlineActions = renderNodeInlineActions?.({
+    isSelected,
+    node,
+    selectNode: onSelectNode,
+    tree,
+  });
 
   function handleEditableFocus() {
     if (!isSelected) {
@@ -144,6 +162,9 @@ export default function EditorNodeSection({
         rows={node.type === 'plan-step' ? 3 : 4}
         value={node.content}
       />
+      {inlineActions ? (
+        <div className="workspace-nodeInlineActions">{inlineActions}</div>
+      ) : null}
       {childNodes.length > 0 ? (
         <div className="workspace-nodeChildren">
           {childNodes.map((childNode) => (
@@ -171,6 +192,7 @@ export default function EditorNodeSection({
                 nodeId={childNode.id}
                 onSelectNode={onSelectNode}
                 onUpdateNode={onUpdateNode}
+                renderNodeInlineActions={renderNodeInlineActions}
                 registerNodeElement={registerNodeElement}
                 selectedNodeId={selectedNodeId}
                 tree={tree}
