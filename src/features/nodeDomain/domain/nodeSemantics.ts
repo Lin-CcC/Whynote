@@ -83,3 +83,32 @@ export function getDisplayNodeTypeLabel(tree: NodeTree, node: TreeNode): string 
       return '摘录';
   }
 }
+
+export function stripRedundantDisplayTypePrefix(
+  title: string,
+  nodeTypeLabel: string,
+): string {
+  const normalizedLabel = nodeTypeLabel.trim();
+
+  if (!normalizedLabel) {
+    return title;
+  }
+
+  const prefixPattern = new RegExp(
+    `^${escapeRegExp(normalizedLabel)}\\s*[:：]\\s*`,
+    'u',
+  );
+
+  return title.replace(prefixPattern, '').trimStart();
+}
+
+export function getDisplayNodeTitle(tree: NodeTree, node: TreeNode): string {
+  return stripRedundantDisplayTypePrefix(
+    node.title,
+    getDisplayNodeTypeLabel(tree, node),
+  );
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

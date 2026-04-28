@@ -1,4 +1,5 @@
 import {
+  getDisplayNodeTitle,
   getDisplayNodeTypeLabel,
   type NodeTree,
 } from '../../nodeDomain';
@@ -80,7 +81,7 @@ export function searchWorkspaceNodes({
         snippet: buildNodeSnippet(tree, node, query),
         sourceSummary: getNodeSourceSummary(tree, node),
         tagNames: getNodeTagNames(tree, node),
-        title: node.title,
+        title: getDisplayNodeTitle(tree, node),
       },
     ];
   });

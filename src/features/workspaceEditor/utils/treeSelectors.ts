@@ -1,4 +1,5 @@
 import {
+  getDisplayNodeTitle,
   getDisplayNodeTypeLabel,
   getAllowedChildTypes,
   getNodeOrThrow,
@@ -136,6 +137,10 @@ export function getNodeTypeLabel(nodeType: NodeType) {
 
 export function getDisplayLabelForNode(tree: NodeTree, node: TreeNode) {
   return getDisplayNodeTypeLabel(tree, node);
+}
+
+export function getDisplayTitleForNode(tree: NodeTree, node: TreeNode) {
+  return getDisplayNodeTitle(tree, node);
 }
 
 export function getNodeEmphasis(node: TreeNode) {

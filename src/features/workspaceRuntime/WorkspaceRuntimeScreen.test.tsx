@@ -188,7 +188,7 @@ test('runs learning-engine plan-step generation from UI and materializes the res
 
   expect(await screen.findByDisplayValue('建立最小概念框架')).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('铺垫：先建立进入问题的基础图景'),
+    await screen.findByDisplayValue('先建立进入问题的基础图景'),
   ).toBeInTheDocument();
   expect(
     await screen.findByDisplayValue('并发渲染到底改变了什么？'),

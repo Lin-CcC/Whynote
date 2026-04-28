@@ -14,6 +14,7 @@ import {
   detachTagFromNode,
   ensureBuiltinTags,
   getAllowedChildTypes,
+  getDisplayNodeTypeLabel,
   getModuleScopeId,
   getNodeOrThrow,
   insertChildNode,
@@ -24,6 +25,7 @@ import {
   type NonRootNode,
   type PlanStepNode,
   shouldConvertToModuleAtRoot,
+  stripRedundantDisplayTypePrefix,
   type TreeNode,
   type WorkspaceSnapshot,
 } from '../../nodeDomain';
@@ -1069,7 +1071,10 @@ function applyNodePatch(tree: NodeTree, nodeId: string, patch: NodeContentPatch)
   const nextNode = getNodeOrThrow(nextTree, nodeId);
 
   if (patch.title !== undefined) {
-    nextNode.title = patch.title;
+    nextNode.title = stripRedundantDisplayTypePrefix(
+      patch.title,
+      getDisplayNodeTypeLabel(tree, getNodeOrThrow(tree, nodeId)),
+    );
   }
 
   if (patch.content !== undefined) {

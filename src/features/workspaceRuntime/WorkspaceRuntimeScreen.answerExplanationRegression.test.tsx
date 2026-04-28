@@ -57,10 +57,10 @@ test('creates a judgment-linked answer explanation on the first evaluation', asy
   await screen.findByDisplayValue('手动回答草稿');
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
-  await screen.findByDisplayValue('判断：回答还不完整');
+  await screen.findByDisplayValue('回答还不完整');
   await screen.findByDisplayValue('标准理解');
 
-  const judgmentNode = findNodeByTitleInput('判断：回答还不完整');
+  const judgmentNode = findNodeByTitleInput('回答还不完整');
   const summaryNode = findNodeByTitleInput('标准理解');
 
   expect(summaryNode).toHaveTextContent('答案解析');
@@ -107,7 +107,7 @@ test('evaluates a manually inserted question and answer through the same closure
   await screen.findByDisplayValue('手动回答草稿');
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
-  expect(await screen.findByDisplayValue('判断：手动问题还差关键因果')).toBeInTheDocument();
+  expect(await screen.findByDisplayValue('手动问题还差关键因果')).toBeInTheDocument();
   expect(await screen.findByDisplayValue('标准理解')).toBeInTheDocument();
   expect(await screen.findByDisplayValue('追问：还缺哪条因果链？')).toBeInTheDocument();
   expect(
@@ -138,10 +138,10 @@ test('keeps answer explanation available on the first evaluation even when summa
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
-    await screen.findByDisplayValue('判断：还缺最后一步'),
+    await screen.findByDisplayValue('还缺最后一步'),
   ).toBeInTheDocument();
   await screen.findByDisplayValue('标准理解');
-  const judgmentNode = findNodeByTitleInput('判断：还缺最后一步');
+  const judgmentNode = findNodeByTitleInput('还缺最后一步');
   const summaryNode = findNodeByTitleInput('标准理解');
   expect(summaryNode).toHaveTextContent('答案解析');
 
