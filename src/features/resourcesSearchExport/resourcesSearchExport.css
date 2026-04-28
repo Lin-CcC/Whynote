@@ -74,6 +74,54 @@
   margin-top: 0.95rem;
 }
 
+.resources-batchPreview,
+.resources-batchResult,
+.resources-batchPreviewGroup {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.resources-batchPreview {
+  padding: 1rem;
+  border: 1px solid rgba(14, 116, 144, 0.16);
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, rgba(240, 249, 255, 0.72), rgba(255, 255, 255, 0.96)),
+    #ffffff;
+}
+
+.resources-batchResult {
+  padding-top: 0.95rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.resources-batchPreviewGrid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.resources-batchPreviewList {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resources-batchPreviewItem {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.resources-batchPreviewItem-result {
+  background: rgba(248, 250, 252, 0.92);
+}
+
 .resources-segmentedControl {
   display: grid;
   gap: 0.65rem;

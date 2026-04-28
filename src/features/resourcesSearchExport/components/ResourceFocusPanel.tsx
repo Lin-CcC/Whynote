@@ -20,6 +20,7 @@ import {
   getNodePathLabel,
   getNodeSourceSummary,
 } from '../utils/resourceTreeUtils';
+import { getResourceImportMethodLabel } from '../utils/resourceMetadataPresentation';
 
 type ResourceFocusPanelProps = {
   activeResourceNodeId: string | null;
@@ -141,12 +142,19 @@ export default function ResourceFocusPanel({
 
   const resourceNode = activeResourceNode;
   const targetResourceNode = resolveTargetResourceNode(tree, resourceNode);
-  const resourceMetadata = resourceMetadataByNodeId[resourceNode.id] ?? null;
   const editorNode =
     selectedEditorNodeId && tree.nodes[selectedEditorNodeId]
       ? getNodeOrThrow(tree, selectedEditorNodeId)
       : null;
   const canAttachCitation = isLearningCitationSourceNode(editorNode);
+  const activeResourceMetadata = resourceMetadataByNodeId[resourceNode.id] ?? null;
+  const targetResourceMetadata = targetResourceNode
+    ? resourceMetadataByNodeId[targetResourceNode.id] ?? null
+    : null;
+  const provenanceMetadata =
+    resourceNode.type === 'resource'
+      ? activeResourceMetadata
+      : targetResourceMetadata;
   const captureTeachingCitation =
     editorNode && isTeachingCitationNode(editorNode);
 
@@ -200,15 +208,33 @@ export default function ResourceFocusPanel({
             <dd>{resourceNode.content || '暂无资料概况'}</dd>
           </div>
         )}
-        {resourceMetadata ? (
+        {provenanceMetadata?.importMethod ? (
+          <div>
+            <dt>导入方式</dt>
+            <dd>{getResourceImportMethodLabel(provenanceMetadata.importMethod)}</dd>
+          </div>
+        ) : null}
+        {provenanceMetadata?.originalFileName ? (
+          <div>
+            <dt>原文件名</dt>
+            <dd>{provenanceMetadata.originalFileName}</dd>
+          </div>
+        ) : null}
+        {provenanceMetadata?.sourceRelativePath ? (
+          <div>
+            <dt>相对路径</dt>
+            <dd>{provenanceMetadata.sourceRelativePath}</dd>
+          </div>
+        ) : null}
+        {resourceNode.type === 'resource' && activeResourceMetadata ? (
           <>
             <div>
               <dt>标题来源</dt>
-              <dd>{getResourceFieldSourceLabel(resourceMetadata.titleSource)}</dd>
+              <dd>{getResourceFieldSourceLabel(activeResourceMetadata.titleSource)}</dd>
             </div>
             <div>
               <dt>概况来源</dt>
-              <dd>{getResourceFieldSourceLabel(resourceMetadata.summarySource)}</dd>
+              <dd>{getResourceFieldSourceLabel(activeResourceMetadata.summarySource)}</dd>
             </div>
           </>
         ) : null}

@@ -2,11 +2,12 @@ import { type ChangeEvent, type FormEvent, useState } from 'react';
 
 import SectionCard from '../../../ui/SectionCard';
 import type { NodeTree, ResourceMetadataRecord } from '../../nodeDomain';
-import { createResourceMetadataRecord } from '../services/resourceIngestMetadataService';
-import type { ResourceImportDraft } from '../services/resourceIngestTypes';
 import { autoFillResourceDraftFromUrl } from '../services/resourceAutoFillService';
 import { createResourceEntry } from '../services/resourceEntryService';
+import { createResourceMetadataRecord } from '../services/resourceIngestMetadataService';
+import type { ResourceImportDraft } from '../services/resourceIngestTypes';
 import { buildResourceDraftFromLocalFile } from '../services/resourceLocalFileService';
+import LocalBatchImportPanel from './LocalBatchImportPanel';
 
 type ResourceEntryPanelProps = {
   activeResourceNodeId?: string | null;
@@ -54,12 +55,12 @@ export default function ResourceEntryPanel({
         </div>
       </div>
       <p className="workspace-helpText">
-        {BROWSER_LIMITED_URL_AUTO_FILL_HELP_TEXT} 同时支持 `txt / md`
-        最小本地上传，不扩展 PDF / DOCX、完整网页抓取或外部检索。
+        {BROWSER_LIMITED_URL_AUTO_FILL_HELP_TEXT}
+        同时保留单份资料录入，并把本地资料入口升级为可预览、可过滤的批量导入。
       </p>
       <form className="resources-entryLayout" onSubmit={handleCreateResource}>
         <div className="resources-entrySection">
-          <h3 className="workspace-splitTitle">新建资料</h3>
+          <h3 className="workspace-splitTitle">新建单份资料</h3>
           <label className="resources-panelField">
             <span className="resources-panelFieldLabel">资料标题</span>
             <input
@@ -84,11 +85,13 @@ export default function ResourceEntryPanel({
             <button
               className="resources-entryButton"
               disabled={isLocalFileImportRunning || isResourceAutoFillRunning}
-              onClick={handleAutoFillResourceDraft}
+              onClick={() => {
+                void handleAutoFillResourceDraft();
+              }}
               type="button"
             >
               {isResourceAutoFillRunning
-                ? '尝试读取中...'
+                ? '尝试读取中…'
                 : '尝试自动补全（浏览器受限）'}
             </button>
           </div>
@@ -96,19 +99,20 @@ export default function ResourceEntryPanel({
             这不是通用网页抓取器。浏览器只能尝试读取当前明确允许直接访问的 URL。
           </p>
           <label className="resources-panelField">
-            <span className="resources-panelFieldLabel">本地文件（txt / md）</span>
+            <span className="resources-panelFieldLabel">本地资料文件（单份预填）</span>
             <input
               accept=".txt,.md,text/plain,text/markdown,text/x-markdown"
               aria-label="本地资料文件"
               className="resources-panelInput resources-fileInput"
               disabled={isLocalFileImportRunning || isResourceAutoFillRunning}
-              onChange={handleLocalFileImport}
+              onChange={(event) => {
+                void handleLocalFileImport(event);
+              }}
               type="file"
             />
           </label>
           <p className="workspace-helpText">
-            上传只做最小文本导入：优先支持 `.txt`、`.md`，不在这版处理 PDF /
-            DOCX 解析。
+            单文件预填继续保留：优先支持 `.txt` / `.md`，不会在这轮扩展到 PDF / DOCX。
           </p>
           <label className="resources-panelField">
             <span className="resources-panelFieldLabel">资料概况</span>
@@ -128,6 +132,13 @@ export default function ResourceEntryPanel({
             创建资料
           </button>
         </div>
+        <LocalBatchImportPanel
+          onApplyTreeChange={onApplyTreeChange}
+          onFocusResourceNode={onFocusResourceNode}
+          onUpsertResourceMetadata={onUpsertResourceMetadata}
+          tree={tree}
+          workspaceId={workspaceId}
+        />
       </form>
       {feedback ? (
         <p

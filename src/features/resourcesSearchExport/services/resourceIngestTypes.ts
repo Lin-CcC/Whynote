@@ -11,8 +11,11 @@ export interface ResourceIngestMetadataDraft {
   bodyText?: string;
   canonicalSource?: string;
   importMethod: ResourceImportMethod;
+  importBatchId?: string;
   ingestStatus: ResourceIngestStatus;
   mimeType?: string;
+  originalFileName?: string;
+  sourceRelativePath?: string;
   summarySource: ResourceSummarySource;
   titleSource: ResourceTitleSource;
 }
