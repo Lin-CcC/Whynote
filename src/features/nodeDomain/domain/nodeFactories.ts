@@ -1,4 +1,5 @@
 import type {
+  CitationPurpose,
   NonRootNode,
   NodeReference,
   PlanStepStatus,
@@ -153,8 +154,12 @@ export function createTag(
 export function createNodeReference(options: {
   sourceNodeId: string;
   targetNodeId: string;
+  focusText?: string;
   id?: string;
   note?: string;
+  purpose?: CitationPurpose;
+  sourceExcerpt?: string;
+  sourceLocator?: string;
   createdAt?: string;
   updatedAt?: string;
 }): NodeReference {
@@ -164,7 +169,11 @@ export function createNodeReference(options: {
     id: options.id ?? createId(),
     sourceNodeId: options.sourceNodeId,
     targetNodeId: options.targetNodeId,
+    focusText: options.focusText,
     note: options.note,
+    purpose: options.purpose,
+    sourceExcerpt: options.sourceExcerpt,
+    sourceLocator: options.sourceLocator,
     createdAt: timestamp,
     updatedAt: options.updatedAt ?? timestamp,
   };

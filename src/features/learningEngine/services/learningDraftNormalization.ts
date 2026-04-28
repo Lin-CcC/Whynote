@@ -1,5 +1,6 @@
 import type {
   LearningActionDraftActionId,
+  LearningNodeCitationDraft,
   JudgmentNodeDraft,
   LearningMode,
   ModuleNodeDraft,
@@ -9,6 +10,7 @@ import type {
   SummaryNodeDraft,
 } from '../domain';
 import { getLearningModeLimits } from '../domain';
+import type { CitationPurpose } from '../../nodeDomain';
 
 import { parseJsonObjectWithTolerance } from './jsonObjectParsing';
 
@@ -36,6 +38,14 @@ const QUESTION_TITLE_SUFFIXES = [
   '需要解释什么',
   '如何判断你真的理解了',
 ] as const;
+const CITATION_PURPOSE_VALUES = new Set([
+  'definition',
+  'mechanism',
+  'behavior',
+  'example',
+  'judgment',
+  'background',
+] as const);
 const MIN_INTRODUCTION_LENGTH = 42;
 const MIN_INTRODUCTION_SENTENCE_COUNT = 2;
 const MIN_QUESTION_GUIDANCE_LENGTH = 18;
@@ -670,24 +680,58 @@ function normalizeCitationDrafts(payload: unknown) {
     return [];
   }
 
-  const citations = payload
-    .map((entry) => {
-      if (typeof entry === 'string') {
-        return entry.trim();
+  const citations: LearningNodeCitationDraft[] = [];
+
+  for (const entry of payload) {
+    if (typeof entry === 'string') {
+      const targetNodeId = entry.trim();
+
+      if (targetNodeId) {
+        citations.push({ targetNodeId });
       }
 
-      if (!isRecord(entry)) {
-        return '';
-      }
+      continue;
+    }
 
-      return (
-        getText(entry.targetNodeId) ||
-        getText(entry.nodeId) ||
-        getText(entry.id)
-      );
-    })
-    .filter(Boolean)
-    .map((targetNodeId) => ({ targetNodeId }));
+    if (!isRecord(entry)) {
+      continue;
+    }
+
+    const targetNodeId =
+      getText(entry.targetNodeId) ||
+      getText(entry.nodeId) ||
+      getText(entry.id);
+
+    if (!targetNodeId) {
+      continue;
+    }
+
+    citations.push({
+      targetNodeId,
+      focusText:
+        getText(entry.focusText) ||
+        getText(entry.claimText) ||
+        getText(entry.claim) ||
+        getText(entry.segmentText) ||
+        undefined,
+      note:
+        getText(entry.note) ||
+        getText(entry.reason) ||
+        getText(entry.why) ||
+        getText(entry.teachingNote) ||
+        undefined,
+      purpose:
+        normalizeCitationPurpose(
+          getText(entry.purpose) ||
+            getText(entry.usage) ||
+            getText(entry.role),
+        ) ?? undefined,
+      sourceExcerpt:
+        getText(entry.sourceExcerpt) || getText(entry.excerpt) || undefined,
+      sourceLocator:
+        getText(entry.sourceLocator) || getText(entry.locator) || undefined,
+    });
+  }
 
   return dedupeCitations(citations);
 }
@@ -1342,17 +1386,37 @@ function ensureUniqueTitles<T extends { title: string }>(items: T[]) {
   }
 }
 
-function dedupeCitations<T extends { targetNodeId: string }>(items: T[]) {
+function dedupeCitations<
+  T extends {
+    focusText?: string;
+    sourceExcerpt?: string;
+    sourceLocator?: string;
+    targetNodeId: string;
+  },
+>(items: T[]) {
   const seen = new Set<string>();
 
   return items.filter((item) => {
-    if (seen.has(item.targetNodeId)) {
+    const dedupeKey = [
+      item.targetNodeId,
+      item.focusText ?? '',
+      item.sourceExcerpt ?? '',
+      item.sourceLocator ?? '',
+    ].join('::');
+
+    if (seen.has(dedupeKey)) {
       return false;
     }
 
-    seen.add(item.targetNodeId);
+    seen.add(dedupeKey);
     return true;
   });
+}
+
+function normalizeCitationPurpose(value: string): CitationPurpose | null {
+  return CITATION_PURPOSE_VALUES.has(value as never)
+    ? (value as CitationPurpose)
+    : null;
 }
 
 function clamp(value: number, min: number, max: number) {
