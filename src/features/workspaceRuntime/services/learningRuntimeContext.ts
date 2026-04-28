@@ -13,6 +13,7 @@ import {
 } from '../../nodeDomain';
 
 export interface QuestionClosureRuntimeContext {
+  answerNodeId: string;
   introductions: string[];
   learnerAnswer: string;
   moduleNode: ModuleNode | null;
@@ -20,6 +21,11 @@ export interface QuestionClosureRuntimeContext {
   questionPath: QuestionClosureInput['questionPath'];
   referenceCandidates: LearningReferenceCandidate[];
   resourceSummary: string;
+}
+
+export interface QuestionAnswerEvaluationTarget {
+  answerNodeId: string;
+  questionNodeId: string;
 }
 
 export interface LearningActionRuntimeContext {
@@ -37,6 +43,7 @@ export interface LearningActionRuntimeContext {
 export function buildQuestionClosureRuntimeContext(
   tree: NodeTree,
   questionNodeId: string,
+  answerNodeId: string,
 ): QuestionClosureRuntimeContext {
   const planStepNode = findAncestorNode(tree, questionNodeId, 'plan-step');
   const referenceCandidates = collectLearningReferenceCandidates(tree);
@@ -45,9 +52,16 @@ export function buildQuestionClosureRuntimeContext(
     throw new Error('当前问题不在任何学习步骤下，无法生成回答评估闭环。');
   }
 
+  const answerNode = getNodeOrThrow(tree, answerNodeId);
+
+  if (answerNode.type !== 'answer' || answerNode.parentId !== questionNodeId) {
+    throw new Error('当前回答不属于目标问题，无法生成回答评估闭环。');
+  }
+
   return {
+    answerNodeId,
     introductions: collectPlanStepIntroductions(tree, planStepNode.id),
-    learnerAnswer: collectQuestionAnswerText(tree, questionNodeId),
+    learnerAnswer: formatAnswerForEvaluation(answerNode),
     moduleNode: findAncestorNode(tree, questionNodeId, 'module'),
     planStepNode,
     questionPath: collectQuestionPath(tree, questionNodeId),
@@ -110,22 +124,99 @@ export function hasQuestionAnswerEvidence(tree: NodeTree, questionNodeId: string
   return collectFilledAnswerNodes(tree, questionNodeId).length > 0;
 }
 
-export function getQuestionNodeIdForAnswerEvaluation(
+export function canEvaluateQuestionAnswer(
+  tree: NodeTree,
+  questionNodeId: string,
+  answerNodeId?: string,
+) {
+  const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+  if (questionNode.type !== 'question') {
+    return false;
+  }
+
+  if (!answerNodeId) {
+    return hasQuestionAnswerEvidence(tree, questionNodeId);
+  }
+
+  const answerNode = tree.nodes[answerNodeId];
+
+  return (
+    answerNode?.type === 'answer' &&
+    answerNode.parentId === questionNodeId &&
+    answerNode.content.trim().length > 0
+  );
+}
+
+export function getLatestQuestionAnswerNodeId(
+  tree: NodeTree,
+  questionNodeId: string,
+) {
+  const filledAnswerNodes = collectFilledAnswerNodes(tree, questionNodeId);
+
+  if (filledAnswerNodes.length > 0) {
+    return filledAnswerNodes[filledAnswerNodes.length - 1]?.id ?? null;
+  }
+
+  const answerNodes = collectAnswerNodes(tree, questionNodeId);
+
+  return answerNodes[answerNodes.length - 1]?.id ?? null;
+}
+
+export function getLatestQuestionAnswerExplanationNodeId(
+  tree: NodeTree,
+  questionNodeId: string,
+) {
+  const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+  if (questionNode.type !== 'question') {
+    return null;
+  }
+
+  const summaryNodes = questionNode.childIds
+    .map((childId) => tree.nodes[childId])
+    .filter(
+      (node): node is Extract<TreeNode, { type: 'summary' }> =>
+        node?.type === 'summary',
+    )
+    .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
+
+  return summaryNodes[summaryNodes.length - 1]?.id ?? null;
+}
+
+export function countQuestionFollowUpNodes(tree: NodeTree, questionNodeId: string) {
+  const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+  if (questionNode.type !== 'question') {
+    return 0;
+  }
+
+  return questionNode.childIds.filter(
+    (childId) => tree.nodes[childId]?.type === 'question',
+  ).length;
+}
+
+export function resolveQuestionAnswerEvaluationTarget(
   tree: NodeTree,
   selectedNodeId: string | null,
-) {
+): QuestionAnswerEvaluationTarget | null {
   if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
     return null;
   }
 
   const selectedNode = getNodeOrThrow(tree, selectedNodeId);
 
-  if (
-    selectedNode.type === 'question' &&
-    isLeafQuestion(tree, selectedNode.id) &&
-    hasQuestionAnswerEvidence(tree, selectedNode.id)
-  ) {
-    return selectedNode.id;
+  if (selectedNode.type === 'question') {
+    const answerNodeId = getLatestQuestionAnswerNodeId(tree, selectedNode.id);
+
+    if (answerNodeId && canEvaluateQuestionAnswer(tree, selectedNode.id, answerNodeId)) {
+      return {
+        answerNodeId,
+        questionNodeId: selectedNode.id,
+      };
+    }
+
+    return null;
   }
 
   if (selectedNode.type !== 'answer' || selectedNode.parentId === null) {
@@ -136,10 +227,12 @@ export function getQuestionNodeIdForAnswerEvaluation(
 
   if (
     parentNode?.type === 'question' &&
-    isLeafQuestion(tree, parentNode.id) &&
-    hasQuestionAnswerEvidence(tree, parentNode.id)
+    canEvaluateQuestionAnswer(tree, parentNode.id, selectedNode.id)
   ) {
-    return parentNode.id;
+    return {
+      answerNodeId: selectedNode.id,
+      questionNodeId: parentNode.id,
+    };
   }
 
   return null;
@@ -272,9 +365,15 @@ function collectAnswerNodes(tree: NodeTree, questionNodeId: string) {
 }
 
 function collectFilledAnswerNodes(tree: NodeTree, questionNodeId: string) {
-  return collectAnswerNodes(tree, questionNodeId).filter((answerNode) =>
-    answerNode.content.trim().length > 0,
-  );
+  return collectAnswerNodes(tree, questionNodeId)
+    .filter((answerNode) => answerNode.content.trim().length > 0)
+    .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
+}
+
+function formatAnswerForEvaluation(
+  answerNode: Extract<TreeNode, { type: 'answer' }>,
+) {
+  return `当前回答：${formatNodeContent(answerNode.title, answerNode.content)}`;
 }
 
 function getQuestionContextNode(tree: NodeTree, selectedNodeId: string) {

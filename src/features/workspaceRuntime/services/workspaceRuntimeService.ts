@@ -26,10 +26,9 @@ import { createInitialWorkspaceSnapshot } from '../utils/createInitialWorkspaceS
 import {
   buildLearningActionRuntimeContext,
   buildQuestionClosureRuntimeContext,
+  canEvaluateQuestionAnswer,
   collectLeafQuestionIdsUnderPlanStep,
   collectLearningReferenceCandidates,
-  hasQuestionAnswerEvidence,
-  isLeafQuestion,
   summarizeLearningReferenceCandidates,
 } from './learningRuntimeContext';
 import type {
@@ -162,6 +161,7 @@ export function createWorkspaceRuntimeService(
     async evaluateQuestionAnswer(
       snapshot: WorkspaceSnapshot,
       questionNodeId: string,
+      answerNodeId: string,
       config: AiConfig,
     ) {
       const questionNode = getNodeOrThrow(snapshot.tree, questionNodeId);
@@ -170,11 +170,7 @@ export function createWorkspaceRuntimeService(
         throw new Error(`节点 ${questionNodeId} 不是 question。`);
       }
 
-      if (!isLeafQuestion(snapshot.tree, questionNodeId)) {
-        throw new Error('当前问题已经派生出追问，请先在最末级问题上继续完成闭环。');
-      }
-
-      if (!hasQuestionAnswerEvidence(snapshot.tree, questionNodeId)) {
+      if (!canEvaluateQuestionAnswer(snapshot.tree, questionNodeId, answerNodeId)) {
         throw new Error('当前问题还没有回答，无法生成判断与讲解。');
       }
 
@@ -185,6 +181,7 @@ export function createWorkspaceRuntimeService(
       const context = buildQuestionClosureRuntimeContext(
         snapshot.tree,
         questionNodeId,
+        answerNodeId,
       );
       const previousChildIds = new Set(questionNode.childIds);
       const closureResult = await questionClosureService.generate({
@@ -210,8 +207,9 @@ export function createWorkspaceRuntimeService(
         nextSelectedNodeId: resolveNextSelectionAfterQuestionClosure(
           nextSnapshot.tree,
           questionNodeId,
+          context.answerNodeId,
           previousChildIds,
-          closureResult.followUpQuestions.length > 0,
+          closureResult.isAnswerSufficient,
         ),
         message: buildQuestionClosureMessage(
           nextSnapshot.tree,
@@ -510,24 +508,12 @@ function findAncestorNode<TNodeType extends TreeNode['type']>(
 function resolveNextSelectionAfterQuestionClosure(
   tree: NodeTree,
   questionNodeId: string,
+  answerNodeId: string,
   previousChildIds: Set<string>,
-  hasFollowUpQuestion: boolean,
+  isAnswerSufficient: boolean,
 ) {
-  if (hasFollowUpQuestion) {
-    const questionNode = getNodeOrThrow(tree, questionNodeId);
-
-    if (questionNode.type !== 'question') {
-      return questionNodeId;
-    }
-
-    const followUpQuestionId = questionNode.childIds.find(
-      (childId) =>
-        !previousChildIds.has(childId) && tree.nodes[childId]?.type === 'question',
-    );
-
-    if (followUpQuestionId) {
-      return followUpQuestionId;
-    }
+  if (!isAnswerSufficient) {
+    return tree.nodes[answerNodeId] ? answerNodeId : questionNodeId;
   }
 
   const planStepNode = findAncestorNode(tree, questionNodeId, 'plan-step');
@@ -593,7 +579,21 @@ function buildQuestionClosureMessage(
       : null;
 
   if (!isAnswerSufficient) {
-    return '系统已检查这次回答，并补出判断、总结和下一问。先顺着新的追问继续。';
+    const hasFollowUpQuestion =
+      getLatestInsertedFollowUpQuestionId(tree, questionNodeId, previousChildIds) !==
+      null;
+    const hasExplanation =
+      getLatestInsertedSummaryId(tree, questionNodeId, previousChildIds) !== null;
+
+    if (hasFollowUpQuestion && hasExplanation) {
+      return '系统已检查这次回答，并补出判断与答案解析。默认主路径仍留在当前回答上，先修改后重新评估；追问已生成，但只作为次级推进。';
+    }
+
+    if (hasExplanation) {
+      return '系统已检查这次回答，并补出判断与答案解析。默认主路径仍留在当前回答上，先修改后重新评估。';
+    }
+
+    return '系统已检查这次回答。默认主路径仍留在当前回答上，先修改后重新评估；如有追问，也只作为次级推进。';
   }
 
   const summaryNodeId = getLatestInsertedSummaryId(tree, questionNodeId, previousChildIds);
@@ -659,6 +659,29 @@ function getLatestInsertedSummaryId(
     .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
 
   return insertedSummaryNodes[insertedSummaryNodes.length - 1]?.id ?? null;
+}
+
+function getLatestInsertedFollowUpQuestionId(
+  tree: NodeTree,
+  questionNodeId: string,
+  previousChildIds: Set<string>,
+) {
+  const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+  if (questionNode.type !== 'question') {
+    return null;
+  }
+
+  const insertedQuestions = questionNode.childIds
+    .filter((childId) => !previousChildIds.has(childId))
+    .map((childId) => tree.nodes[childId])
+    .filter(
+      (childNode): childNode is Extract<TreeNode, { type: 'question' }> =>
+        childNode?.type === 'question',
+    )
+    .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
+
+  return insertedQuestions[insertedQuestions.length - 1]?.id ?? null;
 }
 
 function buildLearningActionDraftMessage(

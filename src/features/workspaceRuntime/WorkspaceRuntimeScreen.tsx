@@ -15,7 +15,9 @@ import WorkspaceRuntimeStatusCard from './components/WorkspaceRuntimeStatusCard'
 import { useWorkspaceRuntime } from './hooks/useWorkspaceRuntime';
 import { createDefaultWorkspaceRuntimeDependencies } from './services/createDefaultWorkspaceRuntimeDependencies';
 import {
-  getQuestionNodeIdForAnswerEvaluation,
+  countQuestionFollowUpNodes,
+  getLatestQuestionAnswerExplanationNodeId,
+  resolveQuestionAnswerEvaluationTarget,
 } from './services/learningRuntimeContext';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 
@@ -109,23 +111,35 @@ export default function WorkspaceRuntimeScreen({
   );
 
   function renderLeftPanelExtra(context: WorkspaceEditorRenderContext) {
-    const evaluationQuestionNodeId = getQuestionNodeIdForAnswerEvaluation(
+    const evaluationTarget = resolveQuestionAnswerEvaluationTarget(
       context.tree,
       context.selectedNode?.id ?? null,
     );
+    const answerExplanationNodeId = evaluationTarget
+      ? getLatestQuestionAnswerExplanationNodeId(
+          context.tree,
+          evaluationTarget.questionNodeId,
+        )
+      : null;
+    const answerFollowUpCount = evaluationTarget
+      ? countQuestionFollowUpNodes(context.tree, evaluationTarget.questionNodeId)
+      : 0;
 
     return (
       <WorkspaceRuntimeActionCard
+        answerExplanationNodeId={answerExplanationNodeId}
+        answerFollowUpCount={answerFollowUpCount}
         currentModule={context.currentModule}
-        evaluationQuestionNodeId={evaluationQuestionNodeId}
+        evaluationTarget={evaluationTarget}
         isAiRunning={runtime.isAiRunning}
         onCreateModule={context.createModule}
-        onEvaluateQuestionAnswer={(questionNodeId) => {
-          void runtime.runQuestionEvaluation(questionNodeId);
+        onEvaluateQuestionAnswer={(target) => {
+          void runtime.runQuestionEvaluation(target);
         }}
         onGeneratePlanSteps={(moduleNodeId) => {
           void runtime.runPlanStepGeneration(moduleNodeId);
         }}
+        onSelectNode={context.selectNode}
         onSplitQuestion={(questionNodeId) => {
           void runtime.runQuestionSplit(questionNodeId);
         }}

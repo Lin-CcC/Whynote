@@ -222,7 +222,7 @@ describe('completionSuggestionService', () => {
     expect(result.reasonSummary).toContain('不能替代具体 question 的闭环');
   });
 
-  it('keeps follow-up leaf questions unresolved until the latest leaf is closed', () => {
+  it('keeps the parent answer as the closure target after follow-up is generated', () => {
     let tree = createBaseTree({
       stepId: 'plan-step-follow-up',
       moduleId: 'module-follow-up',
@@ -279,7 +279,7 @@ describe('completionSuggestionService', () => {
     expect(result.evidence.questionCount).toBe(2);
     expect(result.evidence.leafQuestionCount).toBe(1);
     expect(result.evidence.unresolvedQuestionTitles).toEqual([
-      '追问：还缺哪条因果关系？',
+      '什么是并发渲染？',
     ]);
   });
 });

@@ -3,6 +3,7 @@ import {
   createWorkspaceSnapshot,
   getDisplayNodeTypeLabel,
   insertChildNode,
+  isAnswerClosureSummaryNode,
   isScaffoldSummaryNode,
 } from '..';
 
@@ -15,11 +16,14 @@ test('treats plan-step summaries before the first question as scaffold introduct
   );
 });
 
-test('keeps answer-phase summaries as regular summaries', () => {
+test('treats answer-phase summaries as answer explanations', () => {
   const tree = createSemanticsSnapshot().tree;
 
+  expect(isAnswerClosureSummaryNode(tree, 'summary-closure')).toBe(true);
   expect(isScaffoldSummaryNode(tree, 'summary-closure')).toBe(false);
-  expect(getDisplayNodeTypeLabel(tree, tree.nodes['summary-closure']!)).toBe('总结');
+  expect(getDisplayNodeTypeLabel(tree, tree.nodes['summary-closure']!)).toBe(
+    '答案解析',
+  );
 });
 
 function createSemanticsSnapshot() {
