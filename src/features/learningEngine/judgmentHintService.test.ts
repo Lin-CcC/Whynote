@@ -78,7 +78,11 @@ describe('judgmentHintService', () => {
 
     expect(capturedPrompt).toContain('已有判断评价');
     expect(capturedPrompt).toContain('已有答案解析');
-    expect(capturedPrompt).toContain('hint 只做三件事');
+    expect(capturedPrompt).toContain('不补上会卡在哪里');
+    expect(capturedPrompt).toContain('接下来可以往哪想');
+    expect(capturedPrompt).toContain('focus 只能指向一个具体缺口');
+    expect(capturedPrompt).toContain('background 要补的不是结论本身');
+    expect(capturedPrompt).toContain('thinkingQuestion 要顺着这个卡点给出下一步思考抓手');
     expect(capturedPrompt).toContain(
       '"hint":{"focus":"","background":"","thinkingQuestion":"","content":""}',
     );
