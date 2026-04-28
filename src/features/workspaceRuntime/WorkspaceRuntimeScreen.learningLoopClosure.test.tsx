@@ -107,6 +107,49 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   ).toBeInTheDocument();
 });
 
+test('allows evaluating a leaf question while the answer node is selected', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createAnswerClosureSnapshot(),
+    createMockProviderClient({
+      'question-closure': {
+        isAnswerSufficient: false,
+        judgment: {
+          title: '判断：回答还不完整',
+          content: '你还没有解释为什么更新会被批处理。',
+        },
+        summary: {
+          title: '总结：标准理解',
+          content:
+            'React 会把同一轮事件中的多个状态更新合并后再统一提交，这样可以减少重复渲染。',
+        },
+        followUpQuestions: [
+          {
+            title: '追问：还缺哪一步因果关系？',
+            content: '请只补上为什么会减少重复渲染。',
+          },
+        ],
+      },
+    }),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.focus(screen.getByLabelText('回答草稿 标题'));
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: '评估当前回答' })).toBeEnabled();
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: '评估当前回答' }));
+
+  expect(
+    await screen.findByDisplayValue('判断：回答还不完整'),
+  ).toBeInTheDocument();
+  expect(
+    await screen.findByDisplayValue('追问：还缺哪一步因果关系？'),
+  ).toBeInTheDocument();
+});
+
 test('evaluates a sufficient answer into a closed question and promotes the step to done', async () => {
   const dependencies = await createPreloadedDependencies(
     createAnswerClosureSnapshot(),
@@ -171,7 +214,7 @@ test('preserves a manual step status override across save and reload', async () 
   );
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(screen.getByRole('combobox'), {
+  fireEvent.change(screen.getByRole('combobox', { name: '起始步骤 的步骤状态' }), {
     target: {
       value: 'done',
     },
@@ -193,7 +236,9 @@ test('preserves a manual step status override across save and reload', async () 
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
-  expect(await screen.findByRole('combobox')).toHaveValue('done');
+  expect(
+    await screen.findByRole('combobox', { name: '起始步骤 的步骤状态' }),
+  ).toHaveValue('done');
 });
 
 async function createPreloadedDependencies(

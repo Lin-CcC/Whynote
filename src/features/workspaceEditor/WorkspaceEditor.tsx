@@ -51,14 +51,20 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           <SectionCard>
             <StructureActionBar
               actionAvailability={workspaceEditor.actionAvailability}
+              childInsertOptions={workspaceEditor.childInsertOptions}
               interactionLockReason={props.interactionLockReason ?? null}
               isInteractionLocked={props.isInteractionLocked ?? false}
+              onChildInsertTypeChange={workspaceEditor.setSelectedChildInsertType}
               onDeleteNode={workspaceEditor.deleteSelection}
               onInsertChildNode={workspaceEditor.insertChildAtSelection}
               onInsertSiblingNode={workspaceEditor.insertSiblingAtSelection}
               onLiftNode={workspaceEditor.liftSelection}
               onLowerNode={workspaceEditor.lowerSelection}
+              onSiblingInsertTypeChange={workspaceEditor.setSelectedSiblingInsertType}
+              selectedChildInsertType={workspaceEditor.selectedChildInsertType}
+              selectedSiblingInsertType={workspaceEditor.selectedSiblingInsertType}
               selectedNodeTitle={workspaceEditor.selectedNode?.title ?? null}
+              siblingInsertOptions={workspaceEditor.siblingInsertOptions}
             />
             {workspaceEditor.operationError ? (
               <p className="workspace-errorText" role="alert">

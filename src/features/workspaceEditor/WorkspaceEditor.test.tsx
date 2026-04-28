@@ -98,6 +98,36 @@ test.each([
   expect(operationSpy.mock.calls[0]?.[1]).toBe(DEMO_SELECTED_NODE_ID);
 });
 
+test('allows choosing answer and summary when inserting nodes for a learning question', () => {
+  const operations = createOperationSpies();
+
+  render(<WorkspaceEditor operations={operations} />);
+
+  fireEvent.change(screen.getByLabelText('子节点类型'), {
+    target: {
+      value: 'answer',
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '插入子节点' }));
+
+  const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
+
+  expect(insertChildSpy).toHaveBeenCalledTimes(1);
+  expect(insertChildSpy.mock.calls[0]?.[2].type).toBe('answer');
+
+  fireEvent.change(screen.getByLabelText('同级节点类型'), {
+    target: {
+      value: 'summary',
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '插入同级' }));
+
+  const insertSiblingSpy = getOperationSpy(operations, 'insertSiblingNode');
+
+  expect(insertSiblingSpy).toHaveBeenCalledTimes(1);
+  expect(insertSiblingSpy.mock.calls[0]?.[2].type).toBe('summary');
+});
+
 test('renders plan-step with weaker emphasis than learning nodes', () => {
   render(<WorkspaceEditor />);
 
