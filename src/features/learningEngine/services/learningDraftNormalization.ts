@@ -96,11 +96,24 @@ interface RawQuestionClosurePayload {
   answerSufficient?: unknown;
   judgment?: unknown;
   evaluation?: unknown;
+  hint?: unknown;
+  guidanceHint?: unknown;
   summary?: unknown;
   explanation?: unknown;
   followUpQuestions?: unknown;
   followUps?: unknown;
   nextQuestions?: unknown;
+}
+
+interface NormalizedJudgmentDetails {
+  answeredText: string;
+  gapItems: string[];
+  whyItMattersText: string;
+}
+
+interface NormalizedJudgmentDraftResult {
+  details: NormalizedJudgmentDetails;
+  draft: JudgmentNodeDraft;
 }
 
 export function parseJsonObject(rawText: string): unknown {
@@ -177,17 +190,30 @@ export function normalizeQuestionClosure(
 ): QuestionClosureResult {
   const rawPayload = isRecord(payload) ? (payload as RawQuestionClosurePayload) : {};
   const isAnswerSufficient = resolveAnswerSufficiency(rawPayload);
-  const judgment = normalizeJudgmentDraft(
+  const normalizedJudgment = normalizeJudgmentDraft(
     rawPayload.judgment ?? rawPayload.evaluation,
-    isAnswerSufficient,
-    options?.currentQuestionTitle,
+    {
+      currentQuestionTitle: options?.currentQuestionTitle,
+      isAnswerSufficient,
+      learnerAnswer: options?.learnerAnswer,
+    },
   );
   const summary = normalizeClosureSummaryDraft(
     rawPayload.summary ?? rawPayload.explanation,
     {
       currentQuestionTitle: options?.currentQuestionTitle,
       isAnswerSufficient,
+      judgment: normalizedJudgment.details,
       learnerAnswer: options?.learnerAnswer,
+    },
+  );
+  const hint = normalizeClosureHint(
+    rawPayload.hint ?? rawPayload.guidanceHint,
+    {
+      currentQuestionTitle: options?.currentQuestionTitle,
+      judgment: normalizedJudgment.details,
+      judgmentContent: normalizedJudgment.draft.content,
+      summaryContent: summary.content,
     },
   );
   const followUpQuestions = normalizeFollowUpQuestionDrafts(
@@ -198,7 +224,10 @@ export function normalizeQuestionClosure(
 
   return {
     isAnswerSufficient,
-    judgment,
+    judgment: {
+      ...normalizedJudgment.draft,
+      hint,
+    },
     summary,
     followUpQuestions,
     metadata: {
@@ -473,29 +502,26 @@ function normalizeStandaloneQuestionDraft(
 
 function normalizeJudgmentDraft(
   rawJudgment: unknown,
-  isAnswerSufficient: boolean,
-  currentQuestionTitle?: string,
-): JudgmentNodeDraft {
+  options: {
+    currentQuestionTitle?: string;
+    isAnswerSufficient: boolean;
+    learnerAnswer?: string;
+  },
+): NormalizedJudgmentDraftResult {
   const rawNode = isRecord(rawJudgment)
     ? (rawJudgment as RawLearningNodeDraft)
     : {};
   const title = getText(rawNode.title);
-  const rawContent =
-    getText(rawNode.content) ||
-    getText(rawNode.description) ||
-    (isAnswerSufficient
-      ? '可以进入下一步。'
-      : '需要继续补充。');
+  const details = normalizeJudgmentDetails(rawNode, options);
 
   return {
-    type: 'judgment',
-    title: normalizeJudgmentTitle(title, isAnswerSufficient),
-    content: normalizeJudgmentContent(
-      rawContent,
-      isAnswerSufficient,
-      currentQuestionTitle,
-    ),
-    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+    details,
+    draft: {
+      type: 'judgment',
+      title: normalizeJudgmentTitle(title, options.isAnswerSufficient),
+      content: formatStructuredJudgmentContent(details, options.isAnswerSufficient),
+      citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+    },
   };
 }
 
@@ -504,6 +530,7 @@ function normalizeClosureSummaryDraft(
   options: {
     currentQuestionTitle?: string;
     isAnswerSufficient: boolean;
+    judgment: NormalizedJudgmentDetails;
     learnerAnswer?: string;
   },
 ): SummaryNodeDraft {
@@ -1000,55 +1027,63 @@ function normalizeClosureSummaryContent(
   options: {
     currentQuestionTitle?: string;
     isAnswerSufficient: boolean;
+    judgment: NormalizedJudgmentDetails;
     learnerAnswer?: string;
   },
 ) {
   const normalizedContent = rawContent.trim();
 
-  if (isExplanatorySummaryContent(normalizedContent)) {
+  if (isGuidedExplanationContent(normalizedContent)) {
     return ensureSentenceEnding(normalizedContent);
   }
 
-  const reusableSentence =
-    normalizedContent && !looksLikeJudgmentOnlyContent(normalizedContent)
-      ? ensureSentenceEnding(normalizedContent)
-      : '';
-  const questionLabel = options.currentQuestionTitle
-    ? `围绕“${options.currentQuestionTitle}”`
-    : '围绕当前问题';
+  const reusableSentence = normalizeStandardUnderstandingSentence(
+    normalizedContent,
+    options.currentQuestionTitle,
+  );
   const learnerAngleSentence = buildClosureSummaryLearnerAngle(options);
-  const explanationSentence = options.isAnswerSufficient
-    ? `${questionLabel}，更稳妥的标准理解应该把关键机制、因果链和成立原因连成一条完整说明，必要时补上适用边界，而不是只停在结论。`
-    : `${questionLabel}，更稳妥的标准理解是先把还缺的机制、因果链或判断边界补齐，再整理成完整说明，而不是只停在“答案差不多了”的判断上。`;
+  const breakpointSentence = buildClosureSummaryBreakpoint(options);
+  const guidanceSentence = buildClosureSummaryGuidance(options);
+  const standardUnderstandingSentence = `更稳妥的标准理解是：${reusableSentence}`;
 
-  return [learnerAngleSentence, reusableSentence, explanationSentence]
+  return [
+    learnerAngleSentence,
+    breakpointSentence,
+    guidanceSentence,
+    standardUnderstandingSentence,
+  ]
     .filter(Boolean)
-    .join('');
+    .join('\n');
 }
 
 function buildClosureSummaryLearnerAngle(options: {
+  judgment: NormalizedJudgmentDetails;
   isAnswerSufficient: boolean;
   learnerAnswer?: string;
 }) {
-  if (!options.learnerAnswer?.trim()) {
-    return '';
+  const answeredText = stripTrailingSentencePunctuation(options.judgment.answeredText);
+
+  if (options.isAnswerSufficient) {
+    return answeredText
+      ? `你这版回答已经把主线说到了：${answeredText}。`
+      : '你这版回答已经把当前问题的主线说到了。';
   }
 
-  return options.isAnswerSufficient
-    ? '你的回答已经抓住了主线，下面把它整理成更稳妥的标准理解。'
-    : '你的回答已经碰到了这个问题的一部分方向，下面把缺的机制、因果或边界补齐。';
+  return answeredText
+    ? `你这版回答已经碰到了一部分方向：${answeredText}。`
+    : '你这版回答已经碰到了一部分方向，下面把缺的机制、因果或边界补齐。';
 }
 
-function isExplanatorySummaryContent(content: string) {
+function isGuidedExplanationContent(content: string) {
   if (!content) {
     return false;
   }
 
   return (
     !looksLikeJudgmentOnlyContent(content) &&
-    (content.length >= MIN_SUMMARY_EXPLANATION_LENGTH ||
-      containsExplanatorySignal(content) ||
-      countSentences(content) >= 2)
+    containsExplanatorySignal(content) &&
+    containsGuidanceSignal(content) &&
+    countSentences(content) >= 3
   );
 }
 
@@ -1076,6 +1111,521 @@ function containsExplanatorySignal(content: string) {
     '核心是',
     '换句话说',
   ].some((keyword) => content.includes(keyword));
+}
+
+function containsGuidanceSignal(content: string) {
+  return [
+    '如果沿着',
+    '会卡在',
+    '继续往下想',
+    '追问自己',
+    '有没有考虑过',
+    '如果只停在',
+    '先别急着',
+    '为什么不能只',
+    '你可以先想',
+  ].some((keyword) => content.includes(keyword));
+}
+
+function normalizeJudgmentDetails(
+  rawNode: RawLearningNodeDraft,
+  options: {
+    currentQuestionTitle?: string;
+    isAnswerSufficient: boolean;
+    learnerAnswer?: string;
+  },
+): NormalizedJudgmentDetails {
+  const answeredText = normalizeJudgmentAnsweredText(rawNode, options);
+  const gapItems = normalizeJudgmentGapItems(rawNode, options);
+  const whyItMattersText = normalizeJudgmentWhyItMattersText(
+    rawNode,
+    options,
+    gapItems,
+  );
+
+  return {
+    answeredText,
+    gapItems,
+    whyItMattersText,
+  };
+}
+
+function formatStructuredJudgmentContent(
+  details: NormalizedJudgmentDetails,
+  isAnswerSufficient: boolean,
+) {
+  const gapLines =
+    details.gapItems.length > 0
+      ? details.gapItems.map((gapItem, index) => `${String(index + 1)}. ${gapItem}`)
+      : [
+          isAnswerSufficient
+            ? '1. 当前没有新的关键缺口；如果继续打磨，只需要顺手补边界或压缩表述。'
+            : '1. 当前问题里仍有关键点没有说清楚。',
+        ];
+
+  return [
+    '已答到：',
+    `- ${details.answeredText}`,
+    '',
+    '还缺的关键点：',
+    ...gapLines,
+    '',
+    '为什么关键：',
+    `- ${details.whyItMattersText}`,
+  ].join('\n');
+}
+
+function normalizeJudgmentAnsweredText(
+  rawNode: RawLearningNodeDraft,
+  options: {
+    currentQuestionTitle?: string;
+    isAnswerSufficient: boolean;
+    learnerAnswer?: string;
+  },
+) {
+  const rawAnsweredText =
+    extractStructuredTextFromRawNode(rawNode, ['已答到']) ||
+    getText((rawNode as Record<string, unknown>).answered) ||
+    getText((rawNode as Record<string, unknown>).covered) ||
+    getText((rawNode as Record<string, unknown>).strengths);
+  const learnerAnswerFocus = extractLearnerAnswerFocus(options.learnerAnswer);
+  const fallbackText = learnerAnswerFocus
+    ? `你已经提到“${learnerAnswerFocus}”这条方向`
+    : options.currentQuestionTitle
+      ? options.isAnswerSufficient
+        ? `你已经覆盖了“${options.currentQuestionTitle}”的主线`
+        : `你已经开始围绕“${options.currentQuestionTitle}”给出方向性的解释`
+      : options.isAnswerSufficient
+        ? '你已经覆盖了当前问题的主线'
+        : '你已经给出了一版方向性的解释';
+  const candidateText = rawAnsweredText && !isGenericAnsweredText(rawAnsweredText)
+    ? rawAnsweredText
+    : fallbackText;
+
+  return ensureSentenceEnding(
+    normalizeNarrativeSentence(candidateText, {
+      fallbackPrefix: '你已经',
+      preserveLeadingQuestionWord: false,
+    }),
+  );
+}
+
+function normalizeJudgmentGapItems(
+  rawNode: RawLearningNodeDraft,
+  options: {
+    currentQuestionTitle?: string;
+    isAnswerSufficient: boolean;
+  },
+) {
+  const explicitGapItems = [
+    ...extractTextArray((rawNode as Record<string, unknown>).gaps),
+    ...extractTextArray((rawNode as Record<string, unknown>).missingKeyPoints),
+    ...extractTextArray((rawNode as Record<string, unknown>).missingPoints),
+  ];
+  const structuredGapText = extractStructuredTextFromRawNode(rawNode, [
+    '还缺的关键点',
+    '当前最关键缺口',
+    '还缺',
+  ]);
+  const contentGapItems = structuredGapText
+    ? splitStructuredList(structuredGapText)
+    : options.isAnswerSufficient
+      ? []
+      : splitStructuredList(
+          stripJudgmentScaffoldText(
+            getText(rawNode.content) || getText(rawNode.description),
+          ),
+        );
+  const normalizedGapItems = [...explicitGapItems, ...contentGapItems]
+    .map((item) => sanitizeGapItem(item))
+    .filter((item) => item.length > 0 && !looksGenericGapItem(item));
+
+  if (normalizedGapItems.length > 0) {
+    return normalizedGapItems.slice(0, 3).map(ensureSentenceEnding);
+  }
+
+  if (options.isAnswerSufficient) {
+    return [];
+  }
+
+  return [
+    ensureSentenceEnding(
+      options.currentQuestionTitle
+        ? `把“${options.currentQuestionTitle}”真正依赖的关键机制、因果关系或判断边界说清楚`
+        : '把当前问题真正依赖的关键机制、因果关系或判断边界说清楚',
+    ),
+  ];
+}
+
+function normalizeJudgmentWhyItMattersText(
+  rawNode: RawLearningNodeDraft,
+  options: {
+    currentQuestionTitle?: string;
+    isAnswerSufficient: boolean;
+  },
+  gapItems: string[],
+) {
+  const rawWhyText =
+    extractStructuredTextFromRawNode(rawNode, ['为什么关键']) ||
+    getText((rawNode as Record<string, unknown>).whyItMatters) ||
+    getText((rawNode as Record<string, unknown>).importance) ||
+    getText((rawNode as Record<string, unknown>).whyKey);
+
+  if (rawWhyText && !looksGenericWhyItMattersText(rawWhyText)) {
+    return ensureSentenceEnding(rawWhyText);
+  }
+
+  const questionLabel = options.currentQuestionTitle
+    ? `“${options.currentQuestionTitle}”`
+    : '当前问题';
+
+  if (options.isAnswerSufficient) {
+    return ensureSentenceEnding(
+      `因为这些点已经足以支撑对${questionLabel}的完整理解，后续只剩表述压缩或顺手补边界`,
+    );
+  }
+
+  const gapLabel =
+    gapItems[0]?.replace(/[。！？!?；;]+$/u, '') || `${questionLabel}还缺的关键点`;
+
+  return ensureSentenceEnding(
+    `因为如果不把“${gapLabel}”说清楚，就还无法真正说明${questionLabel}为什么成立，理解会停在表面结论`,
+  );
+}
+
+function normalizeClosureHint(
+  rawHint: unknown,
+  options: {
+    currentQuestionTitle?: string;
+    judgment: NormalizedJudgmentDetails;
+    judgmentContent: string;
+    summaryContent: string;
+  },
+) {
+  const rawHintText = extractRawHintText(rawHint);
+
+  if (isUsableHintContent(rawHintText, options)) {
+    return rawHintText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  const primaryGap =
+    options.judgment.gapItems[0]?.replace(/[。！？!?；;]+$/u, '') ||
+    (options.currentQuestionTitle
+      ? `把“${options.currentQuestionTitle}”里还缺的关键点补清楚`
+      : '把当前问题里还缺的关键点补清楚');
+
+  return [
+    `先补哪块：${primaryGap}。`,
+    buildHintPrimerFromGap(primaryGap),
+    '不要急着展开完整标准答案，先把这一个缺口补到能自圆其说。',
+  ].join('\n');
+}
+
+function normalizeStandardUnderstandingSentence(
+  rawContent: string,
+  currentQuestionTitle?: string,
+) {
+  if (hasUsableStandardUnderstandingContent(rawContent)) {
+    return ensureSentenceEnding(stripLeadingSummaryLabel(rawContent));
+  }
+
+  if (currentQuestionTitle) {
+    return ensureSentenceEnding(
+      `围绕“${currentQuestionTitle}”，要把关键机制、因果链和成立条件连成一条完整说明，而不是只停在结论`,
+    );
+  }
+
+  return ensureSentenceEnding(
+    '需要把关键机制、因果链和成立条件连成一条完整说明，而不是只停在结论',
+  );
+}
+
+function buildClosureSummaryBreakpoint(options: {
+  currentQuestionTitle?: string;
+  isAnswerSufficient: boolean;
+  judgment: NormalizedJudgmentDetails;
+}) {
+  if (options.isAnswerSufficient) {
+    return '如果继续打磨，可以顺手检查自己有没有把适用边界也交代清楚。';
+  }
+
+  const primaryGap =
+    options.judgment.gapItems[0]?.replace(/[。！？!?；;]+$/u, '') ||
+    (options.currentQuestionTitle
+      ? `“${options.currentQuestionTitle}”里还缺的关键点`
+      : '当前还缺的关键点');
+
+  return `如果沿着当前表述继续往下说，你会卡在“${primaryGap}”这一步。`;
+}
+
+function buildClosureSummaryGuidance(options: {
+  currentQuestionTitle?: string;
+  isAnswerSufficient: boolean;
+  judgment: NormalizedJudgmentDetails;
+}) {
+  if (options.isAnswerSufficient) {
+    return '继续追问自己：如果换一个场景或边界条件，这条理解还成立吗？';
+  }
+
+  const primaryGap =
+    options.judgment.gapItems[0]?.replace(/[。！？!?；;]+$/u, '') ||
+    (options.currentQuestionTitle
+      ? `“${options.currentQuestionTitle}”里还缺的关键点`
+      : '当前还缺的关键点');
+
+  return `继续往下想：${toQuestionPromptFromGap(primaryGap, options.currentQuestionTitle)}如果只说结论，会漏掉哪一环？`;
+}
+
+function hasUsableStandardUnderstandingContent(content: string) {
+  return (
+    Boolean(content) &&
+    !looksLikeJudgmentOnlyContent(content) &&
+    (content.length >= MIN_SUMMARY_EXPLANATION_LENGTH ||
+      containsExplanatorySignal(content) ||
+      countSentences(content) >= 2)
+  );
+}
+
+function extractRawHintText(payload: unknown) {
+  if (typeof payload === 'string') {
+    return payload.trim();
+  }
+
+  if (!isRecord(payload)) {
+    return '';
+  }
+
+  return (
+    getText(payload.content) ||
+    getText(payload.text) ||
+    getText(payload.description)
+  );
+}
+
+function isUsableHintContent(
+  content: string,
+  options: {
+    judgmentContent: string;
+    summaryContent: string;
+  },
+) {
+  const normalizedHint = normalizeCompareText(content);
+
+  if (!content || content.length < 18 || looksGenericHintText(content)) {
+    return false;
+  }
+
+  const normalizedJudgment = normalizeCompareText(options.judgmentContent);
+  const normalizedSummary = normalizeCompareText(options.summaryContent);
+
+  return (
+    normalizedHint.length > 0 &&
+    !normalizedJudgment.includes(normalizedHint) &&
+    !normalizedSummary.includes(normalizedHint)
+  );
+}
+
+function buildHintPrimerFromGap(primaryGap: string) {
+  if (primaryGap.includes('为什么')) {
+    return '先想清：把“发生了什么变化 -> 为什么会这样 -> 最后带来什么结果”连成一条因果链。';
+  }
+
+  if (primaryGap.includes('边界') || primaryGap.includes('条件')) {
+    return '先想清：不要只说结论，先分清它在什么条件下成立、什么时候会失效。';
+  }
+
+  if (
+    primaryGap.includes('关系') ||
+    primaryGap.includes('对象') ||
+    primaryGap.includes('机制')
+  ) {
+    return '先想清：把相关对象各自扮演的角色分开，再说明它们怎样发生联系。';
+  }
+
+  return '先想清：先把对象、关系和判断线索摆正，再决定要不要补更多背景。';
+}
+
+function extractStructuredTextFromRawNode(
+  rawNode: RawLearningNodeDraft,
+  sectionLabels: string[],
+) {
+  const content = [getText(rawNode.content), getText(rawNode.description)]
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+
+  for (const label of sectionLabels) {
+    const sectionPattern = new RegExp(
+      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:已答到|还缺的关键点|当前最关键缺口|还缺|为什么关键)[:：]|$)`,
+      'u',
+    );
+    const matched = content.match(sectionPattern)?.[1]?.trim();
+
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return '';
+}
+
+function extractTextArray(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map(getText).filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    return splitStructuredList(value);
+  }
+
+  return [] satisfies string[];
+}
+
+function splitStructuredList(content: string) {
+  return content
+    .split(/\n|[；;]+/u)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function sanitizeGapItem(item: string) {
+  return item
+    .replace(/^\s*[-*•]\s*/u, '')
+    .replace(/^\s*\d+[.)、]\s*/u, '')
+    .replace(/^还缺(?:的关键点)?[:：]?\s*/u, '')
+    .replace(/^当前最关键缺口[:：]?\s*/u, '')
+    .replace(/^你还没有(?:解释|说明)?/u, '')
+    .replace(/^还没有(?:解释|说明)?/u, '')
+    .replace(/^只差把/u, '')
+    .replace(/^需要继续把/u, '')
+    .replace(/^需要把/u, '')
+    .replace(/[。！？!?；;]+$/u, '')
+    .trim();
+}
+
+function stripJudgmentScaffoldText(content: string) {
+  return content
+    .replace(/^已答到[:：][\s\S]*?(?=\n|$)/u, '')
+    .replace(/^为什么关键[:：][\s\S]*?(?=\n|$)/u, '')
+    .replace(/^这次回答(?:还不完整|已答到[^。！？!?；]*?)，?/u, '')
+    .replace(/^这版(?:只差把)?/u, '')
+    .replace(/^回答方向对了，但/u, '')
+    .trim();
+}
+
+function normalizeNarrativeSentence(
+  content: string,
+  options: {
+    fallbackPrefix: string;
+    preserveLeadingQuestionWord: boolean;
+  },
+) {
+  const normalizedContent = content.trim();
+
+  if (!normalizedContent) {
+    return normalizedContent;
+  }
+
+  if (
+    normalizedContent.startsWith('你已经') ||
+    normalizedContent.startsWith('这次回答已经') ||
+    (options.preserveLeadingQuestionWord && normalizedContent.startsWith('为什么'))
+  ) {
+    return stripTrailingSentencePunctuation(normalizedContent);
+  }
+
+  return `${options.fallbackPrefix}${stripTrailingSentencePunctuation(normalizedContent)}`;
+}
+
+function stripLeadingSummaryLabel(content: string) {
+  return content.replace(/^(标准理解|答案解析|总结)[:：]\s*/u, '').trim();
+}
+
+function stripTrailingSentencePunctuation(content: string) {
+  return content.replace(/[。！？!?；;]+$/u, '').trim();
+}
+
+function toQuestionPromptFromGap(primaryGap: string, currentQuestionTitle?: string) {
+  if (primaryGap.includes('为什么')) {
+    return `${stripTrailingSentencePunctuation(primaryGap)}？`;
+  }
+
+  if (currentQuestionTitle) {
+    return `为什么${currentQuestionTitle}不能只停在“${primaryGap}”这一步？`;
+  }
+
+  return `“${primaryGap}”到底是怎么成立的？`;
+}
+
+function extractLearnerAnswerFocus(learnerAnswer?: string) {
+  const normalizedAnswer = learnerAnswer?.trim();
+
+  if (!normalizedAnswer) {
+    return '';
+  }
+
+  const answerLines = normalizedAnswer
+    .replace(/^当前回答[:：]/u, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const contentLine = answerLines[answerLines.length - 1] ?? '';
+  const normalizedLine = stripTrailingSentencePunctuation(contentLine);
+
+  if (!normalizedLine) {
+    return '';
+  }
+
+  return normalizedLine.length <= 28
+    ? normalizedLine
+    : `${normalizedLine.slice(0, 28).trimEnd()}…`;
+}
+
+function looksGenericGapItem(content: string) {
+  return [
+    '继续补充',
+    '再想想',
+    '补充说明',
+    '还有遗漏',
+    '需要继续',
+    '关键点',
+  ].some((keyword) => content.includes(keyword));
+}
+
+function looksGenericHintText(content: string) {
+  return [
+    '继续补充',
+    '再想想',
+    '给一点提示',
+    '看答案解析',
+    '回到回答修改',
+  ].some((keyword) => content.includes(keyword));
+}
+
+function looksGenericWhyItMattersText(content: string) {
+  return [
+    '比较重要',
+    '需要完整',
+    '继续补充',
+    '答案还不完整',
+  ].some((keyword) => content.includes(keyword));
+}
+
+function isGenericAnsweredText(content: string) {
+  return [
+    '关键点都提到了',
+    '回答得不错',
+    '方向是对的',
+    '继续保持',
+  ].some((keyword) => content.includes(keyword));
+}
+
+function normalizeCompareText(content: string) {
+  return content.replace(/\s+/gu, '').replace(/[。！？!?；;:：]/gu, '').trim();
 }
 
 function normalizeFollowUpQuestionDraft(
@@ -1234,7 +1784,7 @@ function normalizeActionSummaryContent(
 ) {
   const normalizedContent = rawContent.trim();
 
-  if (isExplanatorySummaryContent(normalizedContent)) {
+  if (hasUsableStandardUnderstandingContent(normalizedContent)) {
     return ensureSentenceEnding(normalizedContent);
   }
 

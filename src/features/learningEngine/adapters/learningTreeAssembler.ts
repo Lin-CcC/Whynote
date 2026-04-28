@@ -126,6 +126,7 @@ export function appendLearningNodeDraftToTree(
     type: 'question' | 'summary' | 'judgment';
     title: string;
     content: string;
+    hint?: string;
     citations: Array<{
       targetNodeId: string;
       focusText?: string;
@@ -141,6 +142,7 @@ export function appendLearningNodeDraftToTree(
     type: draft.type,
     title: draft.title,
     content: draft.content,
+    ...(draft.type === 'judgment' && draft.hint ? { hint: draft.hint } : {}),
   });
 
   let nextTree = insertChildNode(tree, parentNodeId, node, insertIndex);

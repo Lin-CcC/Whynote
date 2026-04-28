@@ -114,6 +114,15 @@
 - [x] 收口工程壳层 CTA 与主路径提示，让 answer / judgment / summary 三种语境都能直接看到下一步
 - [x] 补齐首次评估、手动 question + answer、手动 summary 配对和点击选中的回归测试，并通过 typecheck / test / build
 
+## 当前工作树：`codex/answer-feedback-and-shell-ux-fix`
+
+- [x] 给工作区自动保存补 debounce，并让“保存中 -> 已保存”切换更稳，避免输入时频繁闪烁
+- [x] 收紧 judgment 职责：明确“已答到什么 / 还缺哪 1-3 个关键点 / 为什么这些缺口关键”
+- [x] 让 hint 成为围绕缺口的独立微型铺垫，而不是摘抄答案解析
+- [x] 保证第一次评估后答案解析稳定存在，`查看答案解析` 在主路径和 judgment 卡片里都稳定可用
+- [x] 收口工程壳层的测试交互提示，减少按钮灰掉却缺少解释的测试困惑
+- [x] 补保存状态、judgment 缺口、hint 独立性、首次评估答案解析可用性的回归，并跑 typecheck / test / build
+
 ## 当前工作树：`codex/resource-citation-runtime`
 
 - [x] 补齐 `answer` 作为合法资料引用源的领域约束

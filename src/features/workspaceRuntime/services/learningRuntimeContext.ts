@@ -303,23 +303,19 @@ export function getJudgmentInlineActionContext(
     questionNode.childIds,
     judgmentIndex,
   );
-  const summaryNodeId = findSummaryNodeIdForJudgment(
-    tree,
-    questionNode.childIds,
-    judgmentIndex,
-  );
+  const summaryNodeId =
+    (answerNodeId
+      ? getLatestSummaryNodeIdForAnswer(tree, questionNode.id, answerNodeId)
+      : null) ??
+    findSummaryNodeIdForJudgment(tree, questionNode.childIds, judgmentIndex);
   const answerNode =
     answerNodeId && tree.nodes[answerNodeId]?.type === 'answer'
       ? tree.nodes[answerNodeId]
       : null;
-  const summaryNode =
-    summaryNodeId && tree.nodes[summaryNodeId]?.type === 'summary'
-      ? tree.nodes[summaryNodeId]
-      : null;
 
   return {
     answerNodeId,
-    hint: buildJudgmentHint(judgmentNode, answerNode, summaryNode),
+    hint: buildJudgmentHint(judgmentNode, questionNode, answerNode),
     questionNodeId: questionNode.id,
     summaryNodeId,
   };
@@ -688,39 +684,57 @@ function findAnswerNodeIdBeforeIndex(
 
 function buildJudgmentHint(
   judgmentNode: Extract<TreeNode, { type: 'judgment' }>,
+  questionNode: Extract<TreeNode, { type: 'question' }>,
   answerNode: Extract<TreeNode, { type: 'answer' }> | null,
-  summaryNode: Extract<TreeNode, { type: 'summary' }> | null,
 ) {
+  const persistedHint = judgmentNode.hint?.trim();
+
+  if (persistedHint) {
+    return persistedHint;
+  }
+
   const answerPrefix = answerNode
     ? `先回到「${answerNode.title}」，只补这次缺口。`
     : '先只补这次缺口。';
-  const gapText = extractJudgmentGapText(judgmentNode.content);
-  const primer = extractHintPrimer(summaryNode?.content);
-  const hintLines = [answerPrefix];
-
-  if (gapText) {
-    hintLines.push(`下一步优先把${gapText}说清楚。`);
-  }
-
-  if (primer) {
-    hintLines.push(
-      `如果卡住，可以先抓住“${primer}”这条线，再接它带来的结果、判断条件或使用边界。`,
-    );
-  }
-
-  hintLines.push('不要把整段答案解析直接改写回回答。');
+  const gapItems = extractJudgmentGapItems(judgmentNode.content, questionNode.title);
+  const primaryGap = gapItems[0] ?? `把“${questionNode.title}”里还缺的关键点说清楚`;
+  const hintLines = [
+    answerPrefix,
+    `先补哪块：${primaryGap}。`,
+    buildHintPrimerFromGap(primaryGap, questionNode.title),
+    '不要急着把整段答案解析搬回回答里，先把这一个缺口补完整。',
+  ];
 
   return hintLines.join('\n');
 }
 
-function extractJudgmentGapText(content: string) {
+function extractJudgmentGapItems(content: string, questionTitle: string) {
+  const sectionText = extractStructuredSection(content, [
+    '还缺的关键点',
+    '当前最关键缺口',
+    '还缺',
+  ]);
+
+  if (sectionText) {
+    const structuredItems = splitGapItems(sectionText);
+
+    if (structuredItems.length > 0) {
+      return structuredItems;
+    }
+  }
+
   const normalizedContent = content.trim();
 
   if (!normalizedContent) {
-    return '';
+    return [
+      `把“${questionTitle}”真正依赖的关键机制、因果关系或判断边界说清楚`,
+    ];
   }
 
-  const normalizedSentence = normalizedContent
+  const fallbackGap = normalizedContent
+    .replace(/^已答到[:：][^\n]+/u, '')
+    .replace(/^还缺(?:的关键点)?[:：]/u, '')
+    .replace(/^为什么关键[:：][^\n]+/u, '')
     .replace(/^这次回答(?:还不完整|已答到[^。！？!?；]*?)，?/u, '')
     .replace(/^这版(?:只差把)?/u, '')
     .replace(/^回答方向对了，但/u, '')
@@ -733,32 +747,66 @@ function extractJudgmentGapText(content: string) {
     .replace(/[。！？!?；;]+$/u, '')
     .trim();
 
-  if (!normalizedSentence) {
-    return '这次判断指出的关键点';
+  if (!fallbackGap) {
+    return [
+      `把“${questionTitle}”真正依赖的关键机制、因果关系或判断边界说清楚`,
+    ];
   }
 
-  return normalizedSentence.startsWith('“')
-    ? normalizedSentence
-    : `“${normalizedSentence}”`;
+  return splitGapItems(fallbackGap);
 }
 
-function extractHintPrimer(content?: string) {
-  const normalizedContent = content?.trim();
-
-  if (!normalizedContent) {
-    return null;
+function buildHintPrimerFromGap(primaryGap: string, questionTitle: string) {
+  if (primaryGap.includes('为什么')) {
+    return '先想清：把“发生了什么变化 -> 为什么会这样 -> 最后带来什么结果”连成一条因果链。';
   }
 
-  const primer = normalizedContent
-    .replace(/^标准理解[:：]\s*/u, '')
-    .split(/因此|所以|从而|这意味着|。|；|，/u)[0]
-    ?.trim();
-
-  if (!primer) {
-    return null;
+  if (primaryGap.includes('边界') || primaryGap.includes('条件')) {
+    return '先想清：不要只说结论，先分清它在什么条件下成立、什么时候会失效。';
   }
 
-  return primer.length <= 26 ? primer : `${primer.slice(0, 26).trimEnd()}…`;
+  if (primaryGap.includes('关系') || primaryGap.includes('对象') || primaryGap.includes('机制')) {
+    return '先想清：把相关对象各自扮演的角色分开，再说明它们怎样发生联系。';
+  }
+
+  return `先想清：围绕“${questionTitle}”，先把对象、关系和判断线索摆正，再决定要不要补更多背景。`;
+}
+
+function extractStructuredSection(content: string, labels: string[]) {
+  for (const label of labels) {
+    const sectionPattern = new RegExp(
+      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:已答到|还缺的关键点|当前最关键缺口|还缺|为什么关键)[:：]|$)`,
+      'u',
+    );
+    const matched = content.match(sectionPattern)?.[1]?.trim();
+
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return '';
+}
+
+function splitGapItems(content: string) {
+  const normalizedItems = content
+    .split(/\n|[；;]+/u)
+    .map((item) =>
+      item
+        .replace(/^\s*[-*•]\s*/u, '')
+        .replace(/^\s*\d+[.)、]\s*/u, '')
+        .replace(/[。！？!?；;]+$/u, '')
+        .trim(),
+    )
+    .filter(Boolean);
+
+  if (normalizedItems.length > 0) {
+    return normalizedItems.slice(0, 3);
+  }
+
+  return [
+    content.replace(/[。！？!?；;]+$/u, '').trim(),
+  ].filter(Boolean);
 }
 
 function findAncestorNode<TNodeType extends TreeNode['type']>(

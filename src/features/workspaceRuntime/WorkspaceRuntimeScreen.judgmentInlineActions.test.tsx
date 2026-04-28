@@ -56,10 +56,10 @@ test('renders inline judgment actions and reveals a hint that stays distinct fro
     'judgment-inline-hint-judgment-inline-primary',
   );
 
-  expect(hintCallout).toHaveTextContent('只补当前缺口');
-  expect(hintCallout).toHaveTextContent('下一步优先把');
+  expect(hintCallout).toHaveTextContent('微型铺垫');
+  expect(hintCallout).toHaveTextContent('先补哪块：');
   expect(hintCallout).toHaveTextContent('为什么会减少重复渲染');
-  expect(hintCallout).toHaveTextContent('先抓住');
+  expect(hintCallout).toHaveTextContent('发生了什么变化 -> 为什么会这样 -> 最后带来什么结果');
   expect(hintCallout).not.toHaveTextContent(
     '还缺“为什么会减少重复渲染”这条因果关系。',
   );

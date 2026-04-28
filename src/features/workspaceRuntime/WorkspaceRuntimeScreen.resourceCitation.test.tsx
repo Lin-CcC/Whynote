@@ -2,6 +2,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
@@ -71,6 +72,7 @@ test('reuses an existing fragment for an answer citation, persists it after remo
   ).toBeInTheDocument();
   expect(reusedFocusCard.getByText('摘录 · 批处理摘录')).toBeInTheDocument();
   expect(screen.getByText('被引用 1 次')).toBeInTheDocument();
+  await waitForSaved();
 
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
@@ -279,4 +281,13 @@ async function findSectionByHeading(name: string) {
   }
 
   return within(section);
+}
+
+async function waitForSaved() {
+  await waitFor(() => {
+    expect(screen.getByText('待保存', { selector: 'dd' })).toBeInTheDocument();
+  });
+  await waitFor(() => {
+    expect(screen.getByText('已保存', { selector: 'dd' })).toBeInTheDocument();
+  });
 }

@@ -90,6 +90,7 @@ export interface SummaryNode extends BaseNode {
 
 export interface JudgmentNode extends BaseNode {
   type: 'judgment';
+  hint?: string;
 }
 
 export interface ResourceNode extends BaseNode {

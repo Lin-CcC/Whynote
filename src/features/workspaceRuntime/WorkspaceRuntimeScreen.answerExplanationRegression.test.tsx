@@ -69,6 +69,9 @@ test('creates a judgment-linked answer explanation on the first evaluation', asy
   ).not.toBeInTheDocument();
 
   fireEvent.click(judgmentNode);
+  expect(
+    within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
+  ).toBeEnabled();
   fireEvent.click(
     within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
   );
@@ -151,6 +154,9 @@ test('keeps answer explanation available on the first evaluation even when summa
   ).toBeEnabled();
 
   fireEvent.click(judgmentNode);
+  expect(
+    screen.getByRole('button', { name: '查看答案解析' }),
+  ).toBeEnabled();
   fireEvent.click(
     screen.getByRole('button', { name: '查看答案解析' }),
   );
