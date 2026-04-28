@@ -97,6 +97,41 @@ export function hasQuestionAnswerEvidence(tree: NodeTree, questionNodeId: string
   return collectAnswerNodes(tree, questionNodeId).length > 0;
 }
 
+export function getQuestionNodeIdForAnswerEvaluation(
+  tree: NodeTree,
+  selectedNodeId: string | null,
+) {
+  if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
+    return null;
+  }
+
+  const selectedNode = getNodeOrThrow(tree, selectedNodeId);
+
+  if (
+    selectedNode.type === 'question' &&
+    isLeafQuestion(tree, selectedNode.id) &&
+    hasQuestionAnswerEvidence(tree, selectedNode.id)
+  ) {
+    return selectedNode.id;
+  }
+
+  if (selectedNode.type !== 'answer' || selectedNode.parentId === null) {
+    return null;
+  }
+
+  const parentNode = tree.nodes[selectedNode.parentId];
+
+  if (
+    parentNode?.type === 'question' &&
+    isLeafQuestion(tree, parentNode.id) &&
+    hasQuestionAnswerEvidence(tree, parentNode.id)
+  ) {
+    return parentNode.id;
+  }
+
+  return null;
+}
+
 export function isLeafQuestion(tree: NodeTree, questionNodeId: string) {
   const questionNode = getNodeOrThrow(tree, questionNodeId);
 

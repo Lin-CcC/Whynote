@@ -2,8 +2,8 @@ import SectionCard from '../../../ui/SectionCard';
 import type { TreeNode } from '../../nodeDomain';
 
 type WorkspaceRuntimeActionCardProps = {
-  canEvaluateQuestionAnswer: boolean;
   currentModule: TreeNode | null;
+  evaluationQuestionNodeId: string | null;
   isAiRunning: boolean;
   onCreateModule: () => void;
   onEvaluateQuestionAnswer: (questionNodeId: string) => void;
@@ -14,8 +14,8 @@ type WorkspaceRuntimeActionCardProps = {
 };
 
 export default function WorkspaceRuntimeActionCard({
-  canEvaluateQuestionAnswer,
   currentModule,
+  evaluationQuestionNodeId,
   isAiRunning,
   onCreateModule,
   onEvaluateQuestionAnswer,
@@ -26,6 +26,8 @@ export default function WorkspaceRuntimeActionCard({
 }: WorkspaceRuntimeActionCardProps) {
   const canGeneratePlanSteps = currentModule?.type === 'module' && !isAiRunning;
   const canSplitQuestion = selectedNode?.type === 'question' && !isAiRunning;
+  const canEvaluateQuestionAnswer =
+    evaluationQuestionNodeId !== null && !isAiRunning;
   const canSuggestCompletion =
     selectedNode?.type === 'plan-step' && !isAiRunning;
 
@@ -46,11 +48,11 @@ export default function WorkspaceRuntimeActionCard({
   }
 
   function handleEvaluateQuestionAnswer() {
-    if (selectedNode?.type !== 'question') {
+    if (!evaluationQuestionNodeId) {
       return;
     }
 
-    onEvaluateQuestionAnswer(selectedNode.id);
+    onEvaluateQuestionAnswer(evaluationQuestionNodeId);
   }
 
   function handleSuggestCompletion() {

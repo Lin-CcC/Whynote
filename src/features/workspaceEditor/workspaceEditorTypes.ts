@@ -40,6 +40,11 @@ export interface EditorActionAvailability {
   canLower: boolean;
 }
 
+export interface EditorInsertTypeOption {
+  label: string;
+  value: NonRootNode['type'];
+}
+
 export interface WorkspaceEditorSelectionState {
   currentModuleId: string | null;
   selectedNodeId: string | null;
