@@ -68,9 +68,10 @@ describe('questionClosureService', () => {
 
     expect(result.isAnswerSufficient).toBe(false);
     expect(result.judgment.title).toBe('判断：回答还差一点');
-    expect(result.judgment.content).toContain('已答到：');
-    expect(result.judgment.content).toContain('还缺的关键点：');
-    expect(result.judgment.content).toContain('为什么关键：');
+    expect(result.judgment.content).toContain('这次答得好的地方：');
+    expect(result.judgment.content).toContain('还没答到的关键点：');
+    expect(result.judgment.content).toContain('不补上会卡在哪里：');
+    expect(result.judgment.content).toContain('接下来可以往哪想：');
     expect(result.judgment.content).toContain(
       '把“为什么状态更新会被批处理？”真正依赖的关键机制、因果关系或判断边界说清楚',
     );
@@ -125,7 +126,7 @@ describe('questionClosureService', () => {
 
     expect(result.isAnswerSufficient).toBe(true);
     expect(result.judgment.title).toBe('判断：已经可以了');
-    expect(result.judgment.content).toContain('已答到：');
+    expect(result.judgment.content).toContain('这次答得好的地方：');
     expect(result.judgment.content).toContain('当前没有新的关键缺口');
     expect(result.summary.title).toBe('标准理解');
     expect(result.summary.content).toContain('继续追问自己');
@@ -225,12 +226,14 @@ describe('questionClosureService', () => {
       learnerAnswer: '因为 React 会把多个更新放在一起。',
     });
 
-    expect(capturedPrompt).toContain('hint 必须单独返回');
+    expect(capturedPrompt).toContain('judgment 要写成站在用户视角的反馈');
+    expect(capturedPrompt).toContain('不补上会卡在哪里');
+    expect(capturedPrompt).toContain('接下来可以往哪想');
+    expect(capturedPrompt).toContain('hint 要承接 judgment 里已经指出的“会卡在哪里 / 接下来往哪想”');
     expect(capturedPrompt).toContain('focus 填“先补哪块”');
-    expect(capturedPrompt).toContain('thinkingQuestion');
-    expect(capturedPrompt).toContain('gaps 返回 1-3 条缺口数组');
     expect(capturedPrompt).toContain(
       '"hint":{"focus":"","background":"","thinkingQuestion":"","content":""}',
     );
+    expect(capturedPrompt).toContain('"judgment":{"title":"","strengths":"","gaps":[""],"impact":"","nextStep":"","content":""');
   });
 });

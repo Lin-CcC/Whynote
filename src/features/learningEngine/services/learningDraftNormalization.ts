@@ -110,6 +110,7 @@ interface NormalizedJudgmentDetails {
   answeredText: string;
   gapItems: string[];
   whyItMattersText: string;
+  nextStepText: string;
 }
 
 interface NormalizedJudgmentDraftResult {
@@ -1143,11 +1144,13 @@ function normalizeJudgmentDetails(
     options,
     gapItems,
   );
+  const nextStepText = normalizeJudgmentNextStepText(rawNode, options, gapItems);
 
   return {
     answeredText,
     gapItems,
     whyItMattersText,
+    nextStepText,
   };
 }
 
@@ -1165,14 +1168,17 @@ function formatStructuredJudgmentContent(
         ];
 
   return [
-    '已答到：',
+    '这次答得好的地方：',
     `- ${details.answeredText}`,
     '',
-    '还缺的关键点：',
+    '还没答到的关键点：',
     ...gapLines,
     '',
-    '为什么关键：',
+    '不补上会卡在哪里：',
     `- ${details.whyItMattersText}`,
+    '',
+    '接下来可以往哪想：',
+    `- ${details.nextStepText}`,
   ].join('\n');
 }
 
@@ -1185,20 +1191,24 @@ function normalizeJudgmentAnsweredText(
   },
 ) {
   const rawAnsweredText =
-    extractStructuredTextFromRawNode(rawNode, ['已答到']) ||
+    extractStructuredTextFromRawNode(rawNode, [
+      '这次答得好的地方',
+      '做得好的地方',
+      '已答到',
+    ]) ||
+    getText((rawNode as Record<string, unknown>).strengths) ||
     getText((rawNode as Record<string, unknown>).answered) ||
-    getText((rawNode as Record<string, unknown>).covered) ||
-    getText((rawNode as Record<string, unknown>).strengths);
+    getText((rawNode as Record<string, unknown>).covered);
   const learnerAnswerFocus = extractLearnerAnswerFocus(options.learnerAnswer);
   const fallbackText = learnerAnswerFocus
-    ? `你已经提到“${learnerAnswerFocus}”这条方向`
+    ? `你已经抓住了“${learnerAnswerFocus}”这个方向，说明你已经碰到了这道题真正要解释的核心矛盾`
     : options.currentQuestionTitle
       ? options.isAnswerSufficient
-        ? `你已经覆盖了“${options.currentQuestionTitle}”的主线`
-        : `你已经开始围绕“${options.currentQuestionTitle}”给出方向性的解释`
+        ? `你已经把“${options.currentQuestionTitle}”最关键的主线答到了，核心方向是对的`
+        : `你已经围绕“${options.currentQuestionTitle}”抓到了一条主线直觉，但还没把它展开成完整解释`
       : options.isAnswerSufficient
-        ? '你已经覆盖了当前问题的主线'
-        : '你已经给出了一版方向性的解释';
+        ? '你已经把当前问题的主线答到了，核心方向是对的'
+        : '你已经抓到了一条有价值的解释方向，但还没把它展开成完整说明';
   const candidateText = rawAnsweredText && !isGenericAnsweredText(rawAnsweredText)
     ? rawAnsweredText
     : fallbackText;
@@ -1224,6 +1234,7 @@ function normalizeJudgmentGapItems(
     ...extractTextArray((rawNode as Record<string, unknown>).missingPoints),
   ];
   const structuredGapText = extractStructuredTextFromRawNode(rawNode, [
+    '还没答到的关键点',
     '还缺的关键点',
     '当前最关键缺口',
     '还缺',
@@ -1267,7 +1278,12 @@ function normalizeJudgmentWhyItMattersText(
   gapItems: string[],
 ) {
   const rawWhyText =
-    extractStructuredTextFromRawNode(rawNode, ['为什么关键']) ||
+    extractStructuredTextFromRawNode(rawNode, [
+      '不补上会卡在哪里',
+      '少了这些会带来什么问题',
+      '为什么关键',
+    ]) ||
+    getText((rawNode as Record<string, unknown>).impact) ||
     getText((rawNode as Record<string, unknown>).whyItMatters) ||
     getText((rawNode as Record<string, unknown>).importance) ||
     getText((rawNode as Record<string, unknown>).whyKey);
@@ -1286,11 +1302,42 @@ function normalizeJudgmentWhyItMattersText(
     );
   }
 
-  const gapLabel =
-    gapItems[0]?.replace(/[。！？!?；;]+$/u, '') || `${questionLabel}还缺的关键点`;
+  return buildJudgmentImpactFallback(questionLabel, gapItems[0]);
+}
 
-  return ensureSentenceEnding(
-    `因为如果不把“${gapLabel}”说清楚，就还无法真正说明${questionLabel}为什么成立，理解会停在表面结论`,
+function normalizeJudgmentNextStepText(
+  rawNode: RawLearningNodeDraft,
+  options: {
+    currentQuestionTitle?: string;
+    isAnswerSufficient: boolean;
+  },
+  gapItems: string[],
+) {
+  const rawNextStepText =
+    extractStructuredTextFromRawNode(rawNode, [
+      '接下来可以往哪想',
+      '下一步往哪想',
+      '继续修改时可以先想',
+      '接下来的重点应放在',
+    ]) ||
+    getText((rawNode as Record<string, unknown>).nextStep) ||
+    getText((rawNode as Record<string, unknown>).nextDirection) ||
+    getText((rawNode as Record<string, unknown>).nextFocus) ||
+    getText((rawNode as Record<string, unknown>).thinkingDirection);
+
+  if (rawNextStepText && !looksGenericNextStepText(rawNextStepText)) {
+    return ensureSentenceEnding(rawNextStepText);
+  }
+
+  if (options.isAnswerSufficient) {
+    return ensureSentenceEnding(
+      '如果还想继续打磨，可以顺手补一下适用边界，或者把现在的表述再压缩得更清楚',
+    );
+  }
+
+  return buildJudgmentNextStepFallback(
+    gapItems[0],
+    options.currentQuestionTitle,
   );
 }
 
@@ -1310,6 +1357,130 @@ function normalizeClosureHint(
     judgmentContent: options.judgmentContent,
     summaryContent: options.summaryContent,
   });
+}
+
+function buildJudgmentImpactFallback(
+  questionLabel: string,
+  primaryGap?: string,
+) {
+  const gapLabel = stripTrailingSentencePunctuation(primaryGap ?? '');
+
+  switch (classifyJudgmentGapKind(gapLabel)) {
+    case 'combinatorial-explosion':
+      return ensureSentenceEnding(
+        '如果不把这个量级说清楚，回答就会停在“参数很多所以很难”的直觉层，后面一旦要解释为什么盲目试错在数量级上根本走不通，就接不上了',
+      );
+    case 'feedback-direction':
+      return ensureSentenceEnding(
+        '如果不把“只知道错了还不够”说清楚，回答就会停在“试错成本高”的层面，后面解释为什么还需要损失函数或梯度方向时会少掉关键转折',
+      );
+    case 'causal':
+      return ensureSentenceEnding(
+        `如果不把“${gapLabel || `${questionLabel}里缺的因果链`}”补上，回答就会只剩结论，别人看不到它到底是怎么一步步成立的`,
+      );
+    case 'boundary':
+      return ensureSentenceEnding(
+        `如果不把“${gapLabel || `${questionLabel}里缺的边界条件`}”补上，这条说法看起来就像任何时候都成立，后面无法判断它何时有效、何时失效`,
+      );
+    case 'mechanism':
+      return ensureSentenceEnding(
+        `如果不把“${gapLabel || `${questionLabel}里缺的机制`}”补上，回答会停在名词或现象层，相关对象之间到底怎么作用仍然不清楚`,
+      );
+    default:
+      return ensureSentenceEnding(
+        `如果不把“${gapLabel || `${questionLabel}里还缺的关键点`}”说清楚，你的回答会停在当前直觉层，后面一旦要解释${questionLabel}为什么成立就接不上`,
+      );
+  }
+}
+
+function buildJudgmentNextStepFallback(
+  primaryGap: string | undefined,
+  currentQuestionTitle?: string,
+) {
+  const gapLabel = stripTrailingSentencePunctuation(primaryGap ?? '');
+
+  switch (classifyJudgmentGapKind(gapLabel)) {
+    case 'combinatorial-explosion':
+      return ensureSentenceEnding(
+        '继续修改时，先别急着直接讲损失函数，先把“盲目尝试为什么会在搜索空间上直接走不通”量化出来，再过渡到模型后来靠什么获得方向',
+      );
+    case 'feedback-direction':
+      return ensureSentenceEnding(
+        '继续修改时，先把“只知道错了为什么还不够”说清楚，再往下接模型究竟需要什么样的反馈信号',
+      );
+    case 'causal':
+      return ensureSentenceEnding(
+        `继续修改时，先把“${gapLabel || '中间那条因果链'}”补出来，再回头检查你的结论是不是自然推出的`,
+      );
+    case 'boundary':
+      return ensureSentenceEnding(
+        `继续修改时，先把“${gapLabel || '这条说法依赖的前提'}”交代清楚，再看当前结论离开这些条件后还成不成立`,
+      );
+    case 'mechanism':
+      return ensureSentenceEnding(
+        `继续修改时，先拆清楚“${gapLabel || '相关对象'}”各自做什么、先后顺序是什么，再把它们串成完整解释`,
+      );
+    default:
+      if (currentQuestionTitle) {
+        return ensureSentenceEnding(
+          `继续修改时，先别急着把“${currentQuestionTitle}”的答案铺满，优先把“${gapLabel || '这条关键缺口'}”背后的机制、因果或边界补清楚`,
+        );
+      }
+
+      return ensureSentenceEnding(
+        `继续修改时，先别急着把答案铺满，优先把“${gapLabel || '这条关键缺口'}”背后的机制、因果或边界补清楚`,
+      );
+  }
+}
+
+function classifyJudgmentGapKind(content: string) {
+  if (
+    content.includes('组合爆炸') ||
+    content.includes('排列组合') ||
+    content.includes('量级') ||
+    content.includes('几辈子') ||
+    content.includes('6000 万') ||
+    content.includes('6000万')
+  ) {
+    return 'combinatorial-explosion' as const;
+  }
+
+  if (
+    content.includes('反馈') ||
+    content.includes('导向') ||
+    content.includes('往哪调') ||
+    content.includes('损失函数') ||
+    content.includes('只知道“错了”') ||
+    content.includes('只知道错了')
+  ) {
+    return 'feedback-direction' as const;
+  }
+
+  if (content.includes('为什么') || content.includes('因果') || content.includes('结果')) {
+    return 'causal' as const;
+  }
+
+  if (
+    content.includes('边界') ||
+    content.includes('条件') ||
+    content.includes('前提') ||
+    content.includes('什么时候') ||
+    content.includes('何时')
+  ) {
+    return 'boundary' as const;
+  }
+
+  if (
+    content.includes('机制') ||
+    content.includes('关系') ||
+    content.includes('对象') ||
+    content.includes('流程') ||
+    content.includes('顺序')
+  ) {
+    return 'mechanism' as const;
+  }
+
+  return 'generic' as const;
 }
 
 function normalizeStandardUnderstandingSentence(
@@ -1388,7 +1559,7 @@ function extractStructuredTextFromRawNode(
 
   for (const label of sectionLabels) {
     const sectionPattern = new RegExp(
-      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:已答到|还缺的关键点|当前最关键缺口|还缺|为什么关键)[:：]|$)`,
+      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:这次答得好的地方|做得好的地方|已答到|还没答到的关键点|还缺的关键点|当前最关键缺口|还缺|不补上会卡在哪里|少了这些会带来什么问题|为什么关键|接下来可以往哪想|下一步往哪想|继续修改时可以先想|接下来的重点应放在)[:：]|$)`,
       'u',
     );
     const matched = content.match(sectionPattern)?.[1]?.trim();
@@ -1437,8 +1608,14 @@ function sanitizeGapItem(item: string) {
 
 function stripJudgmentScaffoldText(content: string) {
   return content
+    .replace(/^这次答得好的地方[:：][\s\S]*?(?=\n|$)/u, '')
+    .replace(/^做得好的地方[:：][\s\S]*?(?=\n|$)/u, '')
     .replace(/^已答到[:：][\s\S]*?(?=\n|$)/u, '')
+    .replace(/^不补上会卡在哪里[:：][\s\S]*?(?=\n|$)/u, '')
+    .replace(/^少了这些会带来什么问题[:：][\s\S]*?(?=\n|$)/u, '')
     .replace(/^为什么关键[:：][\s\S]*?(?=\n|$)/u, '')
+    .replace(/^接下来可以往哪想[:：][\s\S]*?(?=\n|$)/u, '')
+    .replace(/^下一步往哪想[:：][\s\S]*?(?=\n|$)/u, '')
     .replace(/^这次回答(?:还不完整|已答到[^。！？!?；]*?)，?/u, '')
     .replace(/^这版(?:只差把)?/u, '')
     .replace(/^回答方向对了，但/u, '')
@@ -1459,8 +1636,8 @@ function normalizeNarrativeSentence(
   }
 
   if (
-    normalizedContent.startsWith('你已经') ||
-    normalizedContent.startsWith('这次回答已经') ||
+    normalizedContent.startsWith('你') ||
+    normalizedContent.startsWith('这次回答') ||
     (options.preserveLeadingQuestionWord && normalizedContent.startsWith('为什么'))
   ) {
     return stripTrailingSentencePunctuation(normalizedContent);
@@ -1530,6 +1707,16 @@ function looksGenericWhyItMattersText(content: string) {
     '需要完整',
     '继续补充',
     '答案还不完整',
+  ].some((keyword) => content.includes(keyword));
+}
+
+function looksGenericNextStepText(content: string) {
+  return [
+    '继续想',
+    '再想想',
+    '继续补充',
+    '往这个方向想',
+    '再完善一下',
   ].some((keyword) => content.includes(keyword));
 }
 

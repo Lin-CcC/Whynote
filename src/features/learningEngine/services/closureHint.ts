@@ -68,8 +68,11 @@ export function normalizeClosureHintText(options: {
   summaryContent: string;
 }) {
   const sectionDraft = extractHintSectionDraft(options.rawHint);
+  const normalizedFocusCandidate = normalizeHintFocusCandidate(sectionDraft.focus);
   const primaryGapInsight = buildPrimaryGapInsight(
-    sectionDraft.focus || options.judgmentGapItems[0] || '',
+    isUsableHintFocus(normalizedFocusCandidate)
+      ? normalizedFocusCandidate
+      : options.judgmentGapItems[0] || sectionDraft.focus || '',
     options.currentQuestionTitle,
   );
   const focus = resolveHintFocus(sectionDraft, options, primaryGapInsight);
@@ -119,6 +122,7 @@ export function extractJudgmentGapItemsFromText(
   currentQuestionTitle?: string,
 ) {
   const structuredGapText = extractStructuredSection(content, [
+    '还没答到的关键点',
     '还缺的关键点',
     '当前最关键缺口',
     '还缺',
@@ -142,8 +146,14 @@ export function extractJudgmentGapItemsFromText(
 
   const fallbackGap = sanitizeGapItem(
     content
+      .replace(/^这次答得好的地方[:：][\s\S]*?(?=\n|$)/u, '')
+      .replace(/^做得好的地方[:：][\s\S]*?(?=\n|$)/u, '')
       .replace(/^已答到[:：][\s\S]*?(?=\n|$)/u, '')
+      .replace(/^不补上会卡在哪里[:：][\s\S]*?(?=\n|$)/u, '')
+      .replace(/^少了这些会带来什么问题[:：][\s\S]*?(?=\n|$)/u, '')
       .replace(/^为什么关键[:：][\s\S]*?(?=\n|$)/u, '')
+      .replace(/^接下来可以往哪想[:：][\s\S]*?(?=\n|$)/u, '')
+      .replace(/^下一步往哪想[:：][\s\S]*?(?=\n|$)/u, '')
       .replace(/^这次回答(?:还不完整|已答到[^。！？!?；]*?)，?/u, '')
       .replace(/^这版(?:只差把)?/u, '')
       .replace(/^回答方向对了，但/u, '')
@@ -460,23 +470,47 @@ function classifyGapKind(gapInsight: GapInsight): HintGapKind {
 }
 
 function normalizeHintFocusCandidate(content: string) {
-  const normalizedContent = content
-    .replace(/^(先补哪块|优先补哪块|先补什么)[:：]?\s*/u, '')
-    .replace(/^还缺(?:的关键点)?[:：]?\s*/u, '')
-    .replace(/^当前最关键缺口[:：]?\s*/u, '')
-    .replace(/^你还没有(?:解释|说明|交代)?/u, '')
-    .replace(/^还没有(?:解释|说明|交代)?/u, '')
-    .replace(/^(没有|没)(解释|说明|交代)/u, '')
-    .replace(/^需要继续把/u, '')
-    .replace(/^需要把/u, '')
-    .replace(/^只差把/u, '')
-    .replace(/^(解释|说明)/u, '')
-    .replace(/^把/u, '')
-    .replace(/(?:说清楚|讲清楚|补清楚)$/u, '')
-    .trim();
+  const normalizedContent = stripEvaluationLeadIn(
+    content
+      .replace(/^(先补哪块|优先补哪块|先补什么)[:：]?\s*/u, '')
+      .replace(/^还缺(?:的关键点)?[:：]?\s*/u, '')
+      .replace(/^还没答到的关键点[:：]?\s*/u, '')
+      .replace(/^当前最关键缺口[:：]?\s*/u, '')
+      .replace(/^你还没有(?:解释|说明|交代)?/u, '')
+      .replace(/^还没有(?:解释|说明|交代)?/u, '')
+      .replace(/^(没有|没)(解释|说明|交代)/u, '')
+      .replace(/^需要继续把/u, '')
+      .replace(/^需要把/u, '')
+      .replace(/^只差把/u, '')
+      .replace(/^(解释|说明)/u, '')
+      .replace(/^把/u, '')
+      .replace(/(?:说清楚|讲清楚|补清楚)$/u, '')
+      .trim(),
+  );
 
   if (!normalizedContent) {
     return '';
+  }
+
+  const enumeratedGapItems = extractEnumeratedGapItems(normalizedContent);
+
+  if (enumeratedGapItems.length > 0) {
+    return stripTrailingSentencePunctuation(enumeratedGapItems[0]);
+  }
+
+  const structuredGapText = extractStructuredSection(normalizedContent, [
+    '还没答到的关键点',
+    '还缺的关键点',
+    '当前最关键缺口',
+    '还缺',
+  ]);
+
+  if (structuredGapText) {
+    const firstStructuredGap = splitStructuredList(structuredGapText)[0];
+
+    if (firstStructuredGap) {
+      return stripTrailingSentencePunctuation(firstStructuredGap);
+    }
   }
 
   const insight = buildPrimaryGapInsight(normalizedContent);
@@ -557,7 +591,7 @@ function isQuestionLike(content: string) {
 function extractStructuredSection(content: string, labels: string[]) {
   for (const label of labels) {
     const sectionPattern = new RegExp(
-      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:已答到|还缺的关键点|当前最关键缺口|还缺|为什么关键)[:：]|$)`,
+      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:这次答得好的地方|做得好的地方|已答到|还没答到的关键点|还缺的关键点|当前最关键缺口|还缺|不补上会卡在哪里|少了这些会带来什么问题|为什么关键|接下来可以往哪想|下一步往哪想|继续修改时可以先想|接下来的重点应放在)[:：]|$)`,
       'u',
     );
     const matched = content.match(sectionPattern)?.[1]?.trim();
@@ -685,13 +719,39 @@ function stripTrailingSentencePunctuation(content: string) {
 
 function normalizeGapPhrase(content: string) {
   return stripTrailingSentencePunctuation(
-    sanitizeGapItem(content)
+    sanitizeGapItem(stripEvaluationLeadIn(content))
       .replace(/^当前问题里仍有关键点没有说清楚[:：]?\s*/u, '')
       .replace(/^当前问题里仍有关键点没有答到[:：]?\s*/u, '')
       .replace(/^这次回答还不完整[,，]?\s*/u, '')
       .replace(/^目前你已触及问题的表层[,，]但还缺少对以下(?:两个|几个)?关键点的认知[:：]?\s*/u, '')
       .trim(),
   );
+}
+
+function stripEvaluationLeadIn(content: string) {
+  const normalizedContent = content
+    .replace(/^学习现状评价[:：]\s*/u, '')
+    .replace(/^这次答得好的地方[:：]\s*/u, '')
+    .replace(/^做得好的地方[:：]\s*/u, '')
+    .replace(/^不补上会卡在哪里[:：]\s*/u, '')
+    .replace(/^少了这些会带来什么问题[:：]\s*/u, '')
+    .replace(/^接下来可以往哪想[:：]\s*/u, '')
+    .replace(/^下一步往哪想[:：]\s*/u, '')
+    .replace(/^继续修改时可以先想[:：]\s*/u, '')
+    .replace(/^接下来的重点应放在[:：]\s*/u, '')
+    .trim();
+  const contentAfterGapLeadIn =
+    normalizedContent.match(
+      /(?:主要存在以下缺口|当前主要缺口|还没答到的关键点|还缺的关键点|当前最关键缺口|还缺)[:：]\s*([\s\S]*)/u,
+    )?.[1] ?? normalizedContent;
+
+  return contentAfterGapLeadIn
+    .replace(/^你提到的“[^”]+”确实抓住了[^。！？!?]*[。！？!?]\s*/u, '')
+    .replace(/^你已经[^。！？!?]*[。！？!?]\s*/u, '')
+    .replace(/^目前的回答已经[^。！？!?]*[。！？!?]\s*/u, '')
+    .replace(/^这次回答已经[^。！？!?]*[。！？!?]\s*/u, '')
+    .replace(/^这次回答还不完整[^。！？!?]*[。！？!?]\s*/u, '')
+    .trim();
 }
 
 function stripMarkdownDecoration(content: string) {

@@ -158,12 +158,13 @@ describe('normalizeQuestionClosure', () => {
         isAnswerSufficient: false,
         judgment: {
           title: '判断：还缺关键因果',
-          answered: '已经提到了 React 会把更新放在一起。',
+          strengths: '你已经抓住了“会把更新放在一起”这个方向，至少意识到了批处理和“合并更新”有关。',
           gaps: [
             '没有解释为什么统一提交会减少重复渲染。',
             '没有说明这条机制什么时候成立。',
           ],
-          whyItMatters: '少了这两点，就还无法证明理解完整。',
+          impact: '如果不把这两点补上，回答就会停在“更新被放在一起”这层现象，后面解释为什么能减少重复渲染时会断掉。',
+          nextStep: '继续修改时，先把“收集更新 -> 统一提交 -> 减少重复渲染”这条因果链补出来，再回头看边界。',
         },
         summary: {
           title: '标准理解',
@@ -177,15 +178,19 @@ describe('normalizeQuestionClosure', () => {
       },
     );
 
-    expect(result.judgment.content).toContain('已答到：');
-    expect(result.judgment.content).toContain('还缺的关键点：');
+    expect(result.judgment.content).toContain('这次答得好的地方：');
+    expect(result.judgment.content).toContain('你已经抓住了“会把更新放在一起”这个方向');
+    expect(result.judgment.content).toContain('还没答到的关键点：');
     expect(result.judgment.content).toContain(
       '1. 没有解释为什么统一提交会减少重复渲染。',
     );
     expect(result.judgment.content).toContain(
       '2. 没有说明这条机制什么时候成立。',
     );
-    expect(result.judgment.content).toContain('为什么关键：');
+    expect(result.judgment.content).toContain('不补上会卡在哪里：');
+    expect(result.judgment.content).toContain('回答就会停在“更新被放在一起”这层现象');
+    expect(result.judgment.content).toContain('接下来可以往哪想：');
+    expect(result.judgment.content).toContain('先把“收集更新 -> 统一提交 -> 减少重复渲染”这条因果链补出来');
     expect(result.judgment.hint).toContain('先补哪块：为什么统一提交会减少重复渲染');
     expect(result.judgment.hint).toContain('关键背景：');
     expect(result.judgment.hint).toContain('可以先想：');
@@ -199,6 +204,31 @@ describe('normalizeQuestionClosure', () => {
     expect(result.summary.content).toContain('会卡在');
     expect(result.summary.content).toContain('继续往下想');
     expect(result.summary.content).toContain('更稳妥的标准理解是：');
+  });
+
+  it('turns fallback judgment into user-facing feedback with strengths, impact and next direction', () => {
+    const result = normalizeQuestionClosure(
+      {
+        followUpQuestions: [],
+        isAnswerSufficient: false,
+        judgment: {
+          title: '判断：还差一点',
+          content: '继续补充。',
+        },
+      },
+      {
+        currentQuestionTitle: '为什么不能靠反复试错来训练 6000 万参数的模型？',
+        learnerAnswer: '因为参数太多了，靠人工试会很慢。',
+      },
+    );
+
+    expect(result.judgment.content).toContain('这次答得好的地方：');
+    expect(result.judgment.content).toContain('你已经抓住了“因为参数太多了，靠人工试会很慢”这个方向');
+    expect(result.judgment.content).toContain('还没答到的关键点：');
+    expect(result.judgment.content).toContain('不补上会卡在哪里：');
+    expect(result.judgment.content).toContain('接下来可以往哪想：');
+    expect(result.judgment.content).toContain('先别急着直接讲损失函数');
+    expect(result.judgment.content).toContain('先把“盲目尝试为什么会在搜索空间上直接走不通”量化出来');
   });
 
   it('rewrites summary-like hints into a gap-focused micro-scaffold', () => {
@@ -233,6 +263,36 @@ describe('normalizeQuestionClosure', () => {
     expect(result.judgment.hint).not.toContain(
       'React 会把同一轮事件中的多个状态更新合并后再统一提交，因此可以减少重复渲染。',
     );
+  });
+
+  it('strips evaluation lead-in when a weak hint repeats the judgment preface', () => {
+    const result = normalizeQuestionClosure(
+      {
+        followUpQuestions: [],
+        hint: {
+          content:
+            '先补哪块：你提到的“学习成本”确实抓住了问题的核心。目前的回答已经意识到了效率阻碍，但还需要补充对“参数规模”与“盲目尝试”之间矛盾的具体认知，主要存在以下缺口：\n1. 组合爆炸的量级认知：需要明确 6000 万个参数意味着何种程度的搜索空间。',
+        },
+        isAnswerSufficient: false,
+        judgment: {
+          title: '判断：直觉对了，但还差关键量级',
+          strengths: '你已经意识到参数多会带来学习成本。',
+          gaps: ['组合爆炸的量级认知：需要明确 6000 万个参数意味着何种程度的搜索空间。'],
+          impact: '如果不补这点，回答就会停在“成本高”的直觉层。',
+          nextStep: '继续修改时，先量化盲目尝试为什么在搜索空间上走不通。',
+        },
+      },
+      {
+        currentQuestionTitle: '为什么不能靠反复试错来训练 6000 万参数的模型？',
+        learnerAnswer: '因为学习成本太高了。',
+      },
+    );
+
+    expect(result.judgment.hint).toContain('先补哪块：组合爆炸的量级认知。');
+    expect(result.judgment.hint).toContain('关键背景：');
+    expect(result.judgment.hint).toContain('可以先想：');
+    expect(result.judgment.hint).not.toContain('你提到的“学习成本”确实抓住了问题的核心');
+    expect(result.judgment.hint).not.toContain('目前的回答已经意识到了效率阻碍');
   });
 
   it('creates a fallback answer explanation when summary is missing', () => {

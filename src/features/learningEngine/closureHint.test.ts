@@ -6,6 +6,31 @@ import {
 } from './services/closureHint';
 
 describe('closureHint fallback', () => {
+  it('extracts gaps from the new user-facing judgment sections', () => {
+    const gapItems = extractJudgmentGapItemsFromText(
+      [
+        '这次答得好的地方：',
+        '- 你已经抓住了“学习成本高”这个方向。',
+        '',
+        '还没答到的关键点：',
+        '1. 组合爆炸的量级认知：需要明确 6000 万个参数意味着何种程度的搜索空间。',
+        '2. 反馈的导向作用：只知道“错了”还不够，还需要知道“往哪调”。',
+        '',
+        '不补上会卡在哪里：',
+        '- 如果不补这两点，回答会停在“成本高”的直觉层。',
+        '',
+        '接下来可以往哪想：',
+        '- 先量化盲目尝试为什么在搜索空间上走不通。',
+      ].join('\n'),
+      '参数调整的挑战',
+    );
+
+    expect(gapItems).toEqual([
+      '组合爆炸的量级认知：需要明确 6000 万个参数意味着何种程度的搜索空间。',
+      '反馈的导向作用：只知道“错了”还不够，还需要知道“往哪调”。',
+    ]);
+  });
+
   it('extracts numbered judgment gaps instead of treating the whole judgment paragraph as one gap', () => {
     const gapItems = extractJudgmentGapItemsFromText(
       [
