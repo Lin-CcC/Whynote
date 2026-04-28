@@ -47,6 +47,9 @@ test('shows teaching citations at explanation-fragment granularity and expands i
     ),
   ).toBeInTheDocument();
   expect(
+    within(expandedArticle).queryByText('关于 useState 批处理与事件边界的资料概况。'),
+  ).not.toBeInTheDocument();
+  expect(
     within(expandedArticle).getByText('useState > batching'),
   ).toBeInTheDocument();
   expect(
@@ -79,6 +82,14 @@ test('keeps generic references in supplemental sources instead of turning them i
   }
 
   expect(within(supplementalSection).getByText('资料级引用')).toBeInTheDocument();
+  expect(
+    within(supplementalSection).getByText(
+      '当前只记录到来源资料，尚未保存可直接展示的原文片段。',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText('这是 AI 资料概况，不应出现在引用片段里。'),
+  ).not.toBeInTheDocument();
 });
 
 test('keeps focus-text citations without stable anchors in supplemental sources', () => {
@@ -93,6 +104,37 @@ test('keeps focus-text citations without stable anchors in supplemental sources'
   expect(screen.queryByText('解释片段对应的资料依据')).not.toBeInTheDocument();
   expect(screen.getByText('补充来源')).toBeInTheDocument();
   expect(screen.getByText('资料级引用')).toBeInTheDocument();
+});
+
+test('keeps locator-only resource teaching citations honest instead of inventing an excerpt', () => {
+  render(
+    <LearningCitationPanel
+      onFocusResourceNode={() => {}}
+      selectedEditorNodeId="summary-locator-only"
+      tree={createLocatorOnlyTeachingCitationTree()}
+    />,
+  );
+
+  expect(screen.getByText('解释片段对应的资料依据')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '展开依据' }));
+  const expandedArticle = screen
+    .getByRole('button', { name: '收起依据' })
+    .closest('article');
+
+  if (!expandedArticle) {
+    throw new Error('Expected expanded locator-only citation article to exist.');
+  }
+
+  expect(
+    within(expandedArticle).getByText(
+      '当前这条引用只记录了稳定定位，尚未保存可直接展示的原文片段。',
+    ),
+  ).toBeInTheDocument();
+  expect(within(expandedArticle).getByText('useState > queueing')).toBeInTheDocument();
+  expect(
+    screen.queryByText('这是资源卡片摘要，不是原文引文。'),
+  ).not.toBeInTheDocument();
 });
 
 function createTeachingCitationTree(): NodeTree {
@@ -267,7 +309,7 @@ function createGenericCitationTree(): NodeTree {
       type: 'resource',
       id: 'resource-generic',
       title: 'Generic resource',
-      content: '资料概况',
+      content: '这是 AI 资料概况，不应出现在引用片段里。',
       createdAt: '2026-04-28T00:00:00.000Z',
       updatedAt: '2026-04-28T00:00:00.000Z',
     }),
@@ -278,6 +320,82 @@ function createGenericCitationTree(): NodeTree {
       id: 'reference-generic',
       sourceNodeId: 'answer-generic',
       targetNodeId: 'resource-generic',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+
+  return tree;
+}
+
+function createLocatorOnlyTeachingCitationTree(): NodeTree {
+  const snapshot = createWorkspaceSnapshot({
+    title: 'Locator-only teaching citation workspace',
+    workspaceId: 'workspace-locator-only-teaching-citation',
+    rootId: 'theme-locator-only-teaching-citation',
+    createdAt: '2026-04-28T00:00:00.000Z',
+    updatedAt: '2026-04-28T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-locator-only',
+      title: 'Locator-only teaching module',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-locator-only',
+    createNode({
+      type: 'plan-step',
+      id: 'step-locator-only',
+      title: 'Step locator-only',
+      status: 'doing',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-locator-only',
+    createNode({
+      type: 'summary',
+      id: 'summary-locator-only',
+      title: '定位型讲解',
+      content: '这里在解释为什么队列会在同一轮事件结束后统一提交。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'resource',
+      id: 'resource-locator-only',
+      title: 'Locator-only resource',
+      content: '这是资源卡片摘要，不是原文引文。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = addNodeReference(
+    tree,
+    createNodeReference({
+      id: 'reference-locator-only',
+      sourceNodeId: 'summary-locator-only',
+      targetNodeId: 'resource-locator-only',
+      focusText: '这里在解释为什么队列会在同一轮事件结束后统一提交。',
+      note: '这里需要让用户至少知道可以回到 queueing 那一节核对依据。',
+      purpose: 'mechanism',
+      sourceLocator: 'useState > queueing',
       createdAt: '2026-04-28T00:00:00.000Z',
       updatedAt: '2026-04-28T00:00:00.000Z',
     }),

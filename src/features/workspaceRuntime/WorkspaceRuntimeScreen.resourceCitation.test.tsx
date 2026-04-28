@@ -127,6 +127,12 @@ test('falls back to a resource-level citation when runtime cannot resolve a stab
   expect(citationSection.getByText('资料级引用')).toBeInTheDocument();
   expect(citationSection.getAllByText('React 官方文档')).toHaveLength(2);
   expect(
+    citationSection.getByText('这段描述没有稳定对应到现有摘录。'),
+  ).toBeInTheDocument();
+  expect(
+    citationSection.queryByText('关于 useState 和批处理的资料概况。'),
+  ).not.toBeInTheDocument();
+  expect(
     citationSection.getByRole('button', { name: '定位到资料' }),
   ).toBeInTheDocument();
   expect(fallbackFocusCard.getByText('资料 · React 官方文档')).toBeInTheDocument();

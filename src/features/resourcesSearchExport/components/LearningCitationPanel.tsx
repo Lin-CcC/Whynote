@@ -18,7 +18,6 @@ import { isLearningCitationSourceNode } from '../services/resourceCitationServic
 import {
   formatNodeLabel,
   getNodePathLabel,
-  getNodeSourceSummary,
 } from '../utils/resourceTreeUtils';
 
 type LearningCitationPanelProps = {
@@ -33,7 +32,6 @@ type CitationPresentation = {
   excerpt: string | null;
   locator: string | null;
   reference: NodeReference;
-  sourceSummary: string | null;
   sourceTitle: string;
   targetNode: ResourceCitationTargetNode;
   whyText: string;
@@ -109,7 +107,7 @@ export default function LearningCitationPanel({
                     </span>
                   </div>
                   <p className="workspace-helpText">
-                    这里只显示确实承担定义、机制说明、判断支撑或例子来源作用的引用，不会把所有句子都强行挂成参考文献。
+                    这里只显示确实承担定义、机制说明、判断支撑或例子来源作用的引用，并且只展示原文片段或稳定定位，不会把资料概况冒充成引文。
                   </p>
                   <div className="resources-citationBlockList">
                     {teachingCitationGroups.map((group) => (
@@ -184,10 +182,10 @@ export default function LearningCitationPanel({
                                       <dd>{citation.sourceTitle}</dd>
                                     </div>
                                     <div>
-                                      <dt>引用片段</dt>
+                                      <dt>引用依据</dt>
                                       <dd>
                                         {citation.excerpt ??
-                                          '当前只有资料级锚点，尚未保存更细的原文片段。'}
+                                          buildMissingCitationEvidenceText(citation)}
                                       </dd>
                                     </div>
                                     {citation.locator ? (
@@ -225,7 +223,7 @@ export default function LearningCitationPanel({
                     </span>
                   </div>
                   <p className="workspace-helpText">
-                    这些引用要么还没标到具体解释片段上，要么还缺少稳定的资料锚点，所以只保留为补充来源，不会默认升格成教学引用块。
+                    这些引用要么还没标到具体解释片段上，要么还缺少完整片段；这里会诚实保留来源资料或定位信息，但不会把资料概况伪装成“引用片段正文”。
                   </p>
                   <ul className="resources-referenceList">
                     {supplementalCitations.map((citation) => (
@@ -253,11 +251,13 @@ export default function LearningCitationPanel({
                           {getNodePathLabel(tree, citation.targetNode.id)}
                         </span>
                         <span className="resources-librarySummary">
-                          {citation.excerpt ?? '暂无可展示的片段'}
+                          {buildSupplementalCitationEvidenceText(citation)}
                         </span>
-                        <span className="resources-libraryMeta">
-                          {citation.sourceSummary ?? '未记录来源信息'}
-                        </span>
+                        {citation.locator ? (
+                          <span className="resources-libraryMeta">
+                            定位：{citation.locator}
+                          </span>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -293,7 +293,6 @@ function collectCitationPresentations(tree: NodeTree, node: TreeNode) {
         excerpt: resolveCitationExcerpt(targetNode, reference),
         locator: resolveCitationLocator(targetNode, reference),
         reference,
-        sourceSummary: getNodeSourceSummary(tree, targetNode),
         sourceTitle: resolveCitationSourceTitle(tree, targetNode),
         targetNode,
         whyText: buildCitationWhyText(reference),
@@ -395,6 +394,26 @@ function buildCitationWhyText(reference: NodeReference) {
     default:
       return '展开后可以查看这段解释所依据的资料片段。';
   }
+}
+
+function buildSupplementalCitationEvidenceText(citation: CitationPresentation) {
+  if (citation.excerpt) {
+    return citation.excerpt;
+  }
+
+  if (citation.locator) {
+    return '当前未保存可直接展示的原文片段，但已经记录了稳定定位。';
+  }
+
+  return '当前只记录到来源资料，尚未保存可直接展示的原文片段。';
+}
+
+function buildMissingCitationEvidenceText(citation: CitationPresentation) {
+  if (citation.locator) {
+    return '当前这条引用只记录了稳定定位，尚未保存可直接展示的原文片段。';
+  }
+
+  return '当前这条引用还只有资料级来源，尚未保存可直接展示的原文片段。';
 }
 
 function getCitationPurposeLabel(purpose: NodeReference['purpose']) {

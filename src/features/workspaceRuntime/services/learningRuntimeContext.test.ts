@@ -58,9 +58,15 @@ test('includes resource body foundation when building learning reference candida
     targetType: 'resource',
     title: 'React render snapshots',
   });
+  expect(candidate?.content.startsWith('正文基础（优先用于定位真实引用）')).toBe(true);
   expect(candidate?.content).toContain('Short resource summary.');
   expect(candidate?.content).toContain(
     'This longer body foundation keeps the learning chain from seeing only the card summary.',
   );
-  expect(candidate?.content).toContain('正文基础');
+  expect(candidate?.content).toContain(
+    '资料概况（只用于判断资料是否相关，不是引用正文）',
+  );
+  expect(candidate?.content.indexOf('正文基础')).toBeLessThan(
+    candidate?.content.indexOf('资料概况'),
+  );
 });

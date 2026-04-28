@@ -15,6 +15,13 @@ import {
 
 const MAX_RESOURCE_REFERENCE_BODY_LENGTH = 600;
 const MAX_RESOURCE_REFERENCE_SUMMARY_LENGTH = 180;
+const EMPTY_RESOURCE_SUMMARY_VALUES = new Set([
+  '暂无资料概况',
+  '暂无资料摘要',
+  '鏆傛棤璧勬枡鎽樿',
+]);
+const RESOURCE_BODY_FOUNDATION_LABEL = '正文基础（优先用于定位真实引用）';
+const RESOURCE_SUMMARY_LABEL = '资料概况（只用于判断资料是否相关，不是引用正文）';
 
 interface LearningReferenceContextOptions {
   resourceMetadataByNodeId?: Record<string, ResourceMetadataRecord | undefined>;
@@ -726,7 +733,7 @@ function buildResourceReferenceContent(
 ) {
   const normalizedSummary = truncateReferenceText(
     normalizeReferenceText(
-      resourceSummary === '鏆傛棤璧勬枡鎽樿' ? '' : resourceSummary,
+      EMPTY_RESOURCE_SUMMARY_VALUES.has(resourceSummary.trim()) ? '' : resourceSummary,
     ),
     MAX_RESOURCE_REFERENCE_SUMMARY_LENGTH,
   );
@@ -737,13 +744,15 @@ function buildResourceReferenceContent(
 
   if (bodyFoundation) {
     if (normalizedSummary && !bodyFoundation.includes(normalizedSummary)) {
-      return `资料概要：${normalizedSummary}\n正文基础：${bodyFoundation}`;
+      return `${RESOURCE_BODY_FOUNDATION_LABEL}：${bodyFoundation}\n${RESOURCE_SUMMARY_LABEL}：${normalizedSummary}`;
     }
 
-    return `正文基础：${bodyFoundation}`;
+    return `${RESOURCE_BODY_FOUNDATION_LABEL}：${bodyFoundation}`;
   }
 
-  return normalizedSummary ?? '暂无资料概要';
+  return normalizedSummary
+    ? `${RESOURCE_SUMMARY_LABEL}：${normalizedSummary}`
+    : '暂无资料概况';
 }
 
 function normalizeReferenceText(value: string | undefined) {

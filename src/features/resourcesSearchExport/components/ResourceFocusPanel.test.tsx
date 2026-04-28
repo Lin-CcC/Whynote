@@ -6,6 +6,7 @@ import {
   createWorkspaceSnapshot,
   insertChildNode,
   type NodeTree,
+  type ResourceMetadataRecord,
 } from '../../nodeDomain';
 import ResourceFocusPanel from './ResourceFocusPanel';
 
@@ -32,6 +33,52 @@ test('requires a stable excerpt or locator before creating a teaching citation f
     ),
   ).toBeInTheDocument();
   expect(onApplyTreeChange).not.toHaveBeenCalled();
+});
+
+test('keeps resource summary for focus display while separating body foundation preview', () => {
+  const tree = createTeachingCitationTree();
+  const resourceMetadataByNodeId: Record<string, ResourceMetadataRecord> = {
+    'resource-react-docs': {
+      id: 'resource-react-docs',
+      workspaceId: 'workspace-resource-focus-panel',
+      nodeId: 'resource-react-docs',
+      nodeType: 'resource',
+      title: 'React 官方文档',
+      summarySource: 'ai-generated',
+      bodyFormat: 'plain-text',
+      bodyText:
+        'React 会在同一轮事件处理中先收集更新，再在提交阶段统一处理，这段正文基础应该和资料概况分开显示。',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    },
+  };
+
+  render(
+    <ResourceFocusPanel
+      activeResourceNodeId="resource-react-docs"
+      currentModuleTitle="Teaching citation module"
+      onApplyTreeChange={() => {}}
+      onFocusResourceNode={() => {}}
+      resourceMetadataByNodeId={resourceMetadataByNodeId}
+      selectedEditorNodeId="summary-teaching"
+      tree={tree}
+    />,
+  );
+
+  expect(screen.getByText('资料概况')).toBeInTheDocument();
+  expect(
+    screen.getAllByText('关于 useState 批处理与事件边界的资料概况。'),
+  ).toHaveLength(2);
+  expect(screen.getByText('正文基础预览')).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'React 会在同一轮事件处理中先收集更新，再在提交阶段统一处理，这段正文基础应该和资料概况分开显示。',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      '这里会同时保留资料概况和正文基础。资料概况只负责说明“这份资料大概讲什么”，不会自动当成引用正文。',
+    ),
+  ).toBeInTheDocument();
 });
 
 function createTeachingCitationTree(): NodeTree {

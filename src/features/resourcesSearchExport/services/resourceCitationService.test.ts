@@ -100,6 +100,29 @@ describe('resourceCitationService', () => {
     ]);
   });
 
+  it('does not treat resource summaries as citation excerpts during resource-level fallback', () => {
+    const tree = createCitationTree();
+
+    const result = attachResourceCitation(tree, {
+      referenceDraft: {
+        focusText: '这里只是把这份资料登记为当前回答的参考来源。',
+        purpose: 'background',
+      },
+      sourceNodeId: 'answer-citation',
+      targetNodeId: 'resource-react-docs',
+    });
+
+    expect(result.resolution).toBe('resource');
+    expect(result.tree.references[result.reference.id]?.targetNodeId).toBe(
+      'resource-react-docs',
+    );
+    expect(result.tree.references[result.reference.id]?.sourceExcerpt).toBeUndefined();
+    expect(result.tree.references[result.reference.id]?.sourceLocator).toBeUndefined();
+    expect(result.tree.nodes['resource-react-docs'].content).toBe(
+      '关于 React state 更新的资料概况。',
+    );
+  });
+
   it('upgrades an existing generic reference into a teaching citation instead of creating duplicates', () => {
     const tree = createCitationTree();
     const firstResult = attachResourceCitation(tree, {
