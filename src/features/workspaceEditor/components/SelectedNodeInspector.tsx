@@ -80,7 +80,7 @@ export default function SelectedNodeInspector({
             </dd>
           </div>
           <div>
-            <dt>允许的子节点</dt>
+            <dt>当前可接内容</dt>
             <dd>
               {selectedNode
                 ? getAllowedChildTypes(selectedNode.type)

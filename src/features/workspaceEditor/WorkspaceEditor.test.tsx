@@ -127,6 +127,8 @@ test('shows learning actions as the primary path and keeps structure jargon in a
   expect(
     within(advancedActions).getByRole('button', { name: '插入同级' }),
   ).toBeInTheDocument();
+  expect(screen.getByText('当前可接内容')).toBeInTheDocument();
+  expect(screen.queryByText('允许的子节点')).not.toBeInTheDocument();
 });
 
 test('inserts a new question after the selected question by default', () => {
