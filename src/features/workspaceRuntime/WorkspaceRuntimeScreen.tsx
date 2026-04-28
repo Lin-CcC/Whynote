@@ -4,6 +4,7 @@ import AppLayout from '../../ui/AppLayout';
 import SectionCard from '../../ui/SectionCard';
 import WorkspaceEditor from '../workspaceEditor/WorkspaceEditor';
 import type {
+  LearningActionId,
   WorkspaceEditorRenderContext,
   WorkspaceEditorSelectionState,
 } from '../workspaceEditor/workspaceEditorTypes';
@@ -92,6 +93,14 @@ export default function WorkspaceRuntimeScreen({
       interactionLockReason={interactionLockReason}
       isInteractionLocked={runtime.isAiRunning}
       key={`${runtime.snapshot.workspace.id}:${String(runtime.editorSessionKey)}`}
+      onLearningActionRequest={(request) => {
+        if (!canRunAiLearningAction(request.actionId)) {
+          return false;
+        }
+
+        void runtime.runLearningAction(request);
+        return true;
+      }}
       onSelectionChange={handleEditorSelectionChange}
       onSnapshotChange={runtime.handleSnapshotChange}
       renderLeftPanelExtra={renderLeftPanelExtra}
@@ -175,5 +184,20 @@ export default function WorkspaceRuntimeScreen({
   ) {
     setActiveResourceNodeId(null);
     runtime.handleSelectionChange(selection);
+  }
+}
+
+function canRunAiLearningAction(actionId: LearningActionId) {
+  switch (actionId) {
+    case 'insert-scaffold':
+    case 'rephrase-scaffold':
+    case 'simplify-scaffold':
+    case 'add-example':
+    case 'insert-question':
+    case 'insert-summary':
+    case 'insert-judgment':
+      return true;
+    default:
+      return false;
   }
 }

@@ -1,4 +1,5 @@
 import type {
+  LearningActionDraftInput,
   LearningReferenceCandidate,
   QuestionClosureInput,
 } from '../../learningEngine';
@@ -12,6 +13,18 @@ import {
 } from '../../nodeDomain';
 
 export interface QuestionClosureRuntimeContext {
+  introductions: string[];
+  learnerAnswer: string;
+  moduleNode: ModuleNode | null;
+  planStepNode: PlanStepNode | null;
+  questionPath: QuestionClosureInput['questionPath'];
+  referenceCandidates: LearningReferenceCandidate[];
+  resourceSummary: string;
+}
+
+export interface LearningActionRuntimeContext {
+  currentNode: NonNullable<LearningActionDraftInput['currentNode']>;
+  existingQuestionTitles: string[];
   introductions: string[];
   learnerAnswer: string;
   moduleNode: ModuleNode | null;
@@ -94,7 +107,7 @@ export function summarizeLearningReferenceCandidates(
 }
 
 export function hasQuestionAnswerEvidence(tree: NodeTree, questionNodeId: string) {
-  return collectAnswerNodes(tree, questionNodeId).length > 0;
+  return collectFilledAnswerNodes(tree, questionNodeId).length > 0;
 }
 
 export function getQuestionNodeIdForAnswerEvaluation(
@@ -157,6 +170,37 @@ export function collectLeafQuestionIdsUnderPlanStep(
   return collectLeafQuestionIdsFromNode(tree, planStepNode.id);
 }
 
+export function buildLearningActionRuntimeContext(
+  tree: NodeTree,
+  selectedNodeId: string,
+): LearningActionRuntimeContext {
+  const selectedNode = getNodeOrThrow(tree, selectedNodeId);
+  const planStepNode = findAncestorNode(tree, selectedNodeId, 'plan-step');
+  const questionNode = getQuestionContextNode(tree, selectedNodeId);
+  const referenceCandidates = collectLearningReferenceCandidates(tree);
+
+  return {
+    currentNode: {
+      type:
+        selectedNode.type as NonNullable<
+          LearningActionDraftInput['currentNode']
+        >['type'],
+      title: selectedNode.title,
+      content: selectedNode.content,
+    },
+    existingQuestionTitles: planStepNode
+      ? collectDirectQuestionTitles(tree, planStepNode.id)
+      : [],
+    introductions: planStepNode ? collectPlanStepIntroductions(tree, planStepNode.id) : [],
+    learnerAnswer: questionNode ? collectQuestionAnswerText(tree, questionNode.id) : '',
+    moduleNode: findAncestorNode(tree, selectedNodeId, 'module'),
+    planStepNode,
+    questionPath: questionNode ? collectQuestionPath(tree, questionNode.id) : [],
+    referenceCandidates,
+    resourceSummary: summarizeLearningReferenceCandidates(referenceCandidates),
+  };
+}
+
 function collectQuestionPath(
   tree: NodeTree,
   questionNodeId: string,
@@ -205,7 +249,7 @@ function collectPlanStepIntroductions(tree: NodeTree, planStepNodeId: string) {
 }
 
 function collectQuestionAnswerText(tree: NodeTree, questionNodeId: string) {
-  return collectAnswerNodes(tree, questionNodeId)
+  return collectFilledAnswerNodes(tree, questionNodeId)
     .map((answerNode, index) =>
       `回答 ${String(index + 1)}：${formatNodeContent(
         answerNode.title,
@@ -225,6 +269,42 @@ function collectAnswerNodes(tree: NodeTree, questionNodeId: string) {
   return questionNode.childIds
     .map((childId) => tree.nodes[childId])
     .filter((node): node is Extract<TreeNode, { type: 'answer' }> => node?.type === 'answer');
+}
+
+function collectFilledAnswerNodes(tree: NodeTree, questionNodeId: string) {
+  return collectAnswerNodes(tree, questionNodeId).filter((answerNode) =>
+    answerNode.content.trim().length > 0,
+  );
+}
+
+function getQuestionContextNode(tree: NodeTree, selectedNodeId: string) {
+  const selectedNode = getNodeOrThrow(tree, selectedNodeId);
+
+  if (selectedNode.type === 'question') {
+    return selectedNode;
+  }
+
+  if (selectedNode.parentId === null) {
+    return null;
+  }
+
+  const parentNode = tree.nodes[selectedNode.parentId];
+
+  return parentNode?.type === 'question' ? parentNode : null;
+}
+
+function collectDirectQuestionTitles(tree: NodeTree, planStepNodeId: string) {
+  const planStepNode = getNodeOrThrow(tree, planStepNodeId);
+
+  if (planStepNode.type !== 'plan-step') {
+    return [];
+  }
+
+  return planStepNode.childIds
+    .map((childId) => tree.nodes[childId])
+    .filter((node): node is Extract<TreeNode, { type: 'question' }> => node?.type === 'question')
+    .map((questionNode) => questionNode.title)
+    .filter(Boolean);
 }
 
 function collectLeafQuestionIdsFromNode(tree: NodeTree, nodeId: string): string[] {

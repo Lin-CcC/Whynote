@@ -68,7 +68,7 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   fireEvent.click(
     screen.getByRole('button', { name: /^问题为什么状态更新会被批处理？$/ }),
   );
-  fireEvent.click(screen.getByRole('button', { name: '评估当前回答' }));
+  fireEvent.click(screen.getByRole('button', { name: '检查我的理解' }));
 
   expect(
     await screen.findByDisplayValue('判断：回答还不完整'),
@@ -79,6 +79,11 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   expect(
     await screen.findByDisplayValue('追问：还缺哪一步因果关系？'),
   ).toBeInTheDocument();
+  expect(
+    screen
+      .getByDisplayValue('追问：还缺哪一步因果关系？')
+      .closest('[data-testid^="editor-node-"]'),
+  ).toHaveAttribute('data-node-selected', 'true');
 
   const savedSnapshot = await waitForSavedSnapshot(
     dependencies.structuredDataStorage,
@@ -137,14 +142,16 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
 
   fireEvent.focus(screen.getByLabelText('回答草稿 标题'));
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: '评估当前回答' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: '继续，检查我的理解' }),
+    ).toBeEnabled();
   });
   expect(screen.getByTestId('answer-evaluation-callout')).toHaveTextContent(
-    '回答后的主路径',
+    '回答后的默认下一步',
   );
-  expect(screen.getByText('下一步：评估当前回答')).toBeInTheDocument();
+  expect(screen.getByText('下一步：继续学习')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '评估当前回答' }));
+  fireEvent.click(screen.getByRole('button', { name: '继续，检查我的理解' }));
 
   expect(
     await screen.findByDisplayValue('判断：回答还不完整'),
@@ -181,7 +188,7 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   fireEvent.click(
     screen.getByRole('button', { name: /^问题为什么状态更新会被批处理？$/ }),
   );
-  fireEvent.click(screen.getByRole('button', { name: '评估当前回答' }));
+  fireEvent.click(screen.getByRole('button', { name: '检查我的理解' }));
 
   expect(
     await screen.findByDisplayValue('判断：已答到当前问题'),
@@ -207,6 +214,132 @@ test('evaluates a sufficient answer into a closed question and promotes the step
       (node) => node.title === '追问：还缺哪一步因果关系？',
     ),
   ).toBe(false);
+  expect(
+    screen
+      .getByDisplayValue('总结：标准理解')
+      .closest('[data-testid^="editor-node-"]'),
+  ).toHaveAttribute('data-node-selected', 'true');
+});
+
+test('extends a scaffold with a simpler follow-up explanation draft', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createAnswerClosureSnapshot(),
+    createMockProviderClient({
+      'learning-action-draft': (request: AiProviderObjectRequest<unknown>) => {
+        const actionId = extractLearningActionId(request);
+
+        if (actionId !== 'simplify-scaffold') {
+          return {};
+        }
+
+        return {
+          title: '铺垫：先用排队的直觉理解批处理',
+          content:
+            '可以先把批处理想成把同一轮里的更新先排进同一个队列，再一起结算。这样用户只会看到整理后的结果，而不是每塞一次都马上重画一遍页面。',
+          citations: [{ targetNodeId: 'fragment-batching' }],
+        };
+      },
+    }),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(screen.getByRole('button', { name: '更基础一点' }));
+
+  const titleInput = await screen.findByDisplayValue(
+    '铺垫：先用排队的直觉理解批处理',
+  );
+
+  expect(titleInput).toBeInTheDocument();
+  expect(
+    await screen.findByDisplayValue(/可以先把批处理想成把同一轮里的更新先排进同一个队列/u),
+  ).toBeInTheDocument();
+  expect(titleInput.closest('[data-testid^="editor-node-"]')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+});
+
+test('creates AI drafts instead of empty shells for scaffold, question, summary and judgment actions', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createAnswerClosureSnapshot(),
+    createMockProviderClient({
+      'learning-action-draft': (request: AiProviderObjectRequest<unknown>) => {
+        const actionId = extractLearningActionId(request);
+
+        switch (actionId) {
+          case 'insert-scaffold':
+            return {
+              title: '铺垫：先把同一轮更新放到一张图里',
+              content:
+                '先抓住一件事：批处理不是“晚一点更新”，而是把同一轮里的变化先收拢，再决定怎么统一提交。这样后面的提问才有共同参照系。',
+            };
+          case 'insert-question':
+            return {
+              title: '为什么“同一轮事件”是批处理成立的前提？',
+              content:
+                '请解释如果更新不处在同一轮里，React 为什么就不能直接沿用同一套合并节奏。',
+            };
+          case 'insert-summary':
+            return {
+              title: '总结：先把节奏和结果分开看',
+              content:
+                '理解批处理时，先区分“更新何时被收集”与“界面何时被提交”。前者决定能不能合并，后者决定用户会看到几次渲染结果。',
+            };
+          case 'insert-judgment':
+            return {
+              title: '判断：已经抓到批处理的主线',
+              content:
+                '这份草稿已经抓到了“先收集再统一提交”的主线，但还可以继续检查你是否说明了它为什么会减少重复渲染。',
+            };
+          default:
+            return {};
+        }
+      },
+    }),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(screen.getByRole('button', { name: '插入铺垫 / 讲解' }));
+  expect(
+    await screen.findByDisplayValue('铺垫：先把同一轮更新放到一张图里'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByDisplayValue(/先抓住一件事：批处理不是“晚一点更新”/u),
+  ).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '插入问题' }));
+  expect(
+    await screen.findByDisplayValue('为什么“同一轮事件”是批处理成立的前提？'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByDisplayValue(
+      '请解释如果更新不处在同一轮里，React 为什么就不能直接沿用同一套合并节奏。',
+    ),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    screen.getByRole('button', { name: '插入总结' }),
+  );
+  expect(
+    await screen.findByDisplayValue('总结：先把节奏和结果分开看'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByDisplayValue(
+      '理解批处理时，先区分“更新何时被收集”与“界面何时被提交”。前者决定能不能合并，后者决定用户会看到几次渲染结果。',
+    ),
+  ).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '插入判断' }));
+  expect(
+    await screen.findByDisplayValue('判断：已经抓到批处理的主线'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByDisplayValue(/这份草稿已经抓到了“先收集再统一提交”的主线/u),
+  ).toBeInTheDocument();
 });
 
 test('preserves a manual step status override across save and reload', async () => {
@@ -270,14 +403,22 @@ async function createPreloadedDependencies(
 }
 
 function createMockProviderClient(
-  payloadByTaskName: Record<string, unknown>,
+  payloadByTaskName: Record<
+    string,
+    | unknown
+    | ((request: AiProviderObjectRequest<unknown>) => unknown)
+  >,
   _config?: AiConfig,
 ): AiProviderClient {
   return {
     async generateObject<T>(
       request: AiProviderObjectRequest<T>,
     ): Promise<AiProviderObjectResponse<T>> {
-      const payload = payloadByTaskName[request.taskName] ?? {};
+      const payloadSource = payloadByTaskName[request.taskName] ?? {};
+      const payload =
+        typeof payloadSource === 'function'
+          ? payloadSource(request as AiProviderObjectRequest<unknown>)
+          : payloadSource;
       const rawText = JSON.stringify(payload);
 
       return {
@@ -289,6 +430,15 @@ function createMockProviderClient(
       };
     },
   };
+}
+
+function extractLearningActionId(
+  request: AiProviderObjectRequest<unknown>,
+) {
+  const userMessage = request.messages.find((message) => message.role === 'user');
+  const matchedAction = userMessage?.content.match(/学习动作：([^\n]+)/u);
+
+  return matchedAction?.[1]?.trim() ?? '';
 }
 
 async function waitForSavedSnapshot(

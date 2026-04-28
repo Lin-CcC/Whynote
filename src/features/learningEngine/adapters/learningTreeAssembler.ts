@@ -58,7 +58,7 @@ export function appendPlanStepDraftsToModule(
     nextTree = insertChildNode(nextTree, moduleNodeId, planStepNode);
 
     for (const introductionDraft of planStepDraft.introductions) {
-      nextTree = appendLearningNodeDraft(
+      nextTree = appendLearningNodeDraftToTree(
         nextTree,
         planStepNode.id,
         introductionDraft,
@@ -66,7 +66,7 @@ export function appendPlanStepDraftsToModule(
     }
 
     for (const questionDraft of planStepDraft.questions) {
-      nextTree = appendLearningNodeDraft(nextTree, planStepNode.id, questionDraft);
+      nextTree = appendLearningNodeDraftToTree(nextTree, planStepNode.id, questionDraft);
     }
   }
 
@@ -80,19 +80,19 @@ export function appendQuestionClosureToTree(
 ) {
   let nextTree = tree;
 
-  nextTree = appendLearningNodeDraft(
+  nextTree = appendLearningNodeDraftToTree(
     nextTree,
     questionNodeId,
     closureResult.judgment,
   );
-  nextTree = appendLearningNodeDraft(
+  nextTree = appendLearningNodeDraftToTree(
     nextTree,
     questionNodeId,
     closureResult.summary,
   );
 
   for (const questionDraft of closureResult.followUpQuestions) {
-    nextTree = appendLearningNodeDraft(nextTree, questionNodeId, questionDraft);
+    nextTree = appendLearningNodeDraftToTree(nextTree, questionNodeId, questionDraft);
   }
 
   return nextTree;
@@ -106,7 +106,7 @@ export function appendChildQuestionsToTree(
   let nextTree = tree;
 
   for (const childQuestion of splitResult.childQuestions) {
-    nextTree = appendLearningNodeDraft(nextTree, parentQuestionNodeId, {
+    nextTree = appendLearningNodeDraftToTree(nextTree, parentQuestionNodeId, {
       type: 'question',
       title: childQuestion.title,
       content: childQuestion.content,
@@ -117,7 +117,7 @@ export function appendChildQuestionsToTree(
   return nextTree;
 }
 
-function appendLearningNodeDraft(
+export function appendLearningNodeDraftToTree(
   tree: NodeTree,
   parentNodeId: string,
   draft: {
@@ -126,6 +126,7 @@ function appendLearningNodeDraft(
     content: string;
     citations: Array<{ targetNodeId: string }>;
   },
+  insertIndex?: number,
 ) {
   const node = createNode({
     type: draft.type,
@@ -133,7 +134,7 @@ function appendLearningNodeDraft(
     content: draft.content,
   });
 
-  let nextTree = insertChildNode(tree, parentNodeId, node);
+  let nextTree = insertChildNode(tree, parentNodeId, node, insertIndex);
 
   return attachDraftCitations(nextTree, node.id, draft.citations);
 }

@@ -33,6 +33,7 @@ import type {
   ExternalTreeChangeOptions,
   LearningActionId,
   NodeContentPatch,
+  LearningActionPlacement,
   WorkspaceEditorOperations,
   WorkspaceEditorProps,
 } from '../workspaceEditorTypes';
@@ -72,6 +73,7 @@ export function useWorkspaceEditor({
   initialSelectedNodeId = DEMO_SELECTED_NODE_ID,
   isInteractionLocked = false,
   operations = defaultWorkspaceEditorOperations,
+  onLearningActionRequest,
   onSnapshotChange,
   onSelectionChange,
 }: WorkspaceEditorProps) {
@@ -330,9 +332,22 @@ export function useWorkspaceEditor({
       return;
     }
 
-    const nextNode = createEditorNode(placement.nodeType, placement.parentNodeId, {
-      title: placement.title,
-    });
+    const isHandledByExternalRuntime =
+      selectedNodeId &&
+      onLearningActionRequest?.({
+        actionId,
+        currentModuleId,
+        placement,
+        selectedNodeId,
+        tree,
+      }) === true;
+
+    if (isHandledByExternalRuntime) {
+      setOperationError(null);
+      return;
+    }
+
+    const nextNode = createLearningActionNode(actionId, placement);
 
     runStructuralOperation(
       () => {
@@ -631,16 +646,18 @@ function createEditorNode(
   nodeType: NonRootNode['type'],
   parentNodeId: string | null,
   options?: {
+    content?: string;
     title?: string;
   },
 ): NonRootNode {
   const nodeTitle = options?.title ?? getDefaultTitleForType(nodeType);
+  const nodeContent = options?.content ?? '';
 
   if (nodeType === 'resource-fragment') {
     return createNode({
       type: 'resource-fragment',
       title: nodeTitle,
-      content: '',
+      content: nodeContent,
       sourceResourceId: parentNodeId ?? '',
       excerpt: '后续在资料区承接真实摘录内容。',
     });
@@ -649,8 +666,43 @@ function createEditorNode(
   return createNode({
     type: nodeType,
     title: nodeTitle,
-    content: '',
+    content: nodeContent,
   });
+}
+
+function createLearningActionNode(
+  actionId: LearningActionId,
+  placement: LearningActionPlacement,
+) {
+  return createEditorNode(placement.nodeType, placement.parentNodeId, {
+    content: getLearningActionStarterContent(actionId),
+    title: placement.title,
+  });
+}
+
+function getLearningActionStarterContent(actionId: LearningActionId) {
+  switch (actionId) {
+    case 'insert-plan-step':
+      return '';
+    case 'insert-scaffold':
+      return '先交代这一小步为什么值得先学，再点出后面会继续追问的关键概念、关系或判断线索。';
+    case 'rephrase-scaffold':
+      return '换个更直白的说法，把同一件事再解释一次，尽量减少术语堆叠。';
+    case 'simplify-scaffold':
+      return '先退回更基础的直觉或日常语言，再把它接回当前步骤的问题。';
+    case 'add-example':
+      return '给当前铺垫补一个具体情境或例子，让抽象关系更容易看懂。';
+    case 'insert-question':
+      return '请围绕当前步骤补一个真正可判断是否答到的具体问题，优先只检查一个关键理解点。';
+    case 'insert-answer':
+      return '';
+    case 'insert-summary':
+      return '先把当前问题真正要说明的对象、关系和判断线索讲清楚，再决定是否补充例子或边界。';
+    case 'insert-judgment':
+      return '先判断当前理解最可能已经答到了什么、还缺什么，再决定是否需要继续追问。';
+    case 'insert-resource-fragment':
+      return '';
+  }
 }
 
 function getModuleInsertIndex(tree: NodeTree) {

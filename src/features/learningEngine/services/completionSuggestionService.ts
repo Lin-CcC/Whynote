@@ -65,7 +65,9 @@ function buildPlanStepCompletionEvidence(
     (questionNode) =>
       !questionNode.childIds.some((childId) => tree.nodes[childId]?.type === 'question'),
   );
-  const answerNodes = subtreeNodes.filter((node) => node.type === 'answer');
+  const answerNodes = subtreeNodes.filter(
+    (node) => node.type === 'answer' && hasMeaningfulAnswerContent(node),
+  );
   const scaffoldSummaryIds = collectScaffoldSummaryIds(tree, planStepNode);
   const summaryNodes = subtreeNodes.filter(
     (node) => node.type === 'summary' && !scaffoldSummaryIds.has(node.id),
@@ -94,7 +96,7 @@ function buildPlanStepCompletionEvidence(
       return node.type === 'summary' && !scaffoldSummaryIds.has(node.id);
     }).length;
   const answeredQuestionCount = leafQuestionNodes.filter((questionNode) =>
-    hasDirectChildOfType(tree, questionNode, 'answer'),
+    hasDirectMeaningfulAnswerChild(tree, questionNode),
   ).length;
   const unresolvedQuestionTitles = leafQuestionNodes
     .filter((questionNode) => !resolvedLeafQuestionIds.has(questionNode.id))
@@ -227,6 +229,10 @@ function isLeafQuestionResolved(
     return false;
   }
 
+  if (!hasDirectMeaningfulAnswerChild(tree, questionNode)) {
+    return false;
+  }
+
   if (!hasDirectChildOfType(tree, questionNode, 'summary')) {
     return false;
   }
@@ -264,6 +270,17 @@ function hasDirectChildOfType<TNodeType extends TreeNode['type']>(
   return node.childIds.some((childId) => tree.nodes[childId]?.type === nodeType);
 }
 
+function hasDirectMeaningfulAnswerChild(
+  tree: NodeTree,
+  node: Extract<TreeNode, { childIds: string[] }>,
+) {
+  return node.childIds.some((childId) => {
+    const childNode = tree.nodes[childId];
+
+    return childNode?.type === 'answer' && hasMeaningfulAnswerContent(childNode);
+  });
+}
+
 function getLatestDirectChildNode<TNodeType extends TreeNode['type']>(
   tree: NodeTree,
   node: Extract<TreeNode, { childIds: string[] }>,
@@ -288,4 +305,10 @@ function containsBlockingJudgmentSignal(
   return BLOCKING_JUDGMENT_KEYWORDS.some((keyword) =>
     signalText.includes(keyword),
   );
+}
+
+function hasMeaningfulAnswerContent(
+  answerNode: Extract<TreeNode, { type: 'answer' }>,
+) {
+  return answerNode.content.trim().length > 0;
 }

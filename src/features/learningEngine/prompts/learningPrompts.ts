@@ -1,6 +1,7 @@
 import type {
   AiMessage,
   CompoundQuestionSplitInput,
+  LearningActionDraftInput,
   LearningMode,
   LearningModeLimits,
   ModuleGenerationInput,
@@ -141,6 +142,56 @@ export function buildQuestionClosureMessages(
   ];
 }
 
+export function buildLearningActionDraftMessages(
+  input: LearningActionDraftInput,
+): AiMessage[] {
+  return [
+    {
+      role: 'system',
+      content:
+        '你是 Whynote 的学习动作补全器。只输出 JSON，只为当前动作生成一个可编辑草稿，只能使用现有 summary / question / judgment 节点语义，不要返回空内容，不要发明新节点类型。',
+    },
+    {
+      role: 'user',
+      content: [
+        `学习主题：${input.topic.trim()}`,
+        `学习动作：${input.actionId}`,
+        optionalLine('模块标题', input.moduleTitle),
+        optionalLine('步骤标题', input.planStepTitle),
+        optionalLine('步骤目标', input.planStepSummary),
+        optionalLine(
+          '当前铺垫',
+          input.introductions?.filter(Boolean).join('\n\n'),
+        ),
+        optionalLine(
+          '当前选中节点',
+          input.currentNode
+            ? formatTitledContent(input.currentNode.title, input.currentNode.content)
+            : '',
+        ),
+        optionalLine(
+          '当前问题路径',
+          input.questionPath?.length ? formatQuestionPath(input.questionPath) : '',
+        ),
+        optionalLine('现有回答', input.learnerAnswer),
+        optionalLine(
+          '当前步骤已有问题',
+          input.existingQuestionTitles?.filter(Boolean).join('；'),
+        ),
+        optionalLine(
+          '可引用资料候选',
+          formatReferenceCandidates(input.referenceCandidates),
+        ),
+        ...buildLearningActionInstructions(input),
+        '如果资料候选能支撑这份草稿，请在 citations 中返回 targetNodeId；能用 fragment 时优先 fragment。',
+        '返回格式：{"title":"","content":"","citations":[{"targetNodeId":""}]}',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    },
+  ];
+}
+
 export function buildCompoundQuestionSplitMessages(
   input: CompoundQuestionSplitInput,
 ): AiMessage[] {
@@ -222,4 +273,55 @@ function formatTitledContent(title: string, content?: string) {
   }
 
   return `${title.trim()}\n${normalizedContent}`;
+}
+
+function buildLearningActionInstructions(input: LearningActionDraftInput) {
+  switch (input.actionId) {
+    case 'insert-scaffold':
+      return [
+        '目标节点类型：summary。',
+        '请为当前步骤补一段可直接编辑的铺垫 / 讲解草稿。',
+        '重点先解释这一步为什么存在、先要抓住哪些概念或关系、后面会从什么角度继续追问。',
+        '优先写成 3-5 句、约 80-180 个中文字符，不要只给一句空泛提示。',
+      ];
+    case 'rephrase-scaffold':
+      return [
+        '目标节点类型：summary。',
+        '请基于当前铺垫换个说法再解释一次，不要改写原节点，而是生成一段新的补讲草稿。',
+        '优先减少术语堆叠，把同一件事换成更直白的表达。',
+      ];
+    case 'simplify-scaffold':
+      return [
+        '目标节点类型：summary。',
+        '请把当前铺垫退回到更基础的直觉层，用更简单的语言重新讲一遍。',
+        '允许先补最小背景，再接回当前步骤，不要直接重复原文。',
+      ];
+    case 'add-example':
+      return [
+        '目标节点类型：summary。',
+        '请为当前铺垫补一个具体例子或情境，让抽象关系更容易理解。',
+        '例子要服务于理解，不要变成无关段子。',
+      ];
+    case 'insert-question':
+      return [
+        '目标节点类型：question。',
+        '请补一个真正能推进当前步骤的问题草稿。',
+        '问题尽量只检查一个主要理解点，不要使用“谈谈理解”“总结全部内容”这类空泛问法。',
+        '如果当前步骤已有问题，尽量避开重复角度。',
+      ];
+    case 'insert-summary':
+      return [
+        '目标节点类型：summary。',
+        '请补一段可编辑的总结 / 标准理解草稿。',
+        '重点是把当前问题或当前步骤真正想说明的对象、关系和判断线索讲清楚，而不是只写“总结一下”。',
+      ];
+    case 'insert-judgment':
+      return [
+        '目标节点类型：judgment。',
+        input.learnerAnswer?.trim()
+          ? '如果已经有回答，请判断它最可能答到了什么、还缺什么，并保持 judgment 与讲解分工清晰。'
+          : '当前没有现成回答，请先写一份“什么才算答到 / 还需要验证什么”的判断草稿，帮助用户知道作答标准。',
+        '不要把完整讲解塞进 judgment；判断只负责指出当前掌握情况或待验证点。',
+      ];
+  }
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { AiConfig } from '../../learningEngine';
 import type { ResourceMetadataRecord, WorkspaceSnapshot } from '../../nodeDomain';
+import type { WorkspaceEditorLearningActionRequest } from '../../workspaceEditor/workspaceEditorTypes';
 import { createWorkspaceRuntimeService } from '../services/workspaceRuntimeService';
 import type {
   WorkspaceRuntimeDependencies,
@@ -137,7 +138,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
   }
 
   async function runQuestionEvaluation(questionNodeId: string) {
-    await runAiAction('正在评估当前回答', async (snapshot) =>
+    await runAiAction('正在检查理解并继续推进', async (snapshot) =>
       runtimeService.evaluateQuestionAnswer(
         snapshot,
         questionNodeId,
@@ -152,12 +153,19 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     );
   }
 
+  async function runLearningAction(request: WorkspaceEditorLearningActionRequest) {
+    await runAiAction(getLearningActionRuntimeLabel(request.actionId), async (snapshot) =>
+      runtimeService.generateLearningActionDraft(snapshot, request, state.aiConfig),
+    );
+  }
+
   return {
     ...state,
     handleAiConfigChange,
     handleSelectionChange,
     handleSnapshotChange,
     retryInitialization: initializeWorkspace,
+    runLearningAction,
     runCompletionSuggestion,
     runPlanStepGeneration,
     runQuestionEvaluation,
@@ -318,6 +326,33 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
         isAiRunning: false,
       }));
     }
+  }
+}
+
+function getLearningActionRuntimeLabel(
+  actionId: WorkspaceEditorLearningActionRequest['actionId'],
+) {
+  switch (actionId) {
+    case 'insert-scaffold':
+      return '正在补铺垫讲解';
+    case 'rephrase-scaffold':
+      return '正在换个说法解释';
+    case 'simplify-scaffold':
+      return '正在补更基础的讲解';
+    case 'add-example':
+      return '正在补一个例子';
+    case 'insert-question':
+      return '正在补问题草稿';
+    case 'insert-summary':
+      return '正在补总结草稿';
+    case 'insert-judgment':
+      return '正在补判断草稿';
+    case 'insert-plan-step':
+      return '正在补学习步骤';
+    case 'insert-answer':
+      return '正在补回答草稿';
+    case 'insert-resource-fragment':
+      return '正在补摘录草稿';
   }
 }
 
