@@ -13,6 +13,7 @@ import {
   deleteNode,
   detachTagFromNode,
   ensureBuiltinTags,
+  getAllowedChildTypes,
   getModuleScopeId,
   getNodeOrThrow,
   insertChildNode,
@@ -28,6 +29,7 @@ import {
 } from '../../nodeDomain';
 import type {
   EditorActionAvailability,
+  EditorInsertTypeOption,
   ExternalTreeChangeOptions,
   NodeContentPatch,
   WorkspaceEditorOperations,
@@ -96,6 +98,12 @@ export function useWorkspaceEditor({
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(() =>
     buildExpandedNodeIds(initialTree, initialModuleId),
   );
+  const [selectedChildInsertType, setSelectedChildInsertType] = useState<
+    NonRootNode['type'] | null
+  >(null);
+  const [selectedSiblingInsertType, setSelectedSiblingInsertType] = useState<
+    NonRootNode['type'] | null
+  >(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const nodeElementMapRef = useRef(new Map<string, HTMLElement>());
@@ -112,6 +120,32 @@ export function useWorkspaceEditor({
   const actionAvailability = isInteractionLocked
     ? getLockedActionAvailability()
     : getActionAvailability(tree, selectedNodeId);
+  const childInsertOptions = getInsertTypeOptions(
+    getInsertableChildTypes(tree, selectedNodeId),
+  );
+  const siblingInsertOptions = getInsertTypeOptions(
+    getInsertableSiblingTypes(tree, selectedNodeId),
+  );
+
+  useEffect(() => {
+    setSelectedChildInsertType((previousType) =>
+      resolveInsertTypeSelection(
+        previousType,
+        childInsertOptions,
+        getPreferredChildInsertType(tree, selectedNodeId),
+      ),
+    );
+  }, [childInsertOptions, selectedNodeId, tree]);
+
+  useEffect(() => {
+    setSelectedSiblingInsertType((previousType) =>
+      resolveInsertTypeSelection(
+        previousType,
+        siblingInsertOptions,
+        getPreferredSiblingInsertType(tree, selectedNodeId),
+      ),
+    );
+  }, [selectedNodeId, siblingInsertOptions, tree]);
 
   useEffect(() => {
     onSelectionChangeRef.current = onSelectionChange;
@@ -289,7 +323,10 @@ export function useWorkspaceEditor({
     }
 
     const parentNode = getNodeOrThrow(tree, selectedNodeId);
-    const nextNodeType = getDefaultChildType(parentNode.type);
+    const nextNodeType =
+      selectedChildInsertType ??
+      getPreferredChildInsertType(tree, selectedNodeId) ??
+      getDefaultChildType(parentNode.type);
 
     if (!nextNodeType) {
       return;
@@ -326,7 +363,11 @@ export function useWorkspaceEditor({
       return;
     }
 
-    const nextNode = createEditorNode(selectedTreeNode.type, selectedTreeNode.parentId);
+    const nextNodeType =
+      selectedSiblingInsertType ??
+      getPreferredSiblingInsertType(tree, selectedNodeId) ??
+      selectedTreeNode.type;
+    const nextNode = createEditorNode(nextNodeType, selectedTreeNode.parentId);
 
     runStructuralOperation(
       () => {
@@ -502,6 +543,7 @@ export function useWorkspaceEditor({
     actionAvailability,
     currentModule,
     currentModuleId,
+    childInsertOptions,
     createModule,
     expandedNodeIds,
     moduleNodes,
@@ -509,8 +551,13 @@ export function useWorkspaceEditor({
     applyTreeChange,
     registerNodeElement,
     selectNode,
+    selectedChildInsertType,
     selectedNode,
     selectedNodeId,
+    selectedSiblingInsertType,
+    setSelectedChildInsertType,
+    setSelectedSiblingInsertType,
+    siblingInsertOptions,
     switchModule,
     toggleNodeExpanded,
     tree,
@@ -696,6 +743,145 @@ function getLockedActionAvailability(): EditorActionAvailability {
     canLift: false,
     canLower: false,
   };
+}
+
+function getInsertableChildTypes(
+  tree: NodeTree,
+  selectedNodeId: string | null,
+): NonRootNode['type'][] {
+  if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
+    return [];
+  }
+
+  const node = getNodeOrThrow(tree, selectedNodeId);
+
+  if (node.type === 'theme-root') {
+    return [];
+  }
+
+  return getAllowedChildTypes(node.type) as NonRootNode['type'][];
+}
+
+function getInsertableSiblingTypes(
+  tree: NodeTree,
+  selectedNodeId: string | null,
+): NonRootNode['type'][] {
+  if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
+    return [];
+  }
+
+  const node = getNodeOrThrow(tree, selectedNodeId);
+
+  if (node.parentId === null) {
+    return [];
+  }
+
+  const parentNode = getNodeOrThrow(tree, node.parentId);
+
+  return getAllowedChildTypes(parentNode.type) as NonRootNode['type'][];
+}
+
+function getInsertTypeOptions(
+  nodeTypes: NonRootNode['type'][],
+): EditorInsertTypeOption[] {
+  return [...nodeTypes]
+    .sort(compareInsertTypes)
+    .map((nodeType) => ({
+      label: getDefaultTitleForType(nodeType).replace(/^新/u, ''),
+      value: nodeType,
+    }));
+}
+
+function resolveInsertTypeSelection(
+  previousType: NonRootNode['type'] | null,
+  options: EditorInsertTypeOption[],
+  preferredType: NonRootNode['type'] | null,
+) {
+  if (previousType && options.some((option) => option.value === previousType)) {
+    return previousType;
+  }
+
+  if (preferredType && options.some((option) => option.value === preferredType)) {
+    return preferredType;
+  }
+
+  return options[0]?.value ?? null;
+}
+
+function getPreferredChildInsertType(
+  tree: NodeTree,
+  selectedNodeId: string | null,
+): NonRootNode['type'] | null {
+  if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
+    return null;
+  }
+
+  const node = getNodeOrThrow(tree, selectedNodeId);
+  const allowedChildTypes = getInsertableChildTypes(tree, selectedNodeId);
+
+  if (node.type === 'question' && allowedChildTypes.includes('answer')) {
+    return 'answer';
+  }
+
+  if (node.type === 'plan-step' && allowedChildTypes.includes('question')) {
+    return 'question';
+  }
+
+  if (node.type === 'module' && allowedChildTypes.includes('plan-step')) {
+    return 'plan-step';
+  }
+
+  if (node.type === 'resource' && allowedChildTypes.includes('resource-fragment')) {
+    return 'resource-fragment';
+  }
+
+  return allowedChildTypes[0] ?? null;
+}
+
+function getPreferredSiblingInsertType(
+  tree: NodeTree,
+  selectedNodeId: string | null,
+): NonRootNode['type'] | null {
+  if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
+    return null;
+  }
+
+  const node = getNodeOrThrow(tree, selectedNodeId);
+  const allowedSiblingTypes = getInsertableSiblingTypes(tree, selectedNodeId);
+
+  if (
+    node.type !== 'theme-root' &&
+    allowedSiblingTypes.includes(node.type as NonRootNode['type'])
+  ) {
+    return node.type as NonRootNode['type'];
+  }
+
+  return allowedSiblingTypes[0] ?? null;
+}
+
+function compareInsertTypes(leftType: NonRootNode['type'], rightType: NonRootNode['type']) {
+  return getInsertTypeSortOrder(leftType) - getInsertTypeSortOrder(rightType);
+}
+
+function getInsertTypeSortOrder(nodeType: NonRootNode['type']) {
+  switch (nodeType) {
+    case 'module':
+      return 0;
+    case 'plan-step':
+      return 1;
+    case 'question':
+      return 2;
+    case 'answer':
+      return 3;
+    case 'summary':
+      return 4;
+    case 'judgment':
+      return 5;
+    case 'resource':
+      return 6;
+    case 'resource-fragment':
+      return 7;
+  }
 }
 
 function canLiftNode(tree: NodeTree, node: TreeNode) {

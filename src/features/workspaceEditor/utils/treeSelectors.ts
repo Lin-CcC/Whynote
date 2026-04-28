@@ -1,7 +1,9 @@
 import {
+  getDisplayNodeTypeLabel,
   getAllowedChildTypes,
   getNodeOrThrow,
   getModuleScopeId,
+  isScaffoldSummaryNode,
   type ModuleNode,
   type NodeTree,
   type NodeType,
@@ -131,6 +133,10 @@ export function getNodeTypeLabel(nodeType: NodeType) {
   }
 }
 
+export function getDisplayLabelForNode(tree: NodeTree, node: TreeNode) {
+  return getDisplayNodeTypeLabel(tree, node);
+}
+
 export function getNodeEmphasis(node: TreeNode) {
   if (node.type === 'plan-step') {
     return 'supporting';
@@ -171,6 +177,22 @@ export function getNodeInputPlaceholder(
     case 'theme-root':
       return '在这里承接主题说明。';
   }
+}
+
+export function getNodeInputPlaceholderForNode(
+  tree: NodeTree,
+  node: TreeNode,
+  field: NodeField,
+) {
+  if (field === 'title') {
+    return `填写${getDisplayNodeTypeLabel(tree, node)}标题`;
+  }
+
+  if (isScaffoldSummaryNode(tree, node)) {
+    return '在这里承接前置讲解、关键概念或答题铺垫。';
+  }
+
+  return getNodeInputPlaceholder(node.type, field);
 }
 
 export function getDefaultChildType(parentType: NodeType) {

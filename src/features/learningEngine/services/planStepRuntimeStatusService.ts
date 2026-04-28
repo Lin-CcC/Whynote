@@ -28,7 +28,7 @@ export function resolvePlanStepRuntimeStatus(
     };
   }
 
-  const progressReasons = collectProgressReasons(completionSuggestion.evidence);
+  const progressReasons = collectDoingReasons(completionSuggestion.evidence);
 
   if (progressReasons.length > 0) {
     return {
@@ -94,7 +94,7 @@ export function shouldSkipPlanStepStatusReconciliation(
   );
 }
 
-function collectProgressReasons(
+function collectDoingReasons(
   result: PlanStepRuntimeStatusResult['evidence'],
 ): string[] {
   const reasons: string[] = [];
@@ -102,7 +102,6 @@ function collectProgressReasons(
   pushCountReason(reasons, result.answerCount, '已有回答节点');
   pushCountReason(reasons, result.summaryCount, '已有回答后的总结');
   pushCountReason(reasons, result.judgmentCount, '已有回答后的 judgment');
-  pushCountReason(reasons, result.refinedQuestionCount, '已有 question 被继续拆分或追问');
   pushCountReason(reasons, result.referencedNodeCount, '已有学习节点挂上资料引用');
 
   return reasons;

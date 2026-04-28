@@ -29,13 +29,47 @@ export function createOpenAiCompatibleProviderClient(
         fetchFn: options?.fetchFn,
       });
 
+      let content: T;
+
+      try {
+        content = request.parse(response.rawText);
+      } catch (error) {
+        throw new Error(buildProviderParseErrorMessage(error, response.rawText));
+      }
+
       return {
         taskName: request.taskName,
-        content: request.parse(response.rawText),
+        content,
         rawText: response.rawText,
         model: response.model,
         providerLabel: getAiProviderLabel(normalizedConfig),
       };
     },
   };
+}
+
+function buildProviderParseErrorMessage(error: unknown, rawText: string) {
+  const baseMessage =
+    error instanceof Error && error.message.trim()
+      ? error.message
+      : 'AI 返回内容格式不符合当前任务要求。';
+  const snippet = truncateForError(rawText);
+
+  if (!snippet) {
+    return baseMessage;
+  }
+
+  return `${baseMessage} 响应片段：${snippet}`;
+}
+
+function truncateForError(value: string, maxLength = 160) {
+  const normalizedValue = value.replace(/\s+/gu, ' ').trim();
+
+  if (!normalizedValue) {
+    return '';
+  }
+
+  return normalizedValue.length <= maxLength
+    ? normalizedValue
+    : `${normalizedValue.slice(0, maxLength - 1)}…`;
 }

@@ -14,8 +14,7 @@ import WorkspaceRuntimeStatusCard from './components/WorkspaceRuntimeStatusCard'
 import { useWorkspaceRuntime } from './hooks/useWorkspaceRuntime';
 import { createDefaultWorkspaceRuntimeDependencies } from './services/createDefaultWorkspaceRuntimeDependencies';
 import {
-  hasQuestionAnswerEvidence,
-  isLeafQuestion,
+  getQuestionNodeIdForAnswerEvaluation,
 } from './services/learningRuntimeContext';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 
@@ -101,16 +100,15 @@ export default function WorkspaceRuntimeScreen({
   );
 
   function renderLeftPanelExtra(context: WorkspaceEditorRenderContext) {
-    const canEvaluateQuestionAnswer =
-      context.selectedNode?.type === 'question' &&
-      isLeafQuestion(context.tree, context.selectedNode.id) &&
-      hasQuestionAnswerEvidence(context.tree, context.selectedNode.id) &&
-      !runtime.isAiRunning;
+    const evaluationQuestionNodeId = getQuestionNodeIdForAnswerEvaluation(
+      context.tree,
+      context.selectedNode?.id ?? null,
+    );
 
     return (
       <WorkspaceRuntimeActionCard
-        canEvaluateQuestionAnswer={canEvaluateQuestionAnswer}
         currentModule={context.currentModule}
+        evaluationQuestionNodeId={evaluationQuestionNodeId}
         isAiRunning={runtime.isAiRunning}
         onCreateModule={context.createModule}
         onEvaluateQuestionAnswer={(questionNodeId) => {

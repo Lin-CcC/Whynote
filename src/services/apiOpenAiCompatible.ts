@@ -98,17 +98,26 @@ export async function requestOpenAiCompatibleChatCompletion(
 ): Promise<OpenAiCompatibleChatCompletionResult> {
   const fetchFn = options.fetchFn ?? fetch;
   const request = buildOpenAiCompatibleRequest(options);
-  const response = await fetchFn(request.url, request.init);
 
-  if (!response.ok) {
-    throw new Error(`OpenAI-compatible 请求失败：${response.status}`);
+  let response: Response;
+
+  try {
+    response = await fetchFn(request.url, request.init);
+  } catch (error) {
+    throw new Error(buildTransportErrorMessage(error));
   }
 
-  const payload = (await response.json()) as OpenAiCompatibleResponseBody;
+  const rawBody = await response.text();
+
+  if (!response.ok) {
+    throw new Error(buildHttpErrorMessage(response, rawBody));
+  }
+
+  const payload = parseResponseBody(rawBody);
   const rawText = extractMessageText(payload);
 
   if (!rawText.trim()) {
-    throw new Error('OpenAI-compatible 响应缺少可用文本内容。');
+    throw new Error('AI 服务响应缺少可用文本内容。');
   }
 
   return {
@@ -132,6 +141,83 @@ function extractMessageText(payload: OpenAiCompatibleResponseBody) {
   }
 
   return '';
+}
+
+function parseResponseBody(rawBody: string) {
+  try {
+    return JSON.parse(rawBody) as OpenAiCompatibleResponseBody;
+  } catch {
+    throw new Error(
+      `AI 服务返回了无法解析的响应 JSON。响应片段：${truncateForError(rawBody)}`,
+    );
+  }
+}
+
+function buildTransportErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) {
+    return `AI 服务请求失败：${error.message}`;
+  }
+
+  return 'AI 服务请求失败，请检查网络、跨域策略或 baseUrl 配置。';
+}
+
+function buildHttpErrorMessage(response: Response, rawBody: string) {
+  const statusText = normalizeErrorText(response.statusText);
+  const bodyMessage = extractErrorMessageFromBody(rawBody);
+  const statusLabel = statusText
+    ? `${String(response.status)} ${statusText}`
+    : String(response.status);
+
+  if (bodyMessage) {
+    return `AI 服务请求失败（${statusLabel}）：${bodyMessage}`;
+  }
+
+  return `AI 服务请求失败（${statusLabel}）。`;
+}
+
+function extractErrorMessageFromBody(rawBody: string) {
+  const normalizedRawBody = normalizeErrorText(rawBody);
+
+  if (!normalizedRawBody) {
+    return '';
+  }
+
+  try {
+    const payload = JSON.parse(rawBody) as {
+      error?: {
+        message?: unknown;
+        status?: unknown;
+      };
+      message?: unknown;
+    };
+    const errorMessage = normalizeErrorText(payload.error?.message);
+    const topLevelMessage = normalizeErrorText(payload.message);
+    const errorStatus = normalizeErrorText(payload.error?.status);
+
+    return errorMessage || topLevelMessage || errorStatus || truncateForError(rawBody);
+  } catch {
+    return truncateForError(rawBody);
+  }
+}
+
+function truncateForError(value: string, maxLength = 160) {
+  const normalizedValue = normalizeErrorText(value);
+
+  if (!normalizedValue) {
+    return '';
+  }
+
+  return normalizedValue.length <= maxLength
+    ? normalizedValue
+    : `${normalizedValue.slice(0, maxLength - 1)}…`;
+}
+
+function normalizeErrorText(value: unknown) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.replace(/\s+/gu, ' ').trim();
 }
 
 function normalizeBaseUrl(baseUrl: string) {

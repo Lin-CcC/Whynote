@@ -231,6 +231,31 @@
   gap: 0.65rem;
 }
 
+.workspace-actionField {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.workspace-actionLabel {
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.workspace-actionSelect {
+  width: 100%;
+  padding: 0.62rem 0.72rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 0.9rem;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.workspace-actionSelect:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
 .workspace-actionGrid button {
   padding: 0.72rem 0.8rem;
   cursor: pointer;

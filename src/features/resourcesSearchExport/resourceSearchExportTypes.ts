@@ -17,6 +17,7 @@ export interface TagFilterOption {
 export interface SearchResult {
   nodeId: string;
   nodeType: NodeType;
+  nodeTypeLabel: string;
   title: string;
   pathLabel: string;
   snippet: string;

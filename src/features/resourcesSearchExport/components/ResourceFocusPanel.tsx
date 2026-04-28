@@ -114,7 +114,7 @@ export default function ResourceFocusPanel({
       <dl className="resources-focusList">
         <div>
           <dt>节点</dt>
-          <dd>{formatNodeLabel(resourceNode)}</dd>
+          <dd>{formatNodeLabel(tree, resourceNode)}</dd>
         </div>
         <div>
           <dt>路径</dt>
@@ -159,7 +159,9 @@ export default function ResourceFocusPanel({
         </div>
         <div>
           <dt>模块内编辑焦点</dt>
-          <dd>{editorNode ? formatNodeLabel(editorNode) : '当前没有模块内焦点'}</dd>
+          <dd>
+            {editorNode ? formatNodeLabel(tree, editorNode) : '当前没有模块内焦点'}
+          </dd>
         </div>
       </dl>
       <form className="resources-entrySection" onSubmit={handleCreateFragment}>
@@ -174,7 +176,7 @@ export default function ResourceFocusPanel({
               “新建摘录”已从主入口下沉；这里只作为当前资料焦点的补充动作。
             </p>
             <p className="workspace-helpText">
-              当前挂载资料：{formatNodeLabel(targetResourceNode)}
+              当前挂载资料：{formatNodeLabel(tree, targetResourceNode)}
             </p>
             {resourceNode.type === 'resource-fragment' ? (
               <p className="workspace-helpText">
@@ -238,13 +240,14 @@ export default function ResourceFocusPanel({
           </p>
         ) : !canAttachCitation ? (
           <p className="workspace-helpText">
-            当前焦点是 {formatNodeLabel(editorNode)}。这里只对
+            当前焦点是 {formatNodeLabel(tree, editorNode)}。这里只对
             `question / answer / summary / judgment` 建立资料引用。
           </p>
         ) : (
           <form className="resources-entrySection" onSubmit={handleAttachCitation}>
             <p className="workspace-helpText">
-              当前会把 {formatNodeLabel(resourceNode)} 引到 {formatNodeLabel(editorNode)}。
+              当前会把 {formatNodeLabel(tree, resourceNode)} 引到{' '}
+              {formatNodeLabel(tree, editorNode)}。
             </p>
             {resourceNode.type === 'resource' ? (
               <>

@@ -1,4 +1,7 @@
-import type { NodeTree } from '../../nodeDomain';
+import {
+  getDisplayNodeTypeLabel,
+  type NodeTree,
+} from '../../nodeDomain';
 import type {
   SearchScope,
   SearchWorkspaceNodesResult,
@@ -70,6 +73,7 @@ export function searchWorkspaceNodes({
         locationRatio,
         nodeId: node.id,
         nodeType: node.type,
+        nodeTypeLabel: getDisplayNodeTypeLabel(tree, node),
         pathLabel: getNodePathLabel(tree, node.id),
         scopeIndex,
         scopeSize: scopedNodes.length,

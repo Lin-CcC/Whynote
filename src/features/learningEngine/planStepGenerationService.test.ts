@@ -39,13 +39,14 @@ describe('planStepGenerationService', () => {
             prerequisites: [
               {
                 title: '什么是并发渲染的基础术语？',
-                content: '先补齐最小前置概念。',
+                content:
+                  '并发渲染先把渲染工作拆成可中断、可恢复的调度任务，让更新不再只能一次性跑完。理解这一步的关键，是先区分渲染过程和提交过程各自承担什么角色。',
               },
             ],
             questions: [
               {
                 title: '并发渲染到底改变了什么？',
-                content: '聚焦运行时行为变化。',
+                content: '围绕关键问题继续学习。',
               },
             ],
           },
@@ -71,5 +72,14 @@ describe('planStepGenerationService', () => {
     expect(result.planSteps[0].introductions).toHaveLength(1);
     expect(result.planSteps[0].questions).toHaveLength(1);
     expect(result.planSteps[0].introductions[0].title).toContain('铺垫：');
+    expect(result.planSteps[0].introductions[0].content).toContain(
+      '并发渲染先把渲染工作拆成可中断、可恢复的调度任务',
+    );
+    expect(result.planSteps[0].introductions[0].content).toContain(
+      '并发渲染到底改变了什么？',
+    );
+    expect(result.planSteps[0].questions[0].content).toContain(
+      '说明最关键的对象、关系或判断标准',
+    );
   });
 });
