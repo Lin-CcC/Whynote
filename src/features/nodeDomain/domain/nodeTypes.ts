@@ -18,6 +18,14 @@ export const REFERENCE_TARGET_NODE_TYPES = [
   'resource',
   'resource-fragment',
 ] as const;
+export const CITATION_PURPOSES = [
+  'definition',
+  'mechanism',
+  'behavior',
+  'example',
+  'judgment',
+  'background',
+] as const;
 
 export type NodeType =
   | 'theme-root'
@@ -36,6 +44,7 @@ export type ReferenceSourceNodeType =
   (typeof REFERENCE_SOURCE_NODE_TYPES)[number];
 export type ReferenceTargetNodeType =
   (typeof REFERENCE_TARGET_NODE_TYPES)[number];
+export type CitationPurpose = (typeof CITATION_PURPOSES)[number];
 export type PlanStepStatus = 'todo' | 'doing' | 'done';
 
 export interface BaseNode {
@@ -121,7 +130,11 @@ export interface NodeReference {
   id: string;
   sourceNodeId: string;
   targetNodeId: string;
+  focusText?: string;
   note?: string;
+  purpose?: CitationPurpose;
+  sourceExcerpt?: string;
+  sourceLocator?: string;
   createdAt: string;
   updatedAt: string;
 }

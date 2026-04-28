@@ -2,6 +2,7 @@ import { NodeDomainError } from './nodeErrors';
 import {
   canNodeHaveChildren,
   canParentAcceptChild,
+  isCitationPurpose,
   isReferenceSourceNodeType,
   isReferenceTargetNodeType,
 } from './treeConstraints';
@@ -236,6 +237,17 @@ export function validateNodeTree(tree: NodeTree) {
         `节点 ${targetNode.type} 不能作为引用目标。`,
         {
           targetNodeId: targetNode.id,
+        },
+      );
+    }
+
+    if (reference.purpose && !isCitationPurpose(reference.purpose)) {
+      throw new NodeDomainError(
+        'INVALID_REFERENCE',
+        `引用 ${reference.id} 包含不合法的教学引用用途 ${reference.purpose}。`,
+        {
+          referenceId: reference.id,
+          purpose: reference.purpose,
         },
       );
     }

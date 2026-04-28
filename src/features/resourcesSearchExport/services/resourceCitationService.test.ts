@@ -39,6 +39,11 @@ describe('resourceCitationService', () => {
     const tree = createCitationTree();
 
     const result = attachResourceCitation(tree, {
+      referenceDraft: {
+        focusText: '这里在解释为什么同一轮里的多次更新会被合并。',
+        note: '这里在说明机制，应该对照资料里的 batching 段落。',
+        purpose: 'mechanism',
+      },
       sourceNodeId: 'question-citation',
       targetNodeId: 'resource-react-docs',
       fragmentDraft: {
@@ -53,12 +58,23 @@ describe('resourceCitationService', () => {
     expect(result.tree.references[result.reference.id]?.targetNodeId).toBe(
       'fragment-batching',
     );
+    expect(result.tree.references[result.reference.id]?.focusText).toBe(
+      '这里在解释为什么同一轮里的多次更新会被合并。',
+    );
+    expect(result.tree.references[result.reference.id]?.purpose).toBe(
+      'mechanism',
+    );
   });
 
   it('falls back to a resource-level citation when no stable fragment match exists', () => {
     const tree = createCitationTree();
 
     const result = attachResourceCitation(tree, {
+      referenceDraft: {
+        focusText: '这里在支撑“这不是立即逐次渲染”的判断。',
+        note: '这里在支撑判断，应该让用户直接看到资料里提到的批处理位置。',
+        purpose: 'judgment',
+      },
       sourceNodeId: 'summary-citation',
       targetNodeId: 'resource-react-docs',
       fragmentDraft: {
@@ -73,9 +89,42 @@ describe('resourceCitationService', () => {
     expect(result.tree.references[result.reference.id]?.targetNodeId).toBe(
       'resource-react-docs',
     );
+    expect(result.tree.references[result.reference.id]?.sourceExcerpt).toBe(
+      '这段描述没有稳定对应到现有摘录。',
+    );
+    expect(result.tree.references[result.reference.id]?.sourceLocator).toBe(
+      'unknown',
+    );
     expect(result.tree.nodes['resource-react-docs'].childIds).toEqual([
       'fragment-batching',
     ]);
+  });
+
+  it('upgrades an existing generic reference into a teaching citation instead of creating duplicates', () => {
+    const tree = createCitationTree();
+    const firstResult = attachResourceCitation(tree, {
+      sourceNodeId: 'judgment-citation',
+      targetNodeId: 'fragment-batching',
+    });
+
+    const secondResult = attachResourceCitation(firstResult.tree, {
+      referenceDraft: {
+        focusText: '这里在指出用户遗漏了批处理和减少重复渲染之间的关系。',
+        note: '这里在支撑判断，用户点开后应该看到 batching 的原文。',
+        purpose: 'judgment',
+      },
+      sourceNodeId: 'judgment-citation',
+      targetNodeId: 'fragment-batching',
+    });
+
+    expect(secondResult.referenceAlreadyExisted).toBe(true);
+    expect(secondResult.tree.nodes['judgment-citation'].referenceIds).toHaveLength(1);
+    expect(secondResult.tree.references[secondResult.reference.id]?.focusText).toBe(
+      '这里在指出用户遗漏了批处理和减少重复渲染之间的关系。',
+    );
+    expect(secondResult.tree.references[secondResult.reference.id]?.purpose).toBe(
+      'judgment',
+    );
   });
 });
 

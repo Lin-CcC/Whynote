@@ -4,6 +4,8 @@ import {
   createNodeReference,
   getNodeOrThrow,
   insertChildNode,
+  updateNodeReference,
+  type CitationPurpose,
   type NodeTree,
 } from '../../nodeDomain';
 
@@ -124,7 +126,14 @@ export function appendLearningNodeDraftToTree(
     type: 'question' | 'summary' | 'judgment';
     title: string;
     content: string;
-    citations: Array<{ targetNodeId: string }>;
+    citations: Array<{
+      targetNodeId: string;
+      focusText?: string;
+      note?: string;
+      purpose?: CitationPurpose;
+      sourceExcerpt?: string;
+      sourceLocator?: string;
+    }>;
   },
   insertIndex?: number,
 ) {
@@ -142,7 +151,14 @@ export function appendLearningNodeDraftToTree(
 function attachDraftCitations(
   tree: NodeTree,
   sourceNodeId: string,
-  citations: Array<{ targetNodeId: string }>,
+  citations: Array<{
+    targetNodeId: string;
+    focusText?: string;
+    note?: string;
+    purpose?: CitationPurpose;
+    sourceExcerpt?: string;
+    sourceLocator?: string;
+  }>,
 ) {
   let nextTree = tree;
 
@@ -158,11 +174,35 @@ function attachDraftCitations(
     }
 
     const sourceNode = getNodeOrThrow(nextTree, sourceNodeId);
-    const existingReference = sourceNode.referenceIds
+    const exactReference = sourceNode.referenceIds
       .map((referenceId) => nextTree.references[referenceId])
-      .find((reference) => reference?.targetNodeId === targetNode.id);
+      .find(
+        (reference) =>
+          reference?.targetNodeId === targetNode.id &&
+          normalizeCitationMatchText(reference.focusText) ===
+            normalizeCitationMatchText(citation.focusText),
+      );
 
-    if (existingReference) {
+    if (exactReference) {
+      nextTree = mergeCitationMetadata(nextTree, exactReference.id, citation);
+      continue;
+    }
+
+    const upgradeableGenericReference = sourceNode.referenceIds
+      .map((referenceId) => nextTree.references[referenceId])
+      .find(
+        (reference) =>
+          reference?.targetNodeId === targetNode.id &&
+          !normalizeCitationMatchText(reference.focusText) &&
+          hasCitationMetadata(citation),
+      );
+
+    if (upgradeableGenericReference) {
+      nextTree = mergeCitationMetadata(
+        nextTree,
+        upgradeableGenericReference.id,
+        citation,
+      );
       continue;
     }
 
@@ -171,9 +211,99 @@ function attachDraftCitations(
       createNodeReference({
         sourceNodeId,
         targetNodeId: targetNode.id,
+        focusText: normalizeCitationDisplayText(citation.focusText) ?? undefined,
+        note: normalizeCitationDisplayText(citation.note) ?? undefined,
+        purpose: citation.purpose,
+        sourceExcerpt:
+          normalizeCitationDisplayText(citation.sourceExcerpt) ?? undefined,
+        sourceLocator:
+          normalizeCitationDisplayText(citation.sourceLocator) ?? undefined,
       }),
     );
   }
 
   return nextTree;
+}
+
+function mergeCitationMetadata(
+  tree: NodeTree,
+  referenceId: string,
+  citation: {
+    focusText?: string;
+    note?: string;
+    purpose?: CitationPurpose;
+    sourceExcerpt?: string;
+    sourceLocator?: string;
+  },
+) {
+  const reference = tree.references[referenceId];
+
+  if (!reference) {
+    return tree;
+  }
+
+  const focusText = normalizeCitationDisplayText(citation.focusText);
+  const note = normalizeCitationDisplayText(citation.note);
+  const sourceExcerpt = normalizeCitationDisplayText(citation.sourceExcerpt);
+  const sourceLocator = normalizeCitationDisplayText(citation.sourceLocator);
+  const patch: Partial<
+    Pick<
+      typeof reference,
+      'focusText' | 'note' | 'purpose' | 'sourceExcerpt' | 'sourceLocator'
+    >
+  > = {};
+
+  if (focusText && focusText !== reference.focusText) {
+    patch.focusText = focusText;
+  }
+
+  if (note && note !== reference.note) {
+    patch.note = note;
+  }
+
+  if (citation.purpose && citation.purpose !== reference.purpose) {
+    patch.purpose = citation.purpose;
+  }
+
+  if (sourceExcerpt && sourceExcerpt !== reference.sourceExcerpt) {
+    patch.sourceExcerpt = sourceExcerpt;
+  }
+
+  if (sourceLocator && sourceLocator !== reference.sourceLocator) {
+    patch.sourceLocator = sourceLocator;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return tree;
+  }
+
+  return updateNodeReference(tree, referenceId, patch);
+}
+
+function hasCitationMetadata(citation: {
+  focusText?: string;
+  note?: string;
+  purpose?: CitationPurpose;
+  sourceExcerpt?: string;
+  sourceLocator?: string;
+}) {
+  return Boolean(
+    normalizeCitationDisplayText(citation.focusText) ||
+      normalizeCitationDisplayText(citation.note) ||
+      citation.purpose ||
+      normalizeCitationDisplayText(citation.sourceExcerpt) ||
+      normalizeCitationDisplayText(citation.sourceLocator),
+  );
+}
+
+function normalizeCitationMatchText(value: string | null | undefined) {
+  const normalizedValue = value?.trim().replace(/\s+/gu, ' ').toLocaleLowerCase();
+
+  return normalizedValue ? normalizedValue : null;
+}
+
+function normalizeCitationDisplayText(value: string | null | undefined) {
+  const normalizedValue = value?.trim().replace(/\s+/gu, ' ');
+
+  return normalizedValue ? normalizedValue : null;
 }

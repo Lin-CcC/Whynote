@@ -1,10 +1,15 @@
-import type { PlanStepStatus } from '../../nodeDomain';
+import type { CitationPurpose, PlanStepStatus } from '../../nodeDomain';
 
 import type { AiExecutionMetadata } from './aiTypes';
 import type { LearningMode } from './learningMode';
 
 export interface LearningNodeCitationDraft {
   targetNodeId: string;
+  focusText?: string;
+  note?: string;
+  purpose?: CitationPurpose;
+  sourceExcerpt?: string;
+  sourceLocator?: string;
 }
 
 interface BaseLearningNodeDraft {
