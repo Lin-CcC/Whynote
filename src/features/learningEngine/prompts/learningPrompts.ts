@@ -331,7 +331,7 @@ function buildLearningActionInstructions(input: LearningActionDraftInput) {
 }
 
 function buildTeachingCitationInstruction() {
-  return '只给确实承担定义、机制说明、代码行为解释、例子来源、判断支撑或背景补充作用的片段挂 citations，不要给过渡语句挂引用。每条 citation 除 targetNodeId 外，尽量补 focusText（当前讲解里被资料支撑的那一句或那一小段）、purpose（definition / mechanism / behavior / example / judgment / background）、note（为什么该看这段）；如果 citation 要支撑具体讲解片段但 targetNodeId 指向 resource，而不是 fragment，就必须补 sourceExcerpt 或 sourceLocator，否则这条引用不会被当成教学引用展示。';
+  return '只给确实承担定义、机制说明、代码行为解释、例子来源、判断支撑或背景补充作用的片段挂 citations，不要给过渡语句挂引用。每条 citation 除 targetNodeId 外，尽量补 focusText（当前讲解里被资料支撑的那一句或那一小段）、purpose（definition / mechanism / behavior / example / judgment / background）、note（为什么该看这段）；如果 citation 要支撑具体讲解片段但 targetNodeId 指向 resource，而不是 fragment，就必须补 sourceExcerpt 或 sourceLocator。sourceExcerpt / sourceLocator 只能来自原资料正文、显式定位或可回跳摘录，不要把资料概况或 AI 摘要改写成 sourceExcerpt，否则这条引用不会被当成教学引用展示。';
 }
 
 function buildCitationJsonShape() {

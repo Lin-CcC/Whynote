@@ -178,6 +178,11 @@ export default function ResourceFocusPanel({
       <p className="workspace-helpText">
         资料焦点是独立通道，不会覆盖当前模块内的编辑选区。
       </p>
+      {resourceNode.type === 'resource' ? (
+        <p className="workspace-helpText">
+          这里会同时保留资料概况和正文基础。资料概况只负责说明“这份资料大概讲什么”，不会自动当成引用正文。
+        </p>
+      ) : null}
       <dl className="resources-focusList">
         <div>
           <dt>节点</dt>
@@ -203,10 +208,18 @@ export default function ResourceFocusPanel({
             </div>
           </>
         ) : (
-          <div>
-            <dt>资料概况</dt>
-            <dd>{resourceNode.content || '暂无资料概况'}</dd>
-          </div>
+          <>
+            <div>
+              <dt>资料概况</dt>
+              <dd>{resourceNode.content || '暂无资料概况'}</dd>
+            </div>
+            {activeResourceMetadata?.bodyText ? (
+              <div>
+                <dt>正文基础预览</dt>
+                <dd>{buildBodyFoundationPreview(activeResourceMetadata.bodyText)}</dd>
+              </div>
+            ) : null}
+          </>
         )}
         {provenanceMetadata?.importMethod ? (
           <div>
@@ -372,15 +385,19 @@ export default function ResourceFocusPanel({
             ) : null}
             {resourceNode.type === 'resource' ? (
               <>
-              <p className="workspace-helpText">
-                如果你能给出稳定片段，系统会先尝试复用这份资料下已有的 fragment；
-                如果无法可靠命中，就退回为 resource 级引用，但仍会保留你填的原文片段和定位提示。
-              </p>
-              {captureTeachingCitation ? (
                 <p className="workspace-helpText">
-                  当前是教学引用。为了让引用块稳定回答“这段解释依据资料里的哪一部分”，至少填写引用片段正文或定位信息；否则这条引用只会停留在资料级粗引用。
+                  资料卡里的“资料概况”只用于帮助判断这份资料讲什么，不会自动当成引用正文。真正的引用依据优先来自摘录、正文片段或定位信息。
                 </p>
-              ) : null}
+                <p className="workspace-helpText">
+                  如果你能给出稳定片段，系统会先尝试复用这份资料下已有的
+                  fragment；如果无法可靠命中，就退回为 resource
+                  级引用，但仍会保留你填的原文片段和定位提示。
+                </p>
+                {captureTeachingCitation ? (
+                  <p className="workspace-helpText">
+                    当前是教学引用。为了让引用块稳定回答“这段解释依据资料里的哪一部分”，至少填写引用片段正文或定位信息；否则这条引用只会停留在资料级粗引用。
+                  </p>
+                ) : null}
                 <label className="resources-panelField">
                   <span className="resources-panelFieldLabel">引用片段正文</span>
                   <textarea
@@ -688,4 +705,14 @@ function resolveTargetResourceNode(
   const parentResourceNode = tree.nodes[resourceNode.sourceResourceId];
 
   return parentResourceNode?.type === 'resource' ? parentResourceNode : null;
+}
+
+function buildBodyFoundationPreview(bodyText: string, maxLength = 240) {
+  const normalizedBodyText = bodyText.replace(/\s+/gu, ' ').trim();
+
+  if (normalizedBodyText.length <= maxLength) {
+    return normalizedBodyText;
+  }
+
+  return `${normalizedBodyText.slice(0, maxLength - 1).trimEnd()}…`;
 }
