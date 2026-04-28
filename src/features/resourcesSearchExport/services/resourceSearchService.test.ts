@@ -55,6 +55,7 @@ test('labels scaffold summaries as introductions in search results', () => {
 
   expect(result.results.map((item) => item.nodeId)).toEqual(['summary-introduction']);
   expect(result.results[0]?.nodeTypeLabel).toBe('铺垫');
+  expect(result.results[0]?.title).toBe('先理解状态更新的背景');
 });
 
 test('supports resource-only search by source summary', () => {

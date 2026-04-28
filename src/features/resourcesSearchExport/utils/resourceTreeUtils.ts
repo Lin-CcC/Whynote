@@ -1,4 +1,5 @@
 import {
+  getDisplayNodeTitle,
   getDisplayNodeTypeLabel,
   type NodeTree,
   type TreeNode,
@@ -122,7 +123,7 @@ export function getNodePathLabel(tree: NodeTree, nodeId: string) {
 }
 
 export function formatNodeLabel(tree: NodeTree, node: TreeNode) {
-  return `${getDisplayNodeTypeLabel(tree, node)} · ${node.title}`;
+  return `${getDisplayNodeTypeLabel(tree, node)} · ${getDisplayNodeTitle(tree, node)}`;
 }
 
 export function getNodeSourceSummary(tree: NodeTree, node: TreeNode) {

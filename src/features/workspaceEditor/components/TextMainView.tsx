@@ -6,7 +6,7 @@ import type {
   NodeContentPatch,
   WorkspaceEditorNodeRenderContext,
 } from '../workspaceEditorTypes';
-import { getDisplayLabelForNode } from '../utils/treeSelectors';
+import { getDisplayLabelForNode, getDisplayTitleForNode } from '../utils/treeSelectors';
 import EditorNodeSection from './EditorNodeSection';
 
 type TextMainViewProps = {
@@ -82,7 +82,7 @@ export default function TextMainView({
             <dt>当前焦点</dt>
             <dd>
               {selectedNode
-                ? `${getDisplayLabelForNode(tree, selectedNode)} 路 ${selectedNode.title}`
+                ? `${getDisplayLabelForNode(tree, selectedNode)} · ${getDisplayTitleForNode(tree, selectedNode)}`
                 : '未选中节点'}
             </dd>
           </div>

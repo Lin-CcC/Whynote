@@ -65,7 +65,7 @@ test('plans a minimal learning path that lands as plan-step plus introduction an
 
   expect(await screen.findByDisplayValue('先搭建最小概念框架')).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('铺垫：先知道为什么要学这个问题'),
+    await screen.findByDisplayValue('先知道为什么要学这个问题'),
   ).toBeInTheDocument();
   expect(
     await screen.findByDisplayValue('这个模块的核心问题是什么？'),

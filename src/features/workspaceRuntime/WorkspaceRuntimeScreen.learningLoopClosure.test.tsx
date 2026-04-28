@@ -74,7 +74,7 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
-    await screen.findByDisplayValue('判断：回答还不完整'),
+    await screen.findByDisplayValue('回答还不完整'),
   ).toBeInTheDocument();
   expect(
     await screen.findByDisplayValue('标准理解'),
@@ -170,7 +170,7 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
-    await screen.findByDisplayValue('判断：回答还不完整'),
+    await screen.findByDisplayValue('回答还不完整'),
   ).toBeInTheDocument();
   expect(
     await screen.findByDisplayValue('追问：还缺哪一步因果关系？'),
@@ -215,7 +215,7 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
-    await screen.findByDisplayValue('判断：已答到当前问题'),
+    await screen.findByDisplayValue('已答到当前问题'),
   ).toBeInTheDocument();
   expect(
     await screen.findByDisplayValue('标准理解'),
@@ -283,7 +283,7 @@ test('re-evaluates only the currently selected answer when a question already ha
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
-    await screen.findByDisplayValue('判断：第一版回答还不完整'),
+    await screen.findByDisplayValue('第一版回答还不完整'),
   ).toBeInTheDocument();
   expect(observedQuestionClosurePrompt).toContain('当前回答：第一版回答');
   expect(observedQuestionClosurePrompt).toContain('因为 React 会先把更新合并起来。');
@@ -429,7 +429,7 @@ test('extends a scaffold with a simpler follow-up explanation draft', async () =
   fireEvent.click(screen.getByRole('button', { name: '更基础一点' }));
 
   const titleInput = await screen.findByDisplayValue(
-    '铺垫：先用排队的直觉理解批处理',
+    '先用排队的直觉理解批处理',
   );
 
   expect(titleInput).toBeInTheDocument();
@@ -486,7 +486,7 @@ test('creates AI drafts instead of empty shells for scaffold, question, summary 
 
   fireEvent.click(screen.getByRole('button', { name: '插入铺垫 / 讲解' }));
   expect(
-    await screen.findByDisplayValue('铺垫：先把同一轮更新放到一张图里'),
+    await screen.findByDisplayValue('先把同一轮更新放到一张图里'),
   ).toBeInTheDocument();
   expect(
     screen.getByDisplayValue(/先抓住一件事：批处理不是“晚一点更新”/u),
@@ -516,7 +516,7 @@ test('creates AI drafts instead of empty shells for scaffold, question, summary 
 
   fireEvent.click(screen.getByRole('button', { name: '插入判断' }));
   expect(
-    await screen.findByDisplayValue('判断：已经抓到批处理的主线'),
+    await screen.findByDisplayValue('已经抓到批处理的主线'),
   ).toBeInTheDocument();
   expect(
     screen.getByDisplayValue(/这份草稿已经抓到了“先收集再统一提交”的主线/u),
@@ -548,7 +548,7 @@ test('tolerates question-closure JSON wrapped in explanation text and code fence
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
-    await screen.findByDisplayValue('判断：已答到当前问题'),
+    await screen.findByDisplayValue('已答到当前问题'),
   ).toBeInTheDocument();
   expect(
     await screen.findByDisplayValue('标准理解'),

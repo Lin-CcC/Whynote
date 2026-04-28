@@ -3,6 +3,7 @@ import { getNodeOrThrow } from '../../nodeDomain';
 import {
   getChildNodes,
   getDisplayLabelForNode,
+  getDisplayTitleForNode,
   getNodeEmphasis,
 } from '../utils/treeSelectors';
 
@@ -27,6 +28,7 @@ export default function StructureTreeItem({
 }: StructureTreeItemProps) {
   const node = getNodeOrThrow(tree, nodeId);
   const childNodes = getChildNodes(tree, node.id);
+  const displayTitle = getDisplayTitleForNode(tree, node);
   const isExpanded = expandedNodeIds.has(node.id);
   const isSelected = node.id === selectedNodeId;
   const nodeEmphasis = getNodeEmphasis(node);
@@ -40,7 +42,7 @@ export default function StructureTreeItem({
       >
         {childNodes.length > 0 ? (
           <button
-            aria-label={`${isExpanded ? '折叠' : '展开'} ${node.title}`}
+            aria-label={`${isExpanded ? '折叠' : '展开'} ${displayTitle}`}
             className="workspace-treeToggle"
             disabled={isInteractionLocked}
             onClick={() => onToggleNode(node.id)}
@@ -61,7 +63,7 @@ export default function StructureTreeItem({
           <span className="workspace-treeType">
             {getDisplayLabelForNode(tree, node)}
           </span>
-          <span className="workspace-treeText">{node.title}</span>
+          <span className="workspace-treeText">{displayTitle}</span>
         </button>
       </div>
       {childNodes.length > 0 && isExpanded ? (

@@ -1,10 +1,12 @@
 import {
   createNode,
   createWorkspaceSnapshot,
+  getDisplayNodeTitle,
   getDisplayNodeTypeLabel,
   insertChildNode,
   isAnswerClosureSummaryNode,
   isScaffoldSummaryNode,
+  stripRedundantDisplayTypePrefix,
 } from '..';
 
 test('treats plan-step summaries before the first question as scaffold introductions', () => {
@@ -33,6 +35,32 @@ test('treats manually inserted question summaries as answer explanations even be
   expect(
     getDisplayNodeTypeLabel(tree, tree.nodes['summary-manual-first']!),
   ).toBe('答案解析');
+});
+
+test('strips only the redundant type prefix from display titles when the label is already visible', () => {
+  const tree = createSemanticsSnapshot().tree;
+
+  expect(getDisplayNodeTitle(tree, tree.nodes['summary-introduction']!)).toBe(
+    '先建立前置理解',
+  );
+  expect(getDisplayNodeTitle(tree, tree.nodes['question-semantics']!)).toBe(
+    '从参数到学习：AI 的物理基础',
+  );
+  expect(getDisplayNodeTitle(tree, tree.nodes['answer-semantics']!)).toBe(
+    '第一版理解',
+  );
+  expect(getDisplayNodeTitle(tree, tree.nodes['judgment-semantics']!)).toBe(
+    '还差一点',
+  );
+  expect(getDisplayNodeTitle(tree, tree.nodes['summary-closure']!)).toBe(
+    '标准理解',
+  );
+});
+
+test('keeps body colons intact when they are not a redundant type prefix', () => {
+  expect(
+    stripRedundantDisplayTypePrefix('从参数到学习：AI 的物理基础', '铺垫'),
+  ).toBe('从参数到学习：AI 的物理基础');
 });
 
 function createSemanticsSnapshot() {
@@ -87,7 +115,7 @@ function createSemanticsSnapshot() {
     createNode({
       type: 'question',
       id: 'question-semantics',
-      title: '核心问题',
+      title: '问题：从参数到学习：AI 的物理基础',
       createdAt: '2026-04-27T12:00:00.000Z',
       updatedAt: '2026-04-27T12:00:00.000Z',
     }),
@@ -98,7 +126,7 @@ function createSemanticsSnapshot() {
     createNode({
       type: 'answer',
       id: 'answer-semantics',
-      title: '回答草稿',
+      title: '回答：第一版理解',
       content: '先给出一版回答。',
       createdAt: '2026-04-27T12:00:00.000Z',
       updatedAt: '2026-04-27T12:00:00.000Z',
@@ -122,7 +150,7 @@ function createSemanticsSnapshot() {
     createNode({
       type: 'summary',
       id: 'summary-closure',
-      title: '标准理解',
+      title: '答案解析：标准理解',
       content: '这是答题后的答案解析。',
       createdAt: '2026-04-27T12:00:00.000Z',
       updatedAt: '2026-04-27T12:00:00.000Z',

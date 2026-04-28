@@ -7,6 +7,7 @@ import {
 } from '../../nodeDomain';
 import {
   getDisplayLabelForNode,
+  getDisplayTitleForNode,
   getNodePath,
   getNodeTypeLabel,
 } from '../utils/treeSelectors';
@@ -67,7 +68,7 @@ export default function SelectedNodeInspector({
             <dt>节点</dt>
               <dd>
                 {selectedNode
-                  ? `${getDisplayLabelForNode(tree, selectedNode)} · ${selectedNode.title}`
+                  ? `${getDisplayLabelForNode(tree, selectedNode)} · ${getDisplayTitleForNode(tree, selectedNode)}`
                   : '未选中节点'}
               </dd>
           </div>

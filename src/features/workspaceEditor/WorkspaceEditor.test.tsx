@@ -186,6 +186,51 @@ test('shows scaffold teaching follow-up actions when a scaffold node is selected
   ).toBeInTheDocument();
 });
 
+test('removes redundant type prefixes from titles when the UI already shows node labels', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-prefixed-display-titles"
+      initialSelectedNodeId="summary-scaffold-prefixed"
+      initialSnapshot={createPrefixedDisplayTitleSnapshot()}
+      onSnapshotChange={(snapshot) => {
+        snapshots.push(snapshot);
+      }}
+    />,
+  );
+
+  expect(await screen.findByDisplayValue('先建立概念地图')).toBeInTheDocument();
+  expect(screen.queryByDisplayValue('铺垫：先建立概念地图')).not.toBeInTheDocument();
+  expect(screen.getByDisplayValue('从参数到学习：AI 的物理基础')).toBeInTheDocument();
+  expect(screen.queryByDisplayValue('问题：从参数到学习：AI 的物理基础')).not.toBeInTheDocument();
+  expect(screen.getByDisplayValue('第一版理解')).toBeInTheDocument();
+  expect(screen.queryByDisplayValue('回答：第一版理解')).not.toBeInTheDocument();
+  expect(screen.getByDisplayValue('还差关键因果')).toBeInTheDocument();
+  expect(screen.queryByDisplayValue('判断：还差关键因果')).not.toBeInTheDocument();
+  expect(screen.getByDisplayValue('标准理解')).toBeInTheDocument();
+  expect(screen.queryByDisplayValue('答案解析：标准理解')).not.toBeInTheDocument();
+  expect(screen.getByDisplayValue('只围绕当前问题')).toBeInTheDocument();
+  expect(screen.queryByDisplayValue('总结：只围绕当前问题')).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: /问题.*从参数到学习：AI 的物理基础/u }),
+  ).toBeInTheDocument();
+
+  fireEvent.change(screen.getByDisplayValue('还差关键因果'), {
+    target: {
+      value: '判断：补上最后一步',
+    },
+  });
+
+  await waitFor(() => {
+    expect(screen.getByDisplayValue('补上最后一步')).toBeInTheDocument();
+  });
+
+  const latestSnapshot = snapshots[snapshots.length - 1];
+
+  expect(latestSnapshot?.tree.nodes['judgment-prefixed']?.title).toBe('补上最后一步');
+});
+
 test('inserts scaffold before the first question when the step is selected', () => {
   const operations = createOperationSpies();
 
@@ -555,6 +600,121 @@ function createScaffoldActionSnapshot(): WorkspaceSnapshot {
       content: '验证铺垫后的理解。',
       createdAt: '2026-04-27T09:15:00.000Z',
       updatedAt: '2026-04-27T09:15:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createPrefixedDisplayTitleSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '标题前缀收口',
+    workspaceId: 'workspace-prefixed-display-titles',
+    rootId: 'theme-prefixed-display-titles',
+    createdAt: '2026-04-29T09:00:00.000Z',
+    updatedAt: '2026-04-29T09:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-prefixed-display-titles',
+      title: '模块：标题前缀收口',
+      content: '',
+      createdAt: '2026-04-29T09:00:00.000Z',
+      updatedAt: '2026-04-29T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-prefixed-display-titles',
+    createNode({
+      type: 'plan-step',
+      id: 'step-prefixed-display-titles',
+      title: '步骤：统一标题展示',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-04-29T09:00:00.000Z',
+      updatedAt: '2026-04-29T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-prefixed-display-titles',
+    createNode({
+      type: 'summary',
+      id: 'summary-scaffold-prefixed',
+      title: '铺垫：先建立概念地图',
+      content: '先把最小背景交代清楚。',
+      createdAt: '2026-04-29T09:00:00.000Z',
+      updatedAt: '2026-04-29T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-prefixed-display-titles',
+    createNode({
+      type: 'question',
+      id: 'question-prefixed',
+      title: '问题：从参数到学习：AI 的物理基础',
+      content: '这里保留标题正文里的普通冒号。',
+      createdAt: '2026-04-29T09:00:00.000Z',
+      updatedAt: '2026-04-29T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-prefixed',
+    createNode({
+      type: 'answer',
+      id: 'answer-prefixed',
+      title: '回答：第一版理解',
+      content: '先给出一版理解。',
+      createdAt: '2026-04-29T09:00:00.000Z',
+      updatedAt: '2026-04-29T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-prefixed',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-prefixed',
+      title: '判断：还差关键因果',
+      content: '还没把因果关系补全。',
+      createdAt: '2026-04-29T09:00:00.000Z',
+      updatedAt: '2026-04-29T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-prefixed',
+    createNode({
+      type: 'summary',
+      id: 'summary-answer-explanation-prefixed',
+      title: '答案解析：标准理解',
+      content: '把标准理解补完整。',
+      createdAt: '2026-04-29T09:00:00.000Z',
+      updatedAt: '2026-04-29T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-prefixed-display-titles',
+    createNode({
+      type: 'summary',
+      id: 'summary-generic-prefixed',
+      title: '总结：只围绕当前问题',
+      content: '这是步骤层的普通总结。',
+      createdAt: '2026-04-29T09:00:00.000Z',
+      updatedAt: '2026-04-29T09:00:00.000Z',
     }),
   );
 
