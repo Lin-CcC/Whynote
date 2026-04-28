@@ -13,6 +13,9 @@ type ResourceEntryPanelProps = {
   activeResourceNodeId?: string | null;
   onApplyTreeChange: (nextTree: NodeTree) => void;
   onFocusResourceNode: (nodeId: string) => void;
+  onResolveResourceSummary?: (
+    draft: ResourceImportDraft,
+  ) => Promise<ResourceImportDraft>;
   onUpsertResourceMetadata: (record: ResourceMetadataRecord) => Promise<void>;
   tree: NodeTree;
   workspaceId: string;
@@ -32,6 +35,7 @@ export default function ResourceEntryPanel({
   activeResourceNodeId: _activeResourceNodeId,
   onApplyTreeChange,
   onFocusResourceNode,
+  onResolveResourceSummary,
   onUpsertResourceMetadata,
   tree,
   workspaceId,
@@ -91,12 +95,13 @@ export default function ResourceEntryPanel({
               type="button"
             >
               {isResourceAutoFillRunning
-                ? '尝试读取中…'
+                ? '尝试读取中...'
                 : '尝试自动补全（浏览器受限）'}
             </button>
           </div>
           <p className="workspace-helpText">
-            这不是通用网页抓取器。浏览器只能尝试读取当前明确允许直接访问的 URL。
+            这不是通用网页抓取器。浏览器只能尝试读取当前明确允许直接访问的
+            URL。
           </p>
           <label className="resources-panelField">
             <span className="resources-panelFieldLabel">本地资料文件（单份预填）</span>
@@ -112,7 +117,8 @@ export default function ResourceEntryPanel({
             />
           </label>
           <p className="workspace-helpText">
-            单文件预填继续保留：优先支持 `.txt` / `.md`，不会在这轮扩展到 PDF / DOCX。
+            单文件预填继续保留：优先支持 `.txt` / `.md`，不会在这轮扩展到 PDF /
+            DOCX。
           </p>
           <label className="resources-panelField">
             <span className="resources-panelFieldLabel">资料概况</span>
@@ -201,7 +207,7 @@ export default function ResourceEntryPanel({
     } catch (error) {
       setFeedback({
         message:
-          error instanceof Error ? error.message : '资料创建失败，请稍后重试。',
+          error instanceof Error ? error.message : '资源创建失败，请稍后重试。',
         tone: 'error',
       });
     }
@@ -214,11 +220,11 @@ export default function ResourceEntryPanel({
       const draft = await autoFillResourceDraftFromUrl({
         sourceUrl: resourceSource,
       });
+      const resolvedDraft = await resolveResourceDraftSummary(draft);
 
-      applyPreparedDraft(draft);
+      applyPreparedDraft(resolvedDraft);
       setFeedback({
-        message:
-          '当前链接允许浏览器直接读取，已预填资料标题和概况；创建时会一并保存可供后续引用的正文基础。',
+        message: buildAutoFillSuccessMessage(draft, resolvedDraft),
         tone: 'success',
       });
     } catch (error) {
@@ -271,6 +277,42 @@ export default function ResourceEntryPanel({
     setResourceTitle(draft.title);
     setResourceSource(draft.sourceUri);
     setResourceContent(draft.content);
+  }
+
+  async function resolveResourceDraftSummary(draft: ResourceImportDraft) {
+    if (
+      draft.ingest.importMethod !== 'url' ||
+      !draft.ingest.bodyText?.trim() ||
+      !onResolveResourceSummary
+    ) {
+      return draft;
+    }
+
+    try {
+      return await onResolveResourceSummary(draft);
+    } catch {
+      return draft;
+    }
+  }
+
+  function buildAutoFillSuccessMessage(
+    originalDraft: ResourceImportDraft,
+    resolvedDraft: ResourceImportDraft,
+  ) {
+    const hasReadableBodyText = Boolean(originalDraft.ingest.bodyText?.trim());
+    const usedAiSummary =
+      resolvedDraft.ingest.titleSource === 'ai-generated' &&
+      resolvedDraft.ingest.summarySource === 'ai-generated';
+
+    if (usedAiSummary) {
+      return '已读到网页正文，并优先用 AI 生成了更适合作为资料卡片的标题和概况；创建后会同时保存正文基础。';
+    }
+
+    if (hasReadableBodyText) {
+      return '已读到网页正文，但这次未能生成 AI 摘要，已回退到当前规则提取；创建后仍会保存正文基础。';
+    }
+
+    return '当前链接允许浏览器直接读取，已按现有规则预填标题和资料概况。';
   }
 
   function resetForm() {

@@ -254,6 +254,208 @@ test('keeps manual fallback usable when url autofill fails and stores a partial 
   expect(resourceMetadata.bodyFormat).toBeUndefined();
 });
 
+test('prefers AI summary over mechanical body excerpts when a readable URL body is available', async () => {
+  const firstParagraph =
+    'Render snapshots freeze the state and props visible to a specific render, so every callback reads from its own render-time view.';
+  const secondParagraph =
+    'Understanding that frozen view helps explain stale closures, effect timing, and why a log may still print an older value.';
+  const mechanicalSummary = `${firstParagraph} ${secondParagraph}`;
+  const aiTitle = '渲染快照与闭包读取';
+  const aiSummary =
+    '解释每次渲染如何固定读取视角，并适合支撑 stale closure、effect 时序与状态放置问题的排查。';
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return `
+          <html>
+            <head>
+              <title>Render snapshots explained</title>
+            </head>
+            <body>
+              <main>
+                <p>${firstParagraph}</p>
+                <p>${secondParagraph}</p>
+              </main>
+            </body>
+          </html>
+        `;
+      },
+    }),
+  );
+  const dependencies = createTestDependencies({
+    aiConfig: {
+      apiKey: 'test-key',
+      baseUrl: 'https://example.ai',
+      model: 'mock-model',
+    },
+    createProviderClient() {
+      return {
+        async generateObject(request) {
+          const rawText =
+            request.taskName === 'resource-summary-generation'
+              ? JSON.stringify({
+                  title: aiTitle,
+                  summary: aiSummary,
+                })
+              : JSON.stringify({ planSteps: [] });
+
+          return {
+            taskName: request.taskName,
+            content: request.parse(rawText),
+            model: 'mock-model',
+            providerLabel: 'mock-provider',
+            rawText,
+          };
+        },
+      };
+    },
+  });
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.change(screen.getByLabelText('资料来源 URI 或说明'), {
+    target: {
+      value: 'https://example.com/render-snapshots',
+    },
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: '尝试自动补全（浏览器受限）' }),
+  );
+
+  expect(await screen.findByDisplayValue(aiTitle)).toBeInTheDocument();
+  expect(screen.getByDisplayValue(aiSummary)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '创建资料' }));
+
+  expect(
+    await screen.findByRole('button', {
+      name: `定位资料 ${aiTitle}`,
+    }),
+  ).toBeInTheDocument();
+
+  await waitForSaved();
+
+  const restoredSnapshot = await loadOnlyWorkspaceSnapshot(dependencies);
+  const resourceNode = findNodeByTitle(restoredSnapshot.tree, aiTitle, 'resource');
+  const resourceMetadata = findResourceMetadata(
+    await loadOnlyResourceMetadata(dependencies),
+    resourceNode.id,
+  );
+
+  expect(resourceNode.content).toBe(aiSummary);
+  expect(resourceNode.content).not.toBe(mechanicalSummary);
+  expect(resourceMetadata).toMatchObject({
+    nodeId: resourceNode.id,
+    importMethod: 'url',
+    ingestStatus: 'ready',
+    titleSource: 'ai-generated',
+    summarySource: 'ai-generated',
+    bodyFormat: 'plain-text',
+    bodyText: `${firstParagraph}\n\n${secondParagraph}`,
+    sourceUri: 'https://example.com/render-snapshots',
+  });
+});
+
+test('falls back to existing URL summary extraction when AI summary generation fails', async () => {
+  const firstParagraph =
+    'Hooks capture the state visible during a render, which is why a callback keeps reading the snapshot from that specific render.';
+  const secondParagraph =
+    'That behavior is the concrete reason stale closure bugs show up in effects, timers, and deferred handlers.';
+  const fallbackSummary = `${firstParagraph} ${secondParagraph}`;
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      async text() {
+        return `
+          <html>
+            <head>
+              <title>State snapshots explained</title>
+            </head>
+            <body>
+              <main>
+                <p>${firstParagraph}</p>
+                <p>${secondParagraph}</p>
+              </main>
+            </body>
+          </html>
+        `;
+      },
+    }),
+  );
+  const dependencies = createTestDependencies({
+    aiConfig: {
+      apiKey: 'test-key',
+      baseUrl: 'https://example.ai',
+      model: 'mock-model',
+    },
+    createProviderClient() {
+      return {
+        async generateObject() {
+          throw new Error('provider offline');
+        },
+      };
+    },
+  });
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.change(screen.getByLabelText('资料来源 URI 或说明'), {
+    target: {
+      value: 'https://example.com/state-snapshots',
+    },
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: '尝试自动补全（浏览器受限）' }),
+  );
+
+  expect(
+    await screen.findByDisplayValue('State snapshots explained'),
+  ).toBeInTheDocument();
+  expect(screen.getByDisplayValue(fallbackSummary)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '创建资料' }));
+
+  expect(
+    await screen.findByRole('button', {
+      name: '定位资料 State snapshots explained',
+    }),
+  ).toBeInTheDocument();
+
+  await waitForSaved();
+
+  const restoredSnapshot = await loadOnlyWorkspaceSnapshot(dependencies);
+  const resourceNode = findNodeByTitle(
+    restoredSnapshot.tree,
+    'State snapshots explained',
+    'resource',
+  );
+  const resourceMetadata = findResourceMetadata(
+    await loadOnlyResourceMetadata(dependencies),
+    resourceNode.id,
+  );
+
+  expect(resourceNode.content).toBe(fallbackSummary);
+  expect(resourceMetadata).toMatchObject({
+    nodeId: resourceNode.id,
+    importMethod: 'url',
+    ingestStatus: 'ready',
+    titleSource: 'url-document-title',
+    summarySource: 'url-body',
+    bodyFormat: 'plain-text',
+    bodyText: `${firstParagraph}\n\n${secondParagraph}`,
+    sourceUri: 'https://example.com/state-snapshots',
+  });
+});
+
 test.each([
   {
     bodyText:
@@ -485,6 +687,14 @@ test('demotes fragment creation to a supplementary action in resource focus and 
 });
 
 function createTestDependencies(options?: {
+  aiConfig?: {
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+  };
+  createProviderClient?: NonNullable<
+    WorkspaceRuntimeDependencies['createProviderClient']
+  >;
   storage?: StructuredDataStorage;
 }): WorkspaceRuntimeDependencies {
   const storage =
@@ -492,17 +702,30 @@ function createTestDependencies(options?: {
     createIndexedDbStorage({
       databaseName: `whynote-runtime-resource-entry-${crypto.randomUUID()}`,
     });
+  const localPreferenceStorage = createLocalStorageStore({
+    prefix: `whynote-runtime-resource-entry-${crypto.randomUUID()}`,
+    storage: window.localStorage,
+  });
 
   openedStorages.push(storage);
 
+  if (options?.aiConfig) {
+    localPreferenceStorage.saveSettings({
+      values: {
+        'ai.apiKey': options.aiConfig.apiKey,
+        'ai.baseUrl': options.aiConfig.baseUrl,
+        'ai.model': options.aiConfig.model,
+      },
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    });
+  }
+
   return {
     structuredDataStorage: storage,
-    localPreferenceStorage: createLocalStorageStore({
-      prefix: `whynote-runtime-resource-entry-${crypto.randomUUID()}`,
-      storage: window.localStorage,
-    }),
-    createProviderClient() {
-      return {
+    localPreferenceStorage,
+    createProviderClient:
+      options?.createProviderClient ??
+      (() => ({
         async generateObject(request) {
           const rawText = JSON.stringify({ planSteps: [] });
 
@@ -514,8 +737,7 @@ function createTestDependencies(options?: {
             rawText,
           };
         },
-      };
-    },
+      })),
     defaultLearningMode: 'standard',
   };
 }

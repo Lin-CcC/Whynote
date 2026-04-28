@@ -21,6 +21,10 @@ import {
   type TreeNode,
   type WorkspaceSnapshot,
 } from '../../nodeDomain';
+import {
+  createResourceSummaryGenerationService,
+} from '../../resourcesSearchExport/services/resourceSummaryGenerationService';
+import type { ResourceImportDraft } from '../../resourcesSearchExport/services/resourceIngestTypes';
 import type { WorkspaceEditorLearningActionRequest } from '../../workspaceEditor/workspaceEditorTypes';
 import { createInitialWorkspaceSnapshot } from '../utils/createInitialWorkspaceSnapshot';
 import {
@@ -59,10 +63,12 @@ export function createWorkspaceRuntimeService(
     saveWorkspace,
     upsertResourceMetadata,
     rememberSelectionState,
+    resolveResourceSummary,
     async generatePlanSteps(
       snapshot: WorkspaceSnapshot,
       moduleNodeId: string,
       config: AiConfig,
+      resourceMetadataRecords: ResourceMetadataRecord[] = [],
     ) {
       const moduleNode = getNodeOrThrow(snapshot.tree, moduleNodeId);
 
@@ -82,7 +88,10 @@ export function createWorkspaceRuntimeService(
       const generationService = createPlanStepGenerationService({
         providerClient,
       });
-      const referenceCandidates = collectLearningReferenceCandidates(snapshot.tree);
+      const referenceCandidates = collectLearningReferenceCandidates(
+        snapshot.tree,
+        indexResourceMetadataByNodeId(resourceMetadataRecords),
+      );
       const result = await generationService.generate({
         topic: snapshot.workspace.title,
         moduleTitle: moduleNode.title,
@@ -163,6 +172,7 @@ export function createWorkspaceRuntimeService(
       questionNodeId: string,
       answerNodeId: string,
       config: AiConfig,
+      resourceMetadataRecords: ResourceMetadataRecord[] = [],
     ) {
       const questionNode = getNodeOrThrow(snapshot.tree, questionNodeId);
 
@@ -182,6 +192,11 @@ export function createWorkspaceRuntimeService(
         snapshot.tree,
         questionNodeId,
         answerNodeId,
+        {
+          resourceMetadataByNodeId: indexResourceMetadataByNodeId(
+            resourceMetadataRecords,
+          ),
+        },
       );
       const previousChildIds = new Set(questionNode.childIds);
       const closureResult = await questionClosureService.generate({
@@ -223,6 +238,7 @@ export function createWorkspaceRuntimeService(
       snapshot: WorkspaceSnapshot,
       request: WorkspaceEditorLearningActionRequest,
       config: AiConfig,
+      resourceMetadataRecords: ResourceMetadataRecord[] = [],
     ) {
       const actionId = resolveDraftActionId(request.actionId);
 
@@ -237,6 +253,11 @@ export function createWorkspaceRuntimeService(
       const context = buildLearningActionRuntimeContext(
         snapshot.tree,
         request.selectedNodeId,
+        {
+          resourceMetadataByNodeId: indexResourceMetadataByNodeId(
+            resourceMetadataRecords,
+          ),
+        },
       );
       const parentNode = getNodeOrThrow(snapshot.tree, request.placement.parentNodeId);
       const previousChildIds = new Set(parentNode.childIds);
@@ -405,6 +426,47 @@ export function createWorkspaceRuntimeService(
 
   async function upsertResourceMetadata(record: ResourceMetadataRecord) {
     await dependencies.structuredDataStorage.upsertResourceMetadata(record);
+  }
+
+  async function resolveResourceSummary(
+    draft: ResourceImportDraft,
+    config: AiConfig,
+  ) {
+    if (
+      draft.ingest.importMethod !== 'url' ||
+      !draft.ingest.bodyText?.trim()
+    ) {
+      return draft;
+    }
+
+    try {
+      const providerClient = providerFactory(config);
+      const generationService = createResourceSummaryGenerationService({
+        providerClient,
+      });
+      const generatedSummary = await generationService.generate({
+        bodyFormat: draft.ingest.bodyFormat,
+        bodyText: draft.ingest.bodyText,
+        fallbackSummary: draft.content,
+        fallbackTitle: draft.title,
+        importMethod: draft.ingest.importMethod,
+        mimeType: draft.ingest.mimeType,
+        sourceUri: draft.sourceUri,
+      });
+
+      return {
+        ...draft,
+        content: generatedSummary.summary,
+        ingest: {
+          ...draft.ingest,
+          summarySource: 'ai-generated',
+          titleSource: 'ai-generated',
+        },
+        title: generatedSummary.title,
+      } satisfies ResourceImportDraft;
+    } catch {
+      return draft;
+    }
   }
 
   function rememberSelectionState(
@@ -682,6 +744,14 @@ function getLatestInsertedFollowUpQuestionId(
     .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
 
   return insertedQuestions[insertedQuestions.length - 1]?.id ?? null;
+}
+
+function indexResourceMetadataByNodeId(
+  resourceMetadataRecords: ResourceMetadataRecord[],
+) {
+  return Object.fromEntries(
+    resourceMetadataRecords.map((record) => [record.nodeId, record]),
+  ) satisfies Record<string, ResourceMetadataRecord>;
 }
 
 function buildLearningActionDraftMessage(

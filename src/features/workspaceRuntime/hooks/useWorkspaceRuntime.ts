@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { AiConfig } from '../../learningEngine';
 import type { ResourceMetadataRecord, WorkspaceSnapshot } from '../../nodeDomain';
+import type { ResourceImportDraft } from '../../resourcesSearchExport/services/resourceIngestTypes';
 import type { WorkspaceEditorLearningActionRequest } from '../../workspaceEditor/workspaceEditorTypes';
 import { createWorkspaceRuntimeService } from '../services/workspaceRuntimeService';
 import type { QuestionAnswerEvaluationTarget } from '../services/learningRuntimeContext';
@@ -126,9 +127,18 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     }));
   }
 
+  async function resolveResourceSummary(draft: ResourceImportDraft) {
+    return runtimeService.resolveResourceSummary(draft, state.aiConfig);
+  }
+
   async function runPlanStepGeneration(moduleNodeId: string) {
     await runAiAction('正在规划学习路径', async (snapshot) =>
-      runtimeService.generatePlanSteps(snapshot, moduleNodeId, state.aiConfig),
+      runtimeService.generatePlanSteps(
+        snapshot,
+        moduleNodeId,
+        state.aiConfig,
+        state.resourceMetadataRecords,
+      ),
     );
   }
 
@@ -145,6 +155,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
         target.questionNodeId,
         target.answerNodeId,
         state.aiConfig,
+        state.resourceMetadataRecords,
       ),
     );
   }
@@ -157,7 +168,12 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
 
   async function runLearningAction(request: WorkspaceEditorLearningActionRequest) {
     await runAiAction(getLearningActionRuntimeLabel(request.actionId), async (snapshot) =>
-      runtimeService.generateLearningActionDraft(snapshot, request, state.aiConfig),
+      runtimeService.generateLearningActionDraft(
+        snapshot,
+        request,
+        state.aiConfig,
+        state.resourceMetadataRecords,
+      ),
     );
   }
 
@@ -167,6 +183,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     handleSelectionChange,
     handleSnapshotChange,
     retryInitialization: initializeWorkspace,
+    resolveResourceSummary,
     runLearningAction,
     runCompletionSuggestion,
     runPlanStepGeneration,
