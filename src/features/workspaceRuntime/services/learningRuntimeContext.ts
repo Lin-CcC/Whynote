@@ -9,8 +9,16 @@ import {
   type ModuleNode,
   type NodeTree,
   type PlanStepNode,
+  type ResourceMetadataRecord,
   type TreeNode,
 } from '../../nodeDomain';
+
+const MAX_RESOURCE_REFERENCE_BODY_LENGTH = 600;
+const MAX_RESOURCE_REFERENCE_SUMMARY_LENGTH = 180;
+
+interface LearningReferenceContextOptions {
+  resourceMetadataByNodeId?: Record<string, ResourceMetadataRecord | undefined>;
+}
 
 export interface QuestionClosureRuntimeContext {
   answerNodeId: string;
@@ -51,9 +59,13 @@ export function buildQuestionClosureRuntimeContext(
   tree: NodeTree,
   questionNodeId: string,
   answerNodeId: string,
+  options: LearningReferenceContextOptions = {},
 ): QuestionClosureRuntimeContext {
   const planStepNode = findAncestorNode(tree, questionNodeId, 'plan-step');
-  const referenceCandidates = collectLearningReferenceCandidates(tree);
+  const referenceCandidates = collectLearningReferenceCandidates(
+    tree,
+    options.resourceMetadataByNodeId,
+  );
 
   if (!planStepNode) {
     throw new Error('当前问题不在任何学习步骤下，无法生成回答评估闭环。');
@@ -79,7 +91,24 @@ export function buildQuestionClosureRuntimeContext(
 
 export function collectLearningReferenceCandidates(
   tree: NodeTree,
+  resourceMetadataByNodeId: Record<string, ResourceMetadataRecord | undefined> = {},
 ): LearningReferenceCandidate[] {
+  if (Object.keys(resourceMetadataByNodeId).length > 0) {
+    return collectLearningReferenceCandidates(tree).map((candidate) => {
+      if (candidate.targetType !== 'resource') {
+        return candidate;
+      }
+
+      return {
+        ...candidate,
+        content: buildResourceReferenceContent(
+          candidate.content,
+          resourceMetadataByNodeId[candidate.targetNodeId],
+        ),
+      };
+    });
+  }
+
   return Object.values(tree.nodes)
     .filter(
       (node) => node.type === 'resource' || node.type === 'resource-fragment',
@@ -313,12 +342,16 @@ export function collectLeafQuestionIdsUnderPlanStep(
 export function buildLearningActionRuntimeContext(
   tree: NodeTree,
   selectedNodeId: string,
+  options: LearningReferenceContextOptions = {},
 ): LearningActionRuntimeContext {
   const selectedNode = getNodeOrThrow(tree, selectedNodeId);
   const planStepNode = findAncestorNode(tree, selectedNodeId, 'plan-step');
   const questionNode = getQuestionContextNode(tree, selectedNodeId);
   const answerNode = resolveScopedAnswerNode(tree, selectedNodeId);
-  const referenceCandidates = collectLearningReferenceCandidates(tree);
+  const referenceCandidates = collectLearningReferenceCandidates(
+    tree,
+    options.resourceMetadataByNodeId,
+  );
 
   return {
     currentNode: {
@@ -685,4 +718,52 @@ function formatNodeContent(title: string, content?: string) {
   }
 
   return `${title.trim()}\n${normalizedContent}`;
+}
+
+function buildResourceReferenceContent(
+  resourceSummary: string,
+  resourceMetadata?: ResourceMetadataRecord,
+) {
+  const normalizedSummary = truncateReferenceText(
+    normalizeReferenceText(
+      resourceSummary === '鏆傛棤璧勬枡鎽樿' ? '' : resourceSummary,
+    ),
+    MAX_RESOURCE_REFERENCE_SUMMARY_LENGTH,
+  );
+  const bodyFoundation = truncateReferenceText(
+    normalizeReferenceText(resourceMetadata?.bodyText),
+    MAX_RESOURCE_REFERENCE_BODY_LENGTH,
+  );
+
+  if (bodyFoundation) {
+    if (normalizedSummary && !bodyFoundation.includes(normalizedSummary)) {
+      return `资料概要：${normalizedSummary}\n正文基础：${bodyFoundation}`;
+    }
+
+    return `正文基础：${bodyFoundation}`;
+  }
+
+  return normalizedSummary ?? '暂无资料概要';
+}
+
+function normalizeReferenceText(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalizedValue = value.replace(/\s+/gu, ' ').trim();
+
+  return normalizedValue.length > 0 ? normalizedValue : null;
+}
+
+function truncateReferenceText(value: string | null, maxLength: number) {
+  if (!value) {
+    return null;
+  }
+
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 3).trimEnd()}...`;
 }
