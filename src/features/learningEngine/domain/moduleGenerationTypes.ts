@@ -28,6 +28,7 @@ export interface SummaryNodeDraft extends BaseLearningNodeDraft {
 
 export interface JudgmentNodeDraft extends BaseLearningNodeDraft {
   type: 'judgment';
+  hint?: string;
 }
 
 export interface LearningReferenceCandidate {

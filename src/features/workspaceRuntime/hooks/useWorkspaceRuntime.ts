@@ -27,6 +27,9 @@ type PendingSaveState = {
   snapshot: WorkspaceSnapshot;
 };
 
+const AUTO_SAVE_DEBOUNCE_MS = 400;
+const MIN_SAVING_STATUS_MS = 300;
+
 export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) {
   const [runtimeService] = useState(() =>
     createWorkspaceRuntimeService(dependencies),
@@ -55,9 +58,22 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
   });
   const pendingSaveRef = useRef<PendingSaveState | null>(null);
   const isSavingRef = useRef(false);
+  const saveDebounceTimerRef = useRef<number | null>(null);
+  const saveStatusTimerRef = useRef<number | null>(null);
+  const saveStatusStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     void initializeWorkspace();
+
+    return () => {
+      if (saveDebounceTimerRef.current !== null) {
+        window.clearTimeout(saveDebounceTimerRef.current);
+      }
+
+      if (saveStatusTimerRef.current !== null) {
+        window.clearTimeout(saveStatusTimerRef.current);
+      }
+    };
   }, []);
 
   function handleSnapshotChange(snapshot: WorkspaceSnapshot) {
@@ -69,6 +85,8 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     setState((previousState) => ({
       ...previousState,
       completionSuggestion: null,
+      saveError: null,
+      saveStatus: isSavingRef.current ? previousState.saveStatus : 'idle',
       snapshot,
     }));
     queueSave(snapshot, selectionRef.current);
@@ -218,6 +236,8 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
         loadError: null,
         resourceMetadataRecords: result.resourceMetadataRecords,
         runtimeMessage: null,
+        saveError: null,
+        saveStatus: 'saved',
         snapshot: result.snapshot,
       }));
     } catch (error) {
@@ -238,49 +258,93 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
       selection,
       snapshot,
     };
+    schedulePendingSave();
+  }
 
-    if (isSavingRef.current) {
-      return;
+  function schedulePendingSave() {
+    if (saveDebounceTimerRef.current !== null) {
+      window.clearTimeout(saveDebounceTimerRef.current);
     }
 
-    void flushPendingSave();
+    saveDebounceTimerRef.current = window.setTimeout(() => {
+      saveDebounceTimerRef.current = null;
+
+      if (isSavingRef.current) {
+        return;
+      }
+
+      void flushPendingSave();
+    }, AUTO_SAVE_DEBOUNCE_MS);
   }
 
   async function flushPendingSave() {
-    while (pendingSaveRef.current) {
-      const nextSave = pendingSaveRef.current;
+    if (isSavingRef.current || !pendingSaveRef.current) {
+      return;
+    }
 
-      pendingSaveRef.current = null;
-      isSavingRef.current = true;
+    const nextSave = pendingSaveRef.current;
+
+    pendingSaveRef.current = null;
+    isSavingRef.current = true;
+    saveStatusStartedAtRef.current = Date.now();
+    setState((previousState) => ({
+      ...previousState,
+      saveError: null,
+      saveStatus: 'saving',
+    }));
+
+    let didSaveSucceed = false;
+
+    try {
+      await runtimeService.saveWorkspace(
+        nextSave.snapshot,
+        nextSave.selection,
+      );
+      didSaveSucceed = true;
+      await waitForMinimumSavingStatus();
       setState((previousState) => ({
         ...previousState,
         saveError: null,
-        saveStatus: 'saving',
+        saveStatus: pendingSaveRef.current ? 'idle' : 'saved',
       }));
+    } catch (error) {
+      setState((previousState) => ({
+        ...previousState,
+        saveError:
+          error instanceof Error
+            ? error.message
+            : '工作区保存失败，请稍后重试。',
+        saveStatus: 'error',
+      }));
+    } finally {
+      isSavingRef.current = false;
+      saveStatusStartedAtRef.current = null;
 
-      try {
-        await runtimeService.saveWorkspace(
-          nextSave.snapshot,
-          nextSave.selection,
-        );
-        setState((previousState) => ({
-          ...previousState,
-          saveError: null,
-          saveStatus: 'saved',
-        }));
-      } catch (error) {
-        setState((previousState) => ({
-          ...previousState,
-          saveError:
-            error instanceof Error
-              ? error.message
-              : '工作区保存失败，请稍后重试。',
-          saveStatus: 'error',
-        }));
-      } finally {
-        isSavingRef.current = false;
+      if (didSaveSucceed && pendingSaveRef.current) {
+        schedulePendingSave();
       }
     }
+  }
+
+  async function waitForMinimumSavingStatus() {
+    const startedAt = saveStatusStartedAtRef.current;
+
+    if (!startedAt) {
+      return;
+    }
+
+    const remainingMs = MIN_SAVING_STATUS_MS - (Date.now() - startedAt);
+
+    if (remainingMs <= 0) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      saveStatusTimerRef.current = window.setTimeout(() => {
+        saveStatusTimerRef.current = null;
+        resolve();
+      }, remainingMs);
+    });
   }
 
   async function runAiAction(

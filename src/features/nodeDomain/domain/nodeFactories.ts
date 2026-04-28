@@ -27,10 +27,19 @@ type CreateNodeInput =
       updatedAt?: string;
     }
   | {
-      type: 'question' | 'answer' | 'summary' | 'judgment';
+      type: 'question' | 'answer' | 'summary';
       id?: string;
       title: string;
       content?: string;
+      createdAt?: string;
+      updatedAt?: string;
+    }
+  | {
+      type: 'judgment';
+      id?: string;
+      title: string;
+      content?: string;
+      hint?: string;
       createdAt?: string;
       updatedAt?: string;
     }
@@ -108,10 +117,15 @@ export function createNode(input: CreateNodeInput): NonRootNode {
     case 'question':
     case 'answer':
     case 'summary':
-    case 'judgment':
       return {
         ...baseNode,
         type: input.type,
+      };
+    case 'judgment':
+      return {
+        ...baseNode,
+        type: 'judgment',
+        hint: input.hint,
       };
     case 'resource':
       return {

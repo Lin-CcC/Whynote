@@ -55,19 +55,33 @@ export default function WorkspaceRuntimeJudgmentActions({
           回到当前回答继续修改
         </button>
       </div>
-      {!summaryNodeId ? (
-        <p className="workspace-actionHint">当前还没有对应的答案解析。</p>
-      ) : null}
-      {!answerNodeId ? (
-        <p className="workspace-actionHint">当前还没有定位到可回写的回答节点。</p>
-      ) : null}
+      {summaryNodeId ? (
+        <p className="workspace-actionHint">
+          当前答案解析已就绪；如果要看标准理解，可以直接点“查看答案解析”。
+        </p>
+      ) : (
+        <p className="workspace-actionHint">
+          当前还没有对应的答案解析，所以“查看答案解析”会保持禁用。
+        </p>
+      )}
+      {answerNodeId ? (
+        <p className="workspace-actionHint">
+          已定位到当前这版回答；主路径仍然是先回去补缺口，再重新评估。
+        </p>
+      ) : (
+        <p className="workspace-actionHint">
+          当前还没有定位到可回写的回答节点，所以“回到当前回答继续修改”会保持禁用。
+        </p>
+      )}
       {isHintVisible ? (
         <div
           className="workspace-judgmentHintCallout"
           data-testid={`judgment-inline-hint-${judgmentNodeId}`}
         >
           <p className="workspace-judgmentHintTitle">提示</p>
-          <p className="workspace-helpText">只补当前缺口，不要直接展开成完整答案解析。</p>
+          <p className="workspace-helpText">
+            这是围绕当前缺口的微型铺垫，不是答案解析缩写版。
+          </p>
           <pre className="workspace-judgmentHintText">{hint}</pre>
         </div>
       ) : null}

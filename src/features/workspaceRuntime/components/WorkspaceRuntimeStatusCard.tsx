@@ -31,6 +31,7 @@ export default function WorkspaceRuntimeStatusCard({
           <dd>{isAiRunning ? activeAiActionLabel ?? '处理中' : '空闲'}</dd>
         </div>
       </dl>
+      <p className="workspace-helpText">{getSaveStatusDetail(saveStatus)}</p>
       {isAiRunning ? (
         <p className="workspace-lockText" role="status">
           AI 正在运行，文本编辑和结构操作已临时锁定，避免旧快照覆盖新修改。
@@ -78,5 +79,19 @@ function getSaveStatusLabel(saveStatus: WorkspaceRuntimeStatusCardProps['saveSta
     case 'idle':
     default:
       return '待保存';
+  }
+}
+
+function getSaveStatusDetail(saveStatus: WorkspaceRuntimeStatusCardProps['saveStatus']) {
+  switch (saveStatus) {
+    case 'saving':
+      return '自动保存已经开始执行，会尽量避免“保存中 / 已保存”快速来回闪烁。';
+    case 'saved':
+      return '最近一次工作区改动已经落盘。';
+    case 'error':
+      return '保存失败前的改动仍保留在当前界面，可以继续修改后再次触发自动保存。';
+    case 'idle':
+    default:
+      return '输入后会在短暂停顿后自动保存，避免每次极短停顿都立刻刷新状态。';
   }
 }

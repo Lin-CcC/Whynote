@@ -941,6 +941,15 @@ async function findSectionByHeading(name: string) {
 
 async function waitForSaved() {
   await waitFor(() => {
-    expect(screen.getByText('已保存')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (content, element) =>
+          element?.tagName === 'DD' &&
+          (content === '待保存' || content === '保存中'),
+      ),
+    ).toBeInTheDocument();
+  });
+  await waitFor(() => {
+    expect(screen.getByText('已保存', { selector: 'dd' })).toBeInTheDocument();
   });
 }

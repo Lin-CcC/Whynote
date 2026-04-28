@@ -147,6 +147,54 @@ describe('normalizeQuestionClosure', () => {
     ]);
   });
 
+  it('builds explicit judgment gaps and keeps hint distinct from the answer explanation', () => {
+    const result = normalizeQuestionClosure(
+      {
+        followUpQuestions: [],
+        hint: {
+          content:
+            '先补哪块：为什么统一提交会减少重复渲染。\n先想清：把“收集更新 -> 统一提交 -> 减少重复渲染”连成一条因果链。',
+        },
+        isAnswerSufficient: false,
+        judgment: {
+          title: '判断：还缺关键因果',
+          answered: '已经提到了 React 会把更新放在一起。',
+          gaps: [
+            '没有解释为什么统一提交会减少重复渲染。',
+            '没有说明这条机制什么时候成立。',
+          ],
+          whyItMatters: '少了这两点，就还无法证明理解完整。',
+        },
+        summary: {
+          title: '标准理解',
+          content:
+            'React 会把同一轮事件中的多个状态更新合并后再统一提交，因此可以减少重复渲染。',
+        },
+      },
+      {
+        currentQuestionTitle: '为什么状态更新会被批处理？',
+        learnerAnswer: '因为 React 会把多个更新放在一起。',
+      },
+    );
+
+    expect(result.judgment.content).toContain('已答到：');
+    expect(result.judgment.content).toContain('还缺的关键点：');
+    expect(result.judgment.content).toContain(
+      '1. 没有解释为什么统一提交会减少重复渲染。',
+    );
+    expect(result.judgment.content).toContain(
+      '2. 没有说明这条机制什么时候成立。',
+    );
+    expect(result.judgment.content).toContain('为什么关键：');
+    expect(result.judgment.hint).toContain('先补哪块：为什么统一提交会减少重复渲染');
+    expect(result.judgment.hint).not.toContain(
+      'React 会把同一轮事件中的多个状态更新合并后再统一提交',
+    );
+    expect(result.summary.content).toContain('会卡在');
+    expect(result.summary.content).toContain('继续往下想');
+    expect(result.summary.content).toContain('更稳妥的标准理解是：');
+  });
+
   it('creates a fallback answer explanation when summary is missing', () => {
     const result = normalizeQuestionClosure(
       {
@@ -163,11 +211,10 @@ describe('normalizeQuestionClosure', () => {
       },
     );
 
+    expect(result.judgment.hint).toContain('先补哪块：');
     expect(result.summary.title).toBe('标准理解');
-    expect(result.summary.content).toContain(
-      '你的回答已经碰到了这个问题的一部分方向',
-    );
-    expect(result.summary.content).toContain('更稳妥的标准理解是');
-    expect(result.summary.content).toContain('为什么状态更新会被批处理？');
+    expect(result.summary.content).toContain('会卡在');
+    expect(result.summary.content).toContain('继续往下想');
+    expect(result.summary.content).toContain('更稳妥的标准理解是：');
   });
 });

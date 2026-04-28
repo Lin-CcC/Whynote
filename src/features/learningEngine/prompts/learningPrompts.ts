@@ -135,14 +135,17 @@ export function buildQuestionClosureMessages(
           formatReferenceCandidates(input.referenceCandidates),
         ),
         '任务：先判断这次回答是否已经覆盖当前问题的关键点，再给出更好的标准理解；如果回答不足，只追问缺失点，不要重复已经答对的部分。',
-        'judgment 只负责判断是否“已答到”或“还不完整”，并指出主要缺口；不要把完整讲解写进 judgment。',
+        'judgment 只负责三件事：1. 你已经答到什么；2. 你还缺哪 1-3 个关键点；3. 为什么这些缺口关键。',
+        '优先把 judgment 写成结构化内容：answered 填“已答到什么”，gaps 返回 1-3 条缺口数组，whyItMatters 说明为什么这些缺口决定理解是否完整；如果只写 judgment.content，也必须按“已答到 / 还缺的关键点 / 为什么关键”三段来写。',
+        '不要把完整讲解、标准答案或大段纠错塞进 judgment。',
+        'hint 必须单独返回。它是围绕 judgment 缺口的微型铺垫，只帮助用户知道下一步优先补哪块、先从哪个机制或关系去想；hint 不能复述 judgment，也不能摘抄 summary。',
         'summary 只负责给出答案解析 / 标准理解，不要只重复“回答还不完整”或“已经答到”，也不允许留空。',
-        'summary 要先接住用户已经答对或已经靠近的部分，再补缺的机制、因果或边界，最后整理成更稳妥的标准理解；如果用户有误，不要迎合错误表述。',
+        'summary 要写成引导式解析：先承认用户当前思路里已经对的部分，再指出如果沿当前思路继续推会卡在哪里，再用问题式引导推进，必要时最后整理成更稳妥的标准理解；如果用户有误，不要迎合错误表述。',
         '如果回答不足，followUpQuestions 返回 1-2 个具体追问；如果回答充分，followUpQuestions 返回空数组。',
         'followUpQuestions 只能补当前回答缺失的关键点，不要把主问题原样重复，也不要要求用户把整道题完整重答一遍。',
         '如果资料候选能支撑 judgment 或 summary，请在 citations 中返回 targetNodeId；能用 fragment 时优先 fragment。',
         buildTeachingCitationInstruction(),
-        `返回格式：{"isAnswerSufficient":true,"judgment":{"title":"","content":"","citations":[${buildCitationJsonShape()}]},"summary":{"title":"","content":"","citations":[${buildCitationJsonShape()}]},"followUpQuestions":[{"title":"","content":"","citations":[${buildCitationJsonShape()}]}]}`,
+        `返回格式：{"isAnswerSufficient":true,"judgment":{"title":"","answered":"","gaps":[""],"whyItMatters":"","content":"","citations":[${buildCitationJsonShape()}]},"hint":{"content":""},"summary":{"title":"","content":"","citations":[${buildCitationJsonShape()}]},"followUpQuestions":[{"title":"","content":"","citations":[${buildCitationJsonShape()}]}]}`,
       ]
         .filter(Boolean)
         .join('\n'),
@@ -332,9 +335,9 @@ function buildLearningActionInstructions(input: LearningActionDraftInput) {
       return [
         '目标节点类型：judgment。',
         input.learnerAnswer?.trim()
-          ? '如果已经有回答，请判断它最可能答到了什么、还缺什么，并保持 judgment 与讲解分工清晰。'
+          ? '如果已经有回答，请判断它最可能答到了什么、还缺哪 1-3 个关键点，以及为什么这些缺口关键，并保持 judgment 与讲解分工清晰。'
           : '当前没有现成回答，请先写一份“什么才算答到 / 还需要验证什么”的判断草稿，帮助用户知道作答标准。',
-        '不要把完整讲解塞进 judgment；判断只负责指出当前掌握情况或待验证点。',
+        '不要把完整讲解塞进 judgment；判断只负责指出当前掌握情况、关键缺口和待验证点。',
       ];
   }
 }
