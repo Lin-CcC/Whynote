@@ -50,39 +50,7 @@ export function isAnswerClosureSummaryNode(
     return false;
   }
 
-  const parentNode = tree.nodes[node.parentId];
-
-  if (parentNode?.type !== 'question') {
-    return false;
-  }
-
-  const nodeIndex = parentNode.childIds.indexOf(node.id);
-
-  if (nodeIndex <= 0) {
-    return false;
-  }
-
-  for (let siblingIndex = nodeIndex - 1; siblingIndex >= 0; siblingIndex -= 1) {
-    const siblingNode = tree.nodes[parentNode.childIds[siblingIndex]];
-
-    if (!siblingNode) {
-      continue;
-    }
-
-    if (siblingNode.type === 'judgment') {
-      return true;
-    }
-
-    if (
-      siblingNode.type === 'answer' ||
-      siblingNode.type === 'question' ||
-      siblingNode.type === 'summary'
-    ) {
-      return false;
-    }
-  }
-
-  return false;
+  return tree.nodes[node.parentId]?.type === 'question';
 }
 
 export function getDisplayNodeTypeLabel(tree: NodeTree, node: TreeNode): string {

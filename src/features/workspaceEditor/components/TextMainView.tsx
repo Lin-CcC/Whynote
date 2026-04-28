@@ -82,9 +82,13 @@ export default function TextMainView({
             <dt>当前焦点</dt>
             <dd>
               {selectedNode
-                ? `${getDisplayLabelForNode(tree, selectedNode)} · ${selectedNode.title}`
+                ? `${getDisplayLabelForNode(tree, selectedNode)} 路 ${selectedNode.title}`
                 : '未选中节点'}
             </dd>
+          </div>
+          <div>
+            <dt>操作方式</dt>
+            <dd>先点击节点卡片选中，再点击标题或内容输入框进入编辑。</dd>
           </div>
         </dl>
         {isInteractionLocked && interactionLockReason ? (

@@ -26,6 +26,15 @@ test('treats post-judgment summaries as answer explanations', () => {
   );
 });
 
+test('treats manually inserted question summaries as answer explanations even before a judgment exists', () => {
+  const tree = createManualSummaryFirstSnapshot().tree;
+
+  expect(isAnswerClosureSummaryNode(tree, 'summary-manual-first')).toBe(true);
+  expect(
+    getDisplayNodeTypeLabel(tree, tree.nodes['summary-manual-first']!),
+  ).toBe('答案解析');
+});
+
 function createSemanticsSnapshot() {
   const snapshot = createWorkspaceSnapshot({
     title: '语义测试',
@@ -117,6 +126,82 @@ function createSemanticsSnapshot() {
       content: '这是答题后的答案解析。',
       createdAt: '2026-04-27T12:00:00.000Z',
       updatedAt: '2026-04-27T12:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createManualSummaryFirstSnapshot() {
+  const snapshot = createWorkspaceSnapshot({
+    title: '手动答案解析语义',
+    workspaceId: 'workspace-semantics-manual-summary',
+    rootId: 'theme-semantics-manual-summary',
+    createdAt: '2026-04-27T12:30:00.000Z',
+    updatedAt: '2026-04-27T12:30:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-manual-summary',
+      title: '手动语义模块',
+      createdAt: '2026-04-27T12:30:00.000Z',
+      updatedAt: '2026-04-27T12:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-manual-summary',
+    createNode({
+      type: 'plan-step',
+      id: 'step-manual-summary',
+      title: '手动语义步骤',
+      status: 'todo',
+      createdAt: '2026-04-27T12:30:00.000Z',
+      updatedAt: '2026-04-27T12:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-manual-summary',
+    createNode({
+      type: 'question',
+      id: 'question-manual-summary',
+      title: '手动问题',
+      createdAt: '2026-04-27T12:30:00.000Z',
+      updatedAt: '2026-04-27T12:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-manual-summary',
+    createNode({
+      type: 'answer',
+      id: 'answer-manual-summary',
+      title: '手动回答',
+      content: '先给出一版手动回答。',
+      createdAt: '2026-04-27T12:30:00.000Z',
+      updatedAt: '2026-04-27T12:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-manual-summary',
+    createNode({
+      type: 'summary',
+      id: 'summary-manual-first',
+      title: '手动标准理解',
+      content: '这是用户先手动补的答案解析。',
+      createdAt: '2026-04-27T12:30:00.000Z',
+      updatedAt: '2026-04-27T12:30:00.000Z',
     }),
   );
 

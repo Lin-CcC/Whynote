@@ -58,10 +58,23 @@ test('respects the real focused input when the user starts editing another node 
 
   await waitFor(() => {
     expect(textarea).toHaveFocus();
-    expect(textarea).toHaveValue(
-      '直接从另一个节点开始编辑，也不应该被外层卡片抢走焦点。',
-    );
+    expect(textarea).toHaveValue('直接从另一个节点开始编辑，也不应该被外层卡片抢走焦点。');
   });
+});
+
+test('selects a node by clicking its card without requiring textarea focus first', async () => {
+  render(<WorkspaceEditor />);
+
+  const node = screen.getByTestId('editor-node-question-render-boundary');
+  const textarea = getNodeContentInput('question-render-boundary');
+
+  fireEvent.click(node);
+
+  await waitFor(() => {
+    expect(node).toHaveAttribute('data-node-selected', 'true');
+    expect(node).toHaveFocus();
+  });
+  expect(textarea).not.toHaveFocus();
 });
 
 test('toggles builtin tags on the selected node and persists the updated state', () => {

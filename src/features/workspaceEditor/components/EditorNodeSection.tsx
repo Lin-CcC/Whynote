@@ -2,6 +2,7 @@ import {
   Fragment,
   type CSSProperties,
   type ChangeEvent,
+  type MouseEvent,
   type ReactNode,
 } from 'react';
 
@@ -93,14 +94,20 @@ export default function EditorNodeSection({
     onUpdateNode(node.id, { status: event.target.value as PlanStepStatus });
   }
 
+  function handleNodeClick(event: MouseEvent<HTMLElement>) {
+    event.stopPropagation();
+    onSelectNode(node.id);
+  }
+
   return (
     <section
+      aria-selected={isSelected}
       className="workspace-node"
       data-node-emphasis={getNodeEmphasis(node)}
       data-node-selected={isSelected}
       data-node-type={node.type}
       data-testid={`editor-node-${node.id}`}
-      onClick={() => onSelectNode(node.id)}
+      onClick={handleNodeClick}
       ref={(element) => registerNodeElement(node.id, element)}
       style={{ '--node-depth': depth } as CSSProperties}
       tabIndex={-1}
@@ -127,8 +134,15 @@ export default function EditorNodeSection({
               ))}
             </select>
           ) : null}
-          {isSelected ? <span className="workspace-selectedBadge">已聚焦</span> : null}
+          {isSelected ? (
+            <span className="workspace-selectedBadge">已选中</span>
+          ) : null}
         </div>
+        {isSelected ? (
+          <p className="workspace-nodeSelectionHint">
+            这个节点已经被选中。点击卡片空白处只切换选中；点击标题或内容输入框才会进入编辑。
+          </p>
+        ) : null}
         {node.type === 'plan-step' && planStepRuntimeStatus ? (
           <>
             <p className="workspace-nodeHint">

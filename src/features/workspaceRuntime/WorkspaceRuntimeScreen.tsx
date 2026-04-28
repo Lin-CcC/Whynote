@@ -126,6 +126,7 @@ export default function WorkspaceRuntimeScreen({
       ? getLatestQuestionAnswerExplanationNodeId(
           context.tree,
           evaluationTarget.questionNodeId,
+          evaluationTarget.answerNodeId,
         )
       : null;
     const answerFollowUpCount = evaluationTarget

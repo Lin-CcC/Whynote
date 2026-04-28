@@ -173,11 +173,24 @@ export function getLatestQuestionAnswerNodeId(
 export function getLatestQuestionAnswerExplanationNodeId(
   tree: NodeTree,
   questionNodeId: string,
+  answerNodeId?: string | null,
 ) {
   const questionNode = getNodeOrThrow(tree, questionNodeId);
 
   if (questionNode.type !== 'question') {
     return null;
+  }
+
+  if (answerNodeId) {
+    const matchedSummaryNodeId = findSummaryNodeIdForAnswer(
+      tree,
+      questionNode.childIds,
+      answerNodeId,
+    );
+
+    if (matchedSummaryNodeId) {
+      return matchedSummaryNodeId;
+    }
   }
 
   const summaryNodes = questionNode.childIds
@@ -226,19 +239,44 @@ export function resolveQuestionAnswerEvaluationTarget(
     return null;
   }
 
-  if (selectedNode.type !== 'answer' || selectedNode.parentId === null) {
+  const questionNode = getQuestionContextNode(tree, selectedNode.id);
+
+  if (!questionNode) {
     return null;
   }
 
-  const parentNode = tree.nodes[selectedNode.parentId];
+  const selectedNodeIndex = questionNode.childIds.indexOf(selectedNode.id);
+  let answerNodeId: string | null = null;
+
+  switch (selectedNode.type) {
+    case 'answer':
+      answerNodeId = selectedNode.id;
+      break;
+    case 'judgment':
+    case 'summary':
+      if (selectedNodeIndex !== -1) {
+        answerNodeId = findAnswerNodeIdBeforeIndex(
+          tree,
+          questionNode.childIds,
+          selectedNodeIndex,
+        );
+      }
+      break;
+    default:
+      return null;
+  }
+
+  if (!answerNodeId) {
+    answerNodeId = getLatestQuestionAnswerNodeId(tree, questionNode.id);
+  }
 
   if (
-    parentNode?.type === 'question' &&
-    canEvaluateQuestionAnswer(tree, parentNode.id, selectedNode.id)
+    answerNodeId &&
+    canEvaluateQuestionAnswer(tree, questionNode.id, answerNodeId)
   ) {
     return {
-      answerNodeId: selectedNode.id,
-      questionNodeId: parentNode.id,
+      answerNodeId,
+      questionNodeId: questionNode.id,
     };
   }
 
@@ -485,27 +523,7 @@ function findAnswerNodeIdForJudgment(
   siblingIds: string[],
   judgmentIndex: number,
 ) {
-  for (let siblingIndex = judgmentIndex - 1; siblingIndex >= 0; siblingIndex -= 1) {
-    const siblingNode = tree.nodes[siblingIds[siblingIndex]];
-
-    if (!siblingNode) {
-      continue;
-    }
-
-    if (siblingNode.type === 'answer') {
-      return siblingNode.id;
-    }
-
-    if (
-      siblingNode.type === 'judgment' ||
-      siblingNode.type === 'question' ||
-      siblingNode.type === 'summary'
-    ) {
-      return null;
-    }
-  }
-
-  return null;
+  return findAnswerNodeIdBeforeIndex(tree, siblingIds, judgmentIndex);
 }
 
 function findSummaryNodeIdForJudgment(
@@ -528,12 +546,77 @@ function findSummaryNodeIdForJudgment(
       return siblingNode.id;
     }
 
-    if (
-      siblingNode.type === 'answer' ||
-      siblingNode.type === 'judgment' ||
-      siblingNode.type === 'question'
-    ) {
+    if (siblingNode.type === 'answer') {
       return null;
+    }
+  }
+
+  for (let siblingIndex = judgmentIndex - 1; siblingIndex >= 0; siblingIndex -= 1) {
+    const siblingNode = tree.nodes[siblingIds[siblingIndex]];
+
+    if (!siblingNode) {
+      continue;
+    }
+
+    if (siblingNode.type === 'summary') {
+      return siblingNode.id;
+    }
+
+    if (siblingNode.type === 'answer') {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function findSummaryNodeIdForAnswer(
+  tree: NodeTree,
+  siblingIds: string[],
+  answerNodeId: string,
+) {
+  const answerIndex = siblingIds.indexOf(answerNodeId);
+
+  if (answerIndex === -1) {
+    return null;
+  }
+
+  let matchedSummaryNodeId: string | null = null;
+
+  for (
+    let siblingIndex = answerIndex + 1;
+    siblingIndex < siblingIds.length;
+    siblingIndex += 1
+  ) {
+    const siblingNode = tree.nodes[siblingIds[siblingIndex]];
+
+    if (!siblingNode) {
+      continue;
+    }
+
+    if (siblingNode.type === 'summary') {
+      matchedSummaryNodeId = siblingNode.id;
+      continue;
+    }
+
+    if (siblingNode.type === 'answer') {
+      break;
+    }
+  }
+
+  return matchedSummaryNodeId;
+}
+
+function findAnswerNodeIdBeforeIndex(
+  tree: NodeTree,
+  siblingIds: string[],
+  startIndex: number,
+) {
+  for (let siblingIndex = startIndex - 1; siblingIndex >= 0; siblingIndex -= 1) {
+    const siblingNode = tree.nodes[siblingIds[siblingIndex]];
+
+    if (siblingNode?.type === 'answer') {
+      return siblingNode.id;
     }
   }
 
