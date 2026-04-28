@@ -48,18 +48,21 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
               tree={workspaceEditor.tree}
             />
           </SectionCard>
+          {props.renderLeftPanelExtra?.(renderContext)}
           <SectionCard>
             <StructureActionBar
               actionAvailability={workspaceEditor.actionAvailability}
               childInsertOptions={workspaceEditor.childInsertOptions}
               interactionLockReason={props.interactionLockReason ?? null}
               isInteractionLocked={props.isInteractionLocked ?? false}
+              learningActions={workspaceEditor.learningActions}
               onChildInsertTypeChange={workspaceEditor.setSelectedChildInsertType}
               onDeleteNode={workspaceEditor.deleteSelection}
               onInsertChildNode={workspaceEditor.insertChildAtSelection}
               onInsertSiblingNode={workspaceEditor.insertSiblingAtSelection}
               onLiftNode={workspaceEditor.liftSelection}
               onLowerNode={workspaceEditor.lowerSelection}
+              onRunLearningAction={workspaceEditor.runLearningAction}
               onSiblingInsertTypeChange={workspaceEditor.setSelectedSiblingInsertType}
               selectedChildInsertType={workspaceEditor.selectedChildInsertType}
               selectedSiblingInsertType={workspaceEditor.selectedSiblingInsertType}
@@ -72,7 +75,6 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
               </p>
             ) : null}
           </SectionCard>
-          {props.renderLeftPanelExtra?.(renderContext)}
         </div>
       }
       mainPanel={

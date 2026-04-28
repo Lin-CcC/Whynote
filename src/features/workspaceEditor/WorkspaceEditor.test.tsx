@@ -98,6 +98,88 @@ test.each([
   expect(operationSpy.mock.calls[0]?.[1]).toBe(DEMO_SELECTED_NODE_ID);
 });
 
+test('shows learning actions as the primary path and keeps structure jargon in advanced actions', () => {
+  render(<WorkspaceEditor />);
+
+  const learningActionGrid = screen.getByTestId('learning-action-grid');
+
+  expect(
+    within(learningActionGrid).getByRole('button', { name: '插入问题' }),
+  ).toBeInTheDocument();
+  expect(
+    within(learningActionGrid).getByRole('button', { name: '插入回答' }),
+  ).toBeInTheDocument();
+  expect(
+    within(learningActionGrid).getByRole('button', { name: '插入总结' }),
+  ).toBeInTheDocument();
+  expect(
+    within(learningActionGrid).queryByRole('button', { name: '插入子节点' }),
+  ).not.toBeInTheDocument();
+  expect(
+    within(learningActionGrid).queryByRole('button', { name: '插入同级' }),
+  ).not.toBeInTheDocument();
+
+  const advancedActions = screen.getByTestId('advanced-structure-actions');
+
+  expect(
+    within(advancedActions).getByRole('button', { name: '插入子节点' }),
+  ).toBeInTheDocument();
+  expect(
+    within(advancedActions).getByRole('button', { name: '插入同级' }),
+  ).toBeInTheDocument();
+});
+
+test('inserts a new question after the selected question by default', () => {
+  const operations = createOperationSpies();
+
+  render(<WorkspaceEditor operations={operations} />);
+
+  fireEvent.click(screen.getByRole('button', { name: '插入问题' }));
+
+  const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
+
+  expect(insertChildSpy).toHaveBeenCalledTimes(1);
+  expect(insertChildSpy.mock.calls[0]?.[1]).toBe('step-state-basics');
+  expect(insertChildSpy.mock.calls[0]?.[2].type).toBe('question');
+  expect(insertChildSpy.mock.calls[0]?.[3]).toBe(2);
+});
+
+test('inserts an answer into the selected question before closing nodes', () => {
+  const operations = createOperationSpies();
+
+  render(<WorkspaceEditor operations={operations} />);
+
+  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+
+  const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
+
+  expect(insertChildSpy).toHaveBeenCalledTimes(1);
+  expect(insertChildSpy.mock.calls[0]?.[1]).toBe(DEMO_SELECTED_NODE_ID);
+  expect(insertChildSpy.mock.calls[0]?.[2].type).toBe('answer');
+  expect(insertChildSpy.mock.calls[0]?.[3]).toBe(2);
+});
+
+test('inserts scaffold before the first question when the step is selected', () => {
+  const operations = createOperationSpies();
+
+  render(
+    <WorkspaceEditor
+      initialSelectedNodeId="step-state-basics"
+      operations={operations}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: '插入铺垫 / 讲解' }));
+
+  const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
+
+  expect(insertChildSpy).toHaveBeenCalledTimes(1);
+  expect(insertChildSpy.mock.calls[0]?.[1]).toBe('step-state-basics');
+  expect(insertChildSpy.mock.calls[0]?.[2].type).toBe('summary');
+  expect(insertChildSpy.mock.calls[0]?.[2].title).toBe('新铺垫');
+  expect(insertChildSpy.mock.calls[0]?.[3]).toBe(0);
+});
+
 test('allows choosing answer and summary when inserting nodes for a learning question', () => {
   const operations = createOperationSpies();
 

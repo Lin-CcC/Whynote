@@ -45,6 +45,21 @@ export interface EditorInsertTypeOption {
   value: NonRootNode['type'];
 }
 
+export type LearningActionId =
+  | 'insert-plan-step'
+  | 'insert-scaffold'
+  | 'insert-question'
+  | 'insert-answer'
+  | 'insert-summary'
+  | 'insert-judgment'
+  | 'insert-resource-fragment';
+
+export interface LearningActionOption {
+  hint: string;
+  id: LearningActionId;
+  label: string;
+}
+
 export interface WorkspaceEditorSelectionState {
   currentModuleId: string | null;
   selectedNodeId: string | null;

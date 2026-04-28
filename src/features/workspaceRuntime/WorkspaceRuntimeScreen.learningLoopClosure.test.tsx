@@ -139,6 +139,10 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
   await waitFor(() => {
     expect(screen.getByRole('button', { name: '评估当前回答' })).toBeEnabled();
   });
+  expect(screen.getByTestId('answer-evaluation-callout')).toHaveTextContent(
+    '回答后的主路径',
+  );
+  expect(screen.getByText('下一步：评估当前回答')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '评估当前回答' }));
 

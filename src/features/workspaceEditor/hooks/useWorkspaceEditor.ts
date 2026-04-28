@@ -31,6 +31,7 @@ import type {
   EditorActionAvailability,
   EditorInsertTypeOption,
   ExternalTreeChangeOptions,
+  LearningActionId,
   NodeContentPatch,
   WorkspaceEditorOperations,
   WorkspaceEditorProps,
@@ -49,6 +50,10 @@ import {
   getNodePath,
   isNodeWithinModule,
 } from '../utils/treeSelectors';
+import {
+  getLearningActionOptions,
+  resolveLearningActionPlacement,
+} from '../utils/learningActions';
 
 const FIRST_MODULE_CONTENT = '先定义当前主题下的第一个学习方向。';
 const FOLLOW_UP_MODULE_CONTENT = '补充这个模块的学习目标、边界或导读。';
@@ -126,6 +131,7 @@ export function useWorkspaceEditor({
   const siblingInsertOptions = getInsertTypeOptions(
     getInsertableSiblingTypes(tree, selectedNodeId),
   );
+  const learningActions = getLearningActionOptions(tree, selectedNodeId);
 
   useEffect(() => {
     setSelectedChildInsertType((previousType) =>
@@ -310,6 +316,40 @@ export function useWorkspaceEditor({
         };
       },
       '创建模块失败，请稍后重试。',
+    );
+  }
+
+  function runLearningAction(actionId: LearningActionId) {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    const placement = resolveLearningActionPlacement(tree, selectedNodeId, actionId);
+
+    if (!placement) {
+      return;
+    }
+
+    const nextNode = createEditorNode(placement.nodeType, placement.parentNodeId, {
+      title: placement.title,
+    });
+
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.insertChildNode(
+          tree,
+          placement.parentNodeId,
+          nextNode,
+          placement.insertIndex,
+        );
+
+        return {
+          nextSelectedNodeId: nextNode.id,
+          nextTree,
+          preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
+        };
+      },
+      '学习动作执行失败，请检查当前节点。',
     );
   }
 
@@ -546,6 +586,7 @@ export function useWorkspaceEditor({
     childInsertOptions,
     createModule,
     expandedNodeIds,
+    learningActions,
     moduleNodes,
     operationError,
     applyTreeChange,
@@ -566,6 +607,7 @@ export function useWorkspaceEditor({
     workspaceTitle: initialSnapshot.workspace.title,
     insertChildAtSelection,
     insertSiblingAtSelection,
+    runLearningAction,
     deleteSelection,
     liftSelection,
     lowerSelection,
@@ -588,11 +630,16 @@ function createNextSnapshot(
 function createEditorNode(
   nodeType: NonRootNode['type'],
   parentNodeId: string | null,
+  options?: {
+    title?: string;
+  },
 ): NonRootNode {
+  const nodeTitle = options?.title ?? getDefaultTitleForType(nodeType);
+
   if (nodeType === 'resource-fragment') {
     return createNode({
       type: 'resource-fragment',
-      title: getDefaultTitleForType(nodeType),
+      title: nodeTitle,
       content: '',
       sourceResourceId: parentNodeId ?? '',
       excerpt: '后续在资料区承接真实摘录内容。',
@@ -601,7 +648,7 @@ function createEditorNode(
 
   return createNode({
     type: nodeType,
-    title: getDefaultTitleForType(nodeType),
+    title: nodeTitle,
     content: '',
   });
 }

@@ -30,6 +30,14 @@ export default function WorkspaceRuntimeActionCard({
     evaluationQuestionNodeId !== null && !isAiRunning;
   const canSuggestCompletion =
     selectedNode?.type === 'plan-step' && !isAiRunning;
+  const shouldHighlightAnswerEvaluation =
+    selectedNode?.type === 'answer' && canEvaluateQuestionAnswer;
+  const sectionTitle = shouldHighlightAnswerEvaluation
+    ? '下一步：评估当前回答'
+    : '学习推进';
+  const helpText = shouldHighlightAnswerEvaluation
+    ? '你已经写到回答节点了。点下面这一步，系统会继续沿现有闭环生成判断、总结和可选追问。'
+    : '当前接的是最小学习闭环：规划步骤与铺垫讲解、拆分问题、评估回答、查看步骤完成依据。';
 
   function handleGeneratePlanSteps() {
     if (currentModule?.type !== 'module') {
@@ -68,8 +76,8 @@ export default function WorkspaceRuntimeActionCard({
       <SectionCard>
         <div className="workspace-sectionHeader">
           <div>
-            <p className="workspace-kicker">运行时集成</p>
-            <h2 className="workspace-sectionTitle">AI 动作入口</h2>
+            <p className="workspace-kicker">学习推进</p>
+            <h2 className="workspace-sectionTitle">下一步动作</h2>
           </div>
         </div>
         <div className="workspace-emptyState">
@@ -94,13 +102,24 @@ export default function WorkspaceRuntimeActionCard({
     <SectionCard>
       <div className="workspace-sectionHeader">
         <div>
-          <p className="workspace-kicker">运行时集成</p>
-          <h2 className="workspace-sectionTitle">AI 动作入口</h2>
+          <p className="workspace-kicker">学习推进</p>
+          <h2 className="workspace-sectionTitle">{sectionTitle}</h2>
         </div>
       </div>
-      <p className="workspace-helpText">
-        当前接的是最小学习闭环：规划步骤与铺垫讲解、拆分问题、评估回答、查看步骤完成依据。
-      </p>
+      <p className="workspace-helpText">{helpText}</p>
+      {shouldHighlightAnswerEvaluation ? (
+        <div className="workspace-actionCallout" data-testid="answer-evaluation-callout">
+          <p className="workspace-kicker">回答后的主路径</p>
+          <button
+            className="workspace-primaryAction"
+            disabled={!canEvaluateQuestionAnswer}
+            onClick={handleEvaluateQuestionAnswer}
+            type="button"
+          >
+            评估当前回答
+          </button>
+        </div>
+      ) : null}
       <div className="workspace-actionGrid">
         <button
           disabled={!canGeneratePlanSteps}
@@ -116,13 +135,15 @@ export default function WorkspaceRuntimeActionCard({
         >
           拆分当前问题
         </button>
-        <button
-          disabled={!canEvaluateQuestionAnswer}
-          onClick={handleEvaluateQuestionAnswer}
-          type="button"
-        >
-          评估当前回答
-        </button>
+        {!shouldHighlightAnswerEvaluation ? (
+          <button
+            disabled={!canEvaluateQuestionAnswer}
+            onClick={handleEvaluateQuestionAnswer}
+            type="button"
+          >
+            评估当前回答
+          </button>
+        ) : null}
         <button
           disabled={!canSuggestCompletion}
           onClick={handleSuggestCompletion}

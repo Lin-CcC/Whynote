@@ -118,7 +118,9 @@
 .workspace-treeButton,
 .workspace-treeToggle,
 .workspace-inlineAction,
+.workspace-learningAction button,
 .workspace-actionGrid button,
+.workspace-primaryAction,
 .workspace-statusSelect {
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 0.9rem;
@@ -231,6 +233,17 @@
   gap: 0.65rem;
 }
 
+.workspace-learningActionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.workspace-learningAction {
+  display: grid;
+  gap: 0.45rem;
+}
+
 .workspace-actionField {
   display: grid;
   gap: 0.45rem;
@@ -261,9 +274,60 @@
   cursor: pointer;
 }
 
+.workspace-learningAction button,
+.workspace-primaryAction {
+  padding: 0.82rem 0.92rem;
+  cursor: pointer;
+  text-align: left;
+}
+
 .workspace-actionGrid button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.workspace-learningAction button:disabled,
+.workspace-primaryAction:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.workspace-actionHint {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.workspace-secondaryActionSection {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.workspace-subsectionTitle {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.workspace-actionCallout {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(14, 116, 144, 0.18);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.92), #ffffff);
+}
+
+.workspace-primaryAction {
+  border: 1px solid rgba(14, 116, 144, 0.18);
+  border-radius: 0.9rem;
+  background: #0f766e;
+  color: #f8fafc;
 }
 
 .workspace-moduleButton:disabled,
@@ -476,6 +540,7 @@
 }
 
 @media (max-width: 900px) {
+  .workspace-learningActionGrid,
   .workspace-actionGrid {
     grid-template-columns: 1fr;
   }
