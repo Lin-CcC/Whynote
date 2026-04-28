@@ -50,6 +50,18 @@ const MIN_INTRODUCTION_LENGTH = 42;
 const MIN_INTRODUCTION_SENTENCE_COUNT = 2;
 const MIN_QUESTION_GUIDANCE_LENGTH = 18;
 const MIN_SUMMARY_EXPLANATION_LENGTH = 20;
+const FORMULAIC_INTRODUCTION_SENTENCE_PATTERNS = [
+  /接下来/u,
+  /后面会/u,
+  /下面会问/u,
+  /继续追问/u,
+  /理解地图/u,
+  /整体图景/u,
+  /宏观视角/u,
+  /宏观理解/u,
+  /这一步我们要建立/u,
+  /先把核心对象、关键关系和判断线索/u,
+] as const;
 
 interface RawModuleDraft {
   title?: unknown;
@@ -160,6 +172,7 @@ export function normalizeQuestionClosure(
   payload: unknown,
   options?: {
     currentQuestionTitle?: string;
+    learnerAnswer?: string;
   },
 ): QuestionClosureResult {
   const rawPayload = isRecord(payload) ? (payload as RawQuestionClosurePayload) : {};
@@ -174,6 +187,7 @@ export function normalizeQuestionClosure(
     {
       currentQuestionTitle: options?.currentQuestionTitle,
       isAnswerSufficient,
+      learnerAnswer: options?.learnerAnswer,
     },
   );
   const followUpQuestions = normalizeFollowUpQuestionDrafts(
@@ -200,7 +214,6 @@ export function normalizeLearningActionDraft(
     actionId: LearningActionDraftActionId;
     currentQuestionTitle?: string;
     planStepTitle?: string;
-    questionTitles?: string[];
     hasLearnerAnswer?: boolean;
   },
 ) {
@@ -214,7 +227,6 @@ export function normalizeLearningActionDraft(
       return normalizeScaffoldActionDraft(rawNode, {
         actionId: options.actionId,
         planStepTitle: options.planStepTitle,
-        questionTitles: options.questionTitles,
       });
     case 'insert-question':
       return normalizeStandaloneQuestionDraft(rawNode, options);
@@ -264,11 +276,7 @@ function normalizePlanStepDraft(
     type: 'plan-step',
     title: normalizedTitle,
     content,
-    introductions: normalizeIntroductionDrafts(
-      rawPlanStep,
-      normalizedTitle,
-      questions.map((question) => question.title),
-    ),
+    introductions: normalizeIntroductionDrafts(rawPlanStep, normalizedTitle),
     questions,
     status: 'todo',
   };
@@ -306,10 +314,7 @@ function createFallbackPlanStepDraft(
     type: 'plan-step',
     title,
     content: '',
-    introductions: createFallbackIntroductionDrafts(
-      title,
-      questions.map((question) => question.title),
-    ),
+    introductions: createFallbackIntroductionDrafts(title),
     questions,
     status: 'todo',
   };
@@ -318,7 +323,6 @@ function createFallbackPlanStepDraft(
 function normalizeIntroductionDrafts(
   rawPlanStep: RawPlanStepDraft,
   planStepTitle: string,
-  questionTitles: string[],
 ) {
   const rawIntroductions = extractRawLearningNodeDrafts(
     rawPlanStep.introductions ??
@@ -326,16 +330,11 @@ function normalizeIntroductionDrafts(
       rawPlanStep.prerequisiteQuestions,
   );
   const normalizedIntroductions = rawIntroductions.map((rawIntroduction, index) =>
-    normalizeIntroductionDraft(
-      rawIntroduction,
-      index,
-      planStepTitle,
-      questionTitles,
-    ),
+    normalizeIntroductionDraft(rawIntroduction, index, planStepTitle),
   );
 
   if (normalizedIntroductions.length === 0) {
-    return createFallbackIntroductionDrafts(planStepTitle, questionTitles);
+    return createFallbackIntroductionDrafts(planStepTitle);
   }
 
   ensureUniqueTitles(normalizedIntroductions);
@@ -367,7 +366,6 @@ function normalizeIntroductionDraft(
   rawIntroduction: RawLearningNodeDraft,
   index: number,
   planStepTitle: string,
-  questionTitles: string[],
 ): SummaryNodeDraft {
   const rawTitle =
     getText(rawIntroduction.title) ||
@@ -381,11 +379,7 @@ function normalizeIntroductionDraft(
   return {
     type: 'summary',
     title: normalizeIntroductionTitle(rawTitle, planStepTitle, index),
-    content: normalizeIntroductionContent(
-      rawContent,
-      planStepTitle,
-      questionTitles,
-    ),
+    content: normalizeIntroductionContent(rawContent, planStepTitle),
     citations: normalizeCitationDrafts(
       rawIntroduction.citations ?? rawIntroduction.references,
     ),
@@ -424,7 +418,6 @@ function normalizeScaffoldActionDraft(
       'insert-scaffold' | 'rephrase-scaffold' | 'simplify-scaffold' | 'add-example'
     >;
     planStepTitle?: string;
-    questionTitles?: string[];
   },
 ): SummaryNodeDraft {
   const fallbackTitle = getScaffoldActionFallbackTitle(options.actionId);
@@ -441,11 +434,7 @@ function normalizeScaffoldActionDraft(
   return {
     type: 'summary',
     title: normalizeIntroductionTitle(title, planStepLabel, 0),
-    content: normalizeIntroductionContent(
-      rawContent,
-      planStepLabel,
-      options.questionTitles ?? [],
-    ),
+    content: normalizeIntroductionContent(rawContent, planStepLabel),
     citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
   };
 }
@@ -515,6 +504,7 @@ function normalizeClosureSummaryDraft(
   options: {
     currentQuestionTitle?: string;
     isAnswerSufficient: boolean;
+    learnerAnswer?: string;
   },
 ): SummaryNodeDraft {
   const rawNode = isRecord(rawSummary)
@@ -626,13 +616,12 @@ function normalizeFollowUpQuestionDrafts(
 
 function createFallbackIntroductionDrafts(
   planStepTitle: string,
-  questionTitles: string[],
 ): SummaryNodeDraft[] {
   return [
     {
       type: 'summary',
-      title: normalizeIntroductionTitle('建立当前问题的基本图景', planStepTitle, 0),
-      content: normalizeIntroductionContent('', planStepTitle, questionTitles),
+      title: normalizeIntroductionTitle('先把这一步说清楚', planStepTitle, 0),
+      content: normalizeIntroductionContent('', planStepTitle),
       citations: [],
     },
   ];
@@ -841,26 +830,24 @@ function normalizeIntroductionTitle(
 function normalizeIntroductionContent(
   rawContent: string,
   planStepTitle: string,
-  questionTitles: string[],
 ) {
-  const normalizedContent = rawContent.trim();
+  const normalizedContent = stripFormulaicIntroductionSentences(
+    rawContent.trim(),
+  );
 
   if (isSubstantialIntroductionContent(normalizedContent)) {
-    return ensureIntroductionQuestionBridge(normalizedContent, questionTitles);
+    return ensureSentenceEnding(normalizedContent);
   }
 
   const focusSentence = normalizedContent
     ? ensureSentenceEnding(normalizedContent)
-    : '先知道这一步在当前主题里要解决什么问题，而不是直接记零散结论。';
+    : '先知道这里到底在解释什么、为什么它会影响后面的判断，而不是直接记零散结论。';
 
-  return ensureIntroductionQuestionBridge(
-    [
-    `这一小步先要建立“${planStepTitle}”的整体图景，知道它在当前主题里处于什么位置、为什么值得先学。`,
+  return [
+    `这一小步先把“${planStepTitle}”说清楚：它为什么值得单独拿出来看、到底在解释哪一层问题。`,
     focusSentence,
-    buildIntroductionQuestionBridge(questionTitles),
-    ].join(''),
-    questionTitles,
-  );
+    '先分清相关对象各自扮演的角色，再看它们怎样发生联系、产生结果或形成边界；否则很容易只记住名词，却不知道该怎么判断。',
+  ].join('');
 }
 
 function isSubstantialIntroductionContent(content: string) {
@@ -881,6 +868,34 @@ function countSentences(content: string) {
     .filter(Boolean).length;
 }
 
+function stripFormulaicIntroductionSentences(content: string) {
+  if (!content) {
+    return content;
+  }
+
+  const remainingSentences = splitIntoSentences(content).filter(
+    (sentence) => !isFormulaicIntroductionSentence(sentence),
+  );
+
+  return remainingSentences.join('').trim();
+}
+
+function splitIntoSentences(content: string) {
+  return content.match(/[^。！？!?；;]+[。！？!?；;]?/gu) ?? [];
+}
+
+function isFormulaicIntroductionSentence(sentence: string) {
+  const normalizedSentence = sentence.trim();
+
+  if (!normalizedSentence) {
+    return false;
+  }
+
+  return FORMULAIC_INTRODUCTION_SENTENCE_PATTERNS.some((pattern) =>
+    pattern.test(normalizedSentence),
+  );
+}
+
 function ensureSentenceEnding(content: string) {
   if (!content) {
     return '';
@@ -891,41 +906,6 @@ function ensureSentenceEnding(content: string) {
   }
 
   return `${content}。`;
-}
-
-function ensureIntroductionQuestionBridge(
-  content: string,
-  questionTitles: string[],
-) {
-  if (!content) {
-    return content;
-  }
-
-  if (
-    /(接下来|后面会|继续追问|继续讨论|下面会问)/u.test(content) ||
-    questionTitles.some((title) => content.includes(title))
-  ) {
-    return content;
-  }
-
-  return `${ensureSentenceEnding(content)}${buildIntroductionQuestionBridge(questionTitles)}`;
-}
-
-function buildIntroductionQuestionBridge(questionTitles: string[]) {
-  const normalizedQuestionTitles = questionTitles
-    .map((title) => title.trim())
-    .filter(Boolean)
-    .slice(0, 2);
-
-  if (normalizedQuestionTitles.length === 0) {
-    return '接下来系统会继续追问这里的关键机制、判断标准和使用边界，所以先把核心对象、关键关系和判断线索放到同一张理解地图里。';
-  }
-
-  if (normalizedQuestionTitles.length === 1) {
-    return `接下来会围绕“${normalizedQuestionTitles[0]}”继续追问，所以先把核心对象、关键关系和判断线索放到同一张理解地图里。`;
-  }
-
-  return `接下来会围绕“${normalizedQuestionTitles[0]}”和“${normalizedQuestionTitles[1]}”继续追问，所以先把这些概念之间的关系、因果线索和判断边界理顺。`;
 }
 
 function normalizeQuestionContent(
@@ -1020,6 +1000,7 @@ function normalizeClosureSummaryContent(
   options: {
     currentQuestionTitle?: string;
     isAnswerSufficient: boolean;
+    learnerAnswer?: string;
   },
 ) {
   const normalizedContent = rawContent.trim();
@@ -1035,11 +1016,27 @@ function normalizeClosureSummaryContent(
   const questionLabel = options.currentQuestionTitle
     ? `围绕“${options.currentQuestionTitle}”`
     : '围绕当前问题';
+  const learnerAngleSentence = buildClosureSummaryLearnerAngle(options);
   const explanationSentence = options.isAnswerSufficient
-    ? `${questionLabel}，更稳妥的理解是把核心对象、关键关系和判断线索讲清楚，并说明它们为什么成立，而不是只给结论。`
-    : `${questionLabel}，更稳妥的理解是先把还缺的核心对象、关键关系和判断线索补齐，再进入下一步，而不是只停在“答案差不多了”的判断上。`;
+    ? `${questionLabel}，更稳妥的标准理解应该把关键机制、因果链和成立原因连成一条完整说明，必要时补上适用边界，而不是只停在结论。`
+    : `${questionLabel}，更稳妥的标准理解是先把还缺的机制、因果链或判断边界补齐，再整理成完整说明，而不是只停在“答案差不多了”的判断上。`;
 
-  return [reusableSentence, explanationSentence].filter(Boolean).join('');
+  return [learnerAngleSentence, reusableSentence, explanationSentence]
+    .filter(Boolean)
+    .join('');
+}
+
+function buildClosureSummaryLearnerAngle(options: {
+  isAnswerSufficient: boolean;
+  learnerAnswer?: string;
+}) {
+  if (!options.learnerAnswer?.trim()) {
+    return '';
+  }
+
+  return options.isAnswerSufficient
+    ? '你的回答已经抓住了主线，下面把它整理成更稳妥的标准理解。'
+    : '你的回答已经碰到了这个问题的一部分方向，下面把缺的机制、因果或边界补齐。';
 }
 
 function isExplanatorySummaryContent(content: string) {
@@ -1247,10 +1244,10 @@ function normalizeActionSummaryContent(
       : '';
 
   const fallbackSentence = options.currentQuestionTitle
-    ? `围绕“${options.currentQuestionTitle}”，先把核心对象、关键关系和判断线索讲清楚，再把它们串成一条完整说明。`
+    ? `围绕“${options.currentQuestionTitle}”，先把关键机制、因果链和判断边界讲清楚，再把它们串成一条完整说明。`
     : options.planStepTitle
-      ? `围绕“${options.planStepTitle}”，先把这一步真正要建立的理解地图讲清楚，再把容易混淆的边界补出来。`
-      : '先把当前要说明的对象、关系和判断线索讲清楚，再决定是否补充例子或边界。';
+      ? `围绕“${options.planStepTitle}”，先把这一步真正要说明的对象、关系和边界讲清楚，再把容易混淆的地方补出来。`
+      : '先把当前要说明的对象、关系和边界讲清楚，再决定是否补充例子或机制。';
 
   return [reusableSentence, fallbackSentence].filter(Boolean).join('');
 }
@@ -1314,7 +1311,7 @@ function getScaffoldActionFallbackTitle(
 ) {
   switch (actionId) {
     case 'insert-scaffold':
-      return '建立当前问题的理解地图';
+      return '先把这一步说清楚';
     case 'rephrase-scaffold':
       return '换个说法再解释一次';
     case 'simplify-scaffold':

@@ -22,6 +22,7 @@ export function createQuestionClosureService(options: {
       });
       const normalizedResult = normalizeQuestionClosure(response.content, {
         currentQuestionTitle,
+        learnerAnswer: input.learnerAnswer,
       });
 
       return {

@@ -117,6 +117,49 @@ test('evaluates a manually inserted question and answer through the same closure
   ).toBeInTheDocument();
 });
 
+test('keeps answer explanation available on the first evaluation even when summary is omitted', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createManualQuestionAnswerSnapshot(),
+    createMockProviderClient({
+      'question-closure': {
+        isAnswerSufficient: false,
+        judgment: {
+          title: '判断：还缺最后一步',
+          content: '还没有说明为什么统一提交会减少重复渲染。',
+        },
+        followUpQuestions: [],
+      },
+    }),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  await screen.findByDisplayValue('手动回答草稿');
+  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+
+  expect(
+    await screen.findByDisplayValue('判断：还缺最后一步'),
+  ).toBeInTheDocument();
+  await screen.findByDisplayValue('标准理解');
+  const judgmentNode = findNodeByTitleInput('判断：还缺最后一步');
+  const summaryNode = findNodeByTitleInput('标准理解');
+  expect(summaryNode).toHaveTextContent('答案解析');
+
+  const callout = screen.getByTestId('answer-evaluation-callout');
+  expect(
+    within(callout).getByRole('button', { name: '查看答案解析' }),
+  ).toBeEnabled();
+
+  fireEvent.click(judgmentNode);
+  fireEvent.click(
+    screen.getByRole('button', { name: '查看答案解析' }),
+  );
+
+  await waitFor(() => {
+    expect(summaryNode).toHaveAttribute('data-node-selected', 'true');
+  });
+});
+
 test('matches a manual summary before a manual judgment as the same answer explanation path', async () => {
   const dependencies = await createPreloadedDependencies(
     createManualSummaryBeforeJudgmentSnapshot(),

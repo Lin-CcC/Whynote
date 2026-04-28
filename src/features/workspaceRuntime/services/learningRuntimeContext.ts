@@ -305,10 +305,14 @@ export function getJudgmentInlineActionContext(
     answerNodeId && tree.nodes[answerNodeId]?.type === 'answer'
       ? tree.nodes[answerNodeId]
       : null;
+  const summaryNode =
+    summaryNodeId && tree.nodes[summaryNodeId]?.type === 'summary'
+      ? tree.nodes[summaryNodeId]
+      : null;
 
   return {
     answerNodeId,
-    hint: buildJudgmentHint(judgmentNode, answerNode),
+    hint: buildJudgmentHint(judgmentNode, answerNode, summaryNode),
     questionNodeId: questionNode.id,
     summaryNodeId,
   };
@@ -678,17 +682,76 @@ function findAnswerNodeIdBeforeIndex(
 function buildJudgmentHint(
   judgmentNode: Extract<TreeNode, { type: 'judgment' }>,
   answerNode: Extract<TreeNode, { type: 'answer' }> | null,
+  summaryNode: Extract<TreeNode, { type: 'summary' }> | null,
 ) {
-  const normalizedContent = judgmentNode.content.trim();
   const answerPrefix = answerNode
-    ? `先回到「${answerNode.title}」，只补这次判断指出的缺口。`
-    : '先只补这次判断指出的缺口。';
+    ? `先回到「${answerNode.title}」，只补这次缺口。`
+    : '先只补这次缺口。';
+  const gapText = extractJudgmentGapText(judgmentNode.content);
+  const primer = extractHintPrimer(summaryNode?.content);
+  const hintLines = [answerPrefix];
 
-  if (!normalizedContent) {
-    return `${answerPrefix} 不要直接改写成完整答案解析。`;
+  if (gapText) {
+    hintLines.push(`下一步优先把${gapText}说清楚。`);
   }
 
-  return `${answerPrefix} 不要直接改写成完整答案解析。\n${normalizedContent}`;
+  if (primer) {
+    hintLines.push(
+      `如果卡住，可以先抓住“${primer}”这条线，再接它带来的结果、判断条件或使用边界。`,
+    );
+  }
+
+  hintLines.push('不要把整段答案解析直接改写回回答。');
+
+  return hintLines.join('\n');
+}
+
+function extractJudgmentGapText(content: string) {
+  const normalizedContent = content.trim();
+
+  if (!normalizedContent) {
+    return '';
+  }
+
+  const normalizedSentence = normalizedContent
+    .replace(/^这次回答(?:还不完整|已答到[^。！？!?；]*?)，?/u, '')
+    .replace(/^这版(?:只差把)?/u, '')
+    .replace(/^回答方向对了，但/u, '')
+    .replace(/^你还没有(?:解释|说明)?/u, '')
+    .replace(/^还没有(?:解释|说明)?/u, '')
+    .replace(/^还缺/u, '')
+    .replace(/^只差把/u, '')
+    .replace(/^需要继续把/u, '')
+    .replace(/^需要把/u, '')
+    .replace(/[。！？!?；;]+$/u, '')
+    .trim();
+
+  if (!normalizedSentence) {
+    return '这次判断指出的关键点';
+  }
+
+  return normalizedSentence.startsWith('“')
+    ? normalizedSentence
+    : `“${normalizedSentence}”`;
+}
+
+function extractHintPrimer(content?: string) {
+  const normalizedContent = content?.trim();
+
+  if (!normalizedContent) {
+    return null;
+  }
+
+  const primer = normalizedContent
+    .replace(/^标准理解[:：]\s*/u, '')
+    .split(/因此|所以|从而|这意味着|。|；|，/u)[0]
+    ?.trim();
+
+  if (!primer) {
+    return null;
+  }
+
+  return primer.length <= 26 ? primer : `${primer.slice(0, 26).trimEnd()}…`;
 }
 
 function findAncestorNode<TNodeType extends TreeNode['type']>(

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   normalizeQuestionClosure,
+  normalizePlanStepDrafts,
   parseJsonObject,
 } from './services/learningDraftNormalization';
 
@@ -52,6 +53,40 @@ describe('parseJsonObject', () => {
 });
 
 describe('normalizeQuestionClosure', () => {
+  it('removes formulaic scaffold bridge sentences during introduction normalization', () => {
+    const [planStep] = normalizePlanStepDrafts(
+      {
+        planSteps: [
+          {
+            title: '理解批处理',
+            introductions: [
+              {
+                title: '铺垫：串场版',
+                content:
+                  '接下来会围绕“为什么状态更新会被批处理？”继续追问，所以先把核心对象、关键关系和判断线索放到同一张理解地图里。',
+              },
+            ],
+            questions: [
+              {
+                title: '为什么状态更新会被批处理？',
+                content: '请解释它为什么能减少重复渲染。',
+              },
+            ],
+          },
+        ],
+      },
+      '理解更新合并',
+      'standard',
+    );
+
+    expect(planStep.introductions[0].content).not.toMatch(
+      /接下来会围绕|继续追问|理解地图|核心对象、关键关系和判断线索/u,
+    );
+    expect(planStep.introductions[0].content).toContain(
+      '这一小步先把“理解批处理”说清楚',
+    );
+  });
+
   it('keeps teaching citation metadata and only dedupes identical citation signatures', () => {
     const result = normalizeQuestionClosure({
       followUpQuestions: [],
@@ -110,5 +145,29 @@ describe('normalizeQuestionClosure', () => {
         sourceLocator: 'useState > batching',
       },
     ]);
+  });
+
+  it('creates a fallback answer explanation when summary is missing', () => {
+    const result = normalizeQuestionClosure(
+      {
+        followUpQuestions: [],
+        isAnswerSufficient: false,
+        judgment: {
+          title: '判断：还缺关键因果',
+          content: '你还没有解释为什么统一提交会减少重复渲染。',
+        },
+      },
+      {
+        currentQuestionTitle: '为什么状态更新会被批处理？',
+        learnerAnswer: '因为 React 会把多个更新放在一起。',
+      },
+    );
+
+    expect(result.summary.title).toBe('标准理解');
+    expect(result.summary.content).toContain(
+      '你的回答已经碰到了这个问题的一部分方向',
+    );
+    expect(result.summary.content).toContain('更稳妥的标准理解是');
+    expect(result.summary.content).toContain('为什么状态更新会被批处理？');
   });
 });

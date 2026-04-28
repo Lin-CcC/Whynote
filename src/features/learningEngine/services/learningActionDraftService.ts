@@ -30,7 +30,6 @@ export function createLearningActionDraftService(options: {
           currentQuestionTitle,
           hasLearnerAnswer: Boolean(input.learnerAnswer?.trim()),
           planStepTitle: input.planStepTitle,
-          questionTitles: input.existingQuestionTitles,
         }),
         metadata: {
           model: response.model,
