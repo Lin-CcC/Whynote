@@ -1,6 +1,7 @@
 import type {
   AiMessage,
   CompoundQuestionSplitInput,
+  JudgmentHintInput,
   LearningActionDraftInput,
   LearningMode,
   LearningModeLimits,
@@ -149,6 +150,56 @@ export function buildQuestionClosureMessages(
         '如果资料候选能支撑 judgment 或 summary，请在 citations 中返回 targetNodeId；能用 fragment 时优先 fragment。',
         buildTeachingCitationInstruction(),
         `返回格式：{"isAnswerSufficient":true,"judgment":{"title":"","answered":"","gaps":[""],"whyItMatters":"","content":"","citations":[${buildCitationJsonShape()}]},"hint":{"focus":"","background":"","thinkingQuestion":"","content":""},"summary":{"title":"","content":"","citations":[${buildCitationJsonShape()}]},"followUpQuestions":[{"title":"","content":"","citations":[${buildCitationJsonShape()}]}]}`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    },
+  ];
+}
+
+export function buildJudgmentHintMessages(input: JudgmentHintInput): AiMessage[] {
+  const currentQuestion =
+    input.questionPath[input.questionPath.length - 1] ?? null;
+
+  return [
+    {
+      role: 'system',
+      content:
+        '你是 Whynote 的思考提示生成器。只输出 JSON，只生成围绕当前缺口的微型铺垫，不要改写 judgment，也不要复述答案解析。',
+    },
+    {
+      role: 'user',
+      content: [
+        `学习主题：${input.topic.trim()}`,
+        optionalLine('模块标题', input.moduleTitle),
+        optionalLine('步骤标题', input.planStepTitle),
+        optionalLine('步骤目标', input.planStepSummary),
+        optionalLine(
+          '前置讲解',
+          input.introductions?.filter(Boolean).join('\n\n'),
+        ),
+        optionalLine('问题路径', formatQuestionPath(input.questionPath)),
+        optionalLine(
+          '当前问题',
+          currentQuestion
+            ? formatTitledContent(currentQuestion.title, currentQuestion.content)
+            : '',
+        ),
+        optionalLine('用户当前回答', input.learnerAnswer),
+        optionalLine('已有判断评价', input.judgmentContent),
+        optionalLine('已有答案解析', input.summaryContent),
+        optionalLine(
+          '可引用资料候选',
+          formatReferenceCandidates(input.referenceCandidates),
+        ),
+        '任务：基于上面的 judgment，补一条真正帮助用户继续修改回答的提示。',
+        '这条 hint 要和 judgment / 答案解析相辅相成：judgment 负责指出缺口，hint 负责补继续思考所需的最小知识背景。',
+        '优先只抓当前最关键的一个缺口，不要把 judgment 里整段诊断或多条缺口原样搬过来。',
+        'hint 只做三件事：1. 明确这次先补哪一个缺口；2. 补一小段必要知识背景；3. 给一个可以继续思考的问题抓手。',
+        '如果已有答案解析，不要摘抄里面的完整答案句子；只抽出用户继续思考前必须先明白的那层机制、因果链或边界。',
+        '优先把 hint 写成结构化内容：focus 填“先补哪块”，background 填“关键背景”，thinkingQuestion 填“可以先想”；如果只写 hint.content，也必须按“先补哪块 / 关键背景 / 可以先想”三段来写。',
+        'hint 不能写成“继续想想”“先补缺口”这种空提示，也不要直接把标准答案整段告诉用户。',
+        `返回格式：{"hint":{"focus":"","background":"","thinkingQuestion":"","content":""}}`,
       ]
         .filter(Boolean)
         .join('\n'),

@@ -1,5 +1,6 @@
 export * from './completionSuggestionService';
 export * from './compoundQuestionSplitService';
+export * from './judgmentHintService';
 export * from './learningActionDraftService';
 export * from './moduleGenerationService';
 export * from './planStepRuntimeStatusService';

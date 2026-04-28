@@ -178,6 +178,21 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     );
   }
 
+  async function runJudgmentHintGeneration(judgmentNodeId: string) {
+    await runAiAction('正在补一条思考提示', async (snapshot) =>
+      runtimeService.generateJudgmentHint(
+        snapshot,
+        judgmentNodeId,
+        state.aiConfig,
+        state.resourceMetadataRecords,
+      ),
+    );
+
+    const judgmentNode = snapshotRef.current?.tree.nodes[judgmentNodeId];
+
+    return judgmentNode?.type === 'judgment' && Boolean(judgmentNode.hint?.trim());
+  }
+
   async function runCompletionSuggestion(planStepNodeId: string) {
     await runAiAction('正在整理步骤完成依据', async (snapshot) =>
       runtimeService.suggestPlanStepCompletion(snapshot, planStepNodeId),
@@ -204,6 +219,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     resolveResourceSummary,
     runLearningAction,
     runCompletionSuggestion,
+    runJudgmentHintGeneration,
     runPlanStepGeneration,
     runQuestionEvaluation,
     runQuestionSplit,

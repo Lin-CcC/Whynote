@@ -173,6 +173,8 @@ export default function WorkspaceRuntimeScreen({
       return null;
     }
 
+    const hasPersistedHint = Boolean(context.node.hint?.trim());
+
     return (
       <WorkspaceRuntimeJudgmentActions
         answerNodeId={actionContext.answerNodeId}
@@ -188,8 +190,9 @@ export default function WorkspaceRuntimeScreen({
           context.selectNode(actionContext.answerNodeId);
         }}
         onToggleHint={() => {
-          setActiveJudgmentHintNodeId((previousNodeId) =>
-            previousNodeId === context.node.id ? null : context.node.id,
+          void handleJudgmentHintToggle(
+            context.node.id,
+            hasPersistedHint,
           );
         }}
         onViewSummary={() => {
@@ -253,6 +256,28 @@ export default function WorkspaceRuntimeScreen({
   ) {
     setActiveResourceNodeId(null);
     runtime.handleSelectionChange(selection);
+  }
+
+  async function handleJudgmentHintToggle(
+    judgmentNodeId: string,
+    hasPersistedHint: boolean,
+  ) {
+    if (runtime.isAiRunning) {
+      return;
+    }
+
+    if (hasPersistedHint) {
+      setActiveJudgmentHintNodeId((previousNodeId) =>
+        previousNodeId === judgmentNodeId ? null : judgmentNodeId,
+      );
+      return;
+    }
+
+    const didGenerateHint = await runtime.runJudgmentHintGeneration(judgmentNodeId);
+
+    if (didGenerateHint) {
+      setActiveJudgmentHintNodeId(judgmentNodeId);
+    }
   }
 }
 
