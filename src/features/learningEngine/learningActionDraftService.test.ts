@@ -51,7 +51,9 @@ describe('learningActionDraftService', () => {
     expect(result.draft.type).toBe('summary');
     expect(result.draft.title).toBe('铺垫：更好懂的版本');
     expect(result.draft.content).toContain('放进同一个待处理队列');
-    expect(result.draft.content).toContain('为什么状态更新会被批处理？');
+    expect(result.draft.content).toContain('解释批处理为什么成立');
+    expect(result.draft.content).not.toContain('接下来会围绕');
+    expect(result.draft.content).not.toContain('理解地图');
   });
 
   it('在没有现成回答时也会为 insert-judgment 生成可编辑判断草稿', async () => {

@@ -57,7 +57,12 @@ test('renders inline judgment actions and reveals a hint that stays distinct fro
   );
 
   expect(hintCallout).toHaveTextContent('只补当前缺口');
-  expect(hintCallout).toHaveTextContent('还缺“为什么会减少重复渲染”这条因果关系。');
+  expect(hintCallout).toHaveTextContent('下一步优先把');
+  expect(hintCallout).toHaveTextContent('为什么会减少重复渲染');
+  expect(hintCallout).toHaveTextContent('先抓住');
+  expect(hintCallout).not.toHaveTextContent(
+    '还缺“为什么会减少重复渲染”这条因果关系。',
+  );
   expect(hintCallout).not.toHaveTextContent(
     '标准理解：React 会先收拢同一轮事件里的更新，再统一提交，因此可以减少重复渲染。',
   );

@@ -75,8 +75,11 @@ describe('planStepGenerationService', () => {
     expect(result.planSteps[0].introductions[0].content).toContain(
       '并发渲染先把渲染工作拆成可中断、可恢复的调度任务',
     );
-    expect(result.planSteps[0].introductions[0].content).toContain(
-      '并发渲染到底改变了什么？',
+    expect(result.planSteps[0].introductions[0].content).not.toContain(
+      '接下来会围绕',
+    );
+    expect(result.planSteps[0].introductions[0].content).not.toContain(
+      '理解地图',
     );
     expect(result.planSteps[0].questions[0].content).toContain(
       '说明最关键的对象、关系或判断标准',

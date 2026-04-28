@@ -71,10 +71,17 @@ test('plans a minimal learning path that lands as plan-step plus introduction an
     await screen.findByDisplayValue('这个模块的核心问题是什么？'),
   ).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue(
-      /先搭建最小概念框架.*接下来会围绕“这个模块的核心问题是什么？”继续追问/u,
-    ),
+    await screen.findByDisplayValue(/先把这个 step 的目标和前置概念讲清楚/u),
   ).toBeInTheDocument();
+  const introductionInput = screen.getByDisplayValue(
+    /先把这个 step 的目标和前置概念讲清楚/u,
+  );
+  expect((introductionInput as HTMLTextAreaElement).value).toContain(
+    '这一小步先把“先搭建最小概念框架”说清楚',
+  );
+  expect((introductionInput as HTMLTextAreaElement).value).not.toMatch(
+    /接下来会围绕|理解地图/u,
+  );
   expect(await screen.findAllByText('铺垫')).not.toHaveLength(0);
 });
 

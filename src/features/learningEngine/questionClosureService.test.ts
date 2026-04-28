@@ -69,7 +69,10 @@ describe('questionClosureService', () => {
     expect(result.isAnswerSufficient).toBe(false);
     expect(result.judgment.title).toBe('判断：回答还差一点');
     expect(result.judgment.content).toContain('这次回答还不完整');
-    expect(result.summary.content).toContain('更稳妥的理解是');
+    expect(result.summary.content).toContain(
+      '你的回答已经碰到了这个问题的一部分方向',
+    );
+    expect(result.summary.content).toContain('更稳妥的标准理解是');
     expect(result.summary.content).toContain('为什么状态更新会被批处理？');
     expect(result.followUpQuestions).toHaveLength(1);
     expect(result.followUpQuestions[0].title).toBe('追问：再想想');
@@ -120,5 +123,41 @@ describe('questionClosureService', () => {
     expect(result.summary.title).toBe('标准理解');
     expect(result.summary.content).toContain('因此可以减少重复渲染');
     expect(result.followUpQuestions).toHaveLength(0);
+  });
+
+  it('still returns an answer explanation draft when the model omits summary on the first evaluation', async () => {
+    const providerClient = createMockProvider({
+      'question-closure': {
+        isAnswerSufficient: false,
+        judgment: {
+          title: '回答还不完整',
+          content: '还没有说明为什么统一提交会减少重复渲染。',
+        },
+        followUpQuestions: [],
+      },
+    });
+    const service = createQuestionClosureService({
+      providerClient,
+    });
+
+    const result = await service.generate({
+      topic: 'React 批处理',
+      moduleTitle: '理解更新合并',
+      planStepTitle: '解释批处理为什么成立',
+      questionPath: [
+        {
+          title: '为什么状态更新会被批处理？',
+          content: '请解释它为什么能减少重复渲染。',
+        },
+      ],
+      learnerAnswer: '因为 React 会把多个更新放在一起。',
+    });
+
+    expect(result.summary.title).toBe('标准理解');
+    expect(result.summary.content).toContain(
+      '你的回答已经碰到了这个问题的一部分方向',
+    );
+    expect(result.summary.content).toContain('更稳妥的标准理解是');
+    expect(result.summary.content).toContain('为什么状态更新会被批处理？');
   });
 });
