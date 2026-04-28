@@ -10,6 +10,8 @@ import type {
 } from '../domain';
 import { getLearningModeLimits } from '../domain';
 
+import { parseJsonObjectWithTolerance } from './jsonObjectParsing';
+
 const MODULE_TITLE_SUFFIXES = [
   '整体框架',
   '核心概念',
@@ -81,12 +83,7 @@ interface RawQuestionClosurePayload {
 
 export function parseJsonObject(rawText: string): unknown {
   const normalizedText = stripCodeFence(rawText);
-
-  try {
-    return JSON.parse(normalizedText) as unknown;
-  } catch {
-    throw new Error('AI 返回的内容不是合法 JSON。');
-  }
+  return parseJsonObjectWithTolerance(normalizedText);
 }
 
 export function normalizeModuleDrafts(

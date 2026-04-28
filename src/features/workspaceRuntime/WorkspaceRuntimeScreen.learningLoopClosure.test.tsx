@@ -405,6 +405,48 @@ test('creates AI drafts instead of empty shells for scaffold, question, summary 
   ).toBeInTheDocument();
 });
 
+test('tolerates question-closure JSON wrapped in explanation text and code fences', async () => {
+  const rawResponse = `这是评估结果，请按其中的 JSON 对象落地：
+\`\`\`json
+{"isAnswerSufficient":true,"judgment":{"title":"判断：已答到当前问题","content":"这次回答已经覆盖当前问题的关键点。"},"summary":{"title":"标准理解","content":"批处理会把同一轮事件中的多个状态更新合并后再统一提交，从而减少不必要的重复渲染。","citations":[{"targetNodeId":"fragment-batching"}]},"followUpQuestions":[]}
+\`\`\`
+其余文字只是说明。`;
+  const dependencies = await createPreloadedDependencies(
+    createAnswerClosureSnapshot(),
+    createMockProviderClient({
+      'question-closure': rawResponse,
+    }),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(
+    screen.getByRole('button', { name: /^问题为什么状态更新会被批处理？/ }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+
+  expect(
+    await screen.findByDisplayValue('判断：已答到当前问题'),
+  ).toBeInTheDocument();
+  expect(
+    await screen.findByDisplayValue('标准理解'),
+  ).toBeInTheDocument();
+
+  const savedSnapshot = await waitForSavedSnapshot(
+    dependencies.structuredDataStorage,
+    (snapshot) => {
+      const stepNode = snapshot.tree.nodes['step-answer-closure'];
+
+      return stepNode?.type === 'plan-step' && stepNode.status === 'done';
+    },
+  );
+  const stepNode = savedSnapshot.tree.nodes['step-answer-closure'];
+
+  expect(stepNode.type).toBe('plan-step');
+  expect(stepNode.type === 'plan-step' ? stepNode.status : null).toBe('done');
+});
+
 test('preserves a manual step status override across save and reload', async () => {
   const dependencies = await createPreloadedDependencies(
     createManualStatusSnapshot(),
@@ -482,7 +524,8 @@ function createMockProviderClient(
         typeof payloadSource === 'function'
           ? payloadSource(request as AiProviderObjectRequest<unknown>)
           : payloadSource;
-      const rawText = JSON.stringify(payload);
+      const rawText =
+        typeof payload === 'string' ? payload : JSON.stringify(payload);
 
       return {
         taskName: request.taskName,
