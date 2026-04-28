@@ -83,6 +83,7 @@
 - [ ] 让 runtime 读取并使用 resource ingest metadata，而不是只写不读
 - [x] 把“为当前模块生成 plan-step”升级成最小学习路径，并真正落到现有节点树
 - [x] 用现有节点模型表达铺垫知识，优先收敛到 step 下的 question 草案
+- [x] 收紧学习计划与回答评估合同，让铺垫 / 主问题 / 追问 / judgment / summary 的职责边界进入 prompt、normalization 与测试
 - [x] 打通学习节点到 resource / fragment 的最小引用闭环，支持 answer 引用
 - [x] 明确 fragment 复用优先、无法稳定定位时退回 resource 级引用
 - [x] 实现 plan-step 状态自动流转，并保留可解释依据与手动覆盖优先级
