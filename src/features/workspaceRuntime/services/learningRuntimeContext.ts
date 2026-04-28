@@ -4,6 +4,10 @@ import type {
   QuestionClosureInput,
 } from '../../learningEngine';
 import {
+  buildFallbackClosureHintText,
+  extractJudgmentGapItemsFromText,
+} from '../../learningEngine/services/closureHint';
+import {
   getNodeOrThrow,
   isScaffoldSummaryNode,
   type ModuleNode,
@@ -678,7 +682,7 @@ function findAnswerNodeIdBeforeIndex(
 function buildJudgmentHint(
   judgmentNode: Extract<TreeNode, { type: 'judgment' }>,
   questionNode: Extract<TreeNode, { type: 'question' }>,
-  answerNode: Extract<TreeNode, { type: 'answer' }> | null,
+  _answerNode: Extract<TreeNode, { type: 'answer' }> | null,
 ) {
   const persistedHint = judgmentNode.hint?.trim();
 
@@ -686,120 +690,14 @@ function buildJudgmentHint(
     return persistedHint;
   }
 
-  const answerPrefix = answerNode
-    ? `先回到「${answerNode.title}」，只补这次缺口。`
-    : '先只补这次缺口。';
-  const gapItems = extractJudgmentGapItems(judgmentNode.content, questionNode.title);
-  const primaryGap = gapItems[0] ?? `把“${questionNode.title}”里还缺的关键点说清楚`;
-  const hintLines = [
-    answerPrefix,
-    `先补哪块：${primaryGap}。`,
-    buildHintPrimerFromGap(primaryGap, questionNode.title),
-    '不要急着把整段答案解析搬回回答里，先把这一个缺口补完整。',
-  ];
-
-  return hintLines.join('\n');
-}
-
-function extractJudgmentGapItems(content: string, questionTitle: string) {
-  const sectionText = extractStructuredSection(content, [
-    '还缺的关键点',
-    '当前最关键缺口',
-    '还缺',
-  ]);
-
-  if (sectionText) {
-    const structuredItems = splitGapItems(sectionText);
-
-    if (structuredItems.length > 0) {
-      return structuredItems;
-    }
-  }
-
-  const normalizedContent = content.trim();
-
-  if (!normalizedContent) {
-    return [
-      `把“${questionTitle}”真正依赖的关键机制、因果关系或判断边界说清楚`,
-    ];
-  }
-
-  const fallbackGap = normalizedContent
-    .replace(/^已答到[:：][^\n]+/u, '')
-    .replace(/^还缺(?:的关键点)?[:：]/u, '')
-    .replace(/^为什么关键[:：][^\n]+/u, '')
-    .replace(/^这次回答(?:还不完整|已答到[^。！？!?；]*?)，?/u, '')
-    .replace(/^这版(?:只差把)?/u, '')
-    .replace(/^回答方向对了，但/u, '')
-    .replace(/^你还没有(?:解释|说明)?/u, '')
-    .replace(/^还没有(?:解释|说明)?/u, '')
-    .replace(/^还缺/u, '')
-    .replace(/^只差把/u, '')
-    .replace(/^需要继续把/u, '')
-    .replace(/^需要把/u, '')
-    .replace(/[。！？!?；;]+$/u, '')
-    .trim();
-
-  if (!fallbackGap) {
-    return [
-      `把“${questionTitle}”真正依赖的关键机制、因果关系或判断边界说清楚`,
-    ];
-  }
-
-  return splitGapItems(fallbackGap);
-}
-
-function buildHintPrimerFromGap(primaryGap: string, questionTitle: string) {
-  if (primaryGap.includes('为什么')) {
-    return '先想清：把“发生了什么变化 -> 为什么会这样 -> 最后带来什么结果”连成一条因果链。';
-  }
-
-  if (primaryGap.includes('边界') || primaryGap.includes('条件')) {
-    return '先想清：不要只说结论，先分清它在什么条件下成立、什么时候会失效。';
-  }
-
-  if (primaryGap.includes('关系') || primaryGap.includes('对象') || primaryGap.includes('机制')) {
-    return '先想清：把相关对象各自扮演的角色分开，再说明它们怎样发生联系。';
-  }
-
-  return `先想清：围绕“${questionTitle}”，先把对象、关系和判断线索摆正，再决定要不要补更多背景。`;
-}
-
-function extractStructuredSection(content: string, labels: string[]) {
-  for (const label of labels) {
-    const sectionPattern = new RegExp(
-      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:已答到|还缺的关键点|当前最关键缺口|还缺|为什么关键)[:：]|$)`,
-      'u',
-    );
-    const matched = content.match(sectionPattern)?.[1]?.trim();
-
-    if (matched) {
-      return matched;
-    }
-  }
-
-  return '';
-}
-
-function splitGapItems(content: string) {
-  const normalizedItems = content
-    .split(/\n|[；;]+/u)
-    .map((item) =>
-      item
-        .replace(/^\s*[-*•]\s*/u, '')
-        .replace(/^\s*\d+[.)、]\s*/u, '')
-        .replace(/[。！？!?；;]+$/u, '')
-        .trim(),
-    )
-    .filter(Boolean);
-
-  if (normalizedItems.length > 0) {
-    return normalizedItems.slice(0, 3);
-  }
-
-  return [
-    content.replace(/[。！？!?；;]+$/u, '').trim(),
-  ].filter(Boolean);
+  return buildFallbackClosureHintText({
+    currentQuestionTitle: questionNode.title,
+    judgmentGapItems: extractJudgmentGapItemsFromText(
+      judgmentNode.content,
+      questionNode.title,
+    ),
+    judgmentContent: judgmentNode.content,
+  });
 }
 
 function findAncestorNode<TNodeType extends TreeNode['type']>(

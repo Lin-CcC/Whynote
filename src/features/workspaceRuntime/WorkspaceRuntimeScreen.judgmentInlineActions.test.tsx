@@ -58,6 +58,8 @@ test('renders inline judgment actions and reveals a hint that stays distinct fro
 
   expect(hintCallout).toHaveTextContent('微型铺垫');
   expect(hintCallout).toHaveTextContent('先补哪块：');
+  expect(hintCallout).toHaveTextContent('关键背景：');
+  expect(hintCallout).toHaveTextContent('可以先想：');
   expect(hintCallout).toHaveTextContent('为什么会减少重复渲染');
   expect(hintCallout).toHaveTextContent('发生了什么变化 -> 为什么会这样 -> 最后带来什么结果');
   expect(hintCallout).not.toHaveTextContent(

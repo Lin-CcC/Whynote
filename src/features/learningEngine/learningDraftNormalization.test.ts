@@ -187,12 +187,52 @@ describe('normalizeQuestionClosure', () => {
     );
     expect(result.judgment.content).toContain('为什么关键：');
     expect(result.judgment.hint).toContain('先补哪块：为什么统一提交会减少重复渲染');
+    expect(result.judgment.hint).toContain('关键背景：');
+    expect(result.judgment.hint).toContain('可以先想：');
+    expect(result.judgment.hint).toContain(
+      '把“收集更新 -> 统一提交 -> 减少重复渲染”连成一条因果链',
+    );
     expect(result.judgment.hint).not.toContain(
       'React 会把同一轮事件中的多个状态更新合并后再统一提交',
     );
+    expect(result.judgment.hint).not.toContain('少了这两点，就还无法证明理解完整。');
     expect(result.summary.content).toContain('会卡在');
     expect(result.summary.content).toContain('继续往下想');
     expect(result.summary.content).toContain('更稳妥的标准理解是：');
+  });
+
+  it('rewrites summary-like hints into a gap-focused micro-scaffold', () => {
+    const result = normalizeQuestionClosure(
+      {
+        followUpQuestions: [],
+        hint: {
+          content:
+            'React 会把同一轮事件中的多个状态更新合并后再统一提交，因此可以减少重复渲染。',
+        },
+        isAnswerSufficient: false,
+        judgment: {
+          title: '判断：还缺关键因果',
+          gaps: ['没有解释为什么统一提交会减少重复渲染。'],
+          whyItMatters: '少了这条因果链，就还无法证明理解完整。',
+        },
+        summary: {
+          title: '标准理解',
+          content:
+            'React 会把同一轮事件中的多个状态更新合并后再统一提交，因此可以减少重复渲染。',
+        },
+      },
+      {
+        currentQuestionTitle: '为什么状态更新会被批处理？',
+        learnerAnswer: '因为 React 会把多个更新放在一起。',
+      },
+    );
+
+    expect(result.judgment.hint).toContain('先补哪块：为什么统一提交会减少重复渲染。');
+    expect(result.judgment.hint).toContain('关键背景：');
+    expect(result.judgment.hint).toContain('可以先想：');
+    expect(result.judgment.hint).not.toContain(
+      'React 会把同一轮事件中的多个状态更新合并后再统一提交，因此可以减少重复渲染。',
+    );
   });
 
   it('creates a fallback answer explanation when summary is missing', () => {
@@ -212,6 +252,8 @@ describe('normalizeQuestionClosure', () => {
     );
 
     expect(result.judgment.hint).toContain('先补哪块：');
+    expect(result.judgment.hint).toContain('关键背景：');
+    expect(result.judgment.hint).toContain('可以先想：');
     expect(result.summary.title).toBe('标准理解');
     expect(result.summary.content).toContain('会卡在');
     expect(result.summary.content).toContain('继续往下想');
