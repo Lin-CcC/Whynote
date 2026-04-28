@@ -3,6 +3,7 @@ import {
   getAllowedChildTypes,
   getNodeOrThrow,
   getModuleScopeId,
+  isAnswerClosureSummaryNode,
   isScaffoldSummaryNode,
   type ModuleNode,
   type NodeTree,
@@ -190,6 +191,10 @@ export function getNodeInputPlaceholderForNode(
 
   if (isScaffoldSummaryNode(tree, node)) {
     return '在这里承接前置讲解、关键概念或答题铺垫。';
+  }
+
+  if (isAnswerClosureSummaryNode(tree, node)) {
+    return '在这里承接答案解析、标准理解或纠错讲解。';
   }
 
   return getNodeInputPlaceholder(node.type, field);

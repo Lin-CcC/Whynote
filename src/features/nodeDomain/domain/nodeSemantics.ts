@@ -32,9 +32,29 @@ export function isScaffoldSummaryNode(
   return false;
 }
 
+export function isAnswerClosureSummaryNode(
+  tree: NodeTree,
+  nodeOrId: TreeNode | string | null | undefined,
+): boolean {
+  const node =
+    typeof nodeOrId === 'string'
+      ? tree.nodes[nodeOrId]
+      : nodeOrId;
+
+  if (!node || node.type !== 'summary' || node.parentId === null) {
+    return false;
+  }
+
+  return tree.nodes[node.parentId]?.type === 'question';
+}
+
 export function getDisplayNodeTypeLabel(tree: NodeTree, node: TreeNode): string {
   if (isScaffoldSummaryNode(tree, node)) {
     return '铺垫';
+  }
+
+  if (isAnswerClosureSummaryNode(tree, node)) {
+    return '答案解析';
   }
 
   switch (node.type) {

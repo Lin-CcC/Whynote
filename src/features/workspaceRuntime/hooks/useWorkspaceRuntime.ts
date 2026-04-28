@@ -4,6 +4,7 @@ import type { AiConfig } from '../../learningEngine';
 import type { ResourceMetadataRecord, WorkspaceSnapshot } from '../../nodeDomain';
 import type { WorkspaceEditorLearningActionRequest } from '../../workspaceEditor/workspaceEditorTypes';
 import { createWorkspaceRuntimeService } from '../services/workspaceRuntimeService';
+import type { QuestionAnswerEvaluationTarget } from '../services/learningRuntimeContext';
 import type {
   WorkspaceRuntimeDependencies,
   WorkspaceMutationResult,
@@ -137,11 +138,12 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     );
   }
 
-  async function runQuestionEvaluation(questionNodeId: string) {
-    await runAiAction('正在检查理解并继续推进', async (snapshot) =>
+  async function runQuestionEvaluation(target: QuestionAnswerEvaluationTarget) {
+    await runAiAction('正在重新评估当前回答', async (snapshot) =>
       runtimeService.evaluateQuestionAnswer(
         snapshot,
-        questionNodeId,
+        target.questionNodeId,
+        target.answerNodeId,
         state.aiConfig,
       ),
     );

@@ -1,25 +1,32 @@
 import SectionCard from '../../../ui/SectionCard';
 import type { TreeNode } from '../../nodeDomain';
+import type { QuestionAnswerEvaluationTarget } from '../services/learningRuntimeContext';
 
 type WorkspaceRuntimeActionCardProps = {
+  answerExplanationNodeId: string | null;
+  answerFollowUpCount: number;
   currentModule: TreeNode | null;
-  evaluationQuestionNodeId: string | null;
+  evaluationTarget: QuestionAnswerEvaluationTarget | null;
   isAiRunning: boolean;
   onCreateModule: () => void;
-  onEvaluateQuestionAnswer: (questionNodeId: string) => void;
+  onEvaluateQuestionAnswer: (target: QuestionAnswerEvaluationTarget) => void;
   onGeneratePlanSteps: (moduleNodeId: string) => void;
+  onSelectNode: (nodeId: string) => void;
   onSplitQuestion: (questionNodeId: string) => void;
   onSuggestCompletion: (planStepNodeId: string) => void;
   selectedNode: TreeNode | null;
 };
 
 export default function WorkspaceRuntimeActionCard({
+  answerExplanationNodeId,
+  answerFollowUpCount,
   currentModule,
-  evaluationQuestionNodeId,
+  evaluationTarget,
   isAiRunning,
   onCreateModule,
   onEvaluateQuestionAnswer,
   onGeneratePlanSteps,
+  onSelectNode,
   onSplitQuestion,
   onSuggestCompletion,
   selectedNode,
@@ -27,16 +34,18 @@ export default function WorkspaceRuntimeActionCard({
   const canGeneratePlanSteps = currentModule?.type === 'module' && !isAiRunning;
   const canSplitQuestion = selectedNode?.type === 'question' && !isAiRunning;
   const canEvaluateQuestionAnswer =
-    evaluationQuestionNodeId !== null && !isAiRunning;
+    evaluationTarget !== null && !isAiRunning;
   const canSuggestCompletion =
     selectedNode?.type === 'plan-step' && !isAiRunning;
-  const shouldHighlightAnswerEvaluation =
+  const isAnswerRevisionContext =
     selectedNode?.type === 'answer' && canEvaluateQuestionAnswer;
-  const sectionTitle = shouldHighlightAnswerEvaluation
-    ? '下一步：继续学习'
+  const canViewAnswerExplanation =
+    answerExplanationNodeId !== null && !isAiRunning;
+  const sectionTitle = isAnswerRevisionContext
+    ? '当前回答修订'
     : '学习推进';
-  const helpText = shouldHighlightAnswerEvaluation
-    ? '你已经写到回答节点了。点下面这一步，系统会检查理解、补上总结，并在需要时继续追问。'
+  const helpText = isAnswerRevisionContext
+    ? '这里的主路径是继续修改当前回答，再重新评估；如果系统已经生成答案解析，你也可以先对照标准理解。'
     : '当前接的是最小学习闭环：规划步骤与铺垫讲解、拆分问题、评估回答、查看步骤完成依据。';
 
   function handleGeneratePlanSteps() {
@@ -56,11 +65,19 @@ export default function WorkspaceRuntimeActionCard({
   }
 
   function handleEvaluateQuestionAnswer() {
-    if (!evaluationQuestionNodeId) {
+    if (!evaluationTarget) {
       return;
     }
 
-    onEvaluateQuestionAnswer(evaluationQuestionNodeId);
+    onEvaluateQuestionAnswer(evaluationTarget);
+  }
+
+  function handleViewAnswerExplanation() {
+    if (!answerExplanationNodeId) {
+      return;
+    }
+
+    onSelectNode(answerExplanationNodeId);
   }
 
   function handleSuggestCompletion() {
@@ -107,17 +124,33 @@ export default function WorkspaceRuntimeActionCard({
         </div>
       </div>
       <p className="workspace-helpText">{helpText}</p>
-      {shouldHighlightAnswerEvaluation ? (
+      {isAnswerRevisionContext ? (
         <div className="workspace-actionCallout" data-testid="answer-evaluation-callout">
-          <p className="workspace-kicker">回答后的默认下一步</p>
-          <button
-            className="workspace-primaryAction"
-            disabled={!canEvaluateQuestionAnswer}
-            onClick={handleEvaluateQuestionAnswer}
-            type="button"
-          >
-            继续，检查我的理解
-          </button>
+          <p className="workspace-kicker">围绕当前回答继续</p>
+          <div className="workspace-actionGrid">
+            <button
+              className="workspace-primaryAction"
+              disabled={!canEvaluateQuestionAnswer}
+              onClick={handleEvaluateQuestionAnswer}
+              type="button"
+            >
+              重新评估当前回答
+            </button>
+            {answerExplanationNodeId ? (
+              <button
+                disabled={!canViewAnswerExplanation}
+                onClick={handleViewAnswerExplanation}
+                type="button"
+              >
+                查看答案解析
+              </button>
+            ) : null}
+          </div>
+          <p className="workspace-actionHint">
+            {answerFollowUpCount > 0
+              ? `已生成 ${String(answerFollowUpCount)} 个追问，但它们现在只作为次级推进，不会抢走当前回答。`
+              : '默认主路径会留在当前回答上，方便你继续修改后再重新评估。'}
+          </p>
         </div>
       ) : null}
       <div className="workspace-actionGrid">
@@ -135,13 +168,13 @@ export default function WorkspaceRuntimeActionCard({
         >
           拆分当前问题
         </button>
-        {!shouldHighlightAnswerEvaluation ? (
+        {!isAnswerRevisionContext ? (
           <button
             disabled={!canEvaluateQuestionAnswer}
             onClick={handleEvaluateQuestionAnswer}
             type="button"
           >
-            检查我的理解
+            重新评估当前回答
           </button>
         ) : null}
         <button

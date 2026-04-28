@@ -521,7 +521,7 @@ function normalizeClosureSummaryDraft(
 
   return {
     type: 'summary',
-    title: title || '总结：标准理解',
+    title: normalizeClosureSummaryTitle(title),
     content: normalizeClosureSummaryContent(rawContent, options),
     citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
   };
@@ -1167,6 +1167,24 @@ function normalizeActionSummaryTitle(title: string) {
   }
 
   return `总结：${normalizedTitle}`;
+}
+
+function normalizeClosureSummaryTitle(title: string) {
+  const normalizedTitle = title.trim();
+
+  if (!normalizedTitle || /^(总结|答案解析)([:：]\s*)?$/u.test(normalizedTitle)) {
+    return '标准理解';
+  }
+
+  if (/^(总结|答案解析)[:：]/u.test(normalizedTitle)) {
+    const titleWithoutPrefix = normalizedTitle
+      .replace(/^(总结|答案解析)[:：]\s*/u, '')
+      .trim();
+
+    return titleWithoutPrefix || '标准理解';
+  }
+
+  return normalizedTitle;
 }
 
 function normalizeActionSummaryContent(

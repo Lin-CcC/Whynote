@@ -61,9 +61,9 @@ function buildPlanStepCompletionEvidence(
     (node): node is Extract<TreeNode, { type: 'question' }> =>
       node.type === 'question',
   );
-  const leafQuestionNodes = questionNodes.filter(
-    (questionNode) =>
-      !questionNode.childIds.some((childId) => tree.nodes[childId]?.type === 'question'),
+  const completionTargetQuestions = collectCompletionTargetQuestions(
+    tree,
+    planStepNode.id,
   );
   const answerNodes = subtreeNodes.filter(
     (node) => node.type === 'answer' && hasMeaningfulAnswerContent(node),
@@ -84,7 +84,7 @@ function buildPlanStepCompletionEvidence(
   ]);
   const resolvedLeafQuestionIds = collectResolvedLeafQuestionIds(
     tree,
-    leafQuestionNodes,
+    completionTargetQuestions,
   );
   const directClosureCount = planStepNode.childIds
     .map((childId) => getNodeOrThrow(tree, childId))
@@ -95,10 +95,10 @@ function buildPlanStepCompletionEvidence(
 
       return node.type === 'summary' && !scaffoldSummaryIds.has(node.id);
     }).length;
-  const answeredQuestionCount = leafQuestionNodes.filter((questionNode) =>
-    hasDirectMeaningfulAnswerChild(tree, questionNode),
+  const answeredQuestionCount = completionTargetQuestions.filter(
+    (questionNode) => hasDirectMeaningfulAnswerChild(tree, questionNode),
   ).length;
-  const unresolvedQuestionTitles = leafQuestionNodes
+  const unresolvedQuestionTitles = completionTargetQuestions
     .filter((questionNode) => !resolvedLeafQuestionIds.has(questionNode.id))
     .map((questionNode) => questionNode.title);
   const blockingJudgmentCount = countBlockingStepLevelJudgments(tree, planStepNode);
@@ -112,7 +112,7 @@ function buildPlanStepCompletionEvidence(
   return {
     stepStatus: planStepNode.status,
     questionCount: questionNodes.length,
-    leafQuestionCount: leafQuestionNodes.length,
+    leafQuestionCount: completionTargetQuestions.length,
     answerCount: answerNodes.length,
     answeredQuestionCount,
     closedLeafQuestionCount: resolvedLeafQuestionIds.size,
@@ -219,6 +219,35 @@ function collectResolvedLeafQuestionIds(
   }
 
   return resolvedQuestionIds;
+}
+
+function collectCompletionTargetQuestions(
+  tree: NodeTree,
+  nodeId: string,
+): Array<Extract<TreeNode, { type: 'question' }>> {
+  const node = getNodeOrThrow(tree, nodeId);
+
+  if (node.type === 'question') {
+    if (hasDirectMeaningfulAnswerChild(tree, node)) {
+      return [node];
+    }
+
+    const childQuestionIds = node.childIds.filter(
+      (childId) => tree.nodes[childId]?.type === 'question',
+    );
+
+    if (childQuestionIds.length === 0) {
+      return [node];
+    }
+
+    return childQuestionIds.flatMap((childId) =>
+      collectCompletionTargetQuestions(tree, childId),
+    );
+  }
+
+  return node.childIds.flatMap((childId) =>
+    collectCompletionTargetQuestions(tree, childId),
+  );
 }
 
 function isLeafQuestionResolved(

@@ -45,7 +45,7 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
           citations: [{ targetNodeId: 'resource-react-docs' }],
         },
         summary: {
-          title: '总结：标准理解',
+          title: '标准理解',
           content:
             'React 会把同一轮事件中的多个状态更新合并后再统一提交，这样可以减少重复渲染。',
           citations: [{ targetNodeId: 'fragment-batching' }],
@@ -68,38 +68,47 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   fireEvent.click(
     screen.getByRole('button', { name: /^问题为什么状态更新会被批处理？$/ }),
   );
-  fireEvent.click(screen.getByRole('button', { name: '检查我的理解' }));
+  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
     await screen.findByDisplayValue('判断：回答还不完整'),
   ).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('总结：标准理解'),
+    await screen.findByDisplayValue('标准理解'),
   ).toBeInTheDocument();
   expect(
     await screen.findByDisplayValue('追问：还缺哪一步因果关系？'),
   ).toBeInTheDocument();
   expect(
     screen
-      .getByDisplayValue('追问：还缺哪一步因果关系？')
+      .getByDisplayValue('回答草稿')
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
+  expect(screen.getByRole('button', { name: '查看答案解析' })).toBeInTheDocument();
+  expect(screen.getByText(/默认主路径仍留在当前回答上/u)).toBeInTheDocument();
+
+  const summaryNode = screen
+    .getByDisplayValue('标准理解')
+    .closest('[data-testid^="editor-node-"]');
+
+  expect(summaryNode).not.toBeNull();
+  expect(summaryNode).toHaveTextContent('答案解析');
 
   const savedSnapshot = await waitForSavedSnapshot(
     dependencies.structuredDataStorage,
     (snapshot) => findNodeByTitle(snapshot, '判断：回答还不完整') !== null,
   );
   const judgmentNode = findNodeByTitle(savedSnapshot, '判断：回答还不完整');
-  const summaryNode = findNodeByTitle(savedSnapshot, '总结：标准理解');
+  const persistedSummaryNode = findNodeByTitle(savedSnapshot, '标准理解');
   const stepNode = savedSnapshot.tree.nodes['step-answer-closure'];
 
   expect(judgmentNode?.referenceIds).toHaveLength(1);
-  expect(summaryNode?.referenceIds).toHaveLength(1);
+  expect(persistedSummaryNode?.referenceIds).toHaveLength(1);
   expect(
     savedSnapshot.tree.references[judgmentNode!.referenceIds[0]].targetNodeId,
   ).toBe('resource-react-docs');
   expect(
-    savedSnapshot.tree.references[summaryNode!.referenceIds[0]].targetNodeId,
+    savedSnapshot.tree.references[persistedSummaryNode!.referenceIds[0]].targetNodeId,
   ).toBe('fragment-batching');
   expect(stepNode.type).toBe('plan-step');
   expect(stepNode.type === 'plan-step' ? stepNode.status : null).toBe('doing');
@@ -123,7 +132,7 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
           content: '你还没有解释为什么更新会被批处理。',
         },
         summary: {
-          title: '总结：标准理解',
+          title: '标准理解',
           content:
             'React 会把同一轮事件中的多个状态更新合并后再统一提交，这样可以减少重复渲染。',
         },
@@ -143,15 +152,15 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
   fireEvent.focus(screen.getByLabelText('回答草稿 标题'));
   await waitFor(() => {
     expect(
-      screen.getByRole('button', { name: '继续，检查我的理解' }),
+      screen.getByRole('button', { name: '重新评估当前回答' }),
     ).toBeEnabled();
   });
   expect(screen.getByTestId('answer-evaluation-callout')).toHaveTextContent(
-    '回答后的默认下一步',
+    '围绕当前回答继续',
   );
-  expect(screen.getByText('下一步：继续学习')).toBeInTheDocument();
+  expect(screen.getByText('当前回答修订')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '继续，检查我的理解' }));
+  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
     await screen.findByDisplayValue('判断：回答还不完整'),
@@ -159,6 +168,7 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
   expect(
     await screen.findByDisplayValue('追问：还缺哪一步因果关系？'),
   ).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '查看答案解析' })).toBeInTheDocument();
 });
 
 test('evaluates a sufficient answer into a closed question and promotes the step to done', async () => {
@@ -172,7 +182,7 @@ test('evaluates a sufficient answer into a closed question and promotes the step
           content: '回答已经覆盖当前问题的关键点。',
         },
         summary: {
-          title: '总结：标准理解',
+          title: '标准理解',
           content:
             '批处理会把同一轮事件中的多次更新合并提交，从而减少不必要的重复渲染。',
           citations: [{ targetNodeId: 'fragment-batching' }],
@@ -188,13 +198,13 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   fireEvent.click(
     screen.getByRole('button', { name: /^问题为什么状态更新会被批处理？$/ }),
   );
-  fireEvent.click(screen.getByRole('button', { name: '检查我的理解' }));
+  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
     await screen.findByDisplayValue('判断：已答到当前问题'),
   ).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('总结：标准理解'),
+    await screen.findByDisplayValue('标准理解'),
   ).toBeInTheDocument();
 
   const savedSnapshot = await waitForSavedSnapshot(
@@ -216,7 +226,60 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   ).toBe(false);
   expect(
     screen
-      .getByDisplayValue('总结：标准理解')
+      .getByDisplayValue('标准理解')
+      .closest('[data-testid^="editor-node-"]'),
+  ).toHaveAttribute('data-node-selected', 'true');
+});
+
+test('re-evaluates only the currently selected answer when a question already has multiple answers', async () => {
+  let observedQuestionClosurePrompt = '';
+  const dependencies = await createPreloadedDependencies(
+    createMultiAnswerClosureSnapshot(),
+    createMockProviderClient({
+      'question-closure': (request: AiProviderObjectRequest<unknown>) => {
+        const userMessage = request.messages.find((message) => message.role === 'user');
+
+        observedQuestionClosurePrompt = userMessage?.content ?? '';
+
+        return {
+          isAnswerSufficient: false,
+          judgment: {
+            title: '判断：第一版回答还不完整',
+            content: '这次只继续围绕当前选中的回答补缺口。',
+          },
+          summary: {
+            title: '标准理解',
+            content: '先把第一版回答缺失的因果关系补清楚，再决定是否需要继续追问。',
+          },
+          followUpQuestions: [
+            {
+              title: '追问：第一版还缺哪条因果关系？',
+              content: '继续围绕当前这版回答补关键缺口。',
+            },
+          ],
+        };
+      },
+    }),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.focus(screen.getByLabelText('第一版回答 标题'));
+  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+
+  expect(
+    await screen.findByDisplayValue('判断：第一版回答还不完整'),
+  ).toBeInTheDocument();
+  expect(observedQuestionClosurePrompt).toContain('当前回答：第一版回答');
+  expect(observedQuestionClosurePrompt).toContain('因为 React 会先把更新合并起来。');
+  expect(observedQuestionClosurePrompt).not.toContain('第二版回答');
+  expect(observedQuestionClosurePrompt).not.toContain(
+    '因为同一轮事件里的更新会统一提交，所以能减少重复渲染。',
+  );
+  expect(
+    screen
+      .getByDisplayValue('第一版回答')
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
 });
@@ -558,6 +621,35 @@ function createAnswerClosureSnapshot(): WorkspaceSnapshot {
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createMultiAnswerClosureSnapshot(): WorkspaceSnapshot {
+  const snapshot = createAnswerClosureSnapshot();
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    'question-answer-closure',
+    createNode({
+      type: 'answer',
+      id: 'answer-answer-closure-v2',
+      title: '第二版回答',
+      content: '因为同一轮事件里的更新会统一提交，所以能减少重复渲染。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+
+  const firstAnswerNode = tree.nodes['answer-answer-closure'];
+
+  if (firstAnswerNode?.type === 'answer') {
+    firstAnswerNode.title = '第一版回答';
+    firstAnswerNode.content = '因为 React 会先把更新合并起来。';
+  }
 
   return {
     ...snapshot,
