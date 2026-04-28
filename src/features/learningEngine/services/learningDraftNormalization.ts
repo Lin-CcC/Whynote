@@ -12,6 +12,7 @@ import type {
 import { getLearningModeLimits } from '../domain';
 import type { CitationPurpose } from '../../nodeDomain';
 
+import { normalizeClosureHintText } from './closureHint';
 import { parseJsonObjectWithTolerance } from './jsonObjectParsing';
 
 const MODULE_TITLE_SUFFIXES = [
@@ -1302,27 +1303,13 @@ function normalizeClosureHint(
     summaryContent: string;
   },
 ) {
-  const rawHintText = extractRawHintText(rawHint);
-
-  if (isUsableHintContent(rawHintText, options)) {
-    return rawHintText
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  const primaryGap =
-    options.judgment.gapItems[0]?.replace(/[。！？!?；;]+$/u, '') ||
-    (options.currentQuestionTitle
-      ? `把“${options.currentQuestionTitle}”里还缺的关键点补清楚`
-      : '把当前问题里还缺的关键点补清楚');
-
-  return [
-    `先补哪块：${primaryGap}。`,
-    buildHintPrimerFromGap(primaryGap),
-    '不要急着展开完整标准答案，先把这一个缺口补到能自圆其说。',
-  ].join('\n');
+  return normalizeClosureHintText({
+    rawHint,
+    currentQuestionTitle: options.currentQuestionTitle,
+    judgmentGapItems: options.judgment.gapItems,
+    judgmentContent: options.judgmentContent,
+    summaryContent: options.summaryContent,
+  });
 }
 
 function normalizeStandardUnderstandingSentence(
@@ -1388,65 +1375,6 @@ function hasUsableStandardUnderstandingContent(content: string) {
       containsExplanatorySignal(content) ||
       countSentences(content) >= 2)
   );
-}
-
-function extractRawHintText(payload: unknown) {
-  if (typeof payload === 'string') {
-    return payload.trim();
-  }
-
-  if (!isRecord(payload)) {
-    return '';
-  }
-
-  return (
-    getText(payload.content) ||
-    getText(payload.text) ||
-    getText(payload.description)
-  );
-}
-
-function isUsableHintContent(
-  content: string,
-  options: {
-    judgmentContent: string;
-    summaryContent: string;
-  },
-) {
-  const normalizedHint = normalizeCompareText(content);
-
-  if (!content || content.length < 18 || looksGenericHintText(content)) {
-    return false;
-  }
-
-  const normalizedJudgment = normalizeCompareText(options.judgmentContent);
-  const normalizedSummary = normalizeCompareText(options.summaryContent);
-
-  return (
-    normalizedHint.length > 0 &&
-    !normalizedJudgment.includes(normalizedHint) &&
-    !normalizedSummary.includes(normalizedHint)
-  );
-}
-
-function buildHintPrimerFromGap(primaryGap: string) {
-  if (primaryGap.includes('为什么')) {
-    return '先想清：把“发生了什么变化 -> 为什么会这样 -> 最后带来什么结果”连成一条因果链。';
-  }
-
-  if (primaryGap.includes('边界') || primaryGap.includes('条件')) {
-    return '先想清：不要只说结论，先分清它在什么条件下成立、什么时候会失效。';
-  }
-
-  if (
-    primaryGap.includes('关系') ||
-    primaryGap.includes('对象') ||
-    primaryGap.includes('机制')
-  ) {
-    return '先想清：把相关对象各自扮演的角色分开，再说明它们怎样发生联系。';
-  }
-
-  return '先想清：先把对象、关系和判断线索摆正，再决定要不要补更多背景。';
 }
 
 function extractStructuredTextFromRawNode(
@@ -1596,16 +1524,6 @@ function looksGenericGapItem(content: string) {
   ].some((keyword) => content.includes(keyword));
 }
 
-function looksGenericHintText(content: string) {
-  return [
-    '继续补充',
-    '再想想',
-    '给一点提示',
-    '看答案解析',
-    '回到回答修改',
-  ].some((keyword) => content.includes(keyword));
-}
-
 function looksGenericWhyItMattersText(content: string) {
   return [
     '比较重要',
@@ -1622,10 +1540,6 @@ function isGenericAnsweredText(content: string) {
     '方向是对的',
     '继续保持',
   ].some((keyword) => content.includes(keyword));
-}
-
-function normalizeCompareText(content: string) {
-  return content.replace(/\s+/gu, '').replace(/[。！？!?；;:：]/gu, '').trim();
 }
 
 function normalizeFollowUpQuestionDraft(

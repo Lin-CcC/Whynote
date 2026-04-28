@@ -75,7 +75,8 @@ describe('questionClosureService', () => {
       '把“为什么状态更新会被批处理？”真正依赖的关键机制、因果关系或判断边界说清楚',
     );
     expect(result.judgment.hint).toContain('先补哪块：');
-    expect(result.judgment.hint).toContain('先想清：');
+    expect(result.judgment.hint).toContain('关键背景：');
+    expect(result.judgment.hint).toContain('可以先想：');
     expect(result.summary.content).toContain('会卡在');
     expect(result.summary.content).toContain('继续往下想');
     expect(result.summary.content).toContain('更稳妥的标准理解是：');
@@ -184,8 +185,11 @@ describe('questionClosureService', () => {
             whyItMatters: '因为少了这条因果链，就还无法证明理解完整。',
           },
           hint: {
-            content:
-              '先补哪块：为什么统一提交会减少重复渲染。\n先想清：把“收集更新 -> 统一提交 -> 减少重复渲染”连成一条因果链。',
+            focus: '为什么统一提交会减少重复渲染',
+            background:
+              '这里缺的不是再说一遍结论，而是把“收集更新 -> 统一提交 -> 减少重复渲染”连成因果链。',
+            thinkingQuestion:
+              '如果只保留这个结论，中间到底省略了哪一步变化或结果？',
           },
           summary: {
             title: '标准理解',
@@ -222,7 +226,11 @@ describe('questionClosureService', () => {
     });
 
     expect(capturedPrompt).toContain('hint 必须单独返回');
+    expect(capturedPrompt).toContain('focus 填“先补哪块”');
+    expect(capturedPrompt).toContain('thinkingQuestion');
     expect(capturedPrompt).toContain('gaps 返回 1-3 条缺口数组');
-    expect(capturedPrompt).toContain('"hint":{"content":""}');
+    expect(capturedPrompt).toContain(
+      '"hint":{"focus":"","background":"","thinkingQuestion":"","content":""}',
+    );
   });
 });
