@@ -466,6 +466,67 @@
   line-height: 1.6;
 }
 
+.workspace-nodeInlineActions,
+.workspace-judgmentActions,
+.workspace-judgmentHintCallout {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.workspace-nodeInlineActions {
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.workspace-nodeActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.workspace-nodeActionButton {
+  padding: 0.68rem 0.9rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 0.85rem;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.workspace-nodeActionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.workspace-judgmentActionsHeader {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.workspace-judgmentHintCallout {
+  padding: 0.9rem;
+  border: 1px solid rgba(14, 116, 144, 0.16);
+  border-radius: 0.95rem;
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.92), #ffffff);
+}
+
+.workspace-judgmentHintTitle {
+  margin: 0;
+  color: #0e7490;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.workspace-judgmentHintText {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  color: #0f172a;
+}
+
 .workspace-splitHint {
   display: flex;
   flex-direction: column;

@@ -28,6 +28,13 @@ export interface QuestionAnswerEvaluationTarget {
   questionNodeId: string;
 }
 
+export interface JudgmentInlineActionContext {
+  answerNodeId: string | null;
+  hint: string;
+  questionNodeId: string;
+  summaryNodeId: string | null;
+}
+
 export interface LearningActionRuntimeContext {
   currentNode: NonNullable<LearningActionDraftInput['currentNode']>;
   existingQuestionTitles: string[];
@@ -238,6 +245,51 @@ export function resolveQuestionAnswerEvaluationTarget(
   return null;
 }
 
+export function getJudgmentInlineActionContext(
+  tree: NodeTree,
+  judgmentNodeId: string,
+): JudgmentInlineActionContext | null {
+  const judgmentNode = tree.nodes[judgmentNodeId];
+
+  if (!judgmentNode || judgmentNode.type !== 'judgment' || judgmentNode.parentId === null) {
+    return null;
+  }
+
+  const questionNode = tree.nodes[judgmentNode.parentId];
+
+  if (questionNode?.type !== 'question') {
+    return null;
+  }
+
+  const judgmentIndex = questionNode.childIds.indexOf(judgmentNode.id);
+
+  if (judgmentIndex === -1) {
+    return null;
+  }
+
+  const answerNodeId = findAnswerNodeIdForJudgment(
+    tree,
+    questionNode.childIds,
+    judgmentIndex,
+  );
+  const summaryNodeId = findSummaryNodeIdForJudgment(
+    tree,
+    questionNode.childIds,
+    judgmentIndex,
+  );
+  const answerNode =
+    answerNodeId && tree.nodes[answerNodeId]?.type === 'answer'
+      ? tree.nodes[answerNodeId]
+      : null;
+
+  return {
+    answerNodeId,
+    hint: buildJudgmentHint(judgmentNode, answerNode),
+    questionNodeId: questionNode.id,
+    summaryNodeId,
+  };
+}
+
 export function isLeafQuestion(tree: NodeTree, questionNodeId: string) {
   const questionNode = getNodeOrThrow(tree, questionNodeId);
 
@@ -426,6 +478,82 @@ function collectLeafQuestionIdsFromNode(tree: NodeTree, nodeId: string): string[
   return node.childIds.flatMap((childId) =>
     collectLeafQuestionIdsFromNode(tree, childId),
   );
+}
+
+function findAnswerNodeIdForJudgment(
+  tree: NodeTree,
+  siblingIds: string[],
+  judgmentIndex: number,
+) {
+  for (let siblingIndex = judgmentIndex - 1; siblingIndex >= 0; siblingIndex -= 1) {
+    const siblingNode = tree.nodes[siblingIds[siblingIndex]];
+
+    if (!siblingNode) {
+      continue;
+    }
+
+    if (siblingNode.type === 'answer') {
+      return siblingNode.id;
+    }
+
+    if (
+      siblingNode.type === 'judgment' ||
+      siblingNode.type === 'question' ||
+      siblingNode.type === 'summary'
+    ) {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function findSummaryNodeIdForJudgment(
+  tree: NodeTree,
+  siblingIds: string[],
+  judgmentIndex: number,
+) {
+  for (
+    let siblingIndex = judgmentIndex + 1;
+    siblingIndex < siblingIds.length;
+    siblingIndex += 1
+  ) {
+    const siblingNode = tree.nodes[siblingIds[siblingIndex]];
+
+    if (!siblingNode) {
+      continue;
+    }
+
+    if (siblingNode.type === 'summary') {
+      return siblingNode.id;
+    }
+
+    if (
+      siblingNode.type === 'answer' ||
+      siblingNode.type === 'judgment' ||
+      siblingNode.type === 'question'
+    ) {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function buildJudgmentHint(
+  judgmentNode: Extract<TreeNode, { type: 'judgment' }>,
+  answerNode: Extract<TreeNode, { type: 'answer' }> | null,
+) {
+  const normalizedContent = judgmentNode.content.trim();
+  const answerPrefix = answerNode
+    ? `先回到「${answerNode.title}」，只补这次判断指出的缺口。`
+    : '先只补这次判断指出的缺口。';
+
+  if (!normalizedContent) {
+    return `${answerPrefix} 不要直接改写成完整答案解析。`;
+  }
+
+  return `${answerPrefix} 不要直接改写成完整答案解析。\n${normalizedContent}`;
 }
 
 function findAncestorNode<TNodeType extends TreeNode['type']>(

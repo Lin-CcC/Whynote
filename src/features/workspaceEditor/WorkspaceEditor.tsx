@@ -85,6 +85,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           onCreateModule={workspaceEditor.createModule}
           onSelectNode={workspaceEditor.selectNode}
           onUpdateNode={workspaceEditor.updateNode}
+          renderNodeInlineActions={props.renderNodeInlineActions}
           registerNodeElement={workspaceEditor.registerNodeElement}
           selectedNodeId={workspaceEditor.selectedNodeId}
           tree={workspaceEditor.tree}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 
 import type {
@@ -65,9 +65,12 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   );
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(
-    screen.getByRole('button', { name: /^问题为什么状态更新会被批处理？$/ }),
-  );
+  fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
+  await waitFor(() => {
+    expect(
+      screen.getByRole('button', { name: '重新评估当前回答' }),
+    ).toBeEnabled();
+  });
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
@@ -84,7 +87,11 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
       .getByDisplayValue('回答草稿')
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
-  expect(screen.getByRole('button', { name: '查看答案解析' })).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
+      name: '查看答案解析',
+    }),
+  ).toBeInTheDocument();
   expect(screen.getByText(/默认主路径仍留在当前回答上/u)).toBeInTheDocument();
 
   const summaryNode = screen
@@ -168,7 +175,11 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
   expect(
     await screen.findByDisplayValue('追问：还缺哪一步因果关系？'),
   ).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '查看答案解析' })).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
+      name: '查看答案解析',
+    }),
+  ).toBeInTheDocument();
 });
 
 test('evaluates a sufficient answer into a closed question and promotes the step to done', async () => {
@@ -195,9 +206,12 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(
-    screen.getByRole('button', { name: /^问题为什么状态更新会被批处理？$/ }),
-  );
+  fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
+  await waitFor(() => {
+    expect(
+      screen.getByRole('button', { name: '重新评估当前回答' }),
+    ).toBeEnabled();
+  });
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
@@ -421,9 +435,12 @@ test('tolerates question-closure JSON wrapped in explanation text and code fence
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(
-    screen.getByRole('button', { name: /^问题为什么状态更新会被批处理？/ }),
-  );
+  fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
+  await waitFor(() => {
+    expect(
+      screen.getByRole('button', { name: '重新评估当前回答' }),
+    ).toBeEnabled();
+  });
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
