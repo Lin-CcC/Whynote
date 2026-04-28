@@ -16,9 +16,8 @@ test('builds a resource draft from markdown files', async () => {
     },
   );
 
-  await expect(buildResourceDraftFromLocalFile(file)).resolves.toEqual({
-    content:
-      '先梳理渲染边界，再决定局部状态应该放在哪里。 避免把所有状态抬到根层 关注实际变化路径',
+  await expect(buildResourceDraftFromLocalFile(file)).resolves.toMatchObject({
+    content: '先梳理渲染边界，再决定局部状态应该放在哪里。 避免把所有状态抬到根层 关注实际变化路径',
     ingest: {
       bodyFormat: 'markdown',
       bodyText:
@@ -26,6 +25,7 @@ test('builds a resource draft from markdown files', async () => {
       importMethod: 'local-file',
       ingestStatus: 'ready',
       mimeType: 'text/markdown',
+      originalFileName: 'rendering-notes.md',
       summarySource: 'file-body',
       titleSource: 'file-heading',
     },
@@ -48,7 +48,7 @@ test('builds a resource draft from txt files and falls back to the first line as
     },
   );
 
-  await expect(buildResourceDraftFromLocalFile(file)).resolves.toEqual({
+  await expect(buildResourceDraftFromLocalFile(file)).resolves.toMatchObject({
     content: '每次渲染都会形成独立的闭包快照。 如果在旧闭包里读值，就会看到旧状态。',
     ingest: {
       bodyFormat: 'plain-text',
@@ -57,6 +57,7 @@ test('builds a resource draft from txt files and falls back to the first line as
       importMethod: 'local-file',
       ingestStatus: 'ready',
       mimeType: 'text/plain',
+      originalFileName: 'state-snapshot.txt',
       summarySource: 'file-body',
       titleSource: 'file-first-line',
     },

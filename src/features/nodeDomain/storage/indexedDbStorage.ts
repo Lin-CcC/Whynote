@@ -395,6 +395,9 @@ function toResourceMetadataRecords(
         bodyText: existingMetadata?.bodyText,
         bodyFormat: existingMetadata?.bodyFormat,
         importedAt: existingMetadata?.importedAt ?? node.createdAt,
+        originalFileName: existingMetadata?.originalFileName,
+        sourceRelativePath: existingMetadata?.sourceRelativePath,
+        importBatchId: existingMetadata?.importBatchId,
         updatedAt: node.updatedAt,
       });
     }
@@ -416,6 +419,9 @@ function toResourceMetadataRecords(
         bodyText: existingMetadata?.bodyText,
         bodyFormat: existingMetadata?.bodyFormat,
         importedAt: existingMetadata?.importedAt,
+        originalFileName: existingMetadata?.originalFileName,
+        sourceRelativePath: existingMetadata?.sourceRelativePath,
+        importBatchId: existingMetadata?.importBatchId,
         sourceResourceId: node.sourceResourceId,
         locator: node.locator,
         excerpt: node.excerpt,
@@ -480,6 +486,9 @@ function inferResourceIngestStatus(node: ResourceNode): ResourceIngestStatus {
     case 'local-file':
     case 'manual':
       return 'manual';
+    case 'batch':
+    case 'folder':
+      return 'ready';
   }
 }
 
@@ -492,6 +501,8 @@ function inferResourceSummarySource(node: ResourceNode): ResourceSummarySource {
     case 'url':
       return 'url-fallback';
     case 'local-file':
+    case 'batch':
+    case 'folder':
       return 'file-fallback';
     case 'manual':
       return 'user';

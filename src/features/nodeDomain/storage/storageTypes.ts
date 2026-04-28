@@ -1,6 +1,11 @@
 import type { WorkspaceRecord, WorkspaceSnapshot } from '../domain';
 
-export type ResourceImportMethod = 'url' | 'local-file' | 'manual';
+export type ResourceImportMethod =
+  | 'url'
+  | 'local-file'
+  | 'batch'
+  | 'folder'
+  | 'manual';
 export type ResourceIngestStatus = 'ready' | 'partial' | 'manual';
 export type ResourceTitleSource =
   | 'user'
@@ -38,6 +43,9 @@ export interface ResourceMetadataRecord {
   bodyText?: string;
   bodyFormat?: ResourceBodyFormat;
   importedAt?: string;
+  originalFileName?: string;
+  sourceRelativePath?: string;
+  importBatchId?: string;
   sourceResourceId?: string;
   locator?: string;
   excerpt?: string;

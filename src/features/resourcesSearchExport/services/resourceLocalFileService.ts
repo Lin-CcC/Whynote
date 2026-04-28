@@ -7,33 +7,60 @@ const SUPPORTED_MIME_TYPES = [
   'text/x-markdown',
 ] as const;
 const MAX_SUMMARY_LENGTH = 240;
+const LOCAL_FILE_SOURCE_PREFIX = '本地文件：';
+
+interface BuildResourceDraftFromLocalFileOptions {
+  importBatchId?: string;
+  importMethod?: 'local-file' | 'batch' | 'folder';
+  sourceRelativePath?: string | null;
+}
 
 export async function buildResourceDraftFromLocalFile(
   file: File,
+  options?: BuildResourceDraftFromLocalFileOptions,
 ): Promise<ResourceImportDraft> {
   const normalizedMimeType = assertSupportedFile(file);
   const rawText = await file.text();
   const titleResult = extractLocalFileTitle(file.name, rawText);
   const summaryResult = extractLocalFileSummary(rawText, titleResult.value);
+  const sourceRelativePath = normalizeLocalFileRelativePath(
+    options?.sourceRelativePath ?? getLocalFileRelativePath(file),
+  );
 
   return {
     content:
-      summaryResult.value ??
-      `导入自本地文件 ${file.name}，请手动补充资料概况。`,
+      summaryResult.value ?? `导入自本地文件 ${file.name}，请手动补充资料概况。`,
     ingest: {
       bodyFormat: file.name.toLocaleLowerCase().endsWith('.md')
         ? 'markdown'
         : 'plain-text',
       bodyText: rawText,
-      importMethod: 'local-file',
+      importBatchId: options?.importBatchId,
+      importMethod: options?.importMethod ?? 'local-file',
       ingestStatus: 'ready',
       mimeType: normalizedMimeType,
+      originalFileName: file.name,
+      sourceRelativePath: sourceRelativePath ?? undefined,
       summarySource: summaryResult.source ?? 'file-fallback',
       titleSource: titleResult.source,
     },
-    sourceUri: `本地文件：${file.name}`,
+    sourceUri: buildLocalFileSourceUri(file.name, sourceRelativePath),
     title: titleResult.value,
   };
+}
+
+export function buildLocalFileSourceUri(
+  fileName: string,
+  sourceRelativePath?: string | null,
+) {
+  return `${LOCAL_FILE_SOURCE_PREFIX}${sourceRelativePath ?? fileName}`;
+}
+
+export function getLocalFileRelativePath(file: File) {
+  const relativePath = (file as File & { webkitRelativePath?: string })
+    .webkitRelativePath;
+
+  return normalizeLocalFileRelativePath(relativePath);
 }
 
 function assertSupportedFile(file: File) {
@@ -111,7 +138,10 @@ function extractLocalFileSummary(rawText: string, title: string) {
   if (summaryParagraphs.length > 0) {
     return {
       source: 'file-body' as const,
-      value: truncateText(summaryParagraphs.slice(0, 2).join(' '), MAX_SUMMARY_LENGTH),
+      value: truncateText(
+        summaryParagraphs.slice(0, 2).join(' '),
+        MAX_SUMMARY_LENGTH,
+      ),
     };
   }
 
@@ -167,4 +197,17 @@ function truncateText(value: string, maxLength: number) {
   }
 
   return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function normalizeLocalFileRelativePath(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalizedValue = value
+    .replace(/\\/gu, '/')
+    .replace(/^\/+/u, '')
+    .trim();
+
+  return normalizedValue.length > 0 ? normalizedValue : null;
 }

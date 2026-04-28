@@ -70,6 +70,9 @@ export function createResourceMetadataRecord({
       : draft.ingest.canonicalSource,
     bodyText: shouldDropUrlBody ? undefined : draft.ingest.bodyText,
     bodyFormat: shouldDropUrlBody ? undefined : draft.ingest.bodyFormat,
+    originalFileName: draft.ingest.originalFileName,
+    sourceRelativePath: draft.ingest.sourceRelativePath,
+    importBatchId: draft.ingest.importBatchId,
     importedAt,
     updatedAt: resourceNode.updatedAt,
   };
