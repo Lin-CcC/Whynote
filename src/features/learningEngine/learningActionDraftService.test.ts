@@ -28,6 +28,16 @@ function createMockProvider(
   };
 }
 
+function createThrowingProvider(message: string): AiProviderClient {
+  return {
+    async generateObject<T>(
+      _request: AiProviderObjectRequest<T>,
+    ): Promise<AiProviderObjectResponse<T>> {
+      throw new Error(message);
+    },
+  };
+}
+
 describe('learningActionDraftService', () => {
   it('normalizes scaffold补讲动作为可读的 summary 草稿', async () => {
     const providerClient = createMockProvider({
@@ -81,5 +91,33 @@ describe('learningActionDraftService', () => {
     expect(result.draft.title).toBe('判断：先明确什么算答到');
     expect(result.draft.content).toContain('当前还没有现成回答');
     expect(result.draft.content).toContain('为什么状态更新会被批处理？');
+  });
+
+  it('在 provider 失败时回退到本地可编辑判断草稿而不是直接报错', async () => {
+    const service = createLearningActionDraftService({
+      providerClient: createThrowingProvider(
+        'AI 服务请求失败（429）：当前 AI 配额已用尽。',
+      ),
+    });
+
+    const result = await service.generate({
+      actionId: 'insert-judgment',
+      topic: 'React 批处理',
+      planStepTitle: '解释批处理为什么成立',
+      questionPath: [
+        {
+          title: '为什么状态更新会被批处理？',
+          content: '请解释它为什么能减少重复渲染。',
+        },
+      ],
+      learnerAnswer: '因为 React 会把多个更新放在一起。',
+    });
+
+    expect(result.draft.type).toBe('judgment');
+    expect(result.draft.title).toBe('判断：回答还不完整');
+    expect(result.draft.content).toContain('这次回答还不完整');
+    expect(result.draft.content).toContain('为什么状态更新会被批处理？');
+    expect(result.metadata.providerLabel).toBe('local-fallback');
+    expect(result.metadata.model).toBe('heuristic-draft');
   });
 });

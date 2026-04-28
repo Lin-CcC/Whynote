@@ -143,6 +143,52 @@ describe('openAiCompatibleProvider', () => {
     );
   });
 
+  it('rewrites quota-exceeded 429 errors into an actionable message', async () => {
+    const fetchFn: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            code: 429,
+            message:
+              'You exceeded your current quota, please check your plan and billing details.',
+          },
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    const provider = createOpenAiCompatibleProviderClient(
+      {
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'test-key',
+        model: 'gpt-test',
+      },
+      {
+        fetchFn,
+      },
+    );
+
+    await expect(
+      provider.generateObject({
+        taskName: 'demo',
+        messages: [
+          {
+            role: 'user',
+            content: '返回 JSON',
+          },
+        ],
+        parse(rawText) {
+          return JSON.parse(rawText) as { value: string };
+        },
+      }),
+    ).rejects.toThrow(
+      'AI 服务请求失败（429）：当前 AI 配额已用尽，请检查 provider 的 plan / billing，或切换到仍可用的模型与密钥。',
+    );
+  });
+
   it('includes a response snippet when the provider returns non-JSON task content', async () => {
     const fetchFn: typeof fetch = async () =>
       new Response(

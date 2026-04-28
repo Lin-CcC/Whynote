@@ -523,6 +523,31 @@ test('creates AI drafts instead of empty shells for scaffold, question, summary 
   ).toBeInTheDocument();
 });
 
+test('falls back to a local judgment draft when the AI provider is unavailable', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createAnswerClosureSnapshot(),
+    createThrowingProviderClient(
+      'AI 服务请求失败（429）：当前 AI 配额已用尽，请检查 provider 的 plan / billing。',
+    ),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.focus(screen.getByLabelText('回答草稿 标题'));
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: '插入判断' })).toBeEnabled();
+  });
+  fireEvent.click(screen.getByRole('button', { name: '插入判断' }));
+
+  expect(await screen.findByDisplayValue('回答还不完整')).toBeInTheDocument();
+  expect(
+    screen.getByDisplayValue(/这次回答还不完整，“为什么状态更新会被批处理？”里仍有关键点没有答到。/u),
+  ).toBeInTheDocument();
+  expect(screen.getByText('AI 暂时不可用，已先补上一段可编辑的本地判断草稿。')).toBeInTheDocument();
+  expect(screen.queryByText(/AI 动作失败：/u)).not.toBeInTheDocument();
+});
+
 test('tolerates question-closure JSON wrapped in explanation text and code fences', async () => {
   const rawResponse = `这是评估结果，请按其中的 JSON 对象落地：
 \`\`\`json
@@ -655,6 +680,16 @@ function createMockProviderClient(
         providerLabel: 'mock-provider',
         rawText,
       };
+    },
+  };
+}
+
+function createThrowingProviderClient(message: string): AiProviderClient {
+  return {
+    async generateObject<T>(
+      _request: AiProviderObjectRequest<T>,
+    ): Promise<AiProviderObjectResponse<T>> {
+      throw new Error(message);
     },
   };
 }
