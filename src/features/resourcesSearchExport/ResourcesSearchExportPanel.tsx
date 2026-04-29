@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
+
 import type { NodeTree, ResourceMetadataRecord } from '../nodeDomain';
 import type { ResourceImportDraft } from './services/resourceIngestTypes';
+import { deleteResourceNode } from './services/resourceDeleteService';
 import ResourceEntryPanel from './components/ResourceEntryPanel';
 import LearningCitationPanel from './components/LearningCitationPanel';
 import ResourceFocusPanel from './components/ResourceFocusPanel';
@@ -46,6 +49,9 @@ export default function ResourcesSearchExportPanel({
   workspaceId = DEFAULT_WORKSPACE_ID,
   workspaceTitle,
 }: ResourcesSearchExportPanelProps) {
+  const [pendingDeleteNodeId, setPendingDeleteNodeId] = useState<string | null>(
+    null,
+  );
   const currentModuleTitle =
     currentModuleId && tree.nodes[currentModuleId]?.type === 'module'
       ? tree.nodes[currentModuleId].title
@@ -59,6 +65,16 @@ export default function ResourcesSearchExportPanel({
     resourcesSearchExport.query.trim().length > 0 ||
     resourcesSearchExport.selectedTagIds.length > 0;
   const highlightedNodeId = activeResourceNodeId ?? selectedEditorNodeId;
+
+  useEffect(() => {
+    if (pendingDeleteNodeId && !tree.nodes[pendingDeleteNodeId]) {
+      setPendingDeleteNodeId(null);
+    }
+
+    if (activeResourceNodeId && !tree.nodes[activeResourceNodeId]) {
+      onClearResourceFocus?.();
+    }
+  }, [activeResourceNodeId, onClearResourceFocus, pendingDeleteNodeId, tree]);
 
   return (
     <>
@@ -80,8 +96,14 @@ export default function ResourcesSearchExportPanel({
         activeResourceNodeId={activeResourceNodeId}
         currentModuleTitle={currentModuleTitle}
         onApplyTreeChange={onApplyTreeChange}
+        onCancelDeleteNode={() => {
+          setPendingDeleteNodeId(null);
+        }}
         onClearResourceFocus={onClearResourceFocus}
+        onConfirmDeleteNode={handleConfirmDeleteNode}
         onFocusResourceNode={onFocusResourceNode}
+        onRequestDeleteNode={handleRequestDeleteNode}
+        pendingDeleteNodeId={pendingDeleteNodeId}
         resourceMetadataByNodeId={resourceMetadataByNodeId}
         selectedEditorNodeId={selectedEditorNodeId}
         tree={tree}
@@ -105,10 +127,12 @@ export default function ResourcesSearchExportPanel({
         selectedNodeId={highlightedNodeId}
       />
       <ResourceLibraryPanel
+        onRequestDeleteNode={handleRequestDeleteNode}
         onSelectNode={handleLocateNode}
         resourceGroups={resourcesSearchExport.resourceGroups}
         resourceMetadataByNodeId={resourceMetadataByNodeId}
         selectedNodeId={highlightedNodeId}
+        tree={tree}
       />
       <ExportPanel
         canExportFilteredResult={resourcesSearchExport.canExportFilteredResult}
@@ -132,11 +156,46 @@ export default function ResourcesSearchExportPanel({
       return;
     }
 
+    setPendingDeleteNodeId(null);
+
     if (node.type === 'resource' || node.type === 'resource-fragment') {
       onFocusResourceNode(node.id);
       return;
     }
 
     onSelectEditorNode(node.id);
+  }
+
+  function handleRequestDeleteNode(nodeId: string) {
+    const node = tree.nodes[nodeId];
+
+    if (!node) {
+      return;
+    }
+
+    if (node.type !== 'resource' && node.type !== 'resource-fragment') {
+      return;
+    }
+
+    onFocusResourceNode(node.id);
+    setPendingDeleteNodeId(node.id);
+  }
+
+  function handleConfirmDeleteNode() {
+    if (!pendingDeleteNodeId || !tree.nodes[pendingDeleteNodeId]) {
+      return;
+    }
+
+    const result = deleteResourceNode(tree, pendingDeleteNodeId);
+
+    onApplyTreeChange(result.tree);
+    setPendingDeleteNodeId(null);
+
+    if (result.nextFocusNodeId) {
+      onFocusResourceNode(result.nextFocusNodeId);
+      return;
+    }
+
+    onClearResourceFocus?.();
   }
 }

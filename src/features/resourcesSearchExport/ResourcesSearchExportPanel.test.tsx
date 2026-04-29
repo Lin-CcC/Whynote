@@ -1,12 +1,16 @@
+import { useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import {
+  addNodeReference,
   attachTagToNode,
   createNode,
+  createNodeReference,
   createTag,
   createWorkspaceSnapshot,
   insertChildNode,
   upsertTag,
+  type NodeTree,
   type WorkspaceSnapshot,
 } from '../nodeDomain';
 import ResourcesSearchExportPanel from './ResourcesSearchExportPanel';
@@ -124,6 +128,76 @@ test('exports through the browser download flow', () => {
   expect(revokeObjectUrlSpy).toHaveBeenCalledWith('blob:resources-export');
 });
 
+test('confirms fragment deletion impact and restores resource focus to the parent resource', () => {
+  render(
+    <StatefulResourcesSearchExportPanel
+      initialActiveResourceNodeId="fragment-batching"
+      initialSelectedEditorNodeId="question-batching"
+      snapshot={createResourcesPanelSnapshot()}
+    />,
+  );
+
+  fireEvent.click(
+    screen.getByRole('button', { name: '删除摘录 批处理摘录' }),
+  );
+
+  expect(
+    screen.getByRole('heading', { name: '确认删除摘录《批处理摘录》？' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText('删除后会一起移除对应的 1 条资料引用，但不会删除那些学习节点本身。'),
+  ).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '确认删除摘录' }));
+
+  expect(
+    screen.queryByRole('button', { name: '定位摘录 批处理摘录' }),
+  ).not.toBeInTheDocument();
+  expect(
+    getSectionByHeading('当前资料焦点').getByText('资料 · React 官方文档'),
+  ).toBeInTheDocument();
+  expect(
+    getSectionByHeading('当前资料焦点').getByText('问题 · 什么是批处理？'),
+  ).toBeInTheDocument();
+});
+
+test('confirms resource deletion impact and restores focus to an adjacent resource', () => {
+  render(
+    <StatefulResourcesSearchExportPanel
+      initialActiveResourceNodeId="resource-react-docs"
+      initialSelectedEditorNodeId="question-batching"
+      snapshot={createResourcesPanelSnapshot()}
+    />,
+  );
+
+  fireEvent.click(
+    getSectionByHeading('当前资料焦点').getByRole('button', {
+      name: '删除资料',
+    }),
+  );
+
+  expect(
+    screen.getByRole('heading', { name: '确认删除资料《React 官方文档》？' }),
+  ).toBeInTheDocument();
+  expect(screen.getByText('1 条引用')).toBeInTheDocument();
+  expect(screen.getByText('2 条摘录')).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      '删除后会同时删除其下所有摘录，并一并移除 3 条相关资料引用。学习节点本身不会被删除，但这些节点会失去对应资料依据。',
+    ),
+  ).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '确认删除资料' }));
+
+  const resourceFocusCard = getSectionByHeading('当前资料焦点');
+
+  expect(
+    screen.queryByRole('button', { name: '定位资料 React 官方文档' }),
+  ).not.toBeInTheDocument();
+  expect(resourceFocusCard.getByText('资料 · 第二份资料')).toBeInTheDocument();
+  expect(resourceFocusCard.getByText('问题 · 什么是批处理？')).toBeInTheDocument();
+});
+
 function createResourcesPanelSnapshot(): WorkspaceSnapshot {
   const snapshot = createWorkspaceSnapshot({
     title: 'React 学习主题',
@@ -206,13 +280,107 @@ function createResourcesPanelSnapshot(): WorkspaceSnapshot {
       updatedAt: '2026-04-27T12:00:00.000Z',
     }),
   );
+  tree = insertChildNode(
+    tree,
+    'resource-react-docs',
+    createNode({
+      type: 'resource-fragment',
+      id: 'fragment-event-boundary',
+      title: '事件边界摘录',
+      content: '用于解释为什么不会逐次立刻渲染。',
+      excerpt: 'React 会在事件处理结束后统一处理这些更新。',
+      locator: 'useState > event boundary',
+      sourceResourceId: 'resource-react-docs',
+      createdAt: '2026-04-27T12:00:00.000Z',
+      updatedAt: '2026-04-27T12:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'resource',
+      id: 'resource-secondary',
+      title: '第二份资料',
+      content: '备用资料，没有摘录也没有引用。',
+      sourceUri: '本地文件：secondary.md',
+      mimeType: 'text/markdown',
+      createdAt: '2026-04-27T12:00:00.000Z',
+      updatedAt: '2026-04-27T12:00:00.000Z',
+    }),
+  );
   tree = upsertTag(tree, importantTag);
   tree = attachTagToNode(tree, 'question-batching', 'tag-important');
+  tree = addNodeReference(
+    tree,
+    createNodeReference({
+      id: 'reference-resource-react-docs',
+      sourceNodeId: 'question-batching',
+      targetNodeId: 'resource-react-docs',
+      createdAt: '2026-04-27T12:00:00.000Z',
+      updatedAt: '2026-04-27T12:00:00.000Z',
+    }),
+  );
+  tree = addNodeReference(
+    tree,
+    createNodeReference({
+      id: 'reference-fragment-batching',
+      sourceNodeId: 'question-batching',
+      targetNodeId: 'fragment-batching',
+      createdAt: '2026-04-27T12:00:00.000Z',
+      updatedAt: '2026-04-27T12:00:00.000Z',
+    }),
+  );
+  tree = addNodeReference(
+    tree,
+    createNodeReference({
+      id: 'reference-fragment-event-boundary',
+      sourceNodeId: 'question-batching',
+      targetNodeId: 'fragment-event-boundary',
+      createdAt: '2026-04-27T12:00:00.000Z',
+      updatedAt: '2026-04-27T12:00:00.000Z',
+    }),
+  );
 
   return {
     ...snapshot,
     tree,
   };
+}
+
+function StatefulResourcesSearchExportPanel(props: {
+  initialActiveResourceNodeId: string | null;
+  initialSelectedEditorNodeId: string | null;
+  snapshot: WorkspaceSnapshot;
+}) {
+  const [tree, setTree] = useState<NodeTree>(props.snapshot.tree);
+  const [activeResourceNodeId, setActiveResourceNodeId] = useState<string | null>(
+    props.initialActiveResourceNodeId,
+  );
+  const [selectedEditorNodeId, setSelectedEditorNodeId] = useState<
+    string | null
+  >(props.initialSelectedEditorNodeId);
+
+  return (
+    <ResourcesSearchExportPanel
+      activeResourceNodeId={activeResourceNodeId}
+      currentModuleId="module-current"
+      onApplyTreeChange={setTree}
+      onClearResourceFocus={() => {
+        setActiveResourceNodeId(null);
+      }}
+      onFocusResourceNode={setActiveResourceNodeId}
+      onUpsertResourceMetadata={async () => {}}
+      onSelectEditorNode={(nodeId) => {
+        setActiveResourceNodeId(null);
+        setSelectedEditorNodeId(nodeId);
+      }}
+      selectedEditorNodeId={selectedEditorNodeId}
+      tree={tree}
+      workspaceId={props.snapshot.workspace.id}
+      workspaceTitle={props.snapshot.workspace.title}
+    />
+  );
 }
 
 function getSectionByHeading(name: string) {

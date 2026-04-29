@@ -11,6 +11,7 @@ import {
   createNodeReference,
   createTag,
   createWorkspaceSnapshot,
+  deleteNode,
   insertChildNode,
   moveNode,
   upsertTag,
@@ -299,6 +300,98 @@ describe('nodeDomain storage', () => {
         }),
       ]),
     );
+
+    await storage.close();
+  });
+
+  it('persists deleted resources without stale references, fragments, or metadata', async () => {
+    const snapshot = createWorkspaceSnapshot({
+      title: 'Deleted resource persistence',
+      workspaceId: 'workspace-deleted-resource-persistence',
+      rootId: 'root-deleted-resource-persistence',
+      createdAt: '2026-04-29T00:00:00.000Z',
+    });
+    const moduleNode = createNode({
+      type: 'module',
+      id: 'module-deleted-resource',
+      title: 'Deleted resource module',
+      createdAt: '2026-04-29T00:00:00.000Z',
+    });
+    const questionNode = createNode({
+      type: 'question',
+      id: 'question-deleted-resource',
+      title: 'Which evidence remains?',
+      createdAt: '2026-04-29T00:00:00.000Z',
+    });
+    const resourceNode = createNode({
+      type: 'resource',
+      id: 'resource-deleted-persistence',
+      title: 'Deleted persistence resource',
+      sourceUri: 'file:///deleted-persistence.md',
+      createdAt: '2026-04-29T00:00:00.000Z',
+    });
+    const fragmentNode = createNode({
+      type: 'resource-fragment',
+      id: 'fragment-deleted-persistence',
+      title: 'Deleted persistence fragment',
+      sourceResourceId: 'resource-deleted-persistence',
+      excerpt: 'This fragment will be deleted.',
+      locator: 'section:1',
+      createdAt: '2026-04-29T00:00:00.000Z',
+    });
+    const storage = createIndexedDbStorage({
+      databaseName: `whynote-deleted-resource-persistence-${crypto.randomUUID()}`,
+    });
+
+    let tree = insertChildNode(snapshot.tree, snapshot.tree.rootId, moduleNode);
+    tree = insertChildNode(tree, 'module-deleted-resource', questionNode);
+    tree = insertChildNode(tree, snapshot.tree.rootId, resourceNode);
+    tree = insertChildNode(tree, 'resource-deleted-persistence', fragmentNode);
+    tree = addNodeReference(
+      tree,
+      createNodeReference({
+        id: 'reference-deleted-persistence',
+        sourceNodeId: 'question-deleted-resource',
+        targetNodeId: 'fragment-deleted-persistence',
+        createdAt: '2026-04-29T00:00:00.000Z',
+      }),
+    );
+
+    await storage.saveWorkspace({
+      workspace: snapshot.workspace,
+      tree,
+    });
+
+    const deletedTree = deleteNode(tree, 'resource-deleted-persistence');
+
+    await storage.saveWorkspace({
+      workspace: {
+        ...snapshot.workspace,
+        updatedAt: '2026-04-29T01:00:00.000Z',
+      },
+      tree: deletedTree,
+    });
+
+    const restoredSnapshot = await storage.loadWorkspace(snapshot.workspace.id);
+    const resourceMetadata = await storage.listResourceMetadata(
+      snapshot.workspace.id,
+    );
+
+    expect(restoredSnapshot).not.toBeNull();
+    expect(
+      restoredSnapshot?.tree.nodes['resource-deleted-persistence'],
+    ).toBeUndefined();
+    expect(
+      restoredSnapshot?.tree.nodes['fragment-deleted-persistence'],
+    ).toBeUndefined();
+    expect(
+      restoredSnapshot?.tree.references['reference-deleted-persistence'],
+    ).toBeUndefined();
+    expect(
+      restoredSnapshot?.tree.nodes['question-deleted-resource'].referenceIds,
+    ).toEqual([]);
+    expect(resourceMetadata).toEqual([]);
+    validateNodeTree(restoredSnapshot!.tree);
 
     await storage.close();
   });

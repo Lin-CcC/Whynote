@@ -1,22 +1,27 @@
 import { useEffect, useRef } from 'react';
 
 import SectionCard from '../../../ui/SectionCard';
-import type { ResourceMetadataRecord } from '../../nodeDomain';
+import type { NodeTree, ResourceMetadataRecord } from '../../nodeDomain';
 import type { ResourceGroup } from '../resourceSearchExportTypes';
+import { countReferencesToNode } from '../services/resourceDeleteService';
 import { getResourceProvenanceSummary } from '../utils/resourceMetadataPresentation';
 
 type ResourceLibraryPanelProps = {
+  onRequestDeleteNode: (nodeId: string) => void;
   onSelectNode: (nodeId: string) => void;
   resourceGroups: ResourceGroup[];
   resourceMetadataByNodeId: Record<string, ResourceMetadataRecord>;
   selectedNodeId: string | null;
+  tree: NodeTree;
 };
 
 export default function ResourceLibraryPanel({
+  onRequestDeleteNode,
   onSelectNode,
   resourceGroups,
   resourceMetadataByNodeId,
   selectedNodeId,
+  tree,
 }: ResourceLibraryPanelProps) {
   const itemElementMapRef = useRef(new Map<string, HTMLButtonElement>());
 
@@ -78,37 +83,75 @@ export default function ResourceLibraryPanel({
                       ? `被引用 ${String(group.referenceCount)} 次`
                       : '尚未被学习节点引用'}
                   </span>
+                  <span className="resources-libraryMeta">
+                    {group.fragmentNodes.length > 0
+                      ? `含 ${String(group.fragmentNodes.length)} 条摘录`
+                      : '当前还没有摘录'}
+                  </span>
                 </button>
+                <div className="resources-libraryActionRow">
+                  <button
+                    aria-label={`删除资料 ${group.resourceNode.title}`}
+                    className="resources-inlineButton"
+                    onClick={() => onRequestDeleteNode(group.resourceNode.id)}
+                    type="button"
+                  >
+                    删除资料
+                  </button>
+                </div>
                 {group.fragmentNodes.length > 0 ? (
                   <div className="resources-fragmentList">
-                    {group.fragmentNodes.map((fragmentNode) => (
-                      <button
-                        aria-label={`定位摘录 ${fragmentNode.title}`}
-                        className="resources-libraryItem resources-libraryItem-fragment"
-                        data-selected={selectedNodeId === fragmentNode.id}
-                        key={fragmentNode.id}
-                        onClick={() => onSelectNode(fragmentNode.id)}
-                        ref={(element) =>
-                          registerItemElement(fragmentNode.id, element)
-                        }
-                        type="button"
-                      >
-                        <span className="resources-libraryType">摘录</span>
-                        <strong className="resources-libraryTitle">
-                          {fragmentNode.title}
-                        </strong>
-                        <span className="resources-librarySummary">
-                          {fragmentNode.excerpt ||
-                            fragmentNode.content ||
-                            '暂无摘录正文'}
-                        </span>
-                        <span className="resources-libraryMeta">
-                          {fragmentNode.locator
-                            ? `定位：${fragmentNode.locator}`
-                            : '未记录定位信息'}
-                        </span>
-                      </button>
-                    ))}
+                    {group.fragmentNodes.map((fragmentNode) => {
+                      const referenceCount = countReferencesToNode(tree, fragmentNode.id);
+
+                      return (
+                        <div
+                          className="resources-libraryEntry"
+                          key={fragmentNode.id}
+                        >
+                          <button
+                            aria-label={`定位摘录 ${fragmentNode.title}`}
+                            className="resources-libraryItem resources-libraryItem-fragment"
+                            data-selected={selectedNodeId === fragmentNode.id}
+                            onClick={() => onSelectNode(fragmentNode.id)}
+                            ref={(element) =>
+                              registerItemElement(fragmentNode.id, element)
+                            }
+                            type="button"
+                          >
+                            <span className="resources-libraryType">摘录</span>
+                            <strong className="resources-libraryTitle">
+                              {fragmentNode.title}
+                            </strong>
+                            <span className="resources-librarySummary">
+                              {fragmentNode.excerpt ||
+                                fragmentNode.content ||
+                                '暂无摘录正文'}
+                            </span>
+                            <span className="resources-libraryMeta">
+                              {fragmentNode.locator
+                                ? `定位：${fragmentNode.locator}`
+                                : '未记录定位信息'}
+                            </span>
+                            <span className="resources-libraryMeta">
+                              {referenceCount > 0
+                                ? `被引用 ${String(referenceCount)} 次`
+                                : '尚未被学习节点引用'}
+                            </span>
+                          </button>
+                          <div className="resources-libraryActionRow">
+                            <button
+                              aria-label={`删除摘录 ${fragmentNode.title}`}
+                              className="resources-inlineButton"
+                              onClick={() => onRequestDeleteNode(fragmentNode.id)}
+                              type="button"
+                            >
+                              删除摘录
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : null}
               </article>
