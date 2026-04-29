@@ -7,7 +7,7 @@ import {
 } from '../../nodeDomain';
 import { resolveLearningActionPlacement } from './learningActions';
 
-test('keeps AI/manual answers inside the selected question answer block before summary and judgment', () => {
+test('keeps AI/manual answers before summary and judgment on the selected question', () => {
   const snapshot = createWorkspaceSnapshot({
     title: 'Answer placement test',
     workspaceId: 'workspace-answer-placement',
@@ -103,7 +103,7 @@ test('keeps AI/manual answers inside the selected question answer block before s
   );
 
   expect(placement).toEqual({
-    insertIndex: 1,
+    insertIndex: 0,
     nodeType: 'answer',
     parentNodeId: 'question-target',
     title: '新回答',
