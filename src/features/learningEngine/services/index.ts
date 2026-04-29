@@ -6,4 +6,5 @@ export * from './moduleGenerationService';
 export * from './planStepRuntimeStatusService';
 export * from './planStepGenerationService';
 export * from './questionClosureService';
+export * from './summaryEvaluationService';
 export * from './subQuestionOrderingService';

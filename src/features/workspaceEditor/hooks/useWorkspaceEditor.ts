@@ -60,6 +60,12 @@ import {
 
 const FIRST_MODULE_CONTENT = '先定义当前主题下的第一个学习方向。';
 const FOLLOW_UP_MODULE_CONTENT = '补充这个模块的学习目标、边界或导读。';
+const SWITCHABLE_LEAF_NODE_TYPES = [
+  'question',
+  'answer',
+  'summary',
+  'judgment',
+] as const;
 
 export const defaultWorkspaceEditorOperations: WorkspaceEditorOperations = {
   insertChildNode,
@@ -138,6 +144,7 @@ export function useWorkspaceEditor({
     getInsertableSiblingTypes(tree, selectedNodeId),
   );
   const learningActions = getLearningActionOptions(tree, selectedNodeId);
+  const selectedNodeTypeSwitchOptions = getSwitchableNodeTypes(tree, selectedNodeId);
 
   useEffect(() => {
     setSelectedChildInsertType((previousType) =>
@@ -404,7 +411,15 @@ export function useWorkspaceEditor({
       return;
     }
 
-    const nextNode = createEditorNode(nextNodeType, parentNode.id);
+    const nextNode = createEditorNode(nextNodeType, parentNode.id, {
+      judgmentKind: nextNodeType === 'judgment' ? 'manual' : undefined,
+      summaryKind:
+        nextNodeType === 'summary'
+          ? parentNode.type === 'plan-step'
+            ? 'scaffold'
+            : 'manual'
+          : undefined,
+    });
 
     runStructuralOperation(
       () => {
@@ -435,11 +450,24 @@ export function useWorkspaceEditor({
       return;
     }
 
+    if (selectedTreeNode.parentId === null) {
+      return;
+    }
+
     const nextNodeType =
       selectedSiblingInsertType ??
       getPreferredSiblingInsertType(tree, selectedNodeId) ??
       selectedTreeNode.type;
-    const nextNode = createEditorNode(nextNodeType, selectedTreeNode.parentId);
+    const siblingParentNode = getNodeOrThrow(tree, selectedTreeNode.parentId);
+    const nextNode = createEditorNode(nextNodeType, selectedTreeNode.parentId, {
+      judgmentKind: nextNodeType === 'judgment' ? 'manual' : undefined,
+      summaryKind:
+        nextNodeType === 'summary'
+          ? siblingParentNode.type === 'plan-step'
+            ? 'scaffold'
+            : 'manual'
+          : undefined,
+    });
 
     runStructuralOperation(
       () => {
@@ -627,6 +655,7 @@ export function useWorkspaceEditor({
     selectedChildInsertType,
     selectedNode,
     selectedNodeId,
+    selectedNodeTypeSwitchOptions,
     selectedSiblingInsertType,
     setSelectedChildInsertType,
     setSelectedSiblingInsertType,
@@ -643,7 +672,29 @@ export function useWorkspaceEditor({
     deleteSelection,
     liftSelection,
     lowerSelection,
+    switchSelectedNodeType,
   };
+
+  function switchSelectedNodeType(
+    nextNodeType: (typeof SWITCHABLE_LEAF_NODE_TYPES)[number],
+  ) {
+    if (isInteractionLocked || !selectedNodeId || !tree.nodes[selectedNodeId]) {
+      return;
+    }
+
+    runStructuralOperation(
+      () => {
+        const nextTree = switchNodeType(tree, selectedNodeId, nextNodeType);
+
+        return {
+          nextTree,
+          nextSelectedNodeId: selectedNodeId,
+          preferredModuleId: resolveModuleId(nextTree, selectedNodeId, currentModuleId),
+        };
+      },
+      '节点类型切换失败，请检查当前节点。',
+    );
+  }
 }
 
 function createNextSnapshot(
@@ -664,6 +715,8 @@ function createEditorNode(
   parentNodeId: string | null,
   options?: {
     content?: string;
+    judgmentKind?: 'manual';
+    summaryKind?: 'answer-closure' | 'manual' | 'scaffold';
     title?: string;
   },
 ): NonRootNode {
@@ -680,6 +733,24 @@ function createEditorNode(
     });
   }
 
+  if (nodeType === 'summary') {
+    return createNode({
+      type: 'summary',
+      title: nodeTitle,
+      content: nodeContent,
+      summaryKind: options?.summaryKind,
+    });
+  }
+
+  if (nodeType === 'judgment') {
+    return createNode({
+      type: 'judgment',
+      title: nodeTitle,
+      content: nodeContent,
+      judgmentKind: options?.judgmentKind,
+    });
+  }
+
   return createNode({
     type: nodeType,
     title: nodeTitle,
@@ -693,6 +764,8 @@ function createLearningActionNode(
 ) {
   return createEditorNode(placement.nodeType, placement.parentNodeId, {
     content: getLearningActionStarterContent(actionId),
+    judgmentKind: actionId === 'insert-judgment' ? 'manual' : undefined,
+    summaryKind: resolveLearningActionSummaryKind(actionId),
     title: placement.title,
   });
 }
@@ -897,6 +970,33 @@ function getInsertableSiblingTypes(
   return getAllowedChildTypes(parentNode.type) as NonRootNode['type'][];
 }
 
+function getSwitchableNodeTypes(
+  tree: NodeTree,
+  selectedNodeId: string | null,
+): (typeof SWITCHABLE_LEAF_NODE_TYPES)[number][] {
+  if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
+    return [];
+  }
+
+  const selectedNode = getNodeOrThrow(tree, selectedNodeId);
+
+  if (
+    selectedNode.parentId === null ||
+    selectedNode.childIds.length > 0 ||
+    !SWITCHABLE_LEAF_NODE_TYPES.includes(
+      selectedNode.type as (typeof SWITCHABLE_LEAF_NODE_TYPES)[number],
+    )
+  ) {
+    return [];
+  }
+
+  const parentNode = getNodeOrThrow(tree, selectedNode.parentId);
+
+  return SWITCHABLE_LEAF_NODE_TYPES.filter((nodeType) =>
+    canParentAcceptChild(parentNode.type, nodeType),
+  );
+}
+
 function getInsertTypeOptions(
   nodeTypes: NonRootNode['type'][],
 ): EditorInsertTypeOption[] {
@@ -1043,6 +1143,79 @@ function canTargetParentAcceptNode(node: TreeNode, targetParentNode: TreeNode) {
   return canParentAcceptChild(targetParentNode.type, targetNodeType);
 }
 
+function switchNodeType(
+  tree: NodeTree,
+  nodeId: string,
+  nextNodeType: (typeof SWITCHABLE_LEAF_NODE_TYPES)[number],
+) {
+  const currentNode = getNodeOrThrow(tree, nodeId);
+
+  if (currentNode.parentId === null) {
+    throw new Error('根节点不支持切换类型。');
+  }
+
+  if (currentNode.childIds.length > 0) {
+    throw new Error('当前节点仍带有子树，只允许对叶子节点切换类型。');
+  }
+
+  if (currentNode.type === nextNodeType) {
+    return tree;
+  }
+
+  const parentNode = getNodeOrThrow(tree, currentNode.parentId);
+
+  if (!canParentAcceptChild(parentNode.type, nextNodeType)) {
+    throw new Error('目标类型不符合当前父节点约束。');
+  }
+
+  const nextTree = structuredClone(tree);
+  const nextNode = getNodeOrThrow(nextTree, nodeId);
+  const baseNode = {
+    childIds: [] as string[],
+    content: nextNode.content,
+    createdAt: nextNode.createdAt,
+    id: nextNode.id,
+    order: nextNode.order,
+    parentId: nextNode.parentId,
+    referenceIds: [...nextNode.referenceIds],
+    tagIds: [...nextNode.tagIds],
+    title: nextNode.title,
+    updatedAt: new Date().toISOString(),
+  };
+
+  switch (nextNodeType) {
+    case 'question':
+      nextTree.nodes[nodeId] = {
+        ...baseNode,
+        type: 'question',
+      };
+      break;
+    case 'answer':
+      nextTree.nodes[nodeId] = {
+        ...baseNode,
+        type: 'answer',
+      };
+      break;
+    case 'summary':
+      nextTree.nodes[nodeId] = {
+        ...baseNode,
+        type: 'summary',
+        summaryKind:
+          parentNode.type === 'plan-step' ? 'scaffold' : 'manual',
+      };
+      break;
+    case 'judgment':
+      nextTree.nodes[nodeId] = {
+        ...baseNode,
+        type: 'judgment',
+        judgmentKind: 'manual',
+      };
+      break;
+  }
+
+  return nextTree;
+}
+
 function getEffectiveTargetNodeType(
   node: TreeNode,
   targetParentNode: TreeNode,
@@ -1088,4 +1261,18 @@ function applyNodePatch(tree: NodeTree, nodeId: string, patch: NodeContentPatch)
   nextNode.updatedAt = new Date().toISOString();
 
   return nextTree;
+}
+
+function resolveLearningActionSummaryKind(actionId: LearningActionId) {
+  switch (actionId) {
+    case 'insert-scaffold':
+    case 'rephrase-scaffold':
+    case 'simplify-scaffold':
+    case 'add-example':
+      return 'scaffold' as const;
+    case 'insert-summary':
+      return 'manual' as const;
+    default:
+      return undefined;
+  }
 }

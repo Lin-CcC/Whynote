@@ -8,6 +8,7 @@ import type {
   ModuleGenerationInput,
   PlanStepGenerationInput,
   QuestionClosureInput,
+  SummaryEvaluationInput,
 } from '../domain';
 import { getLearningModeLabel } from '../domain';
 
@@ -213,6 +214,59 @@ export function buildJudgmentHintMessages(input: JudgmentHintInput): AiMessage[]
         'hint 不能写成“继续想想”“先补缺口”这种空提示，也不要直接把标准答案整段告诉用户。',
         buildTeachingCitationInstruction(),
         `返回格式：{"hint":{"focus":"","background":"","thinkingQuestion":"","content":"","citations":[${buildCitationJsonShape()}]}}`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    },
+  ];
+}
+
+export function buildSummaryEvaluationMessages(
+  input: SummaryEvaluationInput,
+): AiMessage[] {
+  const currentQuestion =
+    input.questionPath[input.questionPath.length - 1] ?? null;
+
+  return [
+    {
+      role: 'system',
+      content:
+        '你是 Whynote 的总结理解检查器。只输出 JSON，只检查这段 summary 是否真的抓住了当前问题的理解主线；不要把它当成普通 answer evaluation，也不要生成 follow-up question。',
+    },
+    {
+      role: 'user',
+      content: [
+        `学习主题：${input.topic.trim()}`,
+        optionalLine('模块标题', input.moduleTitle),
+        optionalLine('步骤标题', input.planStepTitle),
+        optionalLine('步骤目标', input.planStepSummary),
+        optionalLine(
+          '前置讲解',
+          input.introductions?.filter(Boolean).join('\n\n'),
+        ),
+        optionalLine('问题路径', formatQuestionPath(input.questionPath)),
+        optionalLine(
+          '当前问题',
+          currentQuestion
+            ? formatTitledContent(currentQuestion.title, currentQuestion.content)
+            : '',
+        ),
+        optionalLine('用户当前回答（如有）', input.learnerAnswer),
+        `用户手写总结：${input.learnerSummary.trim()}`,
+        optionalLine(
+          '可引用资料候选',
+          formatReferenceCandidates(input.referenceCandidates),
+        ),
+        '任务：检查这段 summary 是否真的说明白了当前问题，而不是只看它像不像一段顺口的话。',
+        '请把结果落成 judgment，并可选补一条 hint。这里的 judgment 语义不是“回答评估”，而是“总结理解检查”。',
+        'judgment 至少要覆盖四件事：1. 这段总结说对了什么；2. 还缺哪些关键点；3. 哪些地方可能理解偏了；4. 下一步建议优先补哪一层机制 / 因果 / 边界。',
+        '优先把 judgment 写成结构化内容：correctPoints 写“说对了什么”，missingPoints 返回缺口数组，possibleMisunderstandings 返回可能偏差数组，nextFocus 写“下一步先补哪层”；如果只写 judgment.content，也必须按这四段来写。',
+        '不要把 judgment 写成“回答还不完整”的同义改写，也不要把它伪装成答案解析。',
+        'hint 仍然是可选的微型铺垫：如果你认为用户下一步还需要一点背景，才补一条围绕最关键缺口的提示；不要直接给完整标准答案。',
+        '不要生成 follow-up question，也不要把 question-closure 那套“推进下一题”语气搬过来。',
+        '如果资料候选能支撑 judgment 或 hint，请在对应 citations 中返回 targetNodeId；能用 fragment 时优先 fragment。',
+        buildTeachingCitationInstruction(),
+        `返回格式：{"judgment":{"title":"","correctPoints":"","missingPoints":[""],"possibleMisunderstandings":[""],"nextFocus":"","content":"","citations":[${buildCitationJsonShape()}]},"hint":{"focus":"","background":"","thinkingQuestion":"","content":"","citations":[${buildCitationJsonShape()}]}}`,
       ]
         .filter(Boolean)
         .join('\n'),

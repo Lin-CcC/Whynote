@@ -2,6 +2,7 @@ import SectionCard from '../../../ui/SectionCard';
 import {
   getAllowedChildTypes,
   getNodeOrThrow,
+  type NonRootNode,
   resolveBuiltinTags,
   type NodeTree,
 } from '../../nodeDomain';
@@ -15,8 +16,14 @@ import {
 type SelectedNodeInspectorProps = {
   currentModuleId: string | null;
   isInteractionLocked: boolean;
+  onChangeSelectedNodeType: (
+    nodeType: 'question' | 'answer' | 'summary' | 'judgment',
+  ) => void;
   onToggleSelectedNodeTag: (tagId: string) => void;
   selectedNodeId: string | null;
+  selectedNodeTypeSwitchOptions: (
+    'question' | 'answer' | 'summary' | 'judgment'
+  )[];
   tree: NodeTree;
   workspaceTitle: string;
 };
@@ -24,8 +31,10 @@ type SelectedNodeInspectorProps = {
 export default function SelectedNodeInspector({
   currentModuleId,
   isInteractionLocked,
+  onChangeSelectedNodeType,
   onToggleSelectedNodeTag,
   selectedNodeId,
+  selectedNodeTypeSwitchOptions,
   tree,
   workspaceTitle,
 }: SelectedNodeInspectorProps) {
@@ -45,6 +54,8 @@ export default function SelectedNodeInspector({
         .sort((leftTag, rightTag) => leftTag.localeCompare(rightTag, 'zh-Hans-CN'))
     : [];
   const builtinTags = resolveBuiltinTags(tree);
+  const canSwitchSelectedNodeType =
+    Boolean(selectedNode) && selectedNodeTypeSwitchOptions.length > 0;
 
   return (
     <>
@@ -66,15 +77,15 @@ export default function SelectedNodeInspector({
           </div>
           <div>
             <dt>节点</dt>
-              <dd>
-                {selectedNode
-                  ? `${getDisplayLabelForNode(tree, selectedNode)} · ${getDisplayTitleForNode(tree, selectedNode)}`
-                  : '未选中节点'}
-              </dd>
+            <dd className="workspace-inspectorClamp">
+              {selectedNode
+                ? `${getDisplayLabelForNode(tree, selectedNode)} · ${getDisplayTitleForNode(tree, selectedNode)}`
+                : '未选中节点'}
+            </dd>
           </div>
           <div>
             <dt>路径</dt>
-            <dd>
+            <dd className="workspace-inspectorClamp">
               {selectedNodePath.length > 0
                 ? selectedNodePath.map((node) => node.title).join(' / ')
                 : '暂无'}
@@ -95,6 +106,40 @@ export default function SelectedNodeInspector({
             <dd>{selectedTagNames.length > 0 ? selectedTagNames.join('、') : '暂无'}</dd>
           </div>
         </dl>
+        <div className="workspace-tagSection">
+          <p className="workspace-kicker">节点类型</p>
+          <p className="workspace-tagMeta">
+            {selectedNode
+              ? canSwitchSelectedNodeType
+                ? '这里只开放叶子节点的安全切换；只会在当前父节点允许的类型之间切。'
+                : '当前节点暂不支持安全切换类型；只对无子树的 question / answer / summary / judgment 开放。'
+              : '先选中一个节点，再切换它的类型。'}
+          </p>
+          <div className="workspace-typeSwitchList">
+            {(
+              ['question', 'answer', 'summary', 'judgment'] as const satisfies readonly NonRootNode['type'][]
+            ).map((nodeType) => {
+              const isCurrentType = selectedNode?.type === nodeType;
+              const isAllowed = selectedNodeTypeSwitchOptions.includes(nodeType);
+              const nodeTypeLabel = getNodeTypeLabel(nodeType);
+
+              return (
+                <button
+                  aria-label={isCurrentType ? `当前类型：${nodeTypeLabel}` : `切换为${nodeTypeLabel}`}
+                  aria-pressed={isCurrentType}
+                  className="workspace-typeSwitchButton"
+                  data-active={isCurrentType}
+                  disabled={!selectedNode || !isAllowed || isInteractionLocked}
+                  key={nodeType}
+                  onClick={() => onChangeSelectedNodeType(nodeType)}
+                  type="button"
+                >
+                  {nodeTypeLabel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="workspace-tagSection">
           <p className="workspace-kicker">节点标签</p>
           <p className="workspace-tagMeta">

@@ -164,6 +164,56 @@ test('inserts an answer into the selected question before closing nodes', () => 
   expect(insertChildSpy.mock.calls[0]?.[3]).toBe(2);
 });
 
+test('allows switching a newly inserted leaf node between safe types while preserving content', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+
+  render(
+    <WorkspaceEditor
+      initialSelectedNodeId="question-type-switch-target"
+      initialSnapshot={createTypeSwitchSnapshot()}
+      onSnapshotChange={(snapshot) => {
+        snapshots.push(snapshot);
+      }}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+
+  const titleInput = await screen.findByDisplayValue('新回答');
+  const contentInput = screen.getByLabelText('新回答 内容');
+
+  fireEvent.change(contentInput, {
+    target: {
+      value: '这段内容在切换成总结后也应该保留。',
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '切换为总结' }));
+
+  const switchedNode = titleInput.closest('[data-testid^="editor-node-"]');
+
+  await waitFor(() => {
+    expect(switchedNode).toHaveAttribute('data-node-type', 'summary');
+    expect(switchedNode).toHaveTextContent('总结');
+    expect(contentInput).toHaveValue('这段内容在切换成总结后也应该保留。');
+  });
+
+  const latestSnapshot = snapshots[snapshots.length - 1];
+  const preservedNode = Object.values(latestSnapshot.tree.nodes).find(
+    (node) =>
+      node.title === '新回答' &&
+      node.content === '这段内容在切换成总结后也应该保留。',
+  );
+
+  expect(preservedNode?.type).toBe('summary');
+
+  fireEvent.click(screen.getByTestId('editor-node-question-type-switch-complex'));
+
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: '切换为回答' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '切换为总结' })).toBeDisabled();
+  });
+});
+
 test('shows scaffold teaching follow-up actions when a scaffold node is selected', () => {
   render(
     <WorkspaceEditor
@@ -653,6 +703,7 @@ function createPrefixedDisplayTitleSnapshot(): WorkspaceSnapshot {
       id: 'summary-scaffold-prefixed',
       title: '铺垫：先建立概念地图',
       content: '先把最小背景交代清楚。',
+      summaryKind: 'scaffold',
       createdAt: '2026-04-29T09:00:00.000Z',
       updatedAt: '2026-04-29T09:00:00.000Z',
     }),
@@ -701,6 +752,7 @@ function createPrefixedDisplayTitleSnapshot(): WorkspaceSnapshot {
       id: 'summary-answer-explanation-prefixed',
       title: '答案解析：标准理解',
       content: '把标准理解补完整。',
+      summaryKind: 'answer-closure',
       createdAt: '2026-04-29T09:00:00.000Z',
       updatedAt: '2026-04-29T09:00:00.000Z',
     }),
@@ -713,6 +765,7 @@ function createPrefixedDisplayTitleSnapshot(): WorkspaceSnapshot {
       id: 'summary-generic-prefixed',
       title: '总结：只围绕当前问题',
       content: '这是步骤层的普通总结。',
+      summaryKind: 'manual',
       createdAt: '2026-04-29T09:00:00.000Z',
       updatedAt: '2026-04-29T09:00:00.000Z',
     }),
@@ -850,6 +903,85 @@ function createQuestionOrderSnapshot(): WorkspaceSnapshot {
       content: '',
       createdAt: '2026-04-27T10:00:00.000Z',
       updatedAt: '2026-04-27T10:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createTypeSwitchSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '节点类型切换',
+    workspaceId: 'workspace-type-switch',
+    rootId: 'theme-type-switch',
+    createdAt: '2026-04-30T00:00:00.000Z',
+    updatedAt: '2026-04-30T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-type-switch',
+      title: '模块',
+      content: '验证节点类型切换。',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-type-switch',
+    createNode({
+      type: 'plan-step',
+      id: 'step-type-switch',
+      title: '步骤',
+      content: '先插入一个叶子节点，再切换类型。',
+      status: 'todo',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-type-switch',
+    createNode({
+      type: 'question',
+      id: 'question-type-switch-target',
+      title: '目标问题',
+      content: '这里先插一个节点，再改类型。',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-type-switch',
+    createNode({
+      type: 'question',
+      id: 'question-type-switch-complex',
+      title: '复杂问题',
+      content: '这个节点已经有子树，不应该开放安全切换。',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-type-switch-complex',
+    createNode({
+      type: 'question',
+      id: 'question-type-switch-child',
+      title: '子问题',
+      content: '让父问题失去叶子节点资格。',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
     }),
   );
 

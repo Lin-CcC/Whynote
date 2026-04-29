@@ -98,8 +98,12 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           <SelectedNodeInspector
             currentModuleId={workspaceEditor.currentModuleId}
             isInteractionLocked={props.isInteractionLocked ?? false}
+            onChangeSelectedNodeType={workspaceEditor.switchSelectedNodeType}
             onToggleSelectedNodeTag={workspaceEditor.toggleSelectedNodeTag}
             selectedNodeId={workspaceEditor.selectedNodeId}
+            selectedNodeTypeSwitchOptions={
+              workspaceEditor.selectedNodeTypeSwitchOptions
+            }
             tree={workspaceEditor.tree}
             workspaceTitle={workspaceEditor.workspaceTitle}
           />

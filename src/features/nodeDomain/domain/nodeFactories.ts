@@ -1,8 +1,10 @@
 import type {
+  JudgmentNodeKind,
   CitationPurpose,
   NonRootNode,
   NodeReference,
   PlanStepStatus,
+  SummaryNodeKind,
   Tag,
   ThemeRootNode,
   WorkspaceSnapshot,
@@ -27,10 +29,19 @@ type CreateNodeInput =
       updatedAt?: string;
     }
   | {
-      type: 'question' | 'answer' | 'summary';
+      type: 'question' | 'answer';
       id?: string;
       title: string;
       content?: string;
+      createdAt?: string;
+      updatedAt?: string;
+    }
+  | {
+      type: 'summary';
+      id?: string;
+      title: string;
+      content?: string;
+      summaryKind?: SummaryNodeKind;
       createdAt?: string;
       updatedAt?: string;
     }
@@ -40,6 +51,7 @@ type CreateNodeInput =
       title: string;
       content?: string;
       hint?: string;
+      judgmentKind?: JudgmentNodeKind;
       createdAt?: string;
       updatedAt?: string;
     }
@@ -116,16 +128,22 @@ export function createNode(input: CreateNodeInput): NonRootNode {
       };
     case 'question':
     case 'answer':
-    case 'summary':
       return {
         ...baseNode,
         type: input.type,
+      };
+    case 'summary':
+      return {
+        ...baseNode,
+        type: 'summary',
+        ...(input.summaryKind ? { summaryKind: input.summaryKind } : {}),
       };
     case 'judgment':
       return {
         ...baseNode,
         type: 'judgment',
         hint: input.hint,
+        ...(input.judgmentKind ? { judgmentKind: input.judgmentKind } : {}),
       };
     case 'resource':
       return {

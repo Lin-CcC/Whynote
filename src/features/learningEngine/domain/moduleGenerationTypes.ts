@@ -1,4 +1,9 @@
-import type { CitationPurpose, PlanStepStatus } from '../../nodeDomain';
+import type {
+  CitationPurpose,
+  JudgmentNodeKind,
+  PlanStepStatus,
+  SummaryNodeKind,
+} from '../../nodeDomain';
 
 import type { AiExecutionMetadata } from './aiTypes';
 import type { LearningMode } from './learningMode';
@@ -28,11 +33,13 @@ export interface QuestionNodeDraft extends BaseLearningNodeDraft {
 
 export interface SummaryNodeDraft extends BaseLearningNodeDraft {
   type: 'summary';
+  summaryKind?: SummaryNodeKind;
 }
 
 export interface JudgmentNodeDraft extends BaseLearningNodeDraft {
   type: 'judgment';
   hint?: string;
+  judgmentKind?: JudgmentNodeKind;
 }
 
 export interface LearningReferenceCandidate {

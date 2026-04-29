@@ -472,7 +472,7 @@ test('scopes learning-action drafts to the currently selected answer instead of 
   fireEvent.click(screen.getByRole('button', { name: '插入总结' }));
 
   expect(
-    await screen.findByDisplayValue('总结：只围绕第一版回答'),
+    await screen.findByDisplayValue('只围绕第一版回答'),
   ).toBeInTheDocument();
   expect(observedLearningActionPrompt).toContain('现有回答');
   expect(observedLearningActionPrompt).toContain('第一版回答');
@@ -522,11 +522,17 @@ test('keeps judgment nodes actionable within the current answer revision path', 
 
   fireEvent.click(screen.getByRole('button', { name: /第一版回答还不完整/ }));
 
+  const inlineActions = await screen.findByTestId(
+    'judgment-inline-actions-judgment-answer-closure-v1',
+  );
+
   expect(await screen.findByTestId('judgment-inline-actions')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '给我提示' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '查看答案解析' })).toBeInTheDocument();
+  expect(within(inlineActions).getByRole('button', { name: '给我提示' })).toBeInTheDocument();
   expect(
-    screen.getByRole('button', { name: '回到当前回答继续修改' }),
+    within(inlineActions).getByRole('button', { name: '查看答案解析' }),
+  ).toBeInTheDocument();
+  expect(
+    within(inlineActions).getByRole('button', { name: '回到当前回答继续修改' }),
   ).toBeInTheDocument();
   expect(
     screen.queryByRole('button', { name: '重新评估当前回答' }),
@@ -537,7 +543,9 @@ test('keeps judgment nodes actionable within the current answer revision path', 
     ),
   ).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '回到当前回答继续修改' }));
+  fireEvent.click(
+    within(inlineActions).getByRole('button', { name: '回到当前回答继续修改' }),
+  );
   expect(
     screen
       .getByDisplayValue('第一版回答')
@@ -545,7 +553,11 @@ test('keeps judgment nodes actionable within the current answer revision path', 
   ).toHaveAttribute('data-node-selected', 'true');
 
   fireEvent.click(screen.getByRole('button', { name: /第一版回答还不完整/ }));
-  fireEvent.click(screen.getByRole('button', { name: '查看答案解析' }));
+  fireEvent.click(
+    within(
+      await screen.findByTestId('judgment-inline-actions-judgment-answer-closure-v1'),
+    ).getByRole('button', { name: '查看答案解析' }),
+  );
   expect(
     screen
       .getByDisplayValue('标准理解：第一版回答')
@@ -657,7 +669,7 @@ test('creates AI drafts instead of empty shells for scaffold, question, summary 
     screen.getByRole('button', { name: '插入总结' }),
   );
   expect(
-    await screen.findByDisplayValue('总结：先把节奏和结果分开看'),
+    await screen.findByDisplayValue('先把节奏和结果分开看'),
   ).toBeInTheDocument();
   expect(
     screen.getByDisplayValue(
@@ -1026,6 +1038,8 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       id: 'judgment-answer-closure-v1',
       title: '判断：第一版回答还不完整',
       content: '第一版回答还没有把为什么能减少重复渲染讲清楚。',
+      hint: '先把“同一轮更新如何被合并提交”与“为什么会减少重复渲染”这层关系补出来。',
+      judgmentKind: 'answer-closure',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -1037,6 +1051,7 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       id: 'summary-answer-closure-v1',
       title: '标准理解：第一版回答',
       content: '先补上“合并更新如何减少重复渲染”的因果链条。',
+      summaryKind: 'answer-closure',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -1059,6 +1074,8 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       id: 'judgment-answer-closure-v2',
       title: '判断：第二版回答已说明因果关系',
       content: '第二版回答已经把更新节奏和减少重复渲染的关系补全了。',
+      hint: '这轮已经答到位了，只需要按当前答案复述一遍完整因果链。',
+      judgmentKind: 'answer-closure',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -1070,6 +1087,7 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       id: 'summary-answer-closure-v2',
       title: '标准理解：第二版回答',
       content: '第二版已经覆盖了为什么统一提交能减少重复渲染。',
+      summaryKind: 'answer-closure',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
