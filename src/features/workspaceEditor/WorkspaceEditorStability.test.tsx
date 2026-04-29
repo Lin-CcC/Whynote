@@ -48,7 +48,17 @@ test('respects the real focused input when the user starts editing another node 
       'data-node-selected',
       'true',
     );
+    expect(screen.getByTestId('editor-node-question-render-boundary')).toHaveAttribute(
+      'data-node-editing',
+      'true',
+    );
   });
+  expect(screen.getByTestId('editor-node-question-render-boundary')).toHaveTextContent(
+    '当前正在编辑输入框。',
+  );
+  expect(screen.getByTestId('editor-node-question-render-boundary')).toHaveTextContent(
+    '编辑中',
+  );
 
   fireEvent.change(textarea, {
     target: {
@@ -72,9 +82,12 @@ test('selects a node by clicking its card without requiring textarea focus first
 
   await waitFor(() => {
     expect(node).toHaveAttribute('data-node-selected', 'true');
+    expect(node).toHaveAttribute('data-node-editing', 'false');
     expect(node).toHaveFocus();
   });
   expect(textarea).not.toHaveFocus();
+  expect(node).toHaveTextContent('卡片只选中，输入框才会编辑。');
+  expect(node).not.toHaveTextContent('编辑中');
 });
 
 test('toggles builtin tags on the selected node and persists the updated state', () => {

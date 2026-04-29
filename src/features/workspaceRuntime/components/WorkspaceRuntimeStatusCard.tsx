@@ -8,90 +8,200 @@ export default function WorkspaceRuntimeStatusCard({
   aiError,
   completionSuggestion,
   isAiRunning,
+  isInitializing,
   loadError,
   runtimeMessage,
   saveError,
   saveStatus,
 }: WorkspaceRuntimeStatusCardProps) {
+  const latestResult = resolveLatestResult({
+    aiError,
+    completionSuggestion,
+    isAiRunning,
+    loadError,
+    runtimeMessage,
+    saveError,
+    saveStatus,
+  });
+
   return (
     <SectionCard>
       <div className="workspace-sectionHeader">
         <div>
-          <p className="workspace-kicker">运行时状态</p>
-          <h2 className="workspace-sectionTitle">工作区运行状态</h2>
+          <p className="workspace-kicker">运行状态</p>
+          <h2 className="workspace-sectionTitle">忙不忙 + 最近结果</h2>
         </div>
       </div>
       <dl className="workspace-inspectorList">
         <div>
-          <dt>保存</dt>
-          <dd>{getSaveStatusLabel(saveStatus)}</dd>
+          <dt>系统</dt>
+          <dd>
+            {getSystemStatusLabel({
+              activeAiActionLabel,
+              isAiRunning,
+              isInitializing,
+              loadError,
+              saveStatus,
+            })}
+          </dd>
         </div>
         <div>
-          <dt>AI</dt>
-          <dd>{isAiRunning ? activeAiActionLabel ?? '处理中' : '空闲'}</dd>
+          <dt>最近结果</dt>
+          <dd>{latestResult.label}</dd>
         </div>
       </dl>
-      <p className="workspace-helpText">{getSaveStatusDetail(saveStatus)}</p>
       {isAiRunning ? (
         <p className="workspace-lockText" role="status">
-          AI 正在运行，文本编辑和结构操作已临时锁定，避免旧快照覆盖新修改。
+          AI 正在运行，正文编辑和树操作会临时锁定，避免旧结果覆盖新修改。
         </p>
       ) : null}
-      {runtimeMessage ? <p className="workspace-helpText">{runtimeMessage}</p> : null}
-      {loadError ? (
-        <p className="workspace-errorText" role="alert">
-          工作区加载失败：{loadError}
+      {latestResult.detail ? (
+        <p
+          className={
+            latestResult.tone === 'error'
+              ? 'workspace-errorText'
+              : 'workspace-helpText'
+          }
+          role={latestResult.tone === 'error' ? 'alert' : 'status'}
+        >
+          {latestResult.detail}
         </p>
-      ) : null}
-      {saveError ? (
-        <p className="workspace-errorText" role="alert">
-          工作区保存失败：{saveError}
-        </p>
-      ) : null}
-      {aiError ? (
-        <p className="workspace-errorText" role="alert">
-          AI 动作失败：{aiError}
-        </p>
-      ) : null}
-      {completionSuggestion ? (
-        <div className="workspace-runtimeSuggestion">
-          <p className="workspace-kicker">步骤建议</p>
-          <h3 className="workspace-splitTitle">
-            {completionSuggestion.shouldSuggestComplete
-              ? '当前步骤可以考虑标记完成'
-              : '当前步骤暂不建议完成'}
-          </h3>
-          <p className="workspace-helpText">{completionSuggestion.reasonSummary}</p>
-        </div>
       ) : null}
     </SectionCard>
   );
 }
 
-function getSaveStatusLabel(saveStatus: WorkspaceRuntimeStatusCardProps['saveStatus']) {
+function getSystemStatusLabel({
+  activeAiActionLabel,
+  isAiRunning,
+  isInitializing,
+  loadError,
+  saveStatus,
+}: {
+  activeAiActionLabel: string | null;
+  isAiRunning: boolean;
+  isInitializing: boolean;
+  loadError: string | null;
+  saveStatus: WorkspaceRuntimeStatusCardProps['saveStatus'];
+}) {
+  if (loadError) {
+    return '加载失败';
+  }
+
+  if (isInitializing) {
+    return '初始化中';
+  }
+
+  if (isAiRunning) {
+    return activeAiActionLabel ?? 'AI 正在运行';
+  }
+
   switch (saveStatus) {
     case 'saving':
       return '保存中';
     case 'saved':
       return '已保存';
     case 'error':
-      return '失败';
+      return '保存失败';
     case 'idle':
     default:
-      return '待保存';
+      return '空闲';
   }
 }
 
-function getSaveStatusDetail(saveStatus: WorkspaceRuntimeStatusCardProps['saveStatus']) {
+function resolveLatestResult({
+  aiError,
+  completionSuggestion,
+  isAiRunning,
+  loadError,
+  runtimeMessage,
+  saveError,
+  saveStatus,
+}: Pick<
+  WorkspaceRuntimeStatusCardProps,
+  | 'aiError'
+  | 'completionSuggestion'
+  | 'isAiRunning'
+  | 'loadError'
+  | 'runtimeMessage'
+  | 'saveError'
+  | 'saveStatus'
+>) {
+  if (loadError) {
+    return {
+      detail: `工作区加载失败：${loadError}`,
+      label: '工作区暂不可用',
+      tone: 'error' as const,
+    };
+  }
+
+  if (aiError) {
+    return {
+      detail: `AI 动作失败：${aiError}`,
+      label: 'AI 动作失败',
+      tone: 'error' as const,
+    };
+  }
+
+  if (saveError) {
+    return {
+      detail: `工作区保存失败：${saveError}`,
+      label: '自动保存失败',
+      tone: 'error' as const,
+    };
+  }
+
+  if (completionSuggestion) {
+    return {
+      detail: completionSuggestion.reasonSummary,
+      label: completionSuggestion.shouldSuggestComplete
+        ? '步骤可考虑完成'
+        : '步骤暂不建议完成',
+      tone: 'default' as const,
+    };
+  }
+
+  if (runtimeMessage) {
+    return {
+      detail: null,
+      label: runtimeMessage,
+      tone: 'default' as const,
+    };
+  }
+
+  if (isAiRunning) {
+    return {
+      detail: null,
+      label: '正在处理最近一次动作',
+      tone: 'default' as const,
+    };
+  }
+
   switch (saveStatus) {
     case 'saving':
-      return '自动保存已经开始执行，会尽量避免“保存中 / 已保存”快速来回闪烁。';
+      return {
+        detail: null,
+        label: '最近改动正在自动保存',
+        tone: 'default' as const,
+      };
     case 'saved':
-      return '最近一次工作区改动已经落盘。';
+      return {
+        detail: null,
+        label: '最近改动已落盘',
+        tone: 'default' as const,
+      };
     case 'error':
-      return '保存失败前的改动仍保留在当前界面，可以继续修改后再次触发自动保存。';
+      return {
+        detail: null,
+        label: '最近保存未完成',
+        tone: 'default' as const,
+      };
     case 'idle':
     default:
-      return '输入后会在短暂停顿后自动保存，避免每次极短停顿都立刻刷新状态。';
+      return {
+        detail: null,
+        label: '还没有新的动作结果',
+        tone: 'default' as const,
+      };
   }
 }

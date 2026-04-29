@@ -179,6 +179,7 @@ export default function WorkspaceRuntimeScreen({
       <WorkspaceRuntimeJudgmentActions
         answerNodeId={actionContext.answerNodeId}
         hint={actionContext.hint}
+        isBusy={runtime.isAiRunning}
         isHintVisible={activeJudgmentHintNodeId === context.node.id}
         judgmentNodeId={context.node.id}
         onReturnToAnswer={() => {

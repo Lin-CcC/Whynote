@@ -72,7 +72,7 @@ test('reuses an existing fragment for an answer citation, persists it after remo
   ).toBeInTheDocument();
   expect(reusedFocusCard.getByText('摘录 · 批处理摘录')).toBeInTheDocument();
   expect(screen.getAllByText('被引用 1 次')).toHaveLength(2);
-  await waitForSaved();
+  await waitForSaved(dependencies.structuredDataStorage);
 
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
@@ -283,11 +283,13 @@ async function findSectionByHeading(name: string) {
   return within(section);
 }
 
-async function waitForSaved() {
-  await waitFor(() => {
-    expect(screen.getByText('待保存', { selector: 'dd' })).toBeInTheDocument();
-  });
-  await waitFor(() => {
-    expect(screen.getByText('已保存', { selector: 'dd' })).toBeInTheDocument();
+async function waitForSaved(storage: StructuredDataStorage) {
+  await waitFor(async () => {
+    const workspaces = await storage.listWorkspaces();
+    const snapshot = await storage.loadWorkspace(workspaces[0].id);
+    const answerNode = snapshot?.tree.nodes['answer-resource-citation'];
+
+    expect(answerNode?.type).toBe('answer');
+    expect(answerNode?.referenceIds).toHaveLength(1);
   });
 }

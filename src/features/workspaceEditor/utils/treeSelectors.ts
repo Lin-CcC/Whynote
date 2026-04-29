@@ -155,6 +155,37 @@ export function getNodeEmphasis(node: TreeNode) {
   return 'primary';
 }
 
+export function getNodeRoleDescription(tree: NodeTree, node: TreeNode) {
+  if (isScaffoldSummaryNode(tree, node)) {
+    return '这里负责铺垫或前置讲解';
+  }
+
+  if (isAnswerClosureSummaryNode(tree, node)) {
+    return '这里负责答案解析和标准理解';
+  }
+
+  switch (node.type) {
+    case 'theme-root':
+      return '这里承接整个学习主题';
+    case 'module':
+      return '这里承接当前学习模块';
+    case 'plan-step':
+      return '这里承接当前学习步骤';
+    case 'question':
+      return '这里承接要回答的问题';
+    case 'answer':
+      return '这里承接当前这版回答';
+    case 'summary':
+      return '这里承接阶段总结';
+    case 'judgment':
+      return '这里只负责判断缺口和反馈';
+    case 'resource':
+      return '这里记录资料概况与来源';
+    case 'resource-fragment':
+      return '这里固定可回跳的资料片段';
+  }
+}
+
 export function getNodeInputPlaceholder(
   nodeType: NodeType,
   field: NodeField,

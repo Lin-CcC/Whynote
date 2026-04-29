@@ -92,7 +92,9 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
       name: '查看答案解析',
     }),
   ).toBeInTheDocument();
-  expect(screen.getByText(/默认主路径仍留在当前回答上/u)).toBeInTheDocument();
+  expect(
+    screen.getByText('答案解析可以对照，但主路径还是留在当前回答。'),
+  ).toBeInTheDocument();
 
   const summaryNode = screen
     .getByDisplayValue('标准理解')
@@ -163,7 +165,10 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
     ).toBeEnabled();
   });
   expect(screen.getByTestId('answer-evaluation-callout')).toHaveTextContent(
-    '围绕当前回答继续',
+    '改完这版回答再重评',
+  );
+  expect(screen.getByTestId('answer-evaluation-callout')).toHaveTextContent(
+    '先重评当前回答，把判断和答案解析补出来。',
   );
   expect(screen.getByText('当前回答修订')).toBeInTheDocument();
 
@@ -383,7 +388,12 @@ test('keeps judgment nodes actionable within the current answer revision path', 
     screen.getByRole('button', { name: '回到当前回答继续修改' }),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole('button', { name: '重新评估当前回答' }),
+    screen.queryByRole('button', { name: '重新评估当前回答' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByText(
+      '当前 judgment 的主动作已经收口到正文卡片，左侧不再重复抢这条路径。',
+    ),
   ).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '回到当前回答继续修改' }));

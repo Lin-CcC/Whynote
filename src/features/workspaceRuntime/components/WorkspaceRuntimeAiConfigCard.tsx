@@ -36,6 +36,7 @@ export default function WorkspaceRuntimeAiConfigCard({
   onSaveAiPreset,
 }: WorkspaceRuntimeAiConfigCardProps) {
   const selectedTemplate = getAiConfigTemplateById(aiSelectedTemplateId);
+  const canSavePreset = Boolean(aiPresetDraftName.trim());
 
   function handleTemplateChange(event: ChangeEvent<HTMLSelectElement>) {
     onAiTemplateChange(event.target.value);
@@ -157,17 +158,24 @@ export default function WorkspaceRuntimeAiConfigCard({
         )}
       </div>
       <div className="workspace-actionGrid">
-        <button onClick={onSaveAiConfig} type="button">
+        <button className="workspace-primaryAction" onClick={onSaveAiConfig} type="button">
           保存当前配置
         </button>
         <button
-          disabled={!aiPresetDraftName.trim()}
+          disabled={!canSavePreset}
           onClick={onSaveAiPreset}
           type="button"
         >
           {aiSelectedPresetId ? '覆盖当前预设' : '保存为新预设'}
         </button>
       </div>
+      <p className="workspace-actionHint">
+        {!canSavePreset
+          ? '要保存为预设，先填一个预设名称。'
+          : aiSelectedPresetId
+            ? '当前会覆盖已选中的本地预设。'
+            : '当前会把这组三项配置保存成新的本地预设。'}
+      </p>
     </SectionCard>
   );
 }
