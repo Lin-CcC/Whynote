@@ -23,6 +23,20 @@ export default function WorkspaceRuntimeStatusCard({
     saveError,
     saveStatus,
   });
+  const systemStatusLabel = getSystemStatusLabel({
+    activeAiActionLabel,
+    isAiRunning,
+    isInitializing,
+    loadError,
+    saveStatus,
+  });
+  const latestResultDetailText = latestResult.detail ?? '\u00a0';
+  const latestResultDetailRole =
+    latestResult.detail === null
+      ? undefined
+      : latestResult.tone === 'error'
+        ? 'alert'
+        : 'status';
 
   return (
     <SectionCard>
@@ -35,19 +49,15 @@ export default function WorkspaceRuntimeStatusCard({
       <dl className="workspace-inspectorList">
         <div>
           <dt>系统</dt>
-          <dd>
-            {getSystemStatusLabel({
-              activeAiActionLabel,
-              isAiRunning,
-              isInitializing,
-              loadError,
-              saveStatus,
-            })}
+          <dd className="workspace-inspectorClamp" title={systemStatusLabel}>
+            {systemStatusLabel}
           </dd>
         </div>
         <div>
           <dt>最近结果</dt>
-          <dd>{latestResult.label}</dd>
+          <dd className="workspace-inspectorClamp" title={latestResult.label}>
+            {latestResult.label}
+          </dd>
         </div>
       </dl>
       {isAiRunning ? (
@@ -55,18 +65,19 @@ export default function WorkspaceRuntimeStatusCard({
           AI 正在运行，正文编辑和树操作会临时锁定，避免旧结果覆盖新修改。
         </p>
       ) : null}
-      {latestResult.detail ? (
-        <p
-          className={
-            latestResult.tone === 'error'
-              ? 'workspace-errorText'
-              : 'workspace-helpText'
-          }
-          role={latestResult.tone === 'error' ? 'alert' : 'status'}
-        >
-          {latestResult.detail}
-        </p>
-      ) : null}
+      <p
+        aria-hidden={latestResult.detail === null}
+        className={`${
+          latestResult.tone === 'error'
+            ? 'workspace-errorText'
+            : 'workspace-helpText'
+        } workspace-statusDetail workspace-sidebarStableScrollRegion`}
+        data-testid="workspace-runtime-status-detail"
+        role={latestResultDetailRole}
+        title={latestResult.detail ?? undefined}
+      >
+        {latestResultDetailText}
+      </p>
     </SectionCard>
   );
 }

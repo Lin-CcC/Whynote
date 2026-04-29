@@ -5,6 +5,10 @@
   gap: 1rem;
 }
 
+.workspace-panelStack {
+  overflow-anchor: none;
+}
+
 .workspace-section {
   display: flex;
   flex-direction: column;
@@ -660,14 +664,44 @@
 .workspace-inspectorList dd {
   margin: 0;
   color: #0f172a;
+  min-width: 0;
 }
 
+.workspace-sidebarStableText,
+.workspace-sidebarStableTextSingleLine,
 .workspace-inspectorClamp {
   display: -webkit-box;
+  line-height: 1.45;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
   word-break: break-word;
+  -webkit-box-orient: vertical;
+}
+
+.workspace-sidebarStableText,
+.workspace-inspectorClamp {
+  min-height: calc(1.45em * 2);
+  max-height: calc(1.45em * 2);
+  -webkit-line-clamp: 2;
+}
+
+.workspace-sidebarStableTextSingleLine {
+  min-height: 1.45em;
+  max-height: 1.45em;
+  -webkit-line-clamp: 1;
+}
+
+.workspace-sidebarStableScrollRegion {
+  min-height: calc(1.45em * 2);
+  max-height: calc(1.45em * 2);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  scrollbar-width: thin;
+  word-break: break-word;
+}
+
+.workspace-statusDetail {
+  margin-top: 0.75rem;
 }
 
 .workspace-tagSection {

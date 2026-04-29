@@ -47,6 +47,13 @@ export default function SearchControlPanel({
   scope,
   selectedTagIds,
 }: SearchControlPanelProps) {
+  const scopeHelpText =
+    scope === 'current-module'
+      ? `当前默认只搜模块：${currentModuleTitle ?? '未选中模块'}`
+      : scope === 'theme'
+        ? '当前在全主题内搜索，包含模块树和资料区。'
+        : '当前只搜索全局资料区。';
+
   return (
     <SectionCard>
       <div className="workspace-sectionHeader">
@@ -55,12 +62,8 @@ export default function SearchControlPanel({
           <h2 className="workspace-sectionTitle">搜索与定位</h2>
         </div>
       </div>
-      <p className="workspace-helpText">
-        {scope === 'current-module'
-          ? `当前默认只搜模块：${currentModuleTitle ?? '未选中模块'}`
-          : scope === 'theme'
-            ? '当前在全主题内搜索，包含模块树和资料区。'
-            : '当前只搜索全局资料区。'}
+      <p className="workspace-helpText workspace-sidebarStableText" title={scopeHelpText}>
+        {scopeHelpText}
       </p>
       <label className="resources-panelField">
         <span className="resources-panelFieldLabel">关键词</span>
