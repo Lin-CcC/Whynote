@@ -44,6 +44,13 @@ export default function StructureActionBar({
   selectedNodeTitle,
   siblingInsertOptions,
 }: StructureActionBarProps) {
+  const currentNodeContextText =
+    isInteractionLocked && interactionLockReason
+      ? interactionLockReason
+      : selectedNodeTitle
+        ? `当前节点：${selectedNodeTitle}`
+        : '先从结构视图或文本主视图中选中一个节点。';
+
   return (
     <section className="workspace-section">
       <div className="workspace-sectionHeader">
@@ -52,12 +59,11 @@ export default function StructureActionBar({
           <h2 className="workspace-sectionTitle">先做当前这一步学习</h2>
         </div>
       </div>
-      <p className="workspace-helpText">
-        {isInteractionLocked && interactionLockReason
-          ? interactionLockReason
-          : selectedNodeTitle
-            ? `当前节点：${selectedNodeTitle}`
-            : '先从结构视图或文本主视图中选中一个节点。'}
+      <p
+        className="workspace-helpText workspace-sidebarStableText"
+        title={currentNodeContextText}
+      >
+        {currentNodeContextText}
       </p>
       {learningActions.length > 0 ? (
         <div className="workspace-learningActionGrid" data-testid="learning-action-grid">

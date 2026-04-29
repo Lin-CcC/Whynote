@@ -129,6 +129,51 @@ test('keeps the active editor input mounted and focused while autosave status ch
   expect(moduleTitleInput).toHaveFocus();
 });
 
+test('keeps sidebar context synchronized while editing a long module title', async () => {
+  const dependencies = createTestDependencies();
+  const nextTitle =
+    '这是一个会同时带动左右侧栏上下文更新的超长模块标题，用来验证止抖修复后仍然同步但不打断输入';
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  const moduleTitleInput = screen.getByDisplayValue('默认模块');
+
+  moduleTitleInput.focus();
+  expect(moduleTitleInput).toHaveFocus();
+
+  fireEvent.change(moduleTitleInput, {
+    target: {
+      value: nextTitle,
+    },
+  });
+
+  await waitFor(
+    () => {
+      expect(moduleTitleInput).toHaveFocus();
+      expect(moduleTitleInput).toHaveValue(nextTitle);
+      expect(screen.getByTitle(`当前节点：${nextTitle}`)).toBeInTheDocument();
+      expect(screen.getAllByTitle(`模块 · ${nextTitle}`).length).toBeGreaterThan(0);
+      expect(screen.getByTitle(`当前默认只搜模块：${nextTitle}`)).toBeInTheDocument();
+      expect(screen.getByText('保存中')).toBeInTheDocument();
+    },
+    {
+      timeout: 2_000,
+    },
+  );
+
+  await waitFor(
+    () => {
+      expect(screen.getByText('已保存')).toBeInTheDocument();
+    },
+    {
+      timeout: 2_000,
+    },
+  );
+
+  expect(moduleTitleInput).toHaveFocus();
+});
+
 test('does not trigger a cross-component render update warning while editing workspace content', async () => {
   const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   const dependencies = createTestDependencies();

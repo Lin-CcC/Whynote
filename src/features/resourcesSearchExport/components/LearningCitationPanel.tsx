@@ -62,6 +62,9 @@ export default function LearningCitationPanel({
     () => (selectedNode ? collectCitationPresentations(tree, selectedNode) : []),
     [selectedNode, tree],
   );
+  const selectedNodeLabel = selectedNode
+    ? formatNodeLabel(tree, selectedNode)
+    : null;
   const teachingSections = useMemo(
     () => buildTeachingCitationSections(selectedNode, citations),
     [citations, selectedNode],
@@ -85,8 +88,11 @@ export default function LearningCitationPanel({
         </p>
       ) : !isLearningCitationSourceNode(selectedNode) ? (
         <>
-          <p className="workspace-helpText">
-            当前焦点是 {formatNodeLabel(tree, selectedNode)}。学习运行时的资料引用入口当前只对
+          <p
+            className="workspace-helpText workspace-sidebarStableText"
+            title={selectedNodeLabel ?? undefined}
+          >
+            当前焦点是 {selectedNodeLabel}。学习运行时的资料引用入口当前只对
             `question / answer / summary / judgment` 开放。
           </p>
           <p className="workspace-helpText">
@@ -95,8 +101,11 @@ export default function LearningCitationPanel({
         </>
       ) : (
         <>
-          <p className="workspace-helpText">
-            当前焦点：{formatNodeLabel(tree, selectedNode)}
+          <p
+            className="workspace-helpText workspace-sidebarStableText"
+            title={selectedNodeLabel ?? undefined}
+          >
+            当前焦点：{selectedNodeLabel}
           </p>
           {citations.length === 0 ? (
             <p className="workspace-helpText">

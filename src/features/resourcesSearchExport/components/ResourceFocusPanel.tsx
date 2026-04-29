@@ -171,6 +171,10 @@ export default function ResourceFocusPanel({
     pendingDeleteNodeId === resourceNode.id
       ? buildResourceDeleteImpact(tree, resourceNode.id)
       : null;
+  const currentModuleLabel = currentModuleTitle ?? '未选中模块';
+  const editorFocusLabel = editorNode
+    ? formatNodeLabel(tree, editorNode)
+    : '当前没有编辑焦点';
 
   return (
     <SectionCard>
@@ -267,11 +271,15 @@ export default function ResourceFocusPanel({
         ) : null}
         <div>
           <dt>当前模块</dt>
-          <dd>{currentModuleTitle ?? '未选中模块'}</dd>
+          <dd className="workspace-inspectorClamp" title={currentModuleLabel}>
+            {currentModuleLabel}
+          </dd>
         </div>
         <div>
           <dt>模块内编辑焦点</dt>
-          <dd>{editorNode ? formatNodeLabel(tree, editorNode) : '当前没有编辑焦点'}</dd>
+          <dd className="workspace-inspectorClamp" title={editorFocusLabel}>
+            {editorFocusLabel}
+          </dd>
         </div>
       </dl>
 

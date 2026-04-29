@@ -47,6 +47,9 @@ export default function SelectedNodeInspector({
       ? getNodeOrThrow(tree, currentModuleId)
       : null;
   const selectedNodePath = selectedNode ? getNodePath(tree, selectedNode.id) : [];
+  const selectedNodePathSegments = selectedNodePath
+    .filter((node) => node.type !== 'theme-root')
+    .map((node) => getDisplayTitleForNode(tree, node));
   const selectedTagNames = selectedNode
     ? selectedNode.tagIds
         .map((tagId) => tree.tags[tagId]?.name)
@@ -56,6 +59,21 @@ export default function SelectedNodeInspector({
   const builtinTags = resolveBuiltinTags(tree);
   const canSwitchSelectedNodeType =
     Boolean(selectedNode) && selectedNodeTypeSwitchOptions.length > 0;
+  const currentModuleTitle = currentModule?.title ?? '未选中模块';
+  const selectedNodeLabel = selectedNode
+    ? `${getDisplayLabelForNode(tree, selectedNode)} · ${getDisplayTitleForNode(tree, selectedNode)}`
+    : '未选中节点';
+  const selectedNodePathLabel =
+    selectedNodePathSegments.length > 0
+      ? selectedNodePathSegments.join(' / ')
+      : '暂无';
+  const allowedChildTypesLabel = selectedNode
+    ? getAllowedChildTypes(selectedNode.type)
+        .map((nodeType) => getNodeTypeLabel(nodeType))
+        .join('、') || '无'
+    : '暂无';
+  const selectedTagLabel =
+    selectedTagNames.length > 0 ? selectedTagNames.join('、') : '暂无';
 
   return (
     <>
@@ -69,41 +87,42 @@ export default function SelectedNodeInspector({
         <dl className="workspace-inspectorList">
           <div>
             <dt>主题</dt>
-            <dd>{workspaceTitle}</dd>
+            <dd className="workspace-inspectorClamp" title={workspaceTitle}>
+              {workspaceTitle}
+            </dd>
           </div>
           <div>
             <dt>模块</dt>
-            <dd>{currentModule?.title ?? '未选中模块'}</dd>
+            <dd className="workspace-inspectorClamp" title={currentModuleTitle}>
+              {currentModuleTitle}
+            </dd>
           </div>
           <div>
             <dt>节点</dt>
-            <dd className="workspace-inspectorClamp">
-              {selectedNode
-                ? `${getDisplayLabelForNode(tree, selectedNode)} · ${getDisplayTitleForNode(tree, selectedNode)}`
-                : '未选中节点'}
+            <dd className="workspace-inspectorClamp" title={selectedNodeLabel}>
+              {selectedNodeLabel}
             </dd>
           </div>
           <div>
             <dt>路径</dt>
-            <dd className="workspace-inspectorClamp">
-              {selectedNodePath.length > 0
-                ? selectedNodePath.map((node) => node.title).join(' / ')
-                : '暂无'}
+            <dd
+              className="workspace-inspectorClamp"
+              title={selectedNodePathLabel}
+            >
+              {selectedNodePathLabel}
             </dd>
           </div>
           <div>
             <dt>当前可接内容</dt>
-            <dd>
-              {selectedNode
-                ? getAllowedChildTypes(selectedNode.type)
-                    .map((nodeType) => getNodeTypeLabel(nodeType))
-                    .join('、') || '无'
-                : '暂无'}
+            <dd className="workspace-inspectorClamp" title={allowedChildTypesLabel}>
+              {allowedChildTypesLabel}
             </dd>
           </div>
           <div>
             <dt>标签</dt>
-            <dd>{selectedTagNames.length > 0 ? selectedTagNames.join('、') : '暂无'}</dd>
+            <dd className="workspace-inspectorClamp" title={selectedTagLabel}>
+              {selectedTagLabel}
+            </dd>
           </div>
         </dl>
         <div className="workspace-tagSection">

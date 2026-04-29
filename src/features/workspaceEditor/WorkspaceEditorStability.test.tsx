@@ -103,26 +103,23 @@ test('keeps the title input focused while side panels reflect title edits', asyn
   render(<WorkspaceEditor />);
 
   const titleInput = getNodeTitleInput('question-render-boundary');
+  const nextTitle =
+    '这是一个会把侧栏文本一起带着更新的超长标题，用来验证输入焦点不会因为侧栏重排而丢失';
 
   titleInput.focus();
   expect(titleInput).toHaveFocus();
 
   fireEvent.change(titleInput, {
     target: {
-      value: '这是一个会把侧栏文本一起带着更新的超长标题，用来验证输入焦点不会因为侧栏重排而丢失',
+      value: nextTitle,
     },
   });
 
   await waitFor(() => {
     expect(titleInput).toHaveFocus();
-    expect(titleInput).toHaveValue(
-      '这是一个会把侧栏文本一起带着更新的超长标题，用来验证输入焦点不会因为侧栏重排而丢失',
-    );
-    expect(
-      screen.getAllByText(
-        /这是一个会把侧栏文本一起带着更新的超长标题，用来验证输入焦点不会因为侧栏重排而丢失/u,
-      ).length,
-    ).toBeGreaterThan(0);
+    expect(titleInput).toHaveValue(nextTitle);
+    expect(screen.getByTitle(`当前节点：${nextTitle}`)).toBeInTheDocument();
+    expect(screen.getByTitle(`问题 · ${nextTitle}`)).toBeInTheDocument();
   });
 });
 
