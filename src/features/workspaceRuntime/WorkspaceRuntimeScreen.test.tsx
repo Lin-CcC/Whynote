@@ -87,6 +87,48 @@ test('persists workspace edits and restores them on the next mount', async () =>
   expect(await screen.findByDisplayValue('已持久化模块')).toBeInTheDocument();
 });
 
+test('keeps the active editor input mounted and focused while autosave status changes', async () => {
+  const dependencies = createTestDependencies();
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  const moduleTitleInput = screen.getByDisplayValue('默认模块');
+
+  moduleTitleInput.focus();
+  expect(moduleTitleInput).toHaveFocus();
+
+  fireEvent.change(moduleTitleInput, {
+    target: {
+      value: '输入期间不应重挂载',
+    },
+  });
+
+  await waitFor(
+    () => {
+      expect(screen.getByText('保存中')).toBeInTheDocument();
+    },
+    {
+      timeout: 2_000,
+    },
+  );
+
+  expect(screen.getByDisplayValue('输入期间不应重挂载')).toBe(moduleTitleInput);
+  expect(moduleTitleInput).toHaveFocus();
+
+  await waitFor(
+    () => {
+      expect(screen.getByText('已保存')).toBeInTheDocument();
+    },
+    {
+      timeout: 2_000,
+    },
+  );
+
+  expect(screen.getByDisplayValue('输入期间不应重挂载')).toBe(moduleTitleInput);
+  expect(moduleTitleInput).toHaveFocus();
+});
+
 test('does not trigger a cross-component render update warning while editing workspace content', async () => {
   const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   const dependencies = createTestDependencies();

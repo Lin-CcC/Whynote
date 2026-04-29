@@ -4,7 +4,9 @@ import {
   type ChangeEvent,
   type FocusEvent,
   type MouseEvent,
+  type RefObject,
   type ReactNode,
+  useRef,
   useState,
 } from 'react';
 
@@ -60,6 +62,9 @@ export default function EditorNodeSection({
   tree,
 }: EditorNodeSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const contentInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const statusSelectRef = useRef<HTMLSelectElement | null>(null);
   const node = getNodeOrThrow(tree, nodeId);
   const childNodes = getChildNodes(tree, node.id);
   const isSelected = node.id === selectedNodeId;
@@ -87,14 +92,12 @@ export default function EditorNodeSection({
     tree,
   });
 
-  function handleEditableFocus() {
-    if (!isSelected) {
-      onSelectNode(node.id);
-    }
-  }
-
-  function handleSectionFocusCapture(event: FocusEvent<HTMLElement>) {
-    if (!isEditableTarget(event.target)) {
+  function handleEditableFocus(event: FocusEvent<HTMLElement>) {
+    if (!isOwnedEditableTarget(event.target, {
+      contentInputRef,
+      statusSelectRef,
+      titleInputRef,
+    })) {
       return;
     }
 
@@ -105,13 +108,15 @@ export default function EditorNodeSection({
     setIsEditing(true);
   }
 
-  function handleSectionBlurCapture(event: FocusEvent<HTMLElement>) {
+  function handleEditableBlur(event: FocusEvent<HTMLElement>) {
     const nextTarget = event.relatedTarget;
 
     if (
-      nextTarget instanceof HTMLElement &&
-      event.currentTarget.contains(nextTarget) &&
-      isEditableTarget(nextTarget)
+      isOwnedEditableTarget(nextTarget, {
+        contentInputRef,
+        statusSelectRef,
+        titleInputRef,
+      })
     ) {
       return;
     }
@@ -145,9 +150,7 @@ export default function EditorNodeSection({
       data-node-selected={isSelected}
       data-node-type={node.type}
       data-testid={`editor-node-${node.id}`}
-      onBlurCapture={handleSectionBlurCapture}
       onClick={handleNodeClick}
-      onFocusCapture={handleSectionFocusCapture}
       ref={(element) => registerNodeElement(node.id, element)}
       style={{ '--node-depth': depth } as CSSProperties}
       tabIndex={-1}
@@ -162,9 +165,11 @@ export default function EditorNodeSection({
               aria-label={`${displayTitle || getDisplayLabelForNode(tree, node)} 的步骤状态`}
               className="workspace-statusSelect"
               disabled={isInteractionLocked}
+              onBlur={handleEditableBlur}
               onChange={handleStatusChange}
               onClick={(event) => event.stopPropagation()}
               onFocus={handleEditableFocus}
+              ref={statusSelectRef}
               value={node.status}
             >
               {Object.entries(PLAN_STEP_STATUS_LABELS).map(([status, label]) => (
@@ -201,20 +206,24 @@ export default function EditorNodeSection({
         aria-label={`${displayTitle || getDisplayLabelForNode(tree, node)} 标题`}
         className="workspace-nodeTitleInput"
         disabled={isInteractionLocked}
+        onBlur={handleEditableBlur}
         onChange={handleTitleChange}
         onClick={(event) => event.stopPropagation()}
         onFocus={handleEditableFocus}
         placeholder={getNodeInputPlaceholderForNode(tree, node, 'title')}
+        ref={titleInputRef}
         value={displayTitle}
       />
       <textarea
         aria-label={`${displayTitle || getDisplayLabelForNode(tree, node)} 内容`}
         className="workspace-nodeContentInput"
         disabled={isInteractionLocked}
+        onBlur={handleEditableBlur}
         onChange={handleContentChange}
         onClick={(event) => event.stopPropagation()}
         onFocus={handleEditableFocus}
         placeholder={getNodeInputPlaceholderForNode(tree, node, 'content')}
+        ref={contentInputRef}
         rows={node.type === 'plan-step' ? 3 : 4}
         value={node.content}
       />
@@ -273,12 +282,17 @@ function getNodeSelectionHint(
     : `${roleDescription}。卡片只选中，输入框才会编辑。`;
 }
 
-function isEditableTarget(
+function isOwnedEditableTarget(
   target: EventTarget | null,
-): target is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
+  refs: {
+    contentInputRef: RefObject<HTMLTextAreaElement | null>;
+    statusSelectRef: RefObject<HTMLSelectElement | null>;
+    titleInputRef: RefObject<HTMLInputElement | null>;
+  },
+) {
   return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement
+    target === refs.titleInputRef.current ||
+    target === refs.contentInputRef.current ||
+    target === refs.statusSelectRef.current
   );
 }

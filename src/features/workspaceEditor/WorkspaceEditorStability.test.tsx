@@ -52,6 +52,14 @@ test('respects the real focused input when the user starts editing another node 
       'data-node-editing',
       'true',
     );
+    expect(screen.getByTestId('editor-node-step-render-boundary')).toHaveAttribute(
+      'data-node-editing',
+      'false',
+    );
+    expect(screen.getByTestId('editor-node-module-state-rendering')).toHaveAttribute(
+      'data-node-editing',
+      'false',
+    );
   });
   expect(screen.getByTestId('editor-node-question-render-boundary')).toHaveTextContent(
     '当前正在编辑输入框。',
@@ -59,6 +67,7 @@ test('respects the real focused input when the user starts editing another node 
   expect(screen.getByTestId('editor-node-question-render-boundary')).toHaveTextContent(
     '编辑中',
   );
+  expect(screen.getAllByText('编辑中')).toHaveLength(1);
 
   fireEvent.change(textarea, {
     target: {
