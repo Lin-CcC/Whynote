@@ -43,6 +43,8 @@ export default function WorkspaceRuntimeActionCard({
     evaluationTarget,
   );
   const isQuestionClosureContext = questionClosureStage !== null;
+  const shouldUseInlineJudgmentPrimaryAction =
+    questionClosureStage === 'judgment';
   const canReturnToAnswer =
     questionClosureStage !== null &&
     questionClosureStage !== 'answer' &&
@@ -148,91 +150,126 @@ export default function WorkspaceRuntimeActionCard({
               canViewAnswerExplanation,
             )}
           </p>
-          <div className="workspace-actionGrid">
-            {questionClosureStage === 'judgment' ? (
-              <button
-                className="workspace-primaryAction"
-                disabled={!canReturnToAnswer}
-                onClick={handleReturnToAnswer}
-                type="button"
-              >
-                切到对应回答修改
-              </button>
-            ) : questionClosureStage === 'summary' ? (
-              <button
-                className="workspace-primaryAction"
-                disabled={!canReturnToAnswer}
-                onClick={handleReturnToAnswer}
-                type="button"
-              >
-                回到当前回答继续修改
-              </button>
-            ) : (
-              <button
-                className="workspace-primaryAction"
-                disabled={!canEvaluateQuestionAnswer}
-                onClick={handleEvaluateQuestionAnswer}
-                type="button"
-              >
-                重新评估当前回答
-              </button>
-            )}
-            {questionClosureStage !== 'judgment' &&
-            questionClosureStage !== 'summary' &&
-            canViewAnswerExplanation ? (
-              <button
-                disabled={!canViewAnswerExplanation}
-                onClick={handleViewAnswerExplanation}
-                type="button"
-              >
-                查看答案解析
-              </button>
-            ) : null}
-            {questionClosureStage === 'question' && canReturnToAnswer ? (
-              <button
-                disabled={!canReturnToAnswer}
-                onClick={handleReturnToAnswer}
-                type="button"
-              >
-                回到当前回答继续修改
-              </button>
-            ) : null}
-            {questionClosureStage === 'judgment' ||
-            questionClosureStage === 'summary' ? (
-              <button
-                disabled={!canEvaluateQuestionAnswer}
-                onClick={handleEvaluateQuestionAnswer}
-                type="button"
-              >
-                重新评估当前回答
-              </button>
-            ) : null}
-          </div>
-          <p className="workspace-actionHint">
-            {getQuestionClosureHint(
-              questionClosureStage,
-              answerFollowUpCount,
-              canViewAnswerExplanation,
-            )}
-          </p>
+          {shouldUseInlineJudgmentPrimaryAction ? (
+            <p className="workspace-actionHint">
+              {getQuestionClosureHint(
+                questionClosureStage,
+                answerFollowUpCount,
+                canViewAnswerExplanation,
+              )}
+            </p>
+          ) : (
+            <>
+              <div className="workspace-actionGrid">
+                {questionClosureStage === 'summary' ? (
+                  <button
+                    className="workspace-primaryAction"
+                    disabled={!canReturnToAnswer}
+                    onClick={handleReturnToAnswer}
+                    type="button"
+                  >
+                    回到当前回答继续修改
+                  </button>
+                ) : (
+                  <button
+                    className="workspace-primaryAction"
+                    disabled={!canEvaluateQuestionAnswer}
+                    onClick={handleEvaluateQuestionAnswer}
+                    type="button"
+                  >
+                    重新评估当前回答
+                  </button>
+                )}
+                {questionClosureStage !== 'summary' && canViewAnswerExplanation ? (
+                  <button
+                    disabled={!canViewAnswerExplanation}
+                    onClick={handleViewAnswerExplanation}
+                    type="button"
+                  >
+                    查看答案解析
+                  </button>
+                ) : null}
+                {questionClosureStage === 'question' && canReturnToAnswer ? (
+                  <button
+                    disabled={!canReturnToAnswer}
+                    onClick={handleReturnToAnswer}
+                    type="button"
+                  >
+                    回到当前回答继续修改
+                  </button>
+                ) : null}
+                {questionClosureStage === 'summary' ? (
+                  <button
+                    disabled={!canEvaluateQuestionAnswer}
+                    onClick={handleEvaluateQuestionAnswer}
+                    type="button"
+                  >
+                    重新评估当前回答
+                  </button>
+                ) : null}
+              </div>
+              <p className="workspace-actionHint">
+                {getQuestionClosureHint(
+                  questionClosureStage,
+                  answerFollowUpCount,
+                  canViewAnswerExplanation,
+                )}
+              </p>
+            </>
+          )}
         </div>
       ) : null}
-      <div className="workspace-actionGrid">
-        <button
-          disabled={!canGeneratePlanSteps}
-          onClick={handleGeneratePlanSteps}
-          type="button"
-        >
-          为当前模块规划学习路径
-        </button>
-        <button
-          disabled={!canSplitQuestion}
-          onClick={handleSplitQuestion}
-          type="button"
-        >
-          拆分当前问题
-        </button>
-        {!isQuestionClosureContext ? (
+      {isQuestionClosureContext ? (
+        <div className="workspace-secondaryActionSection">
+          <div className="workspace-sectionHeader">
+            <div>
+              <p className="workspace-kicker">其他动作</p>
+              <h3 className="workspace-subsectionTitle">需要时再用</h3>
+            </div>
+          </div>
+          <p className="workspace-helpText">
+            当前主路径已经在上面收口，这里只保留不会抢主动作的次级运行时动作。
+          </p>
+          <div className="workspace-actionGrid">
+            <button
+              disabled={!canGeneratePlanSteps}
+              onClick={handleGeneratePlanSteps}
+              type="button"
+            >
+              为当前模块规划学习路径
+            </button>
+            <button
+              disabled={!canSplitQuestion}
+              onClick={handleSplitQuestion}
+              type="button"
+            >
+              拆分当前问题
+            </button>
+            <button
+              disabled={!canSuggestCompletion}
+              onClick={handleSuggestCompletion}
+              type="button"
+            >
+              查看当前步骤完成依据
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="workspace-actionGrid">
+          <button
+            disabled={!canGeneratePlanSteps}
+            onClick={handleGeneratePlanSteps}
+            type="button"
+          >
+            为当前模块规划学习路径
+          </button>
+          <button
+            disabled={!canSplitQuestion}
+            onClick={handleSplitQuestion}
+            type="button"
+          >
+            拆分当前问题
+          </button>
           <button
             disabled={!canEvaluateQuestionAnswer}
             onClick={handleEvaluateQuestionAnswer}
@@ -240,15 +277,15 @@ export default function WorkspaceRuntimeActionCard({
           >
             重新评估当前回答
           </button>
-        ) : null}
-        <button
-          disabled={!canSuggestCompletion}
-          onClick={handleSuggestCompletion}
-          type="button"
-        >
-          查看当前步骤完成依据
-        </button>
-      </div>
+          <button
+            disabled={!canSuggestCompletion}
+            onClick={handleSuggestCompletion}
+            type="button"
+          >
+            查看当前步骤完成依据
+          </button>
+        </div>
+      )}
     </SectionCard>
   );
 }
@@ -290,15 +327,15 @@ function getSectionTitle(questionClosureStage: QuestionClosureStage) {
 function getSectionHelpText(questionClosureStage: QuestionClosureStage) {
   switch (questionClosureStage) {
     case 'question':
-      return '这道题已经有可评估的回答。先看清当前闭环，再决定是继续评估还是回到回答补结构。';
+      return '这道题已经有可评估回答，主动作先补评估闭环。';
     case 'answer':
-      return '这里的主路径是继续修改当前回答，再重新评估；如果系统已经生成答案解析，也可以先对照标准理解。';
+      return '当前回答还是主编辑面。先改这版回答，再决定是否重评。';
     case 'judgment':
-      return '当前这条 judgment 已经能收窄到对应回答，所以后续动作应继续围绕这版回答，而不是退回父 question 自己找路。';
+      return '当前 judgment 的主动作已经收口到正文卡片，左侧不再重复抢这条路径。';
     case 'summary':
-      return '答案解析负责给出标准理解或纠错讲解；真正要修改内容时，还是回到对应回答继续迭代。';
+      return '答案解析负责给标准理解；真正改内容时，还是回到回答。';
     default:
-      return '当前接的是最小学习闭环：规划步骤与铺垫讲解、拆分问题、评估回答、查看步骤完成依据。';
+      return '这里只保留学习运行时主路径，不和结构动作抢职责。';
   }
 }
 
@@ -315,13 +352,13 @@ function getQuestionClosureCalloutTitle(
 ) {
   switch (questionClosureStage) {
     case 'question':
-      return '下一步：先评估这道题当前回答';
+      return '主动作：先评估当前回答';
     case 'answer':
-      return '围绕当前回答继续';
+      return '主动作：改完这版回答再重评';
     case 'judgment':
-      return '下一步：先按判断回到回答补缺口';
+      return '主动作：留在正文里的当前 judgment 卡片';
     case 'summary':
-      return '下一步：对照答案解析，再回到回答修正';
+      return '主动作：回到回答继续修改';
     default:
       return '下一步';
   }
@@ -334,18 +371,18 @@ function getQuestionClosureCalloutDescription(
   switch (questionClosureStage) {
     case 'question':
       return hasAnswerExplanation
-        ? '这道题已经有一版答案解析，可以先对照再决定是否重评。'
-        : '这道题已经有可评估回答，先跑一次评估，把判断和答案解析补齐。';
+        ? '这道题已经有答案解析，但主动作仍然是先把当前回答评估完整。'
+        : '这道题已经有可评估回答，先把 judgment 和答案解析补齐。';
     case 'answer':
       return hasAnswerExplanation
-        ? '评估、答案解析、修改回答这三步里，主路径优先留在当前回答。'
-        : '先重新评估当前回答，补出判断和答案解析，再决定是否继续追问。';
+        ? '答案解析可以对照，但主路径还是留在当前回答。'
+        : '先重评当前回答，把判断和答案解析补出来。';
     case 'judgment':
       return hasAnswerExplanation
-        ? '判断告诉你还差什么，答案解析告诉你标准理解是什么；两者都不该替代当前回答本身。'
-        : '当前 judgment 已经能定位到对应回答，但还缺答案解析时，主路径仍然是先回到回答补这次缺口。';
+        ? '判断指出缺口，提示和答案解析留在正文卡片里；左侧不再重复放同一主动作。'
+        : '先回到回答补这次缺口；如果还没有答案解析，也在正文里的 judgment 卡片继续处理。';
     case 'summary':
-      return '现在看的就是答案解析。先对照标准理解，再决定是否回到回答继续改写。';
+      return '现在看的就是答案解析。对照完标准理解，再回到回答继续修改。';
     default:
       return '';
   }
@@ -360,16 +397,16 @@ function getQuestionClosureHint(
     case 'question':
     case 'answer':
       if (answerFollowUpCount > 0) {
-        return `已生成 ${String(answerFollowUpCount)} 个追问，但它们现在只作为次级推进，不会抢走当前回答。`;
+        return `已生成 ${String(answerFollowUpCount)} 个追问，但它们现在都降成次级推进。`;
       }
 
       return hasAnswerExplanation
-        ? '默认主路径会留在当前回答上，方便你先对照答案解析，再决定要不要修改后重评。'
-        : '先把判断和答案解析补齐，测试时就不会再遇到“有 judgment 但没有答案解析”的主路径缺口。';
+        ? '主路径会继续留在当前回答上，方便你对照后立刻改写。'
+        : '先把判断和答案解析补齐，当前回答的闭环才算成形。';
     case 'judgment':
-      return 'judgment 节点不是终点。先切到对应回答改写，再重新评估；“给我提示”和“查看答案解析”继续放在正文里的当前 judgment 卡片上。';
+      return '回到回答补缺口仍是唯一主动作；“给我提示”和“查看答案解析”都留在正文里的当前 judgment 卡片。';
     case 'summary':
-      return '答案解析已经存在。接下来如果要继续学习动作，优先回到对应回答改写，再重新评估。';
+      return '答案解析已经存在。接下来优先回到回答改写，再决定是否重评。';
     default:
       return '';
   }

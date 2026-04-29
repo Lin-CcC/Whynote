@@ -114,6 +114,37 @@ test('renders inline judgment actions and generates a hint that stays distinct f
   expect(screen.getByText('判断所依据的资料')).toBeInTheDocument();
 });
 
+test('keeps only one primary action in judgment context and explains why answer explanation is disabled', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createJudgmentInlineSnapshotWithoutSummary(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  const judgmentNode = await screen.findByTestId('editor-node-judgment-inline-primary');
+  fireEvent.click(judgmentNode);
+
+  const actions = within(judgmentNode).getByTestId(
+    'judgment-inline-actions-judgment-inline-primary',
+  );
+  const returnButton = within(actions).getByRole('button', {
+    name: '回到当前回答继续修改',
+  });
+
+  expect(screen.getAllByRole('button', { name: '回到当前回答继续修改' })).toHaveLength(
+    1,
+  );
+  expect(returnButton).toHaveClass('workspace-primaryAction');
+  expect(
+    within(actions).getByRole('button', { name: '查看答案解析' }),
+  ).toBeDisabled();
+  expect(
+    within(actions).getByText(
+      '当前还没有对应的答案解析，所以“查看答案解析”会保持禁用。',
+    ),
+  ).toBeInTheDocument();
+});
+
 test('jumps from judgment to the matching summary and shows it as an answer explanation', async () => {
   const dependencies = await createPreloadedDependencies(
     createJudgmentInlineSnapshot(),
@@ -304,6 +335,81 @@ function createJudgmentInlineSnapshot(): WorkspaceSnapshot {
       purpose: 'judgment',
       createdAt: '2026-04-28T00:00:00.000Z',
       updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createJudgmentInlineSnapshotWithoutSummary(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '判断节点内联动作（无答案解析）',
+    workspaceId: 'workspace-judgment-inline-no-summary',
+    rootId: 'theme-judgment-inline-no-summary',
+    createdAt: '2026-04-28T00:00:00.000Z',
+    updatedAt: '2026-04-28T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-judgment-inline',
+      title: '理解批处理',
+      content: '验证 judgment 节点上的就地下一步。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-judgment-inline',
+    createNode({
+      type: 'plan-step',
+      id: 'step-judgment-inline',
+      title: '先看反馈再改回答',
+      content: '让 judgment 直接承接下一步动作。',
+      status: 'doing',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-judgment-inline',
+    createNode({
+      type: 'question',
+      id: 'question-inline-root',
+      title: '为什么状态更新会被批处理？',
+      content: '请解释它为什么会减少重复渲染。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-inline-root',
+    createNode({
+      type: 'answer',
+      id: 'answer-inline-primary',
+      title: '回答草稿',
+      content: '因为 React 会把同一轮里的更新先放在一起。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-inline-root',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-inline-primary',
+      title: '判断：回答还差一点',
+      content:
+        '已答到的部分：\n- 你已经答到了“更新会先放在一起”这一层。\n\n还缺的关键点：\n1. 你还缺“为什么会减少重复渲染”这一条因果关系。\n\n为什么这些缺口关键：\n- 如果少了统一提交和重复计算之间的因果链，就还是停在现象层。',
+      createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
 

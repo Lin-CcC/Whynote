@@ -63,6 +63,7 @@ test('applies the Gemini template and restores a saved preset after remount', as
   expect(
     await screen.findByRole('button', { name: '覆盖当前预设' }),
   ).toBeInTheDocument();
+  expect(screen.getByText('当前会覆盖已选中的本地预设。')).toBeInTheDocument();
 
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
@@ -74,6 +75,33 @@ test('applies the Gemini template and restores a saved preset after remount', as
   expect(screen.getByLabelText(/API Key/i)).toHaveValue('gemini-key');
   expect(screen.getByLabelText('Model')).toHaveValue('gemini-2.5-flash');
   expect(screen.getByLabelText('预设名称')).toHaveValue('我的 Gemini');
+});
+
+test('explains why preset saving is disabled until a preset name is provided', async () => {
+  const dependencies = createTestDependencies();
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.change(screen.getByLabelText('预设名称'), {
+    target: {
+      value: '',
+    },
+  });
+
+  expect(screen.getByRole('button', { name: '保存为新预设' })).toBeDisabled();
+  expect(screen.getByText('要保存为预设，先填一个预设名称。')).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText('预设名称'), {
+    target: {
+      value: '临时预设',
+    },
+  });
+
+  expect(screen.getByRole('button', { name: '保存为新预设' })).toBeEnabled();
+  expect(
+    screen.getByText('当前会把这组三项配置保存成新的本地预设。'),
+  ).toBeInTheDocument();
 });
 
 test('switches between saved presets and keeps the provider chain working', async () => {
@@ -329,5 +357,8 @@ function findOptionValueByText(
   select: HTMLSelectElement,
   optionLabel: string,
 ) {
-  return [...select.options].find((option) => option.text === optionLabel)?.value ?? null;
+  return (
+    [...select.options].find((option) => option.text === optionLabel)?.value ??
+    null
+  );
 }

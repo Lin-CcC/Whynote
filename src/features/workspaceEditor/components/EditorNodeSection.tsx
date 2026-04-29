@@ -2,18 +2,26 @@ import {
   Fragment,
   type CSSProperties,
   type ChangeEvent,
+  type FocusEvent,
   type MouseEvent,
   type ReactNode,
+  useState,
 } from 'react';
 
 import { resolvePlanStepRuntimeStatus } from '../../learningEngine';
-import { getNodeOrThrow, type NodeTree, type PlanStepStatus } from '../../nodeDomain';
+import {
+  getNodeOrThrow,
+  type NodeTree,
+  type PlanStepStatus,
+  type TreeNode,
+} from '../../nodeDomain';
 import {
   getChildNodes,
   getDisplayLabelForNode,
   getDisplayTitleForNode,
   getNodeEmphasis,
   getNodeInputPlaceholderForNode,
+  getNodeRoleDescription,
 } from '../utils/treeSelectors';
 import type {
   NodeContentPatch,
@@ -51,6 +59,7 @@ export default function EditorNodeSection({
   selectedNodeId,
   tree,
 }: EditorNodeSectionProps) {
+  const [isEditing, setIsEditing] = useState(false);
   const node = getNodeOrThrow(tree, nodeId);
   const childNodes = getChildNodes(tree, node.id);
   const isSelected = node.id === selectedNodeId;
@@ -84,6 +93,32 @@ export default function EditorNodeSection({
     }
   }
 
+  function handleSectionFocusCapture(event: FocusEvent<HTMLElement>) {
+    if (!isEditableTarget(event.target)) {
+      return;
+    }
+
+    if (!isSelected) {
+      onSelectNode(node.id);
+    }
+
+    setIsEditing(true);
+  }
+
+  function handleSectionBlurCapture(event: FocusEvent<HTMLElement>) {
+    const nextTarget = event.relatedTarget;
+
+    if (
+      nextTarget instanceof HTMLElement &&
+      event.currentTarget.contains(nextTarget) &&
+      isEditableTarget(nextTarget)
+    ) {
+      return;
+    }
+
+    setIsEditing(false);
+  }
+
   function handleTitleChange(event: ChangeEvent<HTMLInputElement>) {
     onUpdateNode(node.id, { title: event.target.value });
   }
@@ -106,10 +141,13 @@ export default function EditorNodeSection({
       aria-selected={isSelected}
       className="workspace-node"
       data-node-emphasis={getNodeEmphasis(node)}
+      data-node-editing={isEditing}
       data-node-selected={isSelected}
       data-node-type={node.type}
       data-testid={`editor-node-${node.id}`}
+      onBlurCapture={handleSectionBlurCapture}
       onClick={handleNodeClick}
+      onFocusCapture={handleSectionFocusCapture}
       ref={(element) => registerNodeElement(node.id, element)}
       style={{ '--node-depth': depth } as CSSProperties}
       tabIndex={-1}
@@ -139,10 +177,11 @@ export default function EditorNodeSection({
           {isSelected ? (
             <span className="workspace-selectedBadge">已选中</span>
           ) : null}
+          {isEditing ? <span className="workspace-editingBadge">编辑中</span> : null}
         </div>
         {isSelected ? (
           <p className="workspace-nodeSelectionHint">
-            这个节点已经被选中。点击卡片空白处只切换选中；点击标题或内容输入框才会进入编辑。
+            {getNodeSelectionHint(tree, node, isEditing)}
           </p>
         ) : null}
         {node.type === 'plan-step' && planStepRuntimeStatus ? (
@@ -165,6 +204,7 @@ export default function EditorNodeSection({
         onChange={handleTitleChange}
         onClick={(event) => event.stopPropagation()}
         onFocus={handleEditableFocus}
+        placeholder={getNodeInputPlaceholderForNode(tree, node, 'title')}
         value={displayTitle}
       />
       <textarea
@@ -218,5 +258,27 @@ export default function EditorNodeSection({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function getNodeSelectionHint(
+  tree: NodeTree,
+  node: TreeNode,
+  isEditing: boolean,
+) {
+  const roleDescription = getNodeRoleDescription(tree, node);
+
+  return isEditing
+    ? `${roleDescription}。当前正在编辑输入框。`
+    : `${roleDescription}。卡片只选中，输入框才会编辑。`;
+}
+
+function isEditableTarget(
+  target: EventTarget | null,
+): target is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
   );
 }

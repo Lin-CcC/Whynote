@@ -300,18 +300,15 @@ test('clears completion suggestion after switching to another node', async () =>
   });
   fireEvent.click(completionSuggestionButton);
 
-  expect(
-    await screen.findByRole('heading', { name: '当前步骤可以考虑标记完成' }),
-  ).toBeInTheDocument();
+  expect(await screen.findByText('步骤可考虑完成')).toBeInTheDocument();
   expect(screen.getByText('当前步骤已满足最小学习闭环。')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: /^问题什么是闭环？$/ }));
 
   await waitFor(() => {
-    expect(
-      screen.queryByRole('heading', { name: '当前步骤可以考虑标记完成' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('步骤可考虑完成')).not.toBeInTheDocument();
   });
+  expect(screen.queryByText('当前步骤已满足最小学习闭环。')).not.toBeInTheDocument();
 });
 
 test('clears completion suggestion after editing the related workspace content', async () => {
@@ -331,9 +328,7 @@ test('clears completion suggestion after editing the related workspace content',
   });
   fireEvent.click(completionSuggestionButton);
 
-  expect(
-    await screen.findByRole('heading', { name: '当前步骤可以考虑标记完成' }),
-  ).toBeInTheDocument();
+  expect(await screen.findByText('步骤可考虑完成')).toBeInTheDocument();
   expect(screen.getByText('当前步骤已满足最小学习闭环。')).toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText('理解闭环 内容'), {
@@ -343,10 +338,9 @@ test('clears completion suggestion after editing the related workspace content',
   });
 
   await waitFor(() => {
-    expect(
-      screen.queryByRole('heading', { name: '当前步骤可以考虑标记完成' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('步骤可考虑完成')).not.toBeInTheDocument();
   });
+  expect(screen.queryByText('当前步骤已满足最小学习闭环。')).not.toBeInTheDocument();
 });
 
 function createTestDependencies(options?: {
