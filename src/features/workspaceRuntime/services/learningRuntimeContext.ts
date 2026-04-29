@@ -8,7 +8,9 @@ import {
   extractJudgmentGapItemsFromText,
 } from '../../learningEngine/services/closureHint';
 import {
+  getJudgmentNodeKind,
   getNodeOrThrow,
+  getSummaryNodeKind,
   isScaffoldSummaryNode,
   type ModuleNode,
   type NodeTree,
@@ -54,6 +56,16 @@ export interface JudgmentInlineActionContext {
   summaryNodeId: string | null;
 }
 
+export interface SummaryEvaluationTarget {
+  answerNodeId: string | null;
+  questionNodeId: string;
+  summaryNodeId: string;
+}
+
+export interface SummaryCheckJudgmentContext extends SummaryEvaluationTarget {
+  judgmentNodeId: string;
+}
+
 export interface LearningActionRuntimeContext {
   currentNode: NonNullable<LearningActionDraftInput['currentNode']>;
   existingQuestionTitles: string[];
@@ -71,6 +83,20 @@ export interface JudgmentHintRuntimeContext extends QuestionClosureRuntimeContex
   judgmentNodeId: string;
   questionNodeId: string;
   summaryContent: string;
+}
+
+export interface SummaryEvaluationRuntimeContext {
+  answerNodeId: string | null;
+  introductions: string[];
+  learnerAnswer: string;
+  learnerSummary: string;
+  moduleNode: ModuleNode | null;
+  planStepNode: PlanStepNode | null;
+  questionNodeId: string;
+  questionPath: QuestionClosureInput['questionPath'];
+  referenceCandidates: LearningReferenceCandidate[];
+  resourceSummary: string;
+  summaryNodeId: string;
 }
 
 export function buildQuestionClosureRuntimeContext(
@@ -293,7 +319,12 @@ export function getJudgmentInlineActionContext(
 ): JudgmentInlineActionContext | null {
   const judgmentNode = tree.nodes[judgmentNodeId];
 
-  if (!judgmentNode || judgmentNode.type !== 'judgment' || judgmentNode.parentId === null) {
+  if (
+    !judgmentNode ||
+    judgmentNode.type !== 'judgment' ||
+    judgmentNode.parentId === null ||
+    getJudgmentNodeKind(tree, judgmentNode) !== 'answer-closure'
+  ) {
     return null;
   }
 
@@ -339,7 +370,11 @@ export function buildJudgmentHintRuntimeContext(
 ): JudgmentHintRuntimeContext {
   const judgmentNode = getNodeOrThrow(tree, judgmentNodeId);
 
-  if (judgmentNode.type !== 'judgment' || judgmentNode.parentId === null) {
+  if (
+    judgmentNode.type !== 'judgment' ||
+    judgmentNode.parentId === null ||
+    getJudgmentNodeKind(tree, judgmentNode) !== 'answer-closure'
+  ) {
     throw new Error('当前节点不是可生成提示的 judgment。');
   }
 
@@ -385,6 +420,133 @@ export function buildJudgmentHintRuntimeContext(
     judgmentNodeId: judgmentNode.id,
     questionNodeId: questionNode.id,
     summaryContent: summaryNode?.content ?? '',
+  };
+}
+
+export function resolveSummaryEvaluationTarget(
+  tree: NodeTree,
+  selectedNodeId: string | null,
+): SummaryEvaluationTarget | null {
+  if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
+    return null;
+  }
+
+  const selectedNode = getNodeOrThrow(tree, selectedNodeId);
+
+  if (
+    selectedNode.type !== 'summary' ||
+    selectedNode.parentId === null ||
+    isScaffoldSummaryNode(tree, selectedNode) ||
+    getSummaryNodeKind(tree, selectedNode) !== 'manual'
+  ) {
+    return null;
+  }
+
+  const parentNode = tree.nodes[selectedNode.parentId];
+
+  if (parentNode?.type !== 'question') {
+    return null;
+  }
+
+  return {
+    answerNodeId:
+      findLatestAnswerBeforeQuestionChild(tree, parentNode.id, selectedNode.id)?.id ??
+      null,
+    questionNodeId: parentNode.id,
+    summaryNodeId: selectedNode.id,
+  };
+}
+
+export function buildSummaryEvaluationRuntimeContext(
+  tree: NodeTree,
+  summaryNodeId: string,
+  options: LearningReferenceContextOptions = {},
+): SummaryEvaluationRuntimeContext {
+  const summaryNode = getNodeOrThrow(tree, summaryNodeId);
+
+  if (
+    summaryNode.type !== 'summary' ||
+    summaryNode.parentId === null ||
+    isScaffoldSummaryNode(tree, summaryNode)
+  ) {
+    throw new Error('当前节点不是可检查理解的 summary。');
+  }
+
+  const questionNode = tree.nodes[summaryNode.parentId];
+
+  if (questionNode?.type !== 'question') {
+    throw new Error('当前 summary 不在 question 语境下，暂时无法做理解检查。');
+  }
+
+  const planStepNode = findAncestorNode(tree, questionNode.id, 'plan-step');
+  const referenceCandidates = collectLearningReferenceCandidates(
+    tree,
+    options.resourceMetadataByNodeId,
+  );
+
+  if (!planStepNode) {
+    throw new Error('当前总结不在任何学习步骤下，无法生成理解检查。');
+  }
+
+  const answerNode =
+    findLatestAnswerBeforeQuestionChild(tree, questionNode.id, summaryNode.id);
+
+  return {
+    answerNodeId: answerNode?.id ?? null,
+    introductions: collectPlanStepIntroductions(tree, planStepNode.id),
+    learnerAnswer: answerNode ? formatAnswerForEvaluation(answerNode) : '',
+    learnerSummary: formatNodeContent(summaryNode.title, summaryNode.content),
+    moduleNode: findAncestorNode(tree, questionNode.id, 'module'),
+    planStepNode,
+    questionNodeId: questionNode.id,
+    questionPath: collectQuestionPath(tree, questionNode.id),
+    referenceCandidates,
+    resourceSummary: summarizeLearningReferenceCandidates(referenceCandidates),
+    summaryNodeId: summaryNode.id,
+  };
+}
+
+export function resolveSummaryCheckJudgmentContext(
+  tree: NodeTree,
+  selectedNodeId: string | null,
+): SummaryCheckJudgmentContext | null {
+  if (!selectedNodeId || !tree.nodes[selectedNodeId]) {
+    return null;
+  }
+
+  const selectedNode = getNodeOrThrow(tree, selectedNodeId);
+
+  if (
+    selectedNode.type !== 'judgment' ||
+    selectedNode.parentId === null ||
+    getJudgmentNodeKind(tree, selectedNode) !== 'summary-check'
+  ) {
+    return null;
+  }
+
+  const questionNode = tree.nodes[selectedNode.parentId];
+
+  if (questionNode?.type !== 'question') {
+    return null;
+  }
+
+  const summaryNode = findImmediatePreviousSummarySibling(
+    tree,
+    questionNode.id,
+    selectedNode.id,
+  );
+
+  if (!summaryNode) {
+    return null;
+  }
+
+  return {
+    answerNodeId:
+      findLatestAnswerBeforeQuestionChild(tree, questionNode.id, summaryNode.id)?.id ??
+      null,
+    judgmentNodeId: selectedNode.id,
+    questionNodeId: questionNode.id,
+    summaryNodeId: summaryNode.id,
   };
 }
 
@@ -565,6 +727,20 @@ function resolveScopedAnswerNode(tree: NodeTree, selectedNodeId: string) {
     return null;
   }
 
+  if (
+    selectedNode.type === 'judgment' &&
+    getJudgmentNodeKind(tree, selectedNode) === 'summary-check'
+  ) {
+    return null;
+  }
+
+  if (
+    selectedNode.type === 'summary' &&
+    getSummaryNodeKind(tree, selectedNode) === 'manual'
+  ) {
+    return null;
+  }
+
   const parentNode = tree.nodes[selectedNode.parentId];
 
   if (parentNode?.type !== 'question') {
@@ -643,6 +819,25 @@ function collectQuestionChildNodes(tree: NodeTree, questionNodeId: string) {
     .map((childId) => tree.nodes[childId])
     .filter((childNode): childNode is TreeNode => Boolean(childNode))
     .sort((leftNode, rightNode) => leftNode.order - rightNode.order);
+}
+
+function findImmediatePreviousSummarySibling(
+  tree: NodeTree,
+  questionNodeId: string,
+  judgmentNodeId: string,
+) {
+  const questionChildNodes = collectQuestionChildNodes(tree, questionNodeId);
+  const judgmentIndex = questionChildNodes.findIndex(
+    (childNode) => childNode.id === judgmentNodeId,
+  );
+
+  if (judgmentIndex <= 0) {
+    return null;
+  }
+
+  const previousNode = questionChildNodes[judgmentIndex - 1];
+
+  return previousNode?.type === 'summary' ? previousNode : null;
 }
 
 function collectDirectQuestionTitles(tree: NodeTree, planStepNodeId: string) {

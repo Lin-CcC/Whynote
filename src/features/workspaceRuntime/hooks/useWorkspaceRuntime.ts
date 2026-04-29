@@ -485,6 +485,17 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     );
   }
 
+  async function runSummaryEvaluation(summaryNodeId: string) {
+    await runAiAction('正在检查这段总结', async (snapshot) =>
+      runtimeService.evaluateSummary(
+        snapshot,
+        summaryNodeId,
+        state.aiConfig,
+        state.resourceMetadataRecords,
+      ),
+    );
+  }
+
   async function runQuestionDirectAnswer(
     request: WorkspaceEditorLearningActionRequest,
   ) {
@@ -517,6 +528,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     runPlanStepGeneration,
     runQuestionDirectAnswer,
     runQuestionEvaluation,
+    runSummaryEvaluation,
     runQuestionSplit,
     saveAiConfig,
     saveAiPreset,

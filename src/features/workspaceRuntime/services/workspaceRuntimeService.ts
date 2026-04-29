@@ -4,6 +4,7 @@ import {
   appendChildQuestionsToTree,
   appendPlanStepDraftsToModule,
   appendQuestionClosureToTree,
+  createSummaryEvaluationService,
   createCompoundQuestionSplitService,
   createJudgmentHintService,
   createLearningActionDraftService,
@@ -13,9 +14,11 @@ import {
   reconcilePlanStepStatuses,
   suggestPlanStepCompletion,
   type AiConfig,
+  type JudgmentNodeDraft,
 } from '../../learningEngine';
 import {
   cloneNodeTree,
+  deleteNode,
   getModuleScopeId,
   getNodeOrThrow,
   type ModuleNode,
@@ -34,6 +37,7 @@ import {
   buildJudgmentHintRuntimeContext,
   buildLearningActionRuntimeContext,
   buildQuestionClosureRuntimeContext,
+  buildSummaryEvaluationRuntimeContext,
   canEvaluateQuestionAnswer,
   collectLeafQuestionIdsUnderPlanStep,
   collectLearningReferenceCandidates,
@@ -235,6 +239,62 @@ export function createWorkspaceRuntimeService(
           previousChildIds,
           closureResult.isAnswerSufficient,
         ),
+      } satisfies WorkspaceMutationResult;
+    },
+    async evaluateSummary(
+      snapshot: WorkspaceSnapshot,
+      summaryNodeId: string,
+      config: AiConfig,
+      resourceMetadataRecords: ResourceMetadataRecord[] = [],
+    ) {
+      const summaryNode = getNodeOrThrow(snapshot.tree, summaryNodeId);
+
+      if (summaryNode.type !== 'summary') {
+        throw new Error(`节点 ${summaryNodeId} 不是 summary。`);
+      }
+
+      const providerClient = providerFactory(config);
+      const summaryEvaluationService = createSummaryEvaluationService({
+        providerClient,
+      });
+      const context = buildSummaryEvaluationRuntimeContext(
+        snapshot.tree,
+        summaryNodeId,
+        {
+          resourceMetadataByNodeId: indexResourceMetadataByNodeId(
+            resourceMetadataRecords,
+          ),
+        },
+      );
+      const result = await summaryEvaluationService.generate({
+        topic: snapshot.workspace.title,
+        moduleTitle: context.moduleNode?.title,
+        planStepSummary: context.planStepNode?.content,
+        planStepTitle: context.planStepNode?.title,
+        introductions: context.introductions,
+        learnerAnswer: context.learnerAnswer || undefined,
+        learnerSummary: context.learnerSummary,
+        questionPath: context.questionPath,
+        referenceCandidates: context.referenceCandidates,
+      });
+      const nextTree = appendSummaryCheckJudgmentToTree(
+        snapshot.tree,
+        context.questionNodeId,
+        context.summaryNodeId,
+        result.judgment,
+      );
+      const nextSnapshot = createSnapshot(nextTree, snapshot);
+      const nextJudgmentNodeId = findImmediateSummaryCheckJudgmentId(
+        nextSnapshot.tree,
+        context.questionNodeId,
+        context.summaryNodeId,
+      );
+
+      return {
+        snapshot: nextSnapshot,
+        nextModuleId: context.moduleNode?.id ?? null,
+        nextSelectedNodeId: nextJudgmentNodeId ?? context.summaryNodeId,
+        message: '已检查这段总结，并补出一条理解检查结果。',
       } satisfies WorkspaceMutationResult;
     },
     async generateJudgmentHint(
@@ -808,6 +868,83 @@ function indexResourceMetadataByNodeId(
   return Object.fromEntries(
     resourceMetadataRecords.map((record) => [record.nodeId, record]),
   ) satisfies Record<string, ResourceMetadataRecord>;
+}
+
+function appendSummaryCheckJudgmentToTree(
+  tree: NodeTree,
+  questionNodeId: string,
+  summaryNodeId: string,
+  judgmentDraft: JudgmentNodeDraft,
+) {
+  const existingSummaryCheckJudgmentId = findImmediateSummaryCheckJudgmentId(
+    tree,
+    questionNodeId,
+    summaryNodeId,
+  );
+  let baseTree = tree;
+  let insertIndex = getSummaryCheckJudgmentInsertIndex(tree, questionNodeId, summaryNodeId);
+
+  if (existingSummaryCheckJudgmentId) {
+    baseTree = deleteNode(baseTree, existingSummaryCheckJudgmentId);
+    insertIndex = getSummaryCheckJudgmentInsertIndex(
+      baseTree,
+      questionNodeId,
+      summaryNodeId,
+    );
+  }
+
+  return appendLearningNodeDraftToTree(
+    baseTree,
+    questionNodeId,
+    judgmentDraft,
+    insertIndex,
+  );
+}
+
+function findImmediateSummaryCheckJudgmentId(
+  tree: NodeTree,
+  questionNodeId: string,
+  summaryNodeId: string,
+) {
+  const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+  if (questionNode.type !== 'question') {
+    return null;
+  }
+
+  const summaryIndex = questionNode.childIds.indexOf(summaryNodeId);
+
+  if (summaryIndex === -1) {
+    return null;
+  }
+
+  const nextSiblingId = questionNode.childIds[summaryIndex + 1];
+  const nextSiblingNode = nextSiblingId ? tree.nodes[nextSiblingId] : null;
+
+  return nextSiblingNode?.type === 'judgment' &&
+    nextSiblingNode.judgmentKind === 'summary-check'
+    ? nextSiblingNode.id
+    : null;
+}
+
+function getSummaryCheckJudgmentInsertIndex(
+  tree: NodeTree,
+  questionNodeId: string,
+  summaryNodeId: string,
+) {
+  const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+  if (questionNode.type !== 'question') {
+    throw new Error(`节点 ${questionNodeId} 不是 question。`);
+  }
+
+  const summaryIndex = questionNode.childIds.indexOf(summaryNodeId);
+
+  if (summaryIndex === -1) {
+    throw new Error(`总结 ${summaryNodeId} 不属于问题 ${questionNodeId}。`);
+  }
+
+  return summaryIndex + 1;
 }
 
 function buildLearningActionDraftMessage(

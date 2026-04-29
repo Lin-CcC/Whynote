@@ -22,6 +22,8 @@ import {
   countQuestionFollowUpNodes,
   getJudgmentInlineActionContext,
   getLatestQuestionAnswerExplanationNodeId,
+  resolveSummaryCheckJudgmentContext,
+  resolveSummaryEvaluationTarget,
   resolveQuestionAnswerEvaluationTarget,
 } from './services/learningRuntimeContext';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
@@ -124,6 +126,14 @@ export default function WorkspaceRuntimeScreen({
       context.tree,
       context.selectedNode?.id ?? null,
     );
+    const summaryEvaluationTarget = resolveSummaryEvaluationTarget(
+      context.tree,
+      context.selectedNode?.id ?? null,
+    );
+    const summaryCheckJudgmentContext = resolveSummaryCheckJudgmentContext(
+      context.tree,
+      context.selectedNode?.id ?? null,
+    );
     const directAnswerRequest = resolveDirectAnswerRequest(
       context,
       evaluationTarget,
@@ -161,6 +171,9 @@ export default function WorkspaceRuntimeScreen({
         onEvaluateQuestionAnswer={(target) => {
           void runtime.runQuestionEvaluation(target);
         }}
+        onEvaluateSummary={(target) => {
+          void runtime.runSummaryEvaluation(target.summaryNodeId);
+        }}
         onGeneratePlanSteps={(moduleNodeId) => {
           void runtime.runPlanStepGeneration(moduleNodeId);
         }}
@@ -175,6 +188,8 @@ export default function WorkspaceRuntimeScreen({
           void runtime.runCompletionSuggestion(planStepNodeId);
         }}
         selectedNode={context.selectedNode}
+        summaryCheckJudgmentContext={summaryCheckJudgmentContext}
+        summaryEvaluationTarget={summaryEvaluationTarget}
       />
     );
   }

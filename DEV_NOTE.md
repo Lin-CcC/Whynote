@@ -209,6 +209,26 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - `直接回答当前问题` 只存在于 runtime 的 `question` 语境里，表示“让 AI 先生成一版普通 answer 草稿”，生成后直接接回现有 answer-revision 闭环。
 - hand-authored question 与 system-generated question 统一按节点语义工作：只要当前选中节点是 `question` 且还没有可评估 `answer`，就走同一条 direct answer 入口，不按来源分叉。
 
+### 23. 手动 insert-summary 的默认 placement 语义
+
+- 手动 `insert-summary` 默认落在当前 `question` 闭环链条尾部，也就是该 `question` 子节点列表的最后，而不是插到前面的 `answer / judgment / summary` 中间。
+- 这条规则只约束手动插入的 `summary`；系统生成的 answer closure 仍按既有闭环装配顺序落位。
+- `summary` 继续复用同一节点类型，通过 `summaryKind` 区分 `manual / scaffold / answer-closure`，避免为了 placement 或 runtime 语义再扩节点类型。
+
+### 24. 插入回答 / 直接回答当前问题 / 检查这个总结 的分工
+
+- `插入回答` 只负责手动补一个普通 `answer` 节点，不承担 AI 起草语义。
+- `直接回答当前问题` 只在 runtime 的 `question` 语境里出现，表示让 AI 先生成一版普通 `answer`，随后继续接回 answer evaluation 主链。
+- `检查这个总结` 只针对手写 `summary` 的理解质量，返回“说对了什么 / 还缺什么 / 哪些地方可能理解偏了 / 下一步先补哪层”，不自动生成 follow-up question，也不误走普通 answer closure。
+- summary check 的结果继续复用 `judgment` 节点承载，但 runtime 必须按独立语义处理，不能把它当成普通 answer evaluation judgment。
+
+### 25. 节点类型切换的安全边界
+
+- 只允许对无子节点的叶子学习节点做轻量切换，首版仅覆盖 `question / answer / summary / judgment`。
+- 切换前必须通过当前父节点约束校验；不合法类型只能禁用，不做强转。
+- 切换时保留标题、正文、引用、标签和顺序；只重写节点 type 与必要的语义标记，不做复杂子树变形。
+- `summary` / `judgment` 切换后要补齐 `summaryKind` / `judgmentKind`，保证后续 runtime 判断不靠脆弱位置猜测。
+
 ## 后续需要重新评估这些决策的触发条件
 
 - 需要公开注册或公开商用

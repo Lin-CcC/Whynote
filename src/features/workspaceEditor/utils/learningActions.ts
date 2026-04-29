@@ -232,10 +232,7 @@ function resolveSummaryPlacement(
   }
 
   return {
-    insertIndex:
-      selectedNode.type === 'summary'
-        ? selectedNode.order + 1
-        : getSummaryInsertIndex(tree, questionNode),
+    insertIndex: getQuestionClosureTailInsertIndex(questionNode),
     nodeType: 'summary',
     parentNodeId: questionNode.id,
     title: '新总结',
@@ -354,30 +351,10 @@ function getAnswerInsertIndex(tree: NodeTree, questionNode: Extract<TreeNode, { 
   return insertIndex;
 }
 
-function getSummaryInsertIndex(
-  tree: NodeTree,
+function getQuestionClosureTailInsertIndex(
   questionNode: Extract<TreeNode, { type: 'question' }>,
 ) {
-  let insertIndex = 0;
-
-  for (const childId of questionNode.childIds) {
-    const childNode = tree.nodes[childId];
-
-    if (
-      childNode?.type === 'question' ||
-      childNode?.type === 'answer' ||
-      childNode?.type === 'summary'
-    ) {
-      insertIndex = childNode.order + 1;
-      continue;
-    }
-
-    if (childNode?.type === 'judgment') {
-      break;
-    }
-  }
-
-  return insertIndex;
+  return questionNode.childIds.length;
 }
 
 function getLearningActionLabel(actionId: LearningActionId) {
@@ -441,8 +418,8 @@ function buildLearningActionHint(
         : '默认回到当前问题的回答区。';
     case 'insert-summary':
       return selectedNode.type === 'summary'
-        ? '默认接在当前总结后方。'
-        : '默认接在当前问题的回答后。';
+        ? '默认接到当前问题链条尾部，不再插回中间。'
+        : '默认接到当前问题链条尾部，作为这一段的收束。';
     case 'insert-judgment':
       return selectedNode.type === 'judgment'
         ? '默认接在当前判断后方。'

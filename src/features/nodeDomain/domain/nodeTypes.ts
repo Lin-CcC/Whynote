@@ -26,6 +26,16 @@ export const CITATION_PURPOSES = [
   'judgment',
   'background',
 ] as const;
+export const SUMMARY_NODE_KINDS = [
+  'manual',
+  'scaffold',
+  'answer-closure',
+] as const;
+export const JUDGMENT_NODE_KINDS = [
+  'manual',
+  'answer-closure',
+  'summary-check',
+] as const;
 
 export type NodeType =
   | 'theme-root'
@@ -45,6 +55,8 @@ export type ReferenceSourceNodeType =
 export type ReferenceTargetNodeType =
   (typeof REFERENCE_TARGET_NODE_TYPES)[number];
 export type CitationPurpose = (typeof CITATION_PURPOSES)[number];
+export type SummaryNodeKind = (typeof SUMMARY_NODE_KINDS)[number];
+export type JudgmentNodeKind = (typeof JUDGMENT_NODE_KINDS)[number];
 export type PlanStepStatus = 'todo' | 'doing' | 'done';
 
 export interface BaseNode {
@@ -86,11 +98,13 @@ export interface AnswerNode extends BaseNode {
 
 export interface SummaryNode extends BaseNode {
   type: 'summary';
+  summaryKind?: SummaryNodeKind;
 }
 
 export interface JudgmentNode extends BaseNode {
   type: 'judgment';
   hint?: string;
+  judgmentKind?: JudgmentNodeKind;
 }
 
 export interface ResourceNode extends BaseNode {

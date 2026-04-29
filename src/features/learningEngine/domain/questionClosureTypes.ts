@@ -47,3 +47,20 @@ export interface JudgmentHintResult {
   citations: LearningNodeCitationDraft[];
   metadata: AiExecutionMetadata;
 }
+
+export interface SummaryEvaluationInput {
+  topic: string;
+  moduleTitle?: string;
+  planStepTitle?: string;
+  planStepSummary?: string;
+  introductions?: string[];
+  questionPath: QuestionClosureInput['questionPath'];
+  learnerAnswer?: string;
+  learnerSummary: string;
+  referenceCandidates?: LearningReferenceCandidate[];
+}
+
+export interface SummaryEvaluationResult {
+  judgment: JudgmentNodeDraft;
+  metadata: AiExecutionMetadata;
+}

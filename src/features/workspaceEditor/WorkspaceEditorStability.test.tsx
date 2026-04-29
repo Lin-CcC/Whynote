@@ -99,6 +99,33 @@ test('selects a node by clicking its card without requiring textarea focus first
   expect(node).not.toHaveTextContent('编辑中');
 });
 
+test('keeps the title input focused while side panels reflect title edits', async () => {
+  render(<WorkspaceEditor />);
+
+  const titleInput = getNodeTitleInput('question-render-boundary');
+
+  titleInput.focus();
+  expect(titleInput).toHaveFocus();
+
+  fireEvent.change(titleInput, {
+    target: {
+      value: '这是一个会把侧栏文本一起带着更新的超长标题，用来验证输入焦点不会因为侧栏重排而丢失',
+    },
+  });
+
+  await waitFor(() => {
+    expect(titleInput).toHaveFocus();
+    expect(titleInput).toHaveValue(
+      '这是一个会把侧栏文本一起带着更新的超长标题，用来验证输入焦点不会因为侧栏重排而丢失',
+    );
+    expect(
+      screen.getAllByText(
+        /这是一个会把侧栏文本一起带着更新的超长标题，用来验证输入焦点不会因为侧栏重排而丢失/u,
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+});
+
 test('toggles builtin tags on the selected node and persists the updated state', () => {
   const snapshots: WorkspaceSnapshot[] = [];
 
@@ -155,4 +182,15 @@ function getNodeContentInput(nodeId: string) {
   }
 
   return textarea;
+}
+
+function getNodeTitleInput(nodeId: string) {
+  const container = screen.getByTestId(`editor-node-${nodeId}`);
+  const input = container.querySelector('input');
+
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error(`Unable to find title input for node ${nodeId}.`);
+  }
+
+  return input;
 }

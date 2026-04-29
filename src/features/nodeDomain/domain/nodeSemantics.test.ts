@@ -1,11 +1,14 @@
 import {
   createNode,
   createWorkspaceSnapshot,
+  getJudgmentNodeKind,
   getDisplayNodeTitle,
   getDisplayNodeTypeLabel,
+  getSummaryNodeKind,
   insertChildNode,
   isAnswerClosureSummaryNode,
   isScaffoldSummaryNode,
+  isSummaryCheckJudgmentNode,
   stripRedundantDisplayTypePrefix,
 } from '..';
 
@@ -28,13 +31,31 @@ test('treats post-judgment summaries as answer explanations', () => {
   );
 });
 
-test('treats manually inserted question summaries as answer explanations even before a judgment exists', () => {
+test('treats legacy question summaries without a preceding closure judgment as manual summaries', () => {
   const tree = createManualSummaryFirstSnapshot().tree;
 
-  expect(isAnswerClosureSummaryNode(tree, 'summary-manual-first')).toBe(true);
+  expect(getSummaryNodeKind(tree, 'summary-manual-first')).toBe('manual');
+  expect(isAnswerClosureSummaryNode(tree, 'summary-manual-first')).toBe(false);
   expect(
     getDisplayNodeTypeLabel(tree, tree.nodes['summary-manual-first']!),
-  ).toBe('答案解析');
+  ).toBe('总结');
+});
+
+test('treats explicitly manual summaries under question as summaries instead of answer explanations', () => {
+  const tree = createExplicitManualSummarySnapshot().tree;
+
+  expect(getSummaryNodeKind(tree, 'summary-manual-explicit')).toBe('manual');
+  expect(isAnswerClosureSummaryNode(tree, 'summary-manual-explicit')).toBe(false);
+  expect(getDisplayNodeTypeLabel(tree, tree.nodes['summary-manual-explicit']!)).toBe(
+    '总结',
+  );
+});
+
+test('treats explicitly marked summary-check judgments as a separate judgment kind', () => {
+  const tree = createExplicitManualSummarySnapshot().tree;
+
+  expect(getJudgmentNodeKind(tree, 'judgment-summary-check')).toBe('summary-check');
+  expect(isSummaryCheckJudgmentNode(tree, 'judgment-summary-check')).toBe(true);
 });
 
 test('strips only the redundant type prefix from display titles when the label is already visible', () => {
@@ -140,6 +161,8 @@ function createSemanticsSnapshot() {
       id: 'judgment-semantics',
       title: '判断：还差一点',
       content: '还缺一个关键因果关系。',
+      hint: '先把“为什么会减少重复渲染”这层因果链条补完整。',
+      judgmentKind: 'answer-closure',
       createdAt: '2026-04-27T12:00:00.000Z',
       updatedAt: '2026-04-27T12:00:00.000Z',
     }),
@@ -152,6 +175,7 @@ function createSemanticsSnapshot() {
       id: 'summary-closure',
       title: '答案解析：标准理解',
       content: '这是答题后的答案解析。',
+      summaryKind: 'answer-closure',
       createdAt: '2026-04-27T12:00:00.000Z',
       updatedAt: '2026-04-27T12:00:00.000Z',
     }),
@@ -230,6 +254,84 @@ function createManualSummaryFirstSnapshot() {
       content: '这是用户先手动补的答案解析。',
       createdAt: '2026-04-27T12:30:00.000Z',
       updatedAt: '2026-04-27T12:30:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createExplicitManualSummarySnapshot() {
+  const snapshot = createWorkspaceSnapshot({
+    title: '显式手写总结语义',
+    workspaceId: 'workspace-semantics-explicit-manual-summary',
+    rootId: 'theme-semantics-explicit-manual-summary',
+    createdAt: '2026-04-30T00:00:00.000Z',
+    updatedAt: '2026-04-30T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-explicit-manual-summary',
+      title: '显式手写总结模块',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-explicit-manual-summary',
+    createNode({
+      type: 'plan-step',
+      id: 'step-explicit-manual-summary',
+      title: '显式手写总结步骤',
+      status: 'doing',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-explicit-manual-summary',
+    createNode({
+      type: 'question',
+      id: 'question-explicit-manual-summary',
+      title: '显式手写总结问题',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-explicit-manual-summary',
+    createNode({
+      type: 'summary',
+      id: 'summary-manual-explicit',
+      title: '我的手写总结',
+      content: '这是用户自己写的总结。',
+      summaryKind: 'manual',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-explicit-manual-summary',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-summary-check',
+      title: '判断：总结还可再补',
+      content: '这是针对 summary 的理解检查结果。',
+      judgmentKind: 'summary-check',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
     }),
   );
 

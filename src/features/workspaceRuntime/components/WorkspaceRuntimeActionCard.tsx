@@ -1,6 +1,10 @@
 import SectionCard from '../../../ui/SectionCard';
 import type { TreeNode } from '../../nodeDomain';
-import type { QuestionAnswerEvaluationTarget } from '../services/learningRuntimeContext';
+import type {
+  QuestionAnswerEvaluationTarget,
+  SummaryCheckJudgmentContext,
+  SummaryEvaluationTarget,
+} from '../services/learningRuntimeContext';
 
 type WorkspaceRuntimeActionCardProps = {
   answerExplanationNodeId: string | null;
@@ -13,20 +17,25 @@ type WorkspaceRuntimeActionCardProps = {
   onCreateModule: () => void;
   onDirectAnswerCurrentQuestion: () => void;
   onEvaluateQuestionAnswer: (target: QuestionAnswerEvaluationTarget) => void;
+  onEvaluateSummary: (target: SummaryEvaluationTarget) => void;
   onGeneratePlanSteps: (moduleNodeId: string) => void;
   onInsertAnswer: () => void;
   onSelectNode: (nodeId: string) => void;
   onSplitQuestion: (questionNodeId: string) => void;
   onSuggestCompletion: (planStepNodeId: string) => void;
   selectedNode: TreeNode | null;
+  summaryCheckJudgmentContext: SummaryCheckJudgmentContext | null;
+  summaryEvaluationTarget: SummaryEvaluationTarget | null;
 };
 
-type QuestionClosureStage =
+type RuntimeActionStage =
   | 'question-needs-answer'
   | 'question'
   | 'answer'
   | 'judgment'
   | 'summary'
+  | 'summary-check'
+  | 'summary-check-result'
   | null;
 
 export default function WorkspaceRuntimeActionCard({
@@ -40,33 +49,44 @@ export default function WorkspaceRuntimeActionCard({
   onCreateModule,
   onDirectAnswerCurrentQuestion,
   onEvaluateQuestionAnswer,
+  onEvaluateSummary,
   onGeneratePlanSteps,
   onInsertAnswer,
   onSelectNode,
   onSplitQuestion,
   onSuggestCompletion,
   selectedNode,
+  summaryCheckJudgmentContext,
+  summaryEvaluationTarget,
 }: WorkspaceRuntimeActionCardProps) {
   const canGeneratePlanSteps = currentModule?.type === 'module' && !isAiRunning;
   const canSplitQuestion = selectedNode?.type === 'question' && !isAiRunning;
   const canEvaluateQuestionAnswer = evaluationTarget !== null && !isAiRunning;
+  const canEvaluateSummary =
+    (summaryEvaluationTarget !== null || summaryCheckJudgmentContext !== null) &&
+    !isAiRunning;
   const canSuggestCompletion = selectedNode?.type === 'plan-step' && !isAiRunning;
   const canViewAnswerExplanation = answerExplanationNodeId !== null && !isAiRunning;
-  const questionClosureStage = resolveQuestionClosureStage(
+  const runtimeActionStage = resolveRuntimeActionStage(
     selectedNode,
     evaluationTarget,
     hasDirectAnswerCurrentQuestion,
+    summaryCheckJudgmentContext,
+    summaryEvaluationTarget,
   );
-  const isQuestionClosureContext = questionClosureStage !== null;
+  const hasFocusedActionContext = runtimeActionStage !== null;
   const shouldUseInlineJudgmentPrimaryAction =
-    questionClosureStage === 'judgment';
+    runtimeActionStage === 'judgment';
   const canReturnToAnswer =
-    questionClosureStage !== null &&
-    questionClosureStage !== 'answer' &&
+    runtimeActionStage !== null &&
+    runtimeActionStage !== 'answer' &&
+    runtimeActionStage !== 'summary-check-result' &&
     evaluationTarget !== null &&
     !isAiRunning;
-  const sectionTitle = getSectionTitle(questionClosureStage);
-  const helpText = getSectionHelpText(questionClosureStage);
+  const canReturnToSummary =
+    summaryCheckJudgmentContext !== null && !isAiRunning;
+  const sectionTitle = getSectionTitle(runtimeActionStage);
+  const helpText = getSectionHelpText(runtimeActionStage);
 
   function handleGeneratePlanSteps() {
     if (currentModule?.type !== 'module') {
@@ -124,6 +144,29 @@ export default function WorkspaceRuntimeActionCard({
     onInsertAnswer();
   }
 
+  function handleEvaluateSummary() {
+    if (summaryEvaluationTarget) {
+      onEvaluateSummary(summaryEvaluationTarget);
+      return;
+    }
+
+    if (summaryCheckJudgmentContext) {
+      onEvaluateSummary({
+        answerNodeId: summaryCheckJudgmentContext.answerNodeId,
+        questionNodeId: summaryCheckJudgmentContext.questionNodeId,
+        summaryNodeId: summaryCheckJudgmentContext.summaryNodeId,
+      });
+    }
+  }
+
+  function handleReturnToSummary() {
+    if (!summaryCheckJudgmentContext) {
+      return;
+    }
+
+    onSelectNode(summaryCheckJudgmentContext.summaryNodeId);
+  }
+
   if (!currentModule) {
     return (
       <SectionCard>
@@ -159,24 +202,24 @@ export default function WorkspaceRuntimeActionCard({
         </div>
       </div>
       <p className="workspace-helpText">{helpText}</p>
-      {isQuestionClosureContext ? (
+      {hasFocusedActionContext ? (
         <div
           className="workspace-actionCallout"
-          data-testid={getQuestionClosureCalloutTestId(questionClosureStage)}
+          data-testid={getRuntimeActionCalloutTestId(runtimeActionStage)}
         >
           <p className="workspace-kicker">
-            {getQuestionClosureCalloutTitle(questionClosureStage)}
+            {getRuntimeActionCalloutTitle(runtimeActionStage)}
           </p>
           <p className="workspace-helpText">
-            {getQuestionClosureCalloutDescription(
-              questionClosureStage,
+            {getRuntimeActionCalloutDescription(
+              runtimeActionStage,
               canViewAnswerExplanation,
             )}
           </p>
           {shouldUseInlineJudgmentPrimaryAction ? (
             <p className="workspace-actionHint">
-              {getQuestionClosureHint(
-                questionClosureStage,
+              {getRuntimeActionHint(
+                runtimeActionStage,
                 answerFollowUpCount,
                 canViewAnswerExplanation,
               )}
@@ -184,7 +227,7 @@ export default function WorkspaceRuntimeActionCard({
           ) : (
             <>
               <div className="workspace-actionGrid">
-                {questionClosureStage === 'question-needs-answer' ? (
+                {runtimeActionStage === 'question-needs-answer' ? (
                   <>
                     <button
                       className="workspace-primaryAction"
@@ -202,7 +245,7 @@ export default function WorkspaceRuntimeActionCard({
                       插入回答
                     </button>
                   </>
-                ) : questionClosureStage === 'summary' ? (
+                ) : runtimeActionStage === 'summary' ? (
                   <button
                     className="workspace-primaryAction"
                     disabled={!canReturnToAnswer}
@@ -211,17 +254,35 @@ export default function WorkspaceRuntimeActionCard({
                   >
                     回到当前回答继续修改
                   </button>
+                ) : runtimeActionStage === 'summary-check' ? (
+                  <button
+                    className="workspace-primaryAction"
+                    disabled={!canEvaluateSummary}
+                    onClick={handleEvaluateSummary}
+                    type="button"
+                  >
+                    检查这个总结
+                  </button>
+                ) : runtimeActionStage === 'summary-check-result' ? (
+                  <button
+                    className="workspace-primaryAction"
+                    disabled={!canReturnToSummary}
+                    onClick={handleReturnToSummary}
+                    type="button"
+                  >
+                    回到这个总结继续修改
+                  </button>
                 ) : (
                   <button
                     className="workspace-primaryAction"
                     disabled={!canEvaluateQuestionAnswer}
                     onClick={handleEvaluateQuestionAnswer}
                     type="button"
-                  >
-                    重新评估当前回答
-                  </button>
+                    >
+                      重新评估当前回答
+                    </button>
                 )}
-                {questionClosureStage !== 'summary' && canViewAnswerExplanation ? (
+                {runtimeActionStage !== 'summary' && canViewAnswerExplanation ? (
                   <button
                     disabled={!canViewAnswerExplanation}
                     onClick={handleViewAnswerExplanation}
@@ -230,7 +291,7 @@ export default function WorkspaceRuntimeActionCard({
                     查看答案解析
                   </button>
                 ) : null}
-                {questionClosureStage === 'question' && canReturnToAnswer ? (
+                {runtimeActionStage === 'question' && canReturnToAnswer ? (
                   <button
                     disabled={!canReturnToAnswer}
                     onClick={handleReturnToAnswer}
@@ -239,7 +300,7 @@ export default function WorkspaceRuntimeActionCard({
                     回到当前回答继续修改
                   </button>
                 ) : null}
-                {questionClosureStage === 'summary' ? (
+                {runtimeActionStage === 'summary' ? (
                   <button
                     disabled={!canEvaluateQuestionAnswer}
                     onClick={handleEvaluateQuestionAnswer}
@@ -248,10 +309,28 @@ export default function WorkspaceRuntimeActionCard({
                     重新评估当前回答
                   </button>
                 ) : null}
+                {runtimeActionStage === 'summary-check' && canReturnToAnswer ? (
+                  <button
+                    disabled={!canReturnToAnswer}
+                    onClick={handleReturnToAnswer}
+                    type="button"
+                  >
+                    回到当前回答继续修改
+                  </button>
+                ) : null}
+                {runtimeActionStage === 'summary-check-result' ? (
+                  <button
+                    disabled={!canEvaluateSummary}
+                    onClick={handleEvaluateSummary}
+                    type="button"
+                  >
+                    重新检查这个总结
+                  </button>
+                ) : null}
               </div>
               <p className="workspace-actionHint">
-                {getQuestionClosureHint(
-                  questionClosureStage,
+                {getRuntimeActionHint(
+                  runtimeActionStage,
                   answerFollowUpCount,
                   canViewAnswerExplanation,
                 )}
@@ -260,7 +339,7 @@ export default function WorkspaceRuntimeActionCard({
           )}
         </div>
       ) : null}
-      {isQuestionClosureContext ? (
+      {hasFocusedActionContext ? (
         <div className="workspace-secondaryActionSection">
           <div className="workspace-sectionHeader">
             <div>
@@ -331,11 +410,21 @@ export default function WorkspaceRuntimeActionCard({
   );
 }
 
-function resolveQuestionClosureStage(
+function resolveRuntimeActionStage(
   selectedNode: TreeNode | null,
   evaluationTarget: QuestionAnswerEvaluationTarget | null,
   hasDirectAnswerCurrentQuestion: boolean,
-): QuestionClosureStage {
+  summaryCheckJudgmentContext: SummaryCheckJudgmentContext | null,
+  summaryEvaluationTarget: SummaryEvaluationTarget | null,
+): RuntimeActionStage {
+  if (summaryCheckJudgmentContext) {
+    return 'summary-check-result';
+  }
+
+  if (summaryEvaluationTarget) {
+    return 'summary-check';
+  }
+
   if (!selectedNode) {
     return null;
   }
@@ -362,8 +451,8 @@ function resolveQuestionClosureStage(
   }
 }
 
-function getSectionTitle(questionClosureStage: QuestionClosureStage) {
-  switch (questionClosureStage) {
+function getSectionTitle(runtimeActionStage: RuntimeActionStage) {
+  switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '当前问题起答';
     case 'question':
@@ -374,13 +463,17 @@ function getSectionTitle(questionClosureStage: QuestionClosureStage) {
       return '当前判断反馈';
     case 'summary':
       return '当前答案解析';
+    case 'summary-check':
+      return '当前总结检查';
+    case 'summary-check-result':
+      return '总结理解检查结果';
     default:
       return '学习推进';
   }
 }
 
-function getSectionHelpText(questionClosureStage: QuestionClosureStage) {
-  switch (questionClosureStage) {
+function getSectionHelpText(runtimeActionStage: RuntimeActionStage) {
+  switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '这道题还没有可评估回答，先起一版 answer，再接回现有回答修订闭环。';
     case 'question':
@@ -391,27 +484,39 @@ function getSectionHelpText(questionClosureStage: QuestionClosureStage) {
       return '当前 judgment 的主动作已经收口到正文卡片，左侧不再重复抢这条路径。';
     case 'summary':
       return '答案解析负责给标准理解；真正改内容时，还是回到回答。';
+    case 'summary-check':
+      return '这段总结代表你当前的理解。先检查它有没有缺口、偏差或边界遗漏，再决定回头改哪里。';
+    case 'summary-check-result':
+      return '这条 judgment 是对 summary 的理解检查结果，不是普通 answer evaluation。';
     default:
       return '这里只保留学习运行时主路径，不和结构动作抢职责。';
   }
 }
 
-function getQuestionClosureCalloutTestId(
-  questionClosureStage: QuestionClosureStage,
+function getRuntimeActionCalloutTestId(
+  runtimeActionStage: RuntimeActionStage,
 ) {
-  if (questionClosureStage === 'question-needs-answer') {
+  if (runtimeActionStage === 'question-needs-answer') {
     return 'question-direct-answer-callout';
   }
 
-  return questionClosureStage === 'judgment'
+  if (runtimeActionStage === 'summary-check') {
+    return 'summary-evaluation-callout';
+  }
+
+  if (runtimeActionStage === 'summary-check-result') {
+    return 'summary-evaluation-result-callout';
+  }
+
+  return runtimeActionStage === 'judgment'
     ? 'judgment-inline-actions'
     : 'answer-evaluation-callout';
 }
 
-function getQuestionClosureCalloutTitle(
-  questionClosureStage: QuestionClosureStage,
+function getRuntimeActionCalloutTitle(
+  runtimeActionStage: RuntimeActionStage,
 ) {
-  switch (questionClosureStage) {
+  switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '主动作：直接回答当前问题';
     case 'question':
@@ -422,16 +527,20 @@ function getQuestionClosureCalloutTitle(
       return '主动作：留在正文里的当前 judgment 卡片';
     case 'summary':
       return '主动作：回到回答继续修改';
+    case 'summary-check':
+      return '主动作：检查这个总结';
+    case 'summary-check-result':
+      return '主动作：回到这个总结继续修改';
     default:
       return '下一步';
   }
 }
 
-function getQuestionClosureCalloutDescription(
-  questionClosureStage: QuestionClosureStage,
+function getRuntimeActionCalloutDescription(
+  runtimeActionStage: RuntimeActionStage,
   hasAnswerExplanation: boolean,
 ) {
-  switch (questionClosureStage) {
+  switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '这道题还没有可评估回答。先让 AI 起一版普通 answer，或保留手动回答入口。';
     case 'question':
@@ -448,17 +557,21 @@ function getQuestionClosureCalloutDescription(
         : '先回到回答补这次缺口；如果还没有答案解析，也在正文里的 judgment 卡片继续处理。';
     case 'summary':
       return '现在看的就是答案解析。对照完标准理解，再回到回答继续修改。';
+    case 'summary-check':
+      return '这段总结是你当前的理解稿。系统会单独检查它说对了什么、还缺什么、哪里可能理解偏了。';
+    case 'summary-check-result':
+      return '这条结果只针对当前 summary 的理解质量，不会把你带回普通回答评估链。';
     default:
       return '';
   }
 }
 
-function getQuestionClosureHint(
-  questionClosureStage: QuestionClosureStage,
+function getRuntimeActionHint(
+  runtimeActionStage: RuntimeActionStage,
   answerFollowUpCount: number,
   hasAnswerExplanation: boolean,
 ) {
-  switch (questionClosureStage) {
+  switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '新生成的回答会落成普通 answer 节点，并自动选中，后面直接接回评估、提示和答案解析主链。';
     case 'question':
@@ -474,6 +587,10 @@ function getQuestionClosureHint(
       return '回到回答补缺口仍是唯一主动作；“给我提示”和“查看答案解析”都留在正文里的当前 judgment 卡片。';
     case 'summary':
       return '答案解析已经存在。接下来优先回到回答改写，再决定是否重评。';
+    case 'summary-check':
+      return '这一步不会自动生成追问；它只负责检查这段总结的理解缺口、可能误解和下一步该补哪层。';
+    case 'summary-check-result':
+      return '先按这条检查结果回到总结继续修改；如果还不稳，再重新检查一次。';
     default:
       return '';
   }

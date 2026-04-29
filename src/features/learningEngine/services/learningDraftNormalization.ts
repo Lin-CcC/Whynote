@@ -9,6 +9,7 @@ import type {
   QuestionClosureResult,
   QuestionNodeDraft,
   SummaryNodeDraft,
+  SummaryEvaluationResult,
 } from '../domain';
 import { getLearningModeLimits } from '../domain';
 import type { CitationPurpose } from '../../nodeDomain';
@@ -105,6 +106,13 @@ interface RawQuestionClosurePayload {
   followUpQuestions?: unknown;
   followUps?: unknown;
   nextQuestions?: unknown;
+}
+
+interface RawSummaryEvaluationPayload {
+  judgment?: unknown;
+  evaluation?: unknown;
+  hint?: unknown;
+  guidanceHint?: unknown;
 }
 
 interface NormalizedJudgmentDetails {
@@ -419,6 +427,7 @@ function normalizeIntroductionDraft(
 
   return {
     type: 'summary',
+    summaryKind: 'scaffold',
     title: normalizeIntroductionTitle(rawTitle, planStepTitle, index),
     content: normalizeIntroductionContent(rawContent, planStepTitle),
     citations: normalizeCitationDrafts(
@@ -476,6 +485,7 @@ function normalizeScaffoldActionDraft(
 
   return {
     type: 'summary',
+    summaryKind: 'scaffold',
     title: normalizeIntroductionTitle(title, planStepLabel, 0),
     content: normalizeIntroductionContent(rawContent, planStepLabel),
     citations: normalizeCitationDrafts(
@@ -520,6 +530,45 @@ function normalizeStandaloneQuestionDraft(
   };
 }
 
+export function normalizeSummaryEvaluation(
+  payload: unknown,
+  options?: {
+    currentQuestionTitle?: string;
+    learnerSummary?: string;
+  },
+): SummaryEvaluationResult {
+  const rawPayload = isRecord(payload) ? (payload as RawSummaryEvaluationPayload) : {};
+  const normalizedJudgment = normalizeSummaryEvaluationJudgmentDraft(
+    rawPayload.judgment ?? rawPayload.evaluation,
+    options,
+  );
+  const hint = normalizeClosureHint(rawPayload.hint ?? rawPayload.guidanceHint, {
+    currentQuestionTitle: options?.currentQuestionTitle,
+    judgment: normalizedJudgment.hintDetails,
+    judgmentContent: normalizedJudgment.draft.content,
+    summaryContent: options?.learnerSummary ?? '',
+  });
+  const hintCitations = normalizeHintCitationDrafts(
+    rawPayload.hint ?? rawPayload.guidanceHint,
+    hint,
+  );
+
+  return {
+    judgment: {
+      ...normalizedJudgment.draft,
+      hint,
+      citations: dedupeCitations([
+        ...normalizedJudgment.draft.citations,
+        ...hintCitations,
+      ]),
+    },
+    metadata: {
+      model: '',
+      providerLabel: '',
+    },
+  };
+}
+
 function normalizeActionAnswerDraft(
   rawNode: RawLearningNodeDraft,
   options: {
@@ -561,6 +610,7 @@ function normalizeJudgmentDraft(
     details,
     draft: {
       type: 'judgment',
+      judgmentKind: 'answer-closure',
       title: normalizeJudgmentTitle(title, options.isAnswerSufficient),
       content: formatStructuredJudgmentContent(details, options.isAnswerSufficient),
       citations: normalizeCitationDrafts(
@@ -591,6 +641,7 @@ function normalizeClosureSummaryDraft(
 
   return {
     type: 'summary',
+    summaryKind: 'answer-closure',
     title: normalizeClosureSummaryTitle(title),
     content: normalizeClosureSummaryContent(rawContent, options),
     citations: normalizeCitationDrafts(
@@ -615,6 +666,7 @@ function normalizeActionSummaryDraft(
 
   return {
     type: 'summary',
+    summaryKind: 'manual',
     title,
     content: normalizeActionSummaryContent(rawContent, options),
     citations: normalizeCitationDrafts(
@@ -641,6 +693,7 @@ function normalizeActionJudgmentDraft(
 
     return {
       type: 'judgment',
+      judgmentKind: 'manual',
       title: normalizeJudgmentTitle(title, isAnswerSufficient),
       content: normalizeJudgmentContent(
         rawContent,
@@ -656,6 +709,7 @@ function normalizeActionJudgmentDraft(
 
   return {
     type: 'judgment',
+    judgmentKind: 'manual',
     title: normalizeStandaloneJudgmentTitle(title),
     content: normalizeStandaloneJudgmentContent(rawContent, options),
     citations: normalizeCitationDrafts(
@@ -705,6 +759,7 @@ function createFallbackIntroductionDrafts(
   return [
     {
       type: 'summary',
+      summaryKind: 'scaffold',
       title: normalizeIntroductionTitle('先把这一步说清楚', planStepTitle, 0),
       content: normalizeIntroductionContent('', planStepTitle),
       citations: [],
@@ -1753,6 +1808,12 @@ function splitStructuredList(content: string) {
     .filter(Boolean);
 }
 
+function formatBulletList(items: string[]) {
+  return items
+    .map((item) => `- ${stripTrailingSentencePunctuation(item)}`)
+    .join('\n');
+}
+
 function sanitizeGapItem(item: string) {
   return item
     .replace(/^\s*[-*•]\s*/u, '')
@@ -1904,6 +1965,92 @@ function normalizeFollowUpQuestionDraft(
       rawQuestion.citations ?? rawQuestion.references,
       'question',
     ),
+  };
+}
+
+function normalizeSummaryEvaluationJudgmentDraft(
+  rawJudgment: unknown,
+  options?: {
+    currentQuestionTitle?: string;
+    learnerSummary?: string;
+  },
+): {
+  draft: JudgmentNodeDraft;
+  hintDetails: NormalizedJudgmentDetails;
+} {
+  const rawNode = isRecord(rawJudgment)
+    ? (rawJudgment as RawLearningNodeDraft & {
+        correctPoints?: unknown;
+        missingPoints?: unknown;
+        misunderstandings?: unknown;
+        possibleMisunderstandings?: unknown;
+        nextFocus?: unknown;
+        repairFocus?: unknown;
+      })
+    : {};
+  const rawContent =
+    getText(rawNode.content) ||
+    getText(rawNode.description) ||
+    '';
+  const correctPoints = normalizeSummaryEvaluationCorrectPoints(
+    getText(rawNode.correctPoints) ||
+      extractStructuredTextFromRawNode(rawNode, ['说对了什么', '已经说对的部分']),
+    options?.currentQuestionTitle,
+  );
+  const missingPoints = normalizeSummaryEvaluationGapItems(
+    rawNode.missingPoints,
+    rawNode,
+    ['还缺哪些关键点', '还缺的关键点', '缺口'],
+    options?.currentQuestionTitle,
+  );
+  const misunderstandings = normalizeSummaryEvaluationGapItems(
+    rawNode.possibleMisunderstandings ?? rawNode.misunderstandings,
+    rawNode,
+    ['哪些地方可能理解偏了', '可能理解偏了的地方', '可能的误解'],
+    undefined,
+    null,
+  );
+  const nextFocus = normalizeSummaryEvaluationNextFocus(
+    getText(rawNode.nextFocus) ||
+      getText(rawNode.repairFocus) ||
+      extractStructuredTextFromRawNode(rawNode, [
+        '可以补哪一层机制 / 因果 / 边界',
+        '可以补哪一层',
+        '下一步补哪层',
+      ]),
+    options?.currentQuestionTitle,
+  );
+  const hasBlockingSignal =
+    missingPoints.length > 0 ||
+    misunderstandings.length > 0 ||
+    containsBlockingSignal(rawContent);
+  const hintDetails = {
+    answeredText: correctPoints,
+    gapItems: [...missingPoints, ...misunderstandings].slice(0, 3),
+    whyItMattersText: nextFocus,
+  } satisfies NormalizedJudgmentDetails;
+
+  return {
+    draft: {
+      type: 'judgment',
+      judgmentKind: 'summary-check',
+      title: normalizeSummaryEvaluationJudgmentTitle(
+        getText(rawNode.title),
+        hasBlockingSignal,
+      ),
+      content: normalizeSummaryEvaluationJudgmentContent({
+        correctPoints,
+        misunderstandings,
+        missingPoints,
+        nextFocus,
+        rawContent,
+      }),
+      citations: normalizeCitationDrafts(
+        rawNode.citations ?? rawNode.references,
+        'judgment',
+      ),
+    },
+    hintDetails,
   };
 }
 
@@ -2062,6 +2209,56 @@ function normalizeActionSummaryContent(
   return [reusableSentence, fallbackSentence].filter(Boolean).join('');
 }
 
+function normalizeSummaryEvaluationJudgmentTitle(
+  title: string,
+  hasBlockingSignal: boolean,
+) {
+  const normalizedTitle =
+    title ||
+    (hasBlockingSignal
+      ? '判断：这段总结还可再补'
+      : '判断：这段总结已抓到主线');
+
+  if (/^判断[:：]/u.test(normalizedTitle)) {
+    return normalizedTitle;
+  }
+
+  return `判断：${normalizedTitle}`;
+}
+
+function normalizeSummaryEvaluationJudgmentContent(options: {
+  correctPoints: string;
+  missingPoints: string[];
+  misunderstandings: string[];
+  nextFocus: string;
+  rawContent: string;
+}) {
+  const normalizedRawContent = options.rawContent.trim();
+
+  if (
+    normalizedRawContent.includes('说对了什么') &&
+    normalizedRawContent.includes('还缺')
+  ) {
+    return normalizedRawContent;
+  }
+
+  const missingPointsText =
+    options.missingPoints.length > 0
+      ? formatBulletList(options.missingPoints)
+      : '这段总结暂时没有明显漏掉的大块内容，但还可以继续补足机制、因果或边界。';
+  const misunderstandingsText =
+    options.misunderstandings.length > 0
+      ? formatBulletList(options.misunderstandings)
+      : '暂时没有看到明确误解，但要继续检查自己有没有把结论说得过满。';
+
+  return [
+    `这段总结已经说对了什么：${options.correctPoints}`,
+    `还缺的关键点：${missingPointsText}`,
+    `哪些地方可能理解偏了：${misunderstandingsText}`,
+    `下一步建议先补哪层：${options.nextFocus}`,
+  ].join('\n');
+}
+
 function normalizeActionAnswerContent(
   rawContent: string,
   options: {
@@ -2082,6 +2279,74 @@ function normalizeActionAnswerContent(
       : '当前问题';
 
   return `先直接回答${questionLabel}，至少说明核心结论、它为什么成立，以及它会带来什么结果。`;
+}
+
+function normalizeSummaryEvaluationCorrectPoints(
+  rawText: string,
+  currentQuestionTitle?: string,
+) {
+  const normalizedText = rawText.trim();
+
+  if (normalizedText && !isGenericAnsweredText(normalizedText)) {
+    return ensureSentenceEnding(normalizedText);
+  }
+
+  if (currentQuestionTitle) {
+    return `这段总结已经抓住了“${currentQuestionTitle}”里最显眼的一条主线，但还可以继续补齐它为什么成立。`;
+  }
+
+  return '这段总结已经抓住了当前问题的一条主线，但还可以继续补齐它为什么成立。';
+}
+
+function normalizeSummaryEvaluationGapItems(
+  rawValue: unknown,
+  rawNode: RawLearningNodeDraft,
+  sectionLabels: string[],
+  currentQuestionTitle?: string,
+  fallbackItem?: string | null,
+) {
+  const rawItems = [
+    ...extractTextArray(rawValue),
+    ...splitStructuredList(extractStructuredTextFromRawNode(rawNode, sectionLabels)),
+  ]
+    .map(sanitizeGapItem)
+    .filter(Boolean)
+    .filter((item) => !looksGenericGapItem(item));
+
+  if (rawItems.length > 0) {
+    return rawItems.slice(0, 3);
+  }
+
+  if (fallbackItem === null) {
+    return [] as string[];
+  }
+
+  if (fallbackItem) {
+    return [fallbackItem];
+  }
+
+  if (currentQuestionTitle) {
+    return [`“${currentQuestionTitle}”里还缺一层关键机制、因果关系或边界条件`];
+  }
+
+  return ['当前总结还缺一层关键机制、因果关系或边界条件'];
+}
+
+function normalizeSummaryEvaluationNextFocus(
+  rawText: string,
+  currentQuestionTitle?: string,
+) {
+  const normalizedText = rawText.trim();
+
+  if (normalizedText && !looksGenericWhyItMattersText(normalizedText)) {
+    return ensureSentenceEnding(normalizedText);
+  }
+
+  if (currentQuestionTitle) {
+    return `先把“${currentQuestionTitle}”里最容易被一句结论带过的那层机制、因果或边界补清楚。`;
+  }
+
+  return '先把最容易被一句结论带过的那层机制、因果或边界补清楚。';
 }
 
 function normalizeStandaloneJudgmentTitle(title: string) {

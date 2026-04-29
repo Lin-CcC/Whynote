@@ -225,6 +225,10 @@
 
 .workspace-treeText {
   flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workspace-actionGrid {
@@ -658,6 +662,14 @@
   color: #0f172a;
 }
 
+.workspace-inspectorClamp {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: break-word;
+}
+
 .workspace-tagSection {
   display: flex;
   flex-direction: column;
@@ -672,29 +684,39 @@
   gap: 0.55rem;
 }
 
-.workspace-tagButton {
+.workspace-typeSwitchList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.workspace-tagButton,
+.workspace-typeSwitchButton {
   padding: 0.45rem 0.8rem;
   border: 1px solid rgba(15, 23, 42, 0.12);
-  border-radius: 999px;
+  border-radius: 0.85rem;
   background: #ffffff;
   color: #0f172a;
   cursor: pointer;
 }
 
-.workspace-tagButton[data-active='true'] {
+.workspace-tagButton[data-active='true'],
+.workspace-typeSwitchButton[data-active='true'] {
   border-color: rgba(15, 118, 110, 0.48);
   background: rgba(240, 253, 250, 0.96);
   color: #0f766e;
 }
 
-.workspace-tagButton:disabled {
+.workspace-tagButton:disabled,
+.workspace-typeSwitchButton:disabled {
   opacity: 0.58;
   cursor: not-allowed;
 }
 
 @media (max-width: 900px) {
   .workspace-learningActionGrid,
-  .workspace-actionGrid {
+  .workspace-actionGrid,
+  .workspace-typeSwitchList {
     grid-template-columns: 1fr;
   }
 

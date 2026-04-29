@@ -166,7 +166,7 @@ test('keeps answer explanation available on the first evaluation even when summa
   });
 });
 
-test('matches a manual summary before a manual judgment as the same answer explanation path', async () => {
+test('keeps a manual summary before a manual judgment on the separate summary-check path', async () => {
   const dependencies = await createPreloadedDependencies(
     createManualSummaryBeforeJudgmentSnapshot(),
   );
@@ -176,19 +176,15 @@ test('matches a manual summary before a manual judgment as the same answer expla
   const judgmentNode = await screen.findByTestId('editor-node-manual-judgment');
   const summaryNode = await screen.findByTestId('editor-node-manual-summary');
 
-  fireEvent.click(judgmentNode);
+  fireEvent.click(summaryNode);
   expect(
-    within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
+    screen.getByRole('button', { name: '检查这个总结' }),
   ).toBeEnabled();
+  expect(screen.queryByRole('button', { name: '查看答案解析' })).not.toBeInTheDocument();
+  expect(summaryNode).toHaveTextContent('总结');
 
-  fireEvent.click(
-    within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
-  );
-
-  await waitFor(() => {
-    expect(summaryNode).toHaveAttribute('data-node-selected', 'true');
-  });
-  expect(summaryNode).toHaveTextContent('答案解析');
+  fireEvent.click(judgmentNode);
+  expect(screen.queryByRole('button', { name: '查看答案解析' })).not.toBeInTheDocument();
 });
 
 async function createPreloadedDependencies(
@@ -375,6 +371,7 @@ function createManualSummaryBeforeJudgmentSnapshot(): WorkspaceSnapshot {
       id: 'manual-summary',
       title: '手动标准理解',
       content: '先收集同一轮更新，再统一提交，因此不会为每次更新都重复渲染。',
+      summaryKind: 'manual',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -386,6 +383,7 @@ function createManualSummaryBeforeJudgmentSnapshot(): WorkspaceSnapshot {
       id: 'manual-judgment',
       title: '手动判断',
       content: '回答方向对了，但因果解释还可以更清楚。',
+      judgmentKind: 'manual',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
