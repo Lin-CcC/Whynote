@@ -14,7 +14,9 @@ import {
   attachResourceCitation,
   isLearningCitationSourceNode,
 } from '../services/resourceCitationService';
+import { buildResourceDeleteImpact } from '../services/resourceDeleteService';
 import { createResourceFragmentEntry } from '../services/resourceEntryService';
+import ResourceDeleteConfirmPanel from './ResourceDeleteConfirmPanel';
 import {
   formatNodeLabel,
   getNodePathLabel,
@@ -26,8 +28,12 @@ type ResourceFocusPanelProps = {
   activeResourceNodeId: string | null;
   currentModuleTitle: string | null;
   onApplyTreeChange: (nextTree: NodeTree) => void;
+  onCancelDeleteNode: () => void;
   onClearResourceFocus?: () => void;
+  onConfirmDeleteNode: () => void;
   onFocusResourceNode: (nodeId: string) => void;
+  onRequestDeleteNode: (nodeId: string) => void;
+  pendingDeleteNodeId: string | null;
   resourceMetadataByNodeId: Record<string, ResourceMetadataRecord>;
   selectedEditorNodeId: string | null;
   tree: NodeTree;
@@ -81,8 +87,12 @@ export default function ResourceFocusPanel({
   activeResourceNodeId,
   currentModuleTitle,
   onApplyTreeChange,
+  onCancelDeleteNode,
   onClearResourceFocus,
+  onConfirmDeleteNode,
   onFocusResourceNode,
+  onRequestDeleteNode,
+  pendingDeleteNodeId,
   resourceMetadataByNodeId,
   selectedEditorNodeId,
   tree,
@@ -157,6 +167,10 @@ export default function ResourceFocusPanel({
       : targetResourceMetadata;
   const captureTeachingCitation =
     editorNode && isTeachingCitationNode(editorNode);
+  const deleteImpact =
+    pendingDeleteNodeId === resourceNode.id
+      ? buildResourceDeleteImpact(tree, resourceNode.id)
+      : null;
 
   return (
     <SectionCard>
@@ -260,6 +274,38 @@ export default function ResourceFocusPanel({
           <dd>{editorNode ? formatNodeLabel(tree, editorNode) : '当前没有编辑焦点'}</dd>
         </div>
       </dl>
+
+      <div className="resources-entrySection">
+        <h3 className="workspace-splitTitle">资源动作</h3>
+        <p className="workspace-helpText">
+          当前资源区把常用动作收成“定位 / 补摘录 / 引用 / 删除”这条短路径。删除不会直接执行，必须先看影响确认。
+        </p>
+        <div className="resources-entryActionRow">
+          {resourceNode.type === 'resource-fragment' && targetResourceNode ? (
+            <button
+              className="resources-inlineButton"
+              onClick={() => onFocusResourceNode(targetResourceNode.id)}
+              type="button"
+            >
+              定位父资料
+            </button>
+          ) : null}
+          <button
+            className="resources-inlineButton"
+            onClick={() => onRequestDeleteNode(resourceNode.id)}
+            type="button"
+          >
+            {resourceNode.type === 'resource' ? '删除资料' : '删除摘录'}
+          </button>
+        </div>
+        {deleteImpact ? (
+          <ResourceDeleteConfirmPanel
+            impact={deleteImpact}
+            onCancel={onCancelDeleteNode}
+            onConfirm={onConfirmDeleteNode}
+          />
+        ) : null}
+      </div>
 
       <form className="resources-entrySection" onSubmit={handleCreateFragment}>
         <h3 className="workspace-splitTitle">补充摘录</h3>

@@ -180,6 +180,12 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - 回归测试设计：这条链路的关键风险不是类型错误，而是语义退化。测试不能只覆盖 happy path，还要覆盖一句话铺垫、空泛问题、纯问题拆分误推进状态、question-only citation 误判进展、回答不足时追问缺失等坏例。建议同时保留 unit test 和 runtime integration test：前者固定 normalize / 状态规则，后者固定真实交互路径。
 - 质量控制面优先级：如果目标是稳定产品内生成质量，首选控制面永远是 `prompt + normalization/validator + runtime assembly + tests`。团队侧 `skill` 可以沉淀协作规范和 review rubric，但它不是产品 runtime 的主约束来源，不能替代代码路径里的硬规则。
 
+### 20. 资源删除策略
+
+- `resource` 和 `resource-fragment` 都允许删除；即使已经存在引用，也不应直接禁止，必须先展示影响确认。
+- 删除 `resource` 时继续复用现有 `deleteNode(...)`，由它负责删除 fragment 子树并清理相关 references，不再单独重写树删除逻辑。
+- 删除资料只会移除资料节点、摘录节点和对应资料引用，不会删除学习节点本身；学习节点只是失去对应资料依据。
+
 ## 后续需要重新评估这些决策的触发条件
 
 - 需要公开注册或公开商用

@@ -18,7 +18,11 @@ test('requires a stable excerpt or locator before creating a teaching citation f
       activeResourceNodeId="resource-react-docs"
       currentModuleTitle="Teaching citation module"
       onApplyTreeChange={onApplyTreeChange}
+      onCancelDeleteNode={() => {}}
+      onConfirmDeleteNode={() => {}}
       onFocusResourceNode={() => {}}
+      onRequestDeleteNode={() => {}}
+      pendingDeleteNodeId={null}
       resourceMetadataByNodeId={{}}
       selectedEditorNodeId="summary-teaching"
       tree={createTeachingCitationTree()}
@@ -57,7 +61,11 @@ test('keeps resource summary for focus display while separating body foundation 
       activeResourceNodeId="resource-react-docs"
       currentModuleTitle="Teaching citation module"
       onApplyTreeChange={() => {}}
+      onCancelDeleteNode={() => {}}
+      onConfirmDeleteNode={() => {}}
       onFocusResourceNode={() => {}}
+      onRequestDeleteNode={() => {}}
+      pendingDeleteNodeId={null}
       resourceMetadataByNodeId={resourceMetadataByNodeId}
       selectedEditorNodeId="summary-teaching"
       tree={tree}
