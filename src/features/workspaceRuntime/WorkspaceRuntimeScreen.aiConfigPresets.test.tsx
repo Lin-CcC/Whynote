@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import type {
   AiConfig,
@@ -18,6 +18,7 @@ import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 const openedStorages: StructuredDataStorage[] = [];
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   window.localStorage.clear();
 
   while (openedStorages.length > 0) {
@@ -37,33 +38,16 @@ test('applies the Gemini template and restores a saved preset after remount', as
 
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(screen.getByLabelText('厂商模板'), {
-    target: {
-      value: 'gemini-openai-compatible',
-    },
-  });
-
-  expect(screen.getByLabelText('Base URL')).toHaveValue(
-    'https://generativelanguage.googleapis.com/v1beta/openai',
-  );
-  expect(screen.getByLabelText('Model')).toHaveValue('gemini-2.5-flash');
-
-  fireEvent.change(screen.getByLabelText(/API Key/i), {
-    target: {
-      value: 'gemini-key',
-    },
-  });
-  fireEvent.change(screen.getByLabelText('预设名称'), {
-    target: {
-      value: '我的 Gemini',
-    },
-  });
-  fireEvent.click(screen.getByRole('button', { name: '保存为新预设' }));
+  createGeminiPreset('我的 Gemini');
 
   expect(
     await screen.findByRole('button', { name: '覆盖当前预设' }),
   ).toBeInTheDocument();
-  expect(screen.getByText('当前会覆盖已选中的本地预设。')).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      '当前会覆盖已选中的本地预设内容，不会改名。要改名或删除，请到下方“已保存预设”。',
+    ),
+  ).toBeInTheDocument();
 
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
@@ -74,7 +58,9 @@ test('applies the Gemini template and restores a saved preset after remount', as
   );
   expect(screen.getByLabelText(/API Key/i)).toHaveValue('gemini-key');
   expect(screen.getByLabelText('Model')).toHaveValue('gemini-2.5-flash');
-  expect(screen.getByLabelText('预设名称')).toHaveValue('我的 Gemini');
+  expect(getCurrentConfigSelect().selectedOptions[0]?.text).toBe('我的 Gemini');
+  expect(screen.getByLabelText('新预设名称')).toHaveValue('我的 Gemini');
+  expect(screen.getByLabelText('新预设名称')).toBeDisabled();
 });
 
 test('explains why preset saving is disabled until a preset name is provided', async () => {
@@ -83,16 +69,16 @@ test('explains why preset saving is disabled until a preset name is provided', a
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(screen.getByLabelText('预设名称'), {
+  fireEvent.change(screen.getByLabelText('新预设名称'), {
     target: {
       value: '',
     },
   });
 
   expect(screen.getByRole('button', { name: '保存为新预设' })).toBeDisabled();
-  expect(screen.getByText('要保存为预设，先填一个预设名称。')).toBeInTheDocument();
+  expect(screen.getByText('要保存为预设，先填一个新预设名称。')).toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText('预设名称'), {
+  fireEvent.change(screen.getByLabelText('新预设名称'), {
     target: {
       value: '临时预设',
     },
@@ -114,62 +100,17 @@ test('switches between saved presets and keeps the provider chain working', asyn
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(screen.getByLabelText('厂商模板'), {
-    target: {
-      value: 'gemini-openai-compatible',
-    },
-  });
-  fireEvent.change(screen.getByLabelText(/API Key/i), {
-    target: {
-      value: 'gemini-key',
-    },
-  });
-  fireEvent.change(screen.getByLabelText('预设名称'), {
-    target: {
-      value: '我的 Gemini',
-    },
-  });
-  fireEvent.click(screen.getByRole('button', { name: '保存为新预设' }));
+  createGeminiPreset('我的 Gemini');
+  switchToUnsavedCurrentConfig();
+  createCustomPreset('测试 Key');
 
-  fireEvent.change(screen.getByLabelText('本地预设'), {
-    target: {
-      value: '',
-    },
-  });
-  fireEvent.change(screen.getByLabelText('厂商模板'), {
-    target: {
-      value: 'custom-openai-compatible',
-    },
-  });
-  fireEvent.change(screen.getByLabelText('Base URL'), {
-    target: {
-      value: 'https://example.com/v1',
-    },
-  });
-  fireEvent.change(screen.getByLabelText(/API Key/i), {
-    target: {
-      value: 'custom-key',
-    },
-  });
-  fireEvent.change(screen.getByLabelText('Model'), {
-    target: {
-      value: 'custom-model',
-    },
-  });
-  fireEvent.change(screen.getByLabelText('预设名称'), {
-    target: {
-      value: '测试 Key',
-    },
-  });
-  fireEvent.click(screen.getByRole('button', { name: '保存为新预设' }));
-
-  const presetSelect = screen.getByLabelText('本地预设') as HTMLSelectElement;
+  const currentConfigSelect = getCurrentConfigSelect();
   const geminiPresetId =
-    findOptionValueByText(presetSelect, '我的 Gemini') ?? '';
+    findOptionValueByText(currentConfigSelect, '我的 Gemini') ?? '';
   const customPresetId =
-    findOptionValueByText(presetSelect, '测试 Key') ?? '';
+    findOptionValueByText(currentConfigSelect, '测试 Key') ?? '';
 
-  fireEvent.change(screen.getByLabelText('本地预设'), {
+  fireEvent.change(currentConfigSelect, {
     target: {
       value: geminiPresetId,
     },
@@ -183,7 +124,7 @@ test('switches between saved presets and keeps the provider chain working', asyn
   expect(screen.getByLabelText(/API Key/i)).toHaveValue('gemini-key');
   expect(screen.getByLabelText('Model')).toHaveValue('gemini-2.5-flash');
 
-  fireEvent.change(screen.getByLabelText('本地预设'), {
+  fireEvent.change(currentConfigSelect, {
     target: {
       value: customPresetId,
     },
@@ -195,7 +136,7 @@ test('switches between saved presets and keeps the provider chain working', asyn
   expect(screen.getByLabelText(/API Key/i)).toHaveValue('custom-key');
   expect(screen.getByLabelText('Model')).toHaveValue('custom-model');
 
-  fireEvent.change(screen.getByLabelText('本地预设'), {
+  fireEvent.change(currentConfigSelect, {
     target: {
       value: geminiPresetId,
     },
@@ -219,27 +160,7 @@ test('detaches the selected preset after manual edits or template switches', asy
 
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(screen.getByLabelText('厂商模板'), {
-    target: {
-      value: 'gemini-openai-compatible',
-    },
-  });
-  fireEvent.change(screen.getByLabelText(/API Key/i), {
-    target: {
-      value: 'gemini-key',
-    },
-  });
-  fireEvent.change(screen.getByLabelText('预设名称'), {
-    target: {
-      value: '我的 Gemini',
-    },
-  });
-  fireEvent.click(screen.getByRole('button', { name: '保存为新预设' }));
-
-  expect(screen.getByLabelText('本地预设')).not.toHaveValue('');
-  expect(
-    screen.getByRole('button', { name: '覆盖当前预设' }),
-  ).toBeInTheDocument();
+  createGeminiPreset('我的 Gemini');
 
   fireEvent.change(screen.getByLabelText('Model'), {
     target: {
@@ -247,9 +168,10 @@ test('detaches the selected preset after manual edits or template switches', asy
     },
   });
 
-  expect(screen.getByLabelText('本地预设')).toHaveValue('');
+  expect(getCurrentConfigSelect()).toHaveValue('');
+  expect(screen.getByRole('button', { name: '保存为新预设' })).toBeInTheDocument();
   expect(
-    screen.getByRole('button', { name: '保存为新预设' }),
+    screen.getByText('当前配置已脱离预设：我的 Gemini。现为未保存状态。'),
   ).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '保存当前配置' }));
@@ -258,18 +180,29 @@ test('detaches the selected preset after manual edits or template switches', asy
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   await screen.findByRole('heading', { name: '当前学习模块' });
-  expect(screen.getByLabelText('本地预设')).toHaveValue('');
+  expect(getCurrentConfigSelect()).toHaveValue('');
   expect(screen.getByLabelText('Model')).toHaveValue('gemini-2.5-pro');
 
+  const geminiPresetId =
+    findOptionValueByText(getCurrentConfigSelect(), '我的 Gemini') ?? '';
+
+  fireEvent.change(getCurrentConfigSelect(), {
+    target: {
+      value: geminiPresetId,
+    },
+  });
   fireEvent.change(screen.getByLabelText('厂商模板'), {
     target: {
       value: 'custom-openai-compatible',
     },
   });
 
-  expect(screen.getByLabelText('本地预设')).toHaveValue('');
+  expect(getCurrentConfigSelect()).toHaveValue('');
   expect(screen.getByLabelText('Base URL')).toHaveValue('');
   expect(screen.getByLabelText('Model')).toHaveValue('');
+  expect(
+    screen.getByText('已切换到模板：自定义 OpenAI-compatible。当前配置已回到未保存状态。'),
+  ).toBeInTheDocument();
 });
 
 function createTestDependencies(options?: {
@@ -351,6 +284,66 @@ function createCapturingProviderClient() {
       configs.push(config);
     },
   };
+}
+
+function getCurrentConfigSelect() {
+  return screen.getByLabelText('当前配置') as HTMLSelectElement;
+}
+
+function switchToUnsavedCurrentConfig() {
+  fireEvent.change(getCurrentConfigSelect(), {
+    target: {
+      value: '',
+    },
+  });
+}
+
+function createGeminiPreset(name: string) {
+  fireEvent.change(screen.getByLabelText('厂商模板'), {
+    target: {
+      value: 'gemini-openai-compatible',
+    },
+  });
+  fireEvent.change(screen.getByLabelText(/API Key/i), {
+    target: {
+      value: 'gemini-key',
+    },
+  });
+  fireEvent.change(screen.getByLabelText('新预设名称'), {
+    target: {
+      value: name,
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '保存为新预设' }));
+}
+
+function createCustomPreset(name: string) {
+  fireEvent.change(screen.getByLabelText('厂商模板'), {
+    target: {
+      value: 'custom-openai-compatible',
+    },
+  });
+  fireEvent.change(screen.getByLabelText('Base URL'), {
+    target: {
+      value: 'https://example.com/v1',
+    },
+  });
+  fireEvent.change(screen.getByLabelText(/API Key/i), {
+    target: {
+      value: 'custom-key',
+    },
+  });
+  fireEvent.change(screen.getByLabelText('Model'), {
+    target: {
+      value: 'custom-model',
+    },
+  });
+  fireEvent.change(screen.getByLabelText('新预设名称'), {
+    target: {
+      value: name,
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '保存为新预设' }));
 }
 
 function findOptionValueByText(
