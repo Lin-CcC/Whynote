@@ -1,5 +1,6 @@
 import type { AiExecutionMetadata } from './aiTypes';
 import type {
+  AnswerNodeDraft,
   JudgmentNodeDraft,
   LearningReferenceCandidate,
   QuestionNodeDraft,
@@ -12,10 +13,12 @@ export type LearningActionDraftActionId =
   | 'simplify-scaffold'
   | 'add-example'
   | 'insert-question'
+  | 'insert-answer'
   | 'insert-summary'
   | 'insert-judgment';
 
 export type LearningActionDraft =
+  | AnswerNodeDraft
   | QuestionNodeDraft
   | SummaryNodeDraft
   | JudgmentNodeDraft;

@@ -747,6 +747,7 @@ function resolveDraftActionId(actionId: WorkspaceEditorLearningActionRequest['ac
     case 'simplify-scaffold':
     case 'add-example':
     case 'insert-question':
+    case 'insert-answer':
     case 'insert-summary':
     case 'insert-judgment':
       return actionId;
@@ -825,6 +826,8 @@ function buildLearningActionDraftMessage(
         return 'AI 暂时不可用，已先补上一个可编辑的本地例子草稿。';
       case 'insert-question':
         return 'AI 暂时不可用，已先补上一个可编辑的本地问题草稿。';
+      case 'insert-answer':
+        return 'AI 暂时不可用，已先补上一版可编辑的本地回答草稿。';
       case 'insert-summary':
         return 'AI 暂时不可用，已先补上一段可编辑的本地总结草稿。';
       case 'insert-judgment':
@@ -843,6 +846,8 @@ function buildLearningActionDraftMessage(
       return '已补上一个帮助理解的例子草稿。';
     case 'insert-question':
       return '已补上一个新的问题草稿。';
+    case 'insert-answer':
+      return '已直接回答当前问题，并生成一版可编辑的回答草稿。';
     case 'insert-summary':
       return '已补上一段可编辑的总结草稿。';
     case 'insert-judgment':

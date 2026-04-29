@@ -5,29 +5,43 @@ import type { QuestionAnswerEvaluationTarget } from '../services/learningRuntime
 type WorkspaceRuntimeActionCardProps = {
   answerExplanationNodeId: string | null;
   answerFollowUpCount: number;
+  canDirectAnswerCurrentQuestion: boolean;
   currentModule: TreeNode | null;
   evaluationTarget: QuestionAnswerEvaluationTarget | null;
+  hasDirectAnswerCurrentQuestion: boolean;
   isAiRunning: boolean;
   onCreateModule: () => void;
+  onDirectAnswerCurrentQuestion: () => void;
   onEvaluateQuestionAnswer: (target: QuestionAnswerEvaluationTarget) => void;
   onGeneratePlanSteps: (moduleNodeId: string) => void;
+  onInsertAnswer: () => void;
   onSelectNode: (nodeId: string) => void;
   onSplitQuestion: (questionNodeId: string) => void;
   onSuggestCompletion: (planStepNodeId: string) => void;
   selectedNode: TreeNode | null;
 };
 
-type QuestionClosureStage = 'question' | 'answer' | 'judgment' | 'summary' | null;
+type QuestionClosureStage =
+  | 'question-needs-answer'
+  | 'question'
+  | 'answer'
+  | 'judgment'
+  | 'summary'
+  | null;
 
 export default function WorkspaceRuntimeActionCard({
   answerExplanationNodeId,
   answerFollowUpCount,
+  canDirectAnswerCurrentQuestion,
   currentModule,
   evaluationTarget,
+  hasDirectAnswerCurrentQuestion,
   isAiRunning,
   onCreateModule,
+  onDirectAnswerCurrentQuestion,
   onEvaluateQuestionAnswer,
   onGeneratePlanSteps,
+  onInsertAnswer,
   onSelectNode,
   onSplitQuestion,
   onSuggestCompletion,
@@ -41,6 +55,7 @@ export default function WorkspaceRuntimeActionCard({
   const questionClosureStage = resolveQuestionClosureStage(
     selectedNode,
     evaluationTarget,
+    hasDirectAnswerCurrentQuestion,
   );
   const isQuestionClosureContext = questionClosureStage !== null;
   const shouldUseInlineJudgmentPrimaryAction =
@@ -99,6 +114,14 @@ export default function WorkspaceRuntimeActionCard({
     }
 
     onSuggestCompletion(selectedNode.id);
+  }
+
+  function handleDirectAnswerCurrentQuestion() {
+    onDirectAnswerCurrentQuestion();
+  }
+
+  function handleInsertAnswer() {
+    onInsertAnswer();
   }
 
   if (!currentModule) {
@@ -161,7 +184,25 @@ export default function WorkspaceRuntimeActionCard({
           ) : (
             <>
               <div className="workspace-actionGrid">
-                {questionClosureStage === 'summary' ? (
+                {questionClosureStage === 'question-needs-answer' ? (
+                  <>
+                    <button
+                      className="workspace-primaryAction"
+                      disabled={!canDirectAnswerCurrentQuestion}
+                      onClick={handleDirectAnswerCurrentQuestion}
+                      type="button"
+                    >
+                      直接回答当前问题
+                    </button>
+                    <button
+                      disabled={isAiRunning}
+                      onClick={handleInsertAnswer}
+                      type="button"
+                    >
+                      插入回答
+                    </button>
+                  </>
+                ) : questionClosureStage === 'summary' ? (
                   <button
                     className="workspace-primaryAction"
                     disabled={!canReturnToAnswer}
@@ -293,13 +334,25 @@ export default function WorkspaceRuntimeActionCard({
 function resolveQuestionClosureStage(
   selectedNode: TreeNode | null,
   evaluationTarget: QuestionAnswerEvaluationTarget | null,
+  hasDirectAnswerCurrentQuestion: boolean,
 ): QuestionClosureStage {
-  if (!selectedNode || !evaluationTarget) {
+  if (!selectedNode) {
+    return null;
+  }
+
+  if (selectedNode.type === 'question') {
+    if (evaluationTarget) {
+      return 'question';
+    }
+
+    return hasDirectAnswerCurrentQuestion ? 'question-needs-answer' : null;
+  }
+
+  if (!evaluationTarget) {
     return null;
   }
 
   switch (selectedNode.type) {
-    case 'question':
     case 'answer':
     case 'judgment':
     case 'summary':
@@ -311,6 +364,8 @@ function resolveQuestionClosureStage(
 
 function getSectionTitle(questionClosureStage: QuestionClosureStage) {
   switch (questionClosureStage) {
+    case 'question-needs-answer':
+      return '当前问题起答';
     case 'question':
       return '当前问题闭环';
     case 'answer':
@@ -326,6 +381,8 @@ function getSectionTitle(questionClosureStage: QuestionClosureStage) {
 
 function getSectionHelpText(questionClosureStage: QuestionClosureStage) {
   switch (questionClosureStage) {
+    case 'question-needs-answer':
+      return '这道题还没有可评估回答，先起一版 answer，再接回现有回答修订闭环。';
     case 'question':
       return '这道题已经有可评估回答，主动作先补评估闭环。';
     case 'answer':
@@ -342,6 +399,10 @@ function getSectionHelpText(questionClosureStage: QuestionClosureStage) {
 function getQuestionClosureCalloutTestId(
   questionClosureStage: QuestionClosureStage,
 ) {
+  if (questionClosureStage === 'question-needs-answer') {
+    return 'question-direct-answer-callout';
+  }
+
   return questionClosureStage === 'judgment'
     ? 'judgment-inline-actions'
     : 'answer-evaluation-callout';
@@ -351,6 +412,8 @@ function getQuestionClosureCalloutTitle(
   questionClosureStage: QuestionClosureStage,
 ) {
   switch (questionClosureStage) {
+    case 'question-needs-answer':
+      return '主动作：直接回答当前问题';
     case 'question':
       return '主动作：先评估当前回答';
     case 'answer':
@@ -369,6 +432,8 @@ function getQuestionClosureCalloutDescription(
   hasAnswerExplanation: boolean,
 ) {
   switch (questionClosureStage) {
+    case 'question-needs-answer':
+      return '这道题还没有可评估回答。先让 AI 起一版普通 answer，或保留手动回答入口。';
     case 'question':
       return hasAnswerExplanation
         ? '这道题已经有答案解析，但主动作仍然是先把当前回答评估完整。'
@@ -394,6 +459,8 @@ function getQuestionClosureHint(
   hasAnswerExplanation: boolean,
 ) {
   switch (questionClosureStage) {
+    case 'question-needs-answer':
+      return '新生成的回答会落成普通 answer 节点，并自动选中，后面直接接回评估、提示和答案解析主链。';
     case 'question':
     case 'answer':
       if (answerFollowUpCount > 0) {

@@ -227,7 +227,7 @@ export function buildLearningActionDraftMessages(
     {
       role: 'system',
       content:
-        '你是 Whynote 的学习动作补全器。只输出 JSON，只为当前动作生成一个可编辑草稿，只能使用现有 summary / question / judgment 节点语义，不要返回空内容，不要发明新节点类型。',
+        '你是 Whynote 的学习动作补全器。只输出 JSON，只为当前动作生成一个可编辑草稿，只能使用现有 answer / summary / question / judgment 节点语义，不要返回空内容，不要发明新节点类型。',
     },
     {
       role: 'user',
@@ -388,6 +388,14 @@ function buildLearningActionInstructions(input: LearningActionDraftInput) {
         '请补一个真正能推进当前步骤的问题草稿。',
         '问题尽量只检查一个主要理解点，不要使用“谈谈理解”“总结全部内容”这类空泛问法。',
         '如果当前步骤已有问题，尽量避开重复角度。',
+      ];
+    case 'insert-answer':
+      return [
+        '目标节点类型：answer。',
+        '请直接回答当前问题，生成一版可编辑的回答草稿。',
+        '先正面回答问题，再补关键机制、因果关系或判断边界；不要只给一句空结论。',
+        '不要写成“我会这样回答”“可以从几个方面理解”这类元说明，也不要把 judgment / summary / 追问混进 answer。',
+        '如果当前已经有铺垫讲解，只吸收对回答真正必要的信息，不要把铺垫原句整段复述进 answer。',
       ];
     case 'insert-summary':
       return [

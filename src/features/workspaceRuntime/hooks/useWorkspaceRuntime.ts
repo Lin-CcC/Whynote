@@ -485,6 +485,19 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     );
   }
 
+  async function runQuestionDirectAnswer(
+    request: WorkspaceEditorLearningActionRequest,
+  ) {
+    await runAiAction('正在直接回答当前问题', async (snapshot) =>
+      runtimeService.generateLearningActionDraft(
+        snapshot,
+        request,
+        state.aiConfig,
+        state.resourceMetadataRecords,
+      ),
+    );
+  }
+
   return {
     ...state,
     deleteAiPreset,
@@ -502,6 +515,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     runCompletionSuggestion,
     runJudgmentHintGeneration,
     runPlanStepGeneration,
+    runQuestionDirectAnswer,
     runQuestionEvaluation,
     runQuestionSplit,
     saveAiConfig,

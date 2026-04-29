@@ -5,10 +5,12 @@ import SectionCard from '../../ui/SectionCard';
 import WorkspaceEditor from '../workspaceEditor/WorkspaceEditor';
 import type {
   LearningActionId,
+  WorkspaceEditorLearningActionRequest,
   WorkspaceEditorNodeRenderContext,
   WorkspaceEditorRenderContext,
   WorkspaceEditorSelectionState,
 } from '../workspaceEditor/workspaceEditorTypes';
+import { resolveLearningActionPlacement } from '../workspaceEditor/utils/learningActions';
 import ResourcesSearchExportPanel from '../resourcesSearchExport/ResourcesSearchExportPanel';
 import WorkspaceRuntimeActionCard from './components/WorkspaceRuntimeActionCard';
 import WorkspaceRuntimeAiConfigCard from './components/WorkspaceRuntimeAiConfigCard';
@@ -122,6 +124,10 @@ export default function WorkspaceRuntimeScreen({
       context.tree,
       context.selectedNode?.id ?? null,
     );
+    const directAnswerRequest = resolveDirectAnswerRequest(
+      context,
+      evaluationTarget,
+    );
     const answerExplanationNodeId = evaluationTarget
       ? getLatestQuestionAnswerExplanationNodeId(
           context.tree,
@@ -137,15 +143,29 @@ export default function WorkspaceRuntimeScreen({
       <WorkspaceRuntimeActionCard
         answerExplanationNodeId={answerExplanationNodeId}
         answerFollowUpCount={answerFollowUpCount}
+        canDirectAnswerCurrentQuestion={
+          directAnswerRequest !== null && !runtime.isAiRunning
+        }
         currentModule={context.currentModule}
         evaluationTarget={evaluationTarget}
+        hasDirectAnswerCurrentQuestion={directAnswerRequest !== null}
         isAiRunning={runtime.isAiRunning}
         onCreateModule={context.createModule}
+        onDirectAnswerCurrentQuestion={() => {
+          if (!directAnswerRequest) {
+            return;
+          }
+
+          void runtime.runQuestionDirectAnswer(directAnswerRequest);
+        }}
         onEvaluateQuestionAnswer={(target) => {
           void runtime.runQuestionEvaluation(target);
         }}
         onGeneratePlanSteps={(moduleNodeId) => {
           void runtime.runPlanStepGeneration(moduleNodeId);
+        }}
+        onInsertAnswer={() => {
+          context.runLearningAction('insert-answer');
         }}
         onSelectNode={context.selectNode}
         onSplitQuestion={(questionNodeId) => {
@@ -306,4 +326,31 @@ function canRunAiLearningAction(actionId: LearningActionId) {
     default:
       return false;
   }
+}
+
+function resolveDirectAnswerRequest(
+  context: WorkspaceEditorRenderContext,
+  evaluationTarget: ReturnType<typeof resolveQuestionAnswerEvaluationTarget>,
+): WorkspaceEditorLearningActionRequest | null {
+  if (context.selectedNode?.type !== 'question' || evaluationTarget !== null) {
+    return null;
+  }
+
+  const placement = resolveLearningActionPlacement(
+    context.tree,
+    context.selectedNode.id,
+    'insert-answer',
+  );
+
+  if (!placement) {
+    return null;
+  }
+
+  return {
+    actionId: 'insert-answer',
+    currentModuleId: context.currentModuleId,
+    placement,
+    selectedNodeId: context.selectedNode.id,
+    tree: context.tree,
+  };
 }

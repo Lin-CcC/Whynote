@@ -187,6 +187,147 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
   ).toBeInTheDocument();
 });
 
+test('directly answers a hand-authored question and keeps the answer-revision path intact', async () => {
+  let observedLearningActionPrompt = '';
+  const dependencies = await createPreloadedDependencies(
+    createManualQuestionDirectAnswerSnapshot(),
+    createMockProviderClient({
+      'learning-action-draft': (request: AiProviderObjectRequest<unknown>) => {
+        const userMessage = request.messages.find((message) => message.role === 'user');
+
+        observedLearningActionPrompt = userMessage?.content ?? '';
+
+        return {
+          title: 'AI 回答草稿',
+          content:
+            '因为 React 会把同一轮里的更新先收集，再统一提交，所以界面不必为每次更新都单独重复渲染。',
+        };
+      },
+      'question-closure': {
+        isAnswerSufficient: false,
+        judgment: {
+          title: '判断：AI 回答还可再补',
+          content: '还需要把统一提交为什么会减少重复渲染这条因果链讲完整。',
+        },
+        summary: {
+          title: '标准理解',
+          content:
+            '更稳妥的理解是：同一轮里的更新会先被收集，再统一提交，因此界面不需要为每次更新单独重复渲染。',
+        },
+        followUpQuestions: [],
+      },
+    }),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.focus(screen.getByLabelText('手动问题 标题'));
+
+  const callout = await screen.findByTestId('question-direct-answer-callout');
+  const directAnswerButton = within(callout).getByRole('button', {
+    name: '直接回答当前问题',
+  });
+  const insertAnswerButton = within(callout).getByRole('button', {
+    name: '插入回答',
+  });
+
+  expect(directAnswerButton).toHaveClass('workspace-primaryAction');
+  expect(insertAnswerButton).not.toHaveClass('workspace-primaryAction');
+
+  fireEvent.click(directAnswerButton);
+
+  const answerTitleInput = await screen.findByDisplayValue('AI 回答草稿');
+
+  expect(answerTitleInput.closest('[data-testid^="editor-node-"]')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+  expect(observedLearningActionPrompt).toContain('学习动作：insert-answer');
+  expect(screen.getByText('当前回答修订')).toBeInTheDocument();
+
+  await waitFor(() => {
+    expect(
+      screen.getByRole('button', { name: '重新评估当前回答' }),
+    ).toBeEnabled();
+  });
+  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+
+  expect(
+    await screen.findByDisplayValue('AI 回答还可再补'),
+  ).toBeInTheDocument();
+  expect(await screen.findByDisplayValue('标准理解')).toBeInTheDocument();
+
+  fireEvent.click(
+    within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
+      name: '查看答案解析',
+    }),
+  );
+
+  expect(
+    screen
+      .getByDisplayValue('标准理解')
+      .closest('[data-testid^="editor-node-"]'),
+  ).toHaveAttribute('data-node-selected', 'true');
+
+  fireEvent.click(screen.getByRole('button', { name: '回到当前回答继续修改' }));
+  expect(
+    screen
+      .getByDisplayValue('AI 回答草稿')
+      .closest('[data-testid^="editor-node-"]'),
+  ).toHaveAttribute('data-node-selected', 'true');
+
+  const savedSnapshot = await waitForSavedSnapshot(
+    dependencies.structuredDataStorage,
+    (snapshot) => findNodeByTitle(snapshot, 'AI 回答草稿') !== null,
+  );
+  const answerNode = findNodeByTitle(savedSnapshot, 'AI 回答草稿');
+
+  expect(answerNode?.type).toBe('answer');
+  expect(answerNode?.parentId).toBe('question-manual-direct-answer');
+});
+
+test('directly answers a generated question without relying on question source', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createGeneratedQuestionDirectAnswerSnapshot(),
+    createMockProviderClient({
+      'learning-action-draft': {
+        title: '系统问题 AI 回答',
+        content:
+          '因为同一轮里的更新会被统一提交，所以界面不需要为每次状态变化都立刻重复渲染。',
+      },
+    }),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.focus(screen.getByLabelText('系统生成问题 标题'));
+  fireEvent.click(
+    within(await screen.findByTestId('question-direct-answer-callout')).getByRole(
+      'button',
+      { name: '直接回答当前问题' },
+    ),
+  );
+
+  const answerTitleInput = await screen.findByDisplayValue('系统问题 AI 回答');
+
+  expect(answerTitleInput.closest('[data-testid^="editor-node-"]')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+  expect(screen.getByTestId('answer-evaluation-callout')).toBeInTheDocument();
+
+  const savedSnapshot = await waitForSavedSnapshot(
+    dependencies.structuredDataStorage,
+    (snapshot) => findNodeByTitle(snapshot, '系统问题 AI 回答') !== null,
+  );
+  const answerNode = findNodeByTitle(savedSnapshot, '系统问题 AI 回答');
+
+  expect(answerNode?.type).toBe('answer');
+  expect(answerNode?.parentId).toBe('question-generated-direct-answer');
+});
+
 test('evaluates a sufficient answer into a closed question and promotes the step to done', async () => {
   const dependencies = await createPreloadedDependencies(
     createAnswerClosureSnapshot(),
@@ -929,6 +1070,121 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       id: 'summary-answer-closure-v2',
       title: '标准理解：第二版回答',
       content: '第二版已经覆盖了为什么统一提交能减少重复渲染。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createManualQuestionDirectAnswerSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '手动问题直接回答',
+    workspaceId: 'workspace-manual-direct-answer',
+    rootId: 'theme-manual-direct-answer',
+    createdAt: '2026-04-28T00:00:00.000Z',
+    updatedAt: '2026-04-28T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-manual-direct-answer',
+      title: '手动问题模块',
+      content: '验证 question 语境可以直接起一版 AI answer。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-manual-direct-answer',
+    createNode({
+      type: 'plan-step',
+      id: 'step-manual-direct-answer',
+      title: '手动问题起答',
+      content: '先选中手动插入的 question，再让 AI 直接回答。',
+      status: 'doing',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-manual-direct-answer',
+    createNode({
+      type: 'question',
+      id: 'question-manual-direct-answer',
+      title: '手动问题',
+      content: '为什么 React 会把同一轮里的更新统一提交，从而减少重复渲染？',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createGeneratedQuestionDirectAnswerSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '系统问题直接回答',
+    workspaceId: 'workspace-generated-direct-answer',
+    rootId: 'theme-generated-direct-answer',
+    createdAt: '2026-04-28T00:00:00.000Z',
+    updatedAt: '2026-04-28T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-generated-direct-answer',
+      title: '系统问题模块',
+      content: '验证系统生成的问题也能直接进入同一条 AI answer 主路径。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-generated-direct-answer',
+    createNode({
+      type: 'plan-step',
+      id: 'step-generated-direct-answer',
+      title: '系统问题起答',
+      content: '问题已经在学习树里，但还没有 answer。',
+      status: 'doing',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-generated-direct-answer',
+    createNode({
+      type: 'summary',
+      id: 'intro-generated-direct-answer',
+      title: '系统铺垫',
+      content: '先有一段学习铺垫，再进入系统生成的问题。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-generated-direct-answer',
+    createNode({
+      type: 'question',
+      id: 'question-generated-direct-answer',
+      title: '系统生成问题',
+      content: '为什么同一轮事件里的状态更新会被统一提交，而不是每次更新都立刻重复渲染？',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );

@@ -93,6 +93,37 @@ describe('learningActionDraftService', () => {
     expect(result.draft.content).toContain('为什么状态更新会被批处理？');
   });
 
+  it('会为 insert-answer 生成可编辑的 answer 草稿', async () => {
+    const providerClient = createMockProvider({
+      'learning-action-draft': {
+        title: '第一版回答',
+        content:
+          '因为 React 会把同一轮里的状态更新先收集，再统一提交，所以界面不必为每次更新都单独重复渲染。',
+      },
+    });
+    const service = createLearningActionDraftService({
+      providerClient,
+    });
+
+    const result = await service.generate({
+      actionId: 'insert-answer',
+      topic: 'React 批处理',
+      planStepTitle: '解释批处理为什么成立',
+      introductions: ['铺垫：先知道它发生在同一轮事件里。'],
+      questionPath: [
+        {
+          title: '为什么状态更新会被批处理？',
+          content: '请解释它为什么能减少重复渲染。',
+        },
+      ],
+    });
+
+    expect(result.draft.type).toBe('answer');
+    expect(result.draft.title).toBe('第一版回答');
+    expect(result.draft.content).toContain('同一轮里的状态更新先收集');
+    expect(result.draft.content).toContain('不必为每次更新都单独重复渲染');
+  });
+
   it('在 provider 失败时回退到本地可编辑判断草稿而不是直接报错', async () => {
     const service = createLearningActionDraftService({
       providerClient: createThrowingProvider(

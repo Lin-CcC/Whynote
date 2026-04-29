@@ -10,6 +10,7 @@ import {
 } from '../../nodeDomain';
 
 import type {
+  AnswerNodeDraft,
   CompoundQuestionSplitResult,
   ModuleNodeDraft,
   PlanStepNodeDraft,
@@ -122,20 +123,23 @@ export function appendChildQuestionsToTree(
 export function appendLearningNodeDraftToTree(
   tree: NodeTree,
   parentNodeId: string,
-  draft: {
-    type: 'question' | 'summary' | 'judgment';
-    title: string;
-    content: string;
-    hint?: string;
-    citations: Array<{
-      targetNodeId: string;
-      focusText?: string;
-      note?: string;
-      purpose?: CitationPurpose;
-      sourceExcerpt?: string;
-      sourceLocator?: string;
-    }>;
-  },
+  draft:
+    | AnswerNodeDraft
+    | QuestionNodeDraft
+    | {
+        type: 'summary' | 'judgment';
+        title: string;
+        content: string;
+        hint?: string;
+        citations: Array<{
+          targetNodeId: string;
+          focusText?: string;
+          note?: string;
+          purpose?: CitationPurpose;
+          sourceExcerpt?: string;
+          sourceLocator?: string;
+        }>;
+      },
   insertIndex?: number,
 ) {
   const node = createNode({
