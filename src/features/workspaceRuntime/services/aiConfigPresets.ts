@@ -88,6 +88,50 @@ export function inferAiTemplateId(config: Pick<AiConfig, 'baseUrl'>) {
   );
 }
 
+export function findAiConfigPresetById(
+  presets: AiConfigPreset[],
+  presetId: string | null,
+) {
+  if (!presetId) {
+    return null;
+  }
+
+  return presets.find((preset) => preset.id === presetId) ?? null;
+}
+
+export function doesAiConfigMatchPreset(
+  config: Pick<AiConfig, 'apiKey' | 'baseUrl' | 'model'>,
+  preset: AiConfigPreset | null,
+) {
+  if (!preset) {
+    return false;
+  }
+
+  return (
+    config.apiKey === preset.apiKey &&
+    config.baseUrl === preset.baseUrl &&
+    config.model === preset.model
+  );
+}
+
+export function upsertAiConfigPreset(
+  presets: AiConfigPreset[],
+  nextPreset: AiConfigPreset,
+) {
+  const existingIndex = presets.findIndex((preset) => preset.id === nextPreset.id);
+  const nextPresets = [...presets];
+
+  if (existingIndex === -1) {
+    nextPresets.unshift(nextPreset);
+  } else {
+    nextPresets[existingIndex] = nextPreset;
+  }
+
+  return nextPresets.toSorted((leftPreset, rightPreset) =>
+    rightPreset.updatedAt.localeCompare(leftPreset.updatedAt),
+  );
+}
+
 export function loadStoredAiConfigPreferences(
   settings: AppSettings | null,
 ): StoredAiConfigPreferences {
@@ -220,21 +264,6 @@ function readAiConfigPreset(value: unknown): AiConfigPreset | null {
     model,
     updatedAt,
   };
-}
-
-function doesAiConfigMatchPreset(
-  config: Pick<AiConfig, 'apiKey' | 'baseUrl' | 'model'>,
-  preset: AiConfigPreset | null,
-) {
-  if (!preset) {
-    return false;
-  }
-
-  return (
-    config.apiKey === preset.apiKey &&
-    config.baseUrl === preset.baseUrl &&
-    config.model === preset.model
-  );
 }
 
 function readOptionalString(value: unknown) {

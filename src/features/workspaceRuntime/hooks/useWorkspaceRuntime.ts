@@ -5,8 +5,11 @@ import type { ResourceMetadataRecord, WorkspaceSnapshot } from '../../nodeDomain
 import type { ResourceImportDraft } from '../../resourcesSearchExport/services/resourceIngestTypes';
 import type { WorkspaceEditorLearningActionRequest } from '../../workspaceEditor/workspaceEditorTypes';
 import {
+  doesAiConfigMatchPreset,
+  findAiConfigPresetById,
   getAiConfigTemplateById,
   getDefaultAiPresetName,
+  upsertAiConfigPreset,
   type AiConfigPreset,
   type StoredAiConfigPreferences,
 } from '../services/aiConfigPresets';
@@ -141,25 +144,38 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
   }
 
   function handleAiConfigChange(patch: Partial<AiConfig>) {
+    const selectedPreset = findAiConfigPresetById(
+      aiPreferencesRef.current.presets,
+      aiPreferencesRef.current.selectedPresetId,
+    );
     const nextConfig = {
       ...aiPreferencesRef.current.config,
       ...patch,
     } satisfies AiConfig;
+    const shouldDetachPreset = shouldDetachSelectedPreset(
+      aiPreferencesRef.current,
+      nextConfig,
+    );
 
-    applyAiPreferences({
-      ...aiPreferencesRef.current,
-      config: nextConfig,
-      selectedPresetId: shouldDetachSelectedPreset(
-        aiPreferencesRef.current,
-        nextConfig,
-      )
-        ? null
-        : aiPreferencesRef.current.selectedPresetId,
-    });
+    applyAiPreferences(
+      {
+        ...aiPreferencesRef.current,
+        config: nextConfig,
+        selectedPresetId: shouldDetachPreset
+          ? null
+          : aiPreferencesRef.current.selectedPresetId,
+      },
+      shouldDetachPreset && selectedPreset
+        ? {
+            runtimeMessage: `当前配置已脱离预设：${selectedPreset.name}。现为未保存状态。`,
+          }
+        : undefined,
+    );
   }
 
   function handleAiTemplateChange(templateId: string) {
     const template = getAiConfigTemplateById(templateId);
+    const wasPresetSelected = Boolean(aiPreferencesRef.current.selectedPresetId);
     const nextPreferences = {
       ...aiPreferencesRef.current,
       config: {
@@ -175,7 +191,9 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
       persist: true,
       presetDraftName:
         state.aiPresetDraftName.trim() || getDefaultAiPresetName(template.id),
-      runtimeMessage: `已切换到模板：${template.label}。`,
+      runtimeMessage: wasPresetSelected
+        ? `已切换到模板：${template.label}。当前配置已回到未保存状态。`
+        : `已切换到模板：${template.label}。`,
     });
   }
 
@@ -240,15 +258,24 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
   }
 
   function saveAiPreset() {
+    const selectedPreset = findAiConfigPresetById(
+      aiPreferencesRef.current.presets,
+      aiPreferencesRef.current.selectedPresetId,
+    );
+
+    if (selectedPreset) {
+      overwriteAiPreset(selectedPreset.id);
+      return;
+    }
+
     const presetName = state.aiPresetDraftName.trim();
 
     if (!presetName) {
       return;
     }
 
-    const existingPresetId = aiPreferencesRef.current.selectedPresetId;
     const nextPreset = {
-      id: existingPresetId ?? crypto.randomUUID(),
+      id: crypto.randomUUID(),
       name: presetName,
       templateId: aiPreferencesRef.current.selectedTemplateId,
       baseUrl: aiPreferencesRef.current.config.baseUrl,
@@ -256,7 +283,10 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
       model: aiPreferencesRef.current.config.model,
       updatedAt: new Date().toISOString(),
     } satisfies AiConfigPreset;
-    const nextPresets = upsertAiPreset(aiPreferencesRef.current.presets, nextPreset);
+    const nextPresets = upsertAiConfigPreset(
+      aiPreferencesRef.current.presets,
+      nextPreset,
+    );
 
     applyAiPreferences(
       {
@@ -267,9 +297,114 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
       {
         persist: true,
         presetDraftName: presetName,
-        runtimeMessage: existingPresetId
-          ? `已覆盖本地预设：${presetName}。`
-          : `已保存本地预设：${presetName}。`,
+        runtimeMessage: `已保存本地预设：${presetName}。`,
+      },
+    );
+  }
+
+  function overwriteAiPreset(presetId: string) {
+    const targetPreset = findAiConfigPresetById(
+      aiPreferencesRef.current.presets,
+      presetId,
+    );
+
+    if (!targetPreset) {
+      return;
+    }
+
+    const nextPreset = {
+      ...targetPreset,
+      templateId: aiPreferencesRef.current.selectedTemplateId,
+      baseUrl: aiPreferencesRef.current.config.baseUrl,
+      apiKey: aiPreferencesRef.current.config.apiKey,
+      model: aiPreferencesRef.current.config.model,
+      updatedAt: new Date().toISOString(),
+    } satisfies AiConfigPreset;
+    const nextPresets = upsertAiConfigPreset(
+      aiPreferencesRef.current.presets,
+      nextPreset,
+    );
+
+    applyAiPreferences(
+      {
+        ...aiPreferencesRef.current,
+        presets: nextPresets,
+        selectedPresetId: nextPreset.id,
+      },
+      {
+        persist: true,
+        presetDraftName: nextPreset.name,
+        runtimeMessage: `已覆盖本地预设：${nextPreset.name}。当前配置已对齐到该预设。`,
+      },
+    );
+  }
+
+  function renameAiPreset(presetId: string, nextName: string) {
+    const targetPreset = findAiConfigPresetById(
+      aiPreferencesRef.current.presets,
+      presetId,
+    );
+    const normalizedName = nextName.trim();
+
+    if (!targetPreset || !normalizedName || targetPreset.name === normalizedName) {
+      return;
+    }
+
+    const renamedPreset = {
+      ...targetPreset,
+      name: normalizedName,
+      updatedAt: new Date().toISOString(),
+    } satisfies AiConfigPreset;
+    const nextPresets = upsertAiConfigPreset(
+      aiPreferencesRef.current.presets,
+      renamedPreset,
+    );
+
+    applyAiPreferences(
+      {
+        ...aiPreferencesRef.current,
+        presets: nextPresets,
+      },
+      {
+        persist: true,
+        presetDraftName:
+          aiPreferencesRef.current.selectedPresetId === presetId
+            ? normalizedName
+            : undefined,
+        runtimeMessage: `已重命名本地预设：${targetPreset.name} -> ${normalizedName}。`,
+      },
+    );
+  }
+
+  function deleteAiPreset(presetId: string) {
+    const targetPreset = findAiConfigPresetById(
+      aiPreferencesRef.current.presets,
+      presetId,
+    );
+
+    if (!targetPreset) {
+      return;
+    }
+
+    const isDeletingSelectedPreset =
+      aiPreferencesRef.current.selectedPresetId === targetPreset.id;
+    const nextPresets = aiPreferencesRef.current.presets.filter(
+      (preset) => preset.id !== targetPreset.id,
+    );
+
+    applyAiPreferences(
+      {
+        ...aiPreferencesRef.current,
+        presets: nextPresets,
+        selectedPresetId: isDeletingSelectedPreset
+          ? null
+          : aiPreferencesRef.current.selectedPresetId,
+      },
+      {
+        persist: true,
+        runtimeMessage: isDeletingSelectedPreset
+          ? `已删除本地预设：${targetPreset.name}。当前配置保持不变，已回到未保存状态。`
+          : `已删除本地预设：${targetPreset.name}。当前配置保持不变。`,
       },
     );
   }
@@ -352,12 +487,15 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
 
   return {
     ...state,
+    deleteAiPreset,
     handleAiConfigChange,
     handleAiPresetChange,
     handleAiPresetDraftNameChange,
     handleAiTemplateChange,
     handleSelectionChange,
     handleSnapshotChange,
+    overwriteAiPreset,
+    renameAiPreset,
     retryInitialization: initializeWorkspace,
     resolveResourceSummary,
     runLearningAction,
@@ -660,8 +798,9 @@ function upsertResourceMetadataRecord(
 }
 
 function resolveAiPresetDraftName(preferences: StoredAiConfigPreferences) {
-  const selectedPreset = preferences.presets.find(
-    (preset) => preset.id === preferences.selectedPresetId,
+  const selectedPreset = findAiConfigPresetById(
+    preferences.presets,
+    preferences.selectedPresetId,
   );
 
   return selectedPreset?.name ?? getDefaultAiPresetName(preferences.selectedTemplateId);
@@ -671,8 +810,9 @@ function shouldDetachSelectedPreset(
   preferences: StoredAiConfigPreferences,
   nextConfig: AiConfig,
 ) {
-  const selectedPreset = preferences.presets.find(
-    (preset) => preset.id === preferences.selectedPresetId,
+  const selectedPreset = findAiConfigPresetById(
+    preferences.presets,
+    preferences.selectedPresetId,
   );
 
   if (!selectedPreset) {
@@ -680,27 +820,4 @@ function shouldDetachSelectedPreset(
   }
 
   return !doesAiConfigMatchPreset(nextConfig, selectedPreset);
-}
-
-function doesAiConfigMatchPreset(config: AiConfig, preset: AiConfigPreset) {
-  return (
-    config.baseUrl === preset.baseUrl &&
-    config.apiKey === preset.apiKey &&
-    config.model === preset.model
-  );
-}
-
-function upsertAiPreset(presets: AiConfigPreset[], nextPreset: AiConfigPreset) {
-  const existingIndex = presets.findIndex((preset) => preset.id === nextPreset.id);
-  const nextPresets = [...presets];
-
-  if (existingIndex === -1) {
-    nextPresets.unshift(nextPreset);
-  } else {
-    nextPresets[existingIndex] = nextPreset;
-  }
-
-  return nextPresets.toSorted((leftPreset, rightPreset) =>
-    rightPreset.updatedAt.localeCompare(leftPreset.updatedAt),
-  );
 }

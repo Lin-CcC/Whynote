@@ -249,10 +249,13 @@ export default function WorkspaceRuntimeScreen({
           aiPresets={runtime.aiPresets}
           aiSelectedPresetId={runtime.aiSelectedPresetId}
           aiSelectedTemplateId={runtime.aiSelectedTemplateId}
+          onDeleteAiPreset={runtime.deleteAiPreset}
           onAiConfigChange={runtime.handleAiConfigChange}
           onAiPresetChange={runtime.handleAiPresetChange}
           onAiPresetDraftNameChange={runtime.handleAiPresetDraftNameChange}
           onAiTemplateChange={runtime.handleAiTemplateChange}
+          onOverwriteAiPreset={runtime.overwriteAiPreset}
+          onRenameAiPreset={runtime.renameAiPreset}
           onSaveAiConfig={runtime.saveAiConfig}
           onSaveAiPreset={runtime.saveAiPreset}
         />

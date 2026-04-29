@@ -190,6 +190,43 @@ describe('workspaceRuntimeService AI config preferences', () => {
       selectedTemplateId: 'custom-openai-compatible',
     });
   });
+
+  it('keeps legacy bare AI config readable when a previously selected preset has already been deleted', () => {
+    const localPreferenceStorage = createLocalStorageStore({
+      prefix: `whynote-ai-config-deleted-preset-${crypto.randomUUID()}`,
+      storage: window.localStorage,
+    });
+
+    localPreferenceStorage.saveSettings({
+      values: {
+        'ai.apiKey': 'legacy-key',
+        'ai.baseUrl':
+          'https://generativelanguage.googleapis.com/v1beta/openai',
+        'ai.model': 'gemini-2.5-flash',
+        'ai.presets': [],
+        'ai.selectedPresetId': 'deleted-preset',
+        'ai.selectedTemplateId': 'gemini-openai-compatible',
+      },
+      updatedAt: '2026-04-29T03:00:00.000Z',
+    });
+
+    const service = createWorkspaceRuntimeService({
+      structuredDataStorage: createUnusedStructuredDataStorage(),
+      localPreferenceStorage,
+      defaultLearningMode: 'standard',
+    });
+
+    expect(service.loadAiConfigPreferences()).toEqual({
+      config: {
+        apiKey: 'legacy-key',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        model: 'gemini-2.5-flash',
+      },
+      presets: [],
+      selectedPresetId: null,
+      selectedTemplateId: 'gemini-openai-compatible',
+    });
+  });
 });
 
 function createUnusedStructuredDataStorage(): StructuredDataStorage {

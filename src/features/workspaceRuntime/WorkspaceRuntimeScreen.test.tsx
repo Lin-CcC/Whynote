@@ -27,6 +27,7 @@ import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 const openedStorages: StructuredDataStorage[] = [];
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   window.localStorage.clear();
 
   while (openedStorages.length > 0) {
@@ -343,6 +344,90 @@ test('clears completion suggestion after editing the related workspace content',
   expect(screen.queryByText('当前步骤已满足最小学习闭环。')).not.toBeInTheDocument();
 });
 
+test('deletes a non-selected preset without changing the current config', async () => {
+  const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const dependencies = createTestDependencies();
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  createAiGeminiPreset('我的 Gemini');
+  switchAiCurrentConfigToUnsaved();
+  createAiCustomPreset('测试 Key');
+
+  fireEvent.click(screen.getByRole('button', { name: '删除预设：我的 Gemini' }));
+
+  expect(confirmSpy).toHaveBeenCalledWith(
+    expect.stringContaining('是否删除本地预设「我的 Gemini」？'),
+  );
+  expect(screen.getByLabelText('Base URL')).toHaveValue('https://example.com/v1');
+  expect(screen.getByLabelText(/API Key/i)).toHaveValue('custom-key');
+  expect(screen.getByLabelText('Model')).toHaveValue('custom-model');
+  expect(getAiCurrentConfigSelect().selectedOptions[0]?.text).toBe('测试 Key');
+  expect(findOptionValueByText(getAiCurrentConfigSelect(), '我的 Gemini')).toBeNull();
+  expect(
+    screen.getByText('已删除本地预设：我的 Gemini。当前配置保持不变。'),
+  ).toBeInTheDocument();
+});
+
+test('deletes the selected preset and returns the UI to current config unsaved', async () => {
+  const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const dependencies = createTestDependencies();
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  createAiGeminiPreset('我的 Gemini');
+
+  fireEvent.click(screen.getByRole('button', { name: '删除预设：我的 Gemini' }));
+
+  expect(confirmSpy).toHaveBeenCalledWith(
+    expect.stringContaining('如果它正被当前配置使用，界面会回到“当前配置（未保存）”。'),
+  );
+  expect(getAiCurrentConfigSelect()).toHaveValue('');
+  expect(getAiCurrentConfigSelect().selectedOptions[0]?.text).toBe('当前配置（未保存）');
+  expect(screen.getByLabelText('Base URL')).toHaveValue(
+    'https://generativelanguage.googleapis.com/v1beta/openai',
+  );
+  expect(screen.getByLabelText(/API Key/i)).toHaveValue('gemini-key');
+  expect(screen.getByLabelText('Model')).toHaveValue('gemini-2.5-flash');
+  expect(findOptionValueByText(getAiCurrentConfigSelect(), '我的 Gemini')).toBeNull();
+  expect(
+    screen.getByText(
+      '已删除本地预设：我的 Gemini。当前配置保持不变，已回到未保存状态。',
+    ),
+  ).toBeInTheDocument();
+});
+
+test('renames the selected preset immediately without changing its content', async () => {
+  const dependencies = createTestDependencies();
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  createAiGeminiPreset('我的 Gemini');
+
+  fireEvent.click(screen.getByRole('button', { name: '重命名预设：我的 Gemini' }));
+  fireEvent.change(screen.getByLabelText('重命名预设：我的 Gemini'), {
+    target: {
+      value: '工作用 Gemini',
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '保存名称' }));
+
+  expect(getAiCurrentConfigSelect().selectedOptions[0]?.text).toBe('工作用 Gemini');
+  expect(findOptionValueByText(getAiCurrentConfigSelect(), '我的 Gemini')).toBeNull();
+  expect(findOptionValueByText(getAiCurrentConfigSelect(), '工作用 Gemini')).not.toBeNull();
+  expect(screen.getByLabelText('Base URL')).toHaveValue(
+    'https://generativelanguage.googleapis.com/v1beta/openai',
+  );
+  expect(screen.getByLabelText(/API Key/i)).toHaveValue('gemini-key');
+  expect(screen.getByLabelText('Model')).toHaveValue('gemini-2.5-flash');
+  expect(
+    screen.getByText('已重命名本地预设：我的 Gemini -> 工作用 Gemini。'),
+  ).toBeInTheDocument();
+});
+
 function createTestDependencies(options?: {
   providerClient?: AiProviderClient;
   storage?: StructuredDataStorage;
@@ -584,4 +669,74 @@ function createEmptyWorkspaceSnapshot(): WorkspaceSnapshot {
     createdAt: '2026-04-28T00:00:00.000Z',
     updatedAt: '2026-04-28T00:00:00.000Z',
   });
+}
+
+function getAiCurrentConfigSelect() {
+  return screen.getByLabelText('当前配置') as HTMLSelectElement;
+}
+
+function switchAiCurrentConfigToUnsaved() {
+  fireEvent.change(getAiCurrentConfigSelect(), {
+    target: {
+      value: '',
+    },
+  });
+}
+
+function createAiGeminiPreset(name: string) {
+  fireEvent.change(screen.getByLabelText('厂商模板'), {
+    target: {
+      value: 'gemini-openai-compatible',
+    },
+  });
+  fireEvent.change(screen.getByLabelText(/API Key/i), {
+    target: {
+      value: 'gemini-key',
+    },
+  });
+  fireEvent.change(screen.getByLabelText('新预设名称'), {
+    target: {
+      value: name,
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '保存为新预设' }));
+}
+
+function createAiCustomPreset(name: string) {
+  fireEvent.change(screen.getByLabelText('厂商模板'), {
+    target: {
+      value: 'custom-openai-compatible',
+    },
+  });
+  fireEvent.change(screen.getByLabelText('Base URL'), {
+    target: {
+      value: 'https://example.com/v1',
+    },
+  });
+  fireEvent.change(screen.getByLabelText(/API Key/i), {
+    target: {
+      value: 'custom-key',
+    },
+  });
+  fireEvent.change(screen.getByLabelText('Model'), {
+    target: {
+      value: 'custom-model',
+    },
+  });
+  fireEvent.change(screen.getByLabelText('新预设名称'), {
+    target: {
+      value: name,
+    },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '保存为新预设' }));
+}
+
+function findOptionValueByText(
+  select: HTMLSelectElement,
+  optionLabel: string,
+) {
+  return (
+    [...select.options].find((option) => option.text === optionLabel)?.value ??
+    null
+  );
 }
