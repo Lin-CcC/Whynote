@@ -47,7 +47,7 @@ test('keeps a small visible workspace edit after refresh', async ({ page }) => {
   const updatedModuleTitle = 'Smoke 持久化模块';
 
   await getCurrentModuleTitleInput(page).fill(updatedModuleTitle);
-  await expect(page.getByText('已保存')).toBeVisible();
+  await expect(page.getByText('已保存', { exact: true })).toBeVisible();
 
   await page.reload();
 

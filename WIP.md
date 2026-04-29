@@ -4,7 +4,7 @@
 
 ## 当前工作面
 
-- 当前工作树：`codex/ai-preset-management`
+- 当前工作树：`codex/editor-input-jitter`
 - 当前短期执行项已清空，等待下一轮任务。
 
 ## 当前短期任务
