@@ -39,18 +39,17 @@ import {
   collectLearningReferenceCandidates,
   summarizeLearningReferenceCandidates,
 } from './learningRuntimeContext';
+import type { StoredAiConfigPreferences } from './aiConfigPresets';
+import {
+  loadStoredAiConfigPreferences,
+  saveStoredAiConfigPreferences,
+} from './aiConfigPresets';
 import type {
   WorkspaceInitializationResult,
   WorkspaceMutationResult,
   WorkspaceRuntimeDependencies,
   WorkspaceRuntimeSelectionState,
 } from '../workspaceRuntimeTypes';
-
-const AI_SETTINGS_KEYS = {
-  apiKey: 'ai.apiKey',
-  baseUrl: 'ai.baseUrl',
-  model: 'ai.model',
-} as const;
 
 export function createWorkspaceRuntimeService(
   dependencies: WorkspaceRuntimeDependencies,
@@ -62,8 +61,8 @@ export function createWorkspaceRuntimeService(
   return {
     initializeWorkspace,
     listResourceMetadata,
-    loadAiConfig,
-    saveAiConfig,
+    loadAiConfigPreferences,
+    saveAiConfigPreferences,
     saveWorkspace,
     upsertResourceMetadata,
     rememberSelectionState,
@@ -462,28 +461,18 @@ export function createWorkspaceRuntimeService(
     return dependencies.structuredDataStorage.listResourceMetadata(workspaceId);
   }
 
-  function loadAiConfig(): AiConfig {
+  function loadAiConfigPreferences(): StoredAiConfigPreferences {
     const settings = dependencies.localPreferenceStorage.loadSettings();
 
-    return {
-      baseUrl: readSetting(settings?.values[AI_SETTINGS_KEYS.baseUrl]),
-      apiKey: readSetting(settings?.values[AI_SETTINGS_KEYS.apiKey]),
-      model: readSetting(settings?.values[AI_SETTINGS_KEYS.model]),
-    };
+    return loadStoredAiConfigPreferences(settings);
   }
 
-  function saveAiConfig(config: AiConfig) {
+  function saveAiConfigPreferences(preferences: StoredAiConfigPreferences) {
     const previousSettings = dependencies.localPreferenceStorage.loadSettings();
 
-    dependencies.localPreferenceStorage.saveSettings({
-      values: {
-        ...previousSettings?.values,
-        [AI_SETTINGS_KEYS.baseUrl]: config.baseUrl,
-        [AI_SETTINGS_KEYS.apiKey]: config.apiKey,
-        [AI_SETTINGS_KEYS.model]: config.model,
-      },
-      updatedAt: new Date().toISOString(),
-    });
+    dependencies.localPreferenceStorage.saveSettings(
+      saveStoredAiConfigPreferences(previousSettings, preferences),
+    );
   }
 
   async function saveWorkspace(
@@ -749,10 +738,6 @@ function buildQuestionText(node: Extract<TreeNode, { type: 'question' }>) {
   }
 
   return `${node.title}\n${normalizedContent}`;
-}
-
-function readSetting(value: unknown) {
-  return typeof value === 'string' ? value : '';
 }
 
 function resolveDraftActionId(actionId: WorkspaceEditorLearningActionRequest['actionId']) {

@@ -244,8 +244,16 @@ export default function WorkspaceRuntimeScreen({
         />
         <WorkspaceRuntimeAiConfigCard
           aiConfig={runtime.aiConfig}
+          aiPresetDraftName={runtime.aiPresetDraftName}
+          aiPresets={runtime.aiPresets}
+          aiSelectedPresetId={runtime.aiSelectedPresetId}
+          aiSelectedTemplateId={runtime.aiSelectedTemplateId}
           onAiConfigChange={runtime.handleAiConfigChange}
+          onAiPresetChange={runtime.handleAiPresetChange}
+          onAiPresetDraftNameChange={runtime.handleAiPresetDraftNameChange}
+          onAiTemplateChange={runtime.handleAiTemplateChange}
           onSaveAiConfig={runtime.saveAiConfig}
+          onSaveAiPreset={runtime.saveAiPreset}
         />
       </>
     );

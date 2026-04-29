@@ -354,7 +354,8 @@
   font-size: 0.9rem;
 }
 
-.workspace-runtimeField input {
+.workspace-runtimeField input,
+.workspace-runtimeField select {
   width: 100%;
   padding: 0.7rem 0.8rem;
   border: 1px solid rgba(15, 23, 42, 0.12);

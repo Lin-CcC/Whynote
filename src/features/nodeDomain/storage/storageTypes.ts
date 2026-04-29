@@ -52,7 +52,13 @@ export interface ResourceMetadataRecord {
   updatedAt: string;
 }
 
-export type PreferenceValue = boolean | number | string | null;
+export type PreferencePrimitiveValue = boolean | number | string | null;
+export type PreferenceValue =
+  | PreferencePrimitiveValue
+  | PreferenceValue[]
+  | {
+      [key: string]: PreferenceValue;
+    };
 
 export interface AppSettings {
   values: Record<string, PreferenceValue>;
