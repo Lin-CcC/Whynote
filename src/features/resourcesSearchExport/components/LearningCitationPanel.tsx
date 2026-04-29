@@ -42,6 +42,12 @@ type CitationFocusGroup = {
   focusText: string;
 };
 
+type TeachingCitationSection = {
+  groups: CitationFocusGroup[];
+  helpText: string;
+  title: string;
+};
+
 export default function LearningCitationPanel({
   onFocusResourceNode,
   selectedEditorNodeId,
@@ -56,9 +62,9 @@ export default function LearningCitationPanel({
     () => (selectedNode ? collectCitationPresentations(tree, selectedNode) : []),
     [selectedNode, tree],
   );
-  const teachingCitationGroups = useMemo(
-    () => buildTeachingCitationGroups(citations),
-    [citations],
+  const teachingSections = useMemo(
+    () => buildTeachingCitationSections(selectedNode, citations),
+    [citations, selectedNode],
   );
   const supplementalCitations = citations.filter(
     (citation) => !isTeachingCitationPresentation(citation),
@@ -98,121 +104,123 @@ export default function LearningCitationPanel({
             </p>
           ) : (
             <>
-              {teachingCitationGroups.length > 0 ? (
-                <div className="resources-citationSection">
-                  <div className="resources-citationSectionHeader">
-                    <h3 className="workspace-splitTitle">解释片段对应的资料依据</h3>
-                    <span className="resources-citationCounter">
-                      {teachingCitationGroups.length} 段解释
-                    </span>
-                  </div>
-                  <p className="workspace-helpText">
-                    这里只显示确实承担定义、机制说明、判断支撑或例子来源作用的引用，并且只展示原文片段或稳定定位，不会把资料概况冒充成引文。
-                  </p>
-                  <div className="resources-citationBlockList">
-                    {teachingCitationGroups.map((group) => (
-                      <section
-                        className="resources-citationBlock"
-                        key={buildTeachingGroupKey(group)}
-                      >
-                        <div className="resources-citationBlockHeader">
-                          <span className="resources-citationLabel">当前解释片段</span>
-                          <span className="resources-citationCounter">
-                            {group.citations.length} 条依据
-                          </span>
-                        </div>
-                        <p className="resources-citationFocusText">
-                          {group.focusText}
-                        </p>
-                        <div className="resources-citationEvidenceList">
-                          {group.citations.map((citation) => {
-                            const isExpanded = expandedReferenceIds.includes(
-                              citation.reference.id,
-                            );
+              {teachingSections.length > 0
+                ? teachingSections.map((section) => (
+                    <div className="resources-citationSection" key={section.title}>
+                      <div className="resources-citationSectionHeader">
+                        <h3 className="workspace-splitTitle">{section.title}</h3>
+                        <span className="resources-citationCounter">
+                          {section.groups.length} 段解释
+                        </span>
+                      </div>
+                      <p className="workspace-helpText">{section.helpText}</p>
+                      <div className="resources-citationBlockList">
+                        {section.groups.map((group) => (
+                          <section
+                            className="resources-citationBlock"
+                            key={`${section.title}::${buildTeachingGroupKey(group)}`}
+                          >
+                            <div className="resources-citationBlockHeader">
+                              <span className="resources-citationLabel">当前解释片段</span>
+                              <span className="resources-citationCounter">
+                                {group.citations.length} 条依据
+                              </span>
+                            </div>
+                            <p className="resources-citationFocusText">
+                              {group.focusText}
+                            </p>
+                            <div className="resources-citationEvidenceList">
+                              {group.citations.map((citation) => {
+                                const isExpanded = expandedReferenceIds.includes(
+                                  citation.reference.id,
+                                );
 
-                            return (
-                              <article
-                                className="resources-citationEvidence"
-                                key={citation.reference.id}
-                              >
-                                <div className="resources-citationEvidenceHeader">
-                                  <div className="resources-citationEvidenceMeta">
-                                    <span className="resources-citationLabel">
-                                      {getCitationPurposeLabel(
-                                        citation.reference.purpose,
-                                      )}
-                                    </span>
-                                    <strong className="resources-libraryTitle">
-                                      {citation.sourceTitle}
-                                    </strong>
-                                  </div>
-                                  <div className="resources-citationEvidenceActions">
-                                    <button
-                                      className="resources-inlineButton"
-                                      onClick={() =>
-                                        toggleReferenceExpansion(
-                                          citation.reference.id,
-                                          setExpandedReferenceIds,
-                                        )
-                                      }
-                                      type="button"
-                                    >
-                                      {isExpanded ? '收起依据' : '展开依据'}
-                                    </button>
-                                    <button
-                                      className="resources-inlineButton"
-                                      onClick={() =>
-                                        onFocusResourceNode(citation.targetNode.id)
-                                      }
-                                      type="button"
-                                    >
-                                      {citation.targetNode.type === 'resource-fragment'
-                                        ? '定位到摘录'
-                                        : '定位到资料'}
-                                    </button>
-                                  </div>
-                                </div>
-                                <p className="resources-citationWhyText">
-                                  {citation.whyText}
-                                </p>
-                                {isExpanded ? (
-                                  <dl className="resources-citationDetailList">
-                                    <div>
-                                      <dt>资料标题</dt>
-                                      <dd>{citation.sourceTitle}</dd>
-                                    </div>
-                                    <div>
-                                      <dt>引用依据</dt>
-                                      <dd>
-                                        {citation.excerpt ??
-                                          buildMissingCitationEvidenceText(citation)}
-                                      </dd>
-                                    </div>
-                                    {citation.locator ? (
-                                      <div>
-                                        <dt>定位</dt>
-                                        <dd>{citation.locator}</dd>
+                                return (
+                                  <article
+                                    className="resources-citationEvidence"
+                                    key={citation.reference.id}
+                                  >
+                                    <div className="resources-citationEvidenceHeader">
+                                      <div className="resources-citationEvidenceMeta">
+                                        <span className="resources-citationLabel">
+                                          {getCitationPurposeLabel(
+                                            citation.reference.purpose,
+                                          )}
+                                        </span>
+                                        <strong className="resources-libraryTitle">
+                                          {citation.sourceTitle}
+                                        </strong>
                                       </div>
+                                      <div className="resources-citationEvidenceActions">
+                                        <button
+                                          className="resources-inlineButton"
+                                          onClick={() =>
+                                            toggleReferenceExpansion(
+                                              citation.reference.id,
+                                              setExpandedReferenceIds,
+                                            )
+                                          }
+                                          type="button"
+                                        >
+                                          {isExpanded ? '收起依据' : '展开依据'}
+                                        </button>
+                                        <button
+                                          className="resources-inlineButton"
+                                          onClick={() =>
+                                            onFocusResourceNode(citation.targetNode.id)
+                                          }
+                                          type="button"
+                                        >
+                                          {citation.targetNode.type === 'resource-fragment'
+                                            ? '定位到摘录'
+                                            : '定位到资料'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <p className="resources-citationWhyText">
+                                      {citation.whyText}
+                                    </p>
+                                    {isExpanded ? (
+                                      <dl className="resources-citationDetailList">
+                                        <div>
+                                          <dt>资料标题</dt>
+                                          <dd>{citation.sourceTitle}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>引用依据</dt>
+                                          <dd>
+                                            {citation.excerpt ??
+                                              buildMissingCitationEvidenceText(citation)}
+                                          </dd>
+                                        </div>
+                                        {citation.locator ? (
+                                          <div>
+                                            <dt>定位</dt>
+                                            <dd>{citation.locator}</dd>
+                                          </div>
+                                        ) : null}
+                                        <div>
+                                          <dt>为什么引用这段</dt>
+                                          <dd>{citation.whyText}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>回跳路径</dt>
+                                          <dd>
+                                            {getNodePathLabel(tree, citation.targetNode.id)}
+                                          </dd>
+                                        </div>
+                                      </dl>
                                     ) : null}
-                                    <div>
-                                      <dt>为什么引用这段</dt>
-                                      <dd>{citation.whyText}</dd>
-                                    </div>
-                                    <div>
-                                      <dt>回跳路径</dt>
-                                      <dd>{getNodePathLabel(tree, citation.targetNode.id)}</dd>
-                                    </div>
-                                  </dl>
-                                ) : null}
-                              </article>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          </section>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                : null}
 
               {supplementalCitations.length > 0 ? (
                 <div className="resources-citationSection">
@@ -329,6 +337,71 @@ function buildTeachingCitationGroups(citations: CitationPresentation[]) {
   }
 
   return [...groupedCitations.values()];
+}
+
+function buildTeachingCitationSections(
+  selectedNode: TreeNode | null,
+  citations: CitationPresentation[],
+) {
+  const teachingCitations = citations.filter(isTeachingCitationPresentation);
+
+  if (teachingCitations.length === 0) {
+    return [] satisfies TeachingCitationSection[];
+  }
+
+  if (selectedNode?.type === 'judgment') {
+    const hintGroups = buildTeachingCitationGroups(
+      teachingCitations.filter(
+        (citation) => citation.reference.purpose === 'background',
+      ),
+    );
+    const judgmentGroups = buildTeachingCitationGroups(
+      teachingCitations.filter(
+        (citation) => citation.reference.purpose !== 'background',
+      ),
+    );
+    const sections: TeachingCitationSection[] = [];
+
+    if (hintGroups.length > 0) {
+      sections.push({
+        title: '提示里可参考的资料',
+        helpText:
+          '这些引用只给继续思考的抓手。如果卡住，再去看资料里的对应片段；它们不是现成答案。',
+        groups: hintGroups,
+      });
+    }
+
+    if (judgmentGroups.length > 0) {
+      sections.push({
+        title: '判断所依据的资料',
+        helpText:
+          '这些引用只支撑当前判断为什么成立，帮助你看清缺口，不会在这里直接展开成完整答案解析。',
+        groups: judgmentGroups,
+      });
+    }
+
+    return sections;
+  }
+
+  if (selectedNode?.type === 'summary') {
+    return [
+      {
+        title: '答案解析对应的资料依据',
+        helpText:
+          '这里会说明当前哪一段解析用了哪一段资料，以及这段资料为什么能帮助你看懂当前问题。',
+        groups: buildTeachingCitationGroups(teachingCitations),
+      },
+    ] satisfies TeachingCitationSection[];
+  }
+
+  return [
+    {
+      title: '解释片段对应的资料依据',
+      helpText:
+        '这里只显示确实承担定义、机制说明、判断支撑或例子来源作用的引用，并且只展示原文片段或稳定定位，不会把资料概况冒充成引文。',
+      groups: buildTeachingCitationGroups(teachingCitations),
+    },
+  ] satisfies TeachingCitationSection[];
 }
 
 function buildTeachingGroupKey(group: CitationFocusGroup) {

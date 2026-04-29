@@ -1,6 +1,7 @@
 import type { AiExecutionMetadata } from './aiTypes';
 import type {
   JudgmentNodeDraft,
+  LearningNodeCitationDraft,
   LearningReferenceCandidate,
   QuestionNodeDraft,
   SummaryNodeDraft,
@@ -43,5 +44,6 @@ export interface JudgmentHintInput {
 
 export interface JudgmentHintResult {
   hint: string;
+  citations: LearningNodeCitationDraft[];
   metadata: AiExecutionMetadata;
 }

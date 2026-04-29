@@ -150,6 +150,21 @@ export function appendLearningNodeDraftToTree(
   return attachDraftCitations(nextTree, node.id, draft.citations);
 }
 
+export function attachCitationDraftsToNode(
+  tree: NodeTree,
+  sourceNodeId: string,
+  citations: Array<{
+    targetNodeId: string;
+    focusText?: string;
+    note?: string;
+    purpose?: CitationPurpose;
+    sourceExcerpt?: string;
+    sourceLocator?: string;
+  }>,
+) {
+  return attachDraftCitations(tree, sourceNodeId, citations);
+}
+
 function attachDraftCitations(
   tree: NodeTree,
   sourceNodeId: string,

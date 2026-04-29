@@ -28,7 +28,9 @@ export default function WorkspaceRuntimeJudgmentActions({
     >
       <div className="workspace-judgmentActionsHeader">
         <p className="workspace-kicker">下一步</p>
-        <p className="workspace-helpText">看完判断后，直接在这里继续。</p>
+        <p className="workspace-helpText">
+          这里先分清三件事：判断只做诊断，提示只推一步，答案解析才负责把机制讲清楚。
+        </p>
       </div>
       <div className="workspace-nodeActionRow">
         <button
@@ -57,7 +59,7 @@ export default function WorkspaceRuntimeJudgmentActions({
       </div>
       {summaryNodeId ? (
         <p className="workspace-actionHint">
-          当前答案解析已就绪；如果要看标准理解，可以直接点“查看答案解析”。
+          当前答案解析已就绪；如果你要对照更完整的标准理解，再点“查看答案解析”。
         </p>
       ) : (
         <p className="workspace-actionHint">
@@ -66,11 +68,11 @@ export default function WorkspaceRuntimeJudgmentActions({
       )}
       {answerNodeId ? (
         <p className="workspace-actionHint">
-          已定位到当前这版回答；主路径仍然是先回去补缺口，再重新评估。
+          已定位到当前这版回答；主路径仍然是先回去补 judgment 指出的缺口，再重新评估。
         </p>
       ) : (
         <p className="workspace-actionHint">
-          当前还没有定位到可回写的回答节点，所以“回到当前回答继续修改”会保持禁用。
+          当前还没有定位到可回改的回答节点，所以“回到当前回答继续修改”会保持禁用。
         </p>
       )}
       {isHintVisible ? (
@@ -80,7 +82,7 @@ export default function WorkspaceRuntimeJudgmentActions({
         >
           <p className="workspace-judgmentHintTitle">提示</p>
           <p className="workspace-helpText">
-            这是围绕当前缺口的微型铺垫，不是答案解析缩写版。
+            这是围绕当前缺口的微型铺垫：补最小背景，给继续思考的抓手，不直接摊开完整答案。
           </p>
           <pre className="workspace-judgmentHintText">{hint}</pre>
         </div>
