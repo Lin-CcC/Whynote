@@ -203,6 +203,12 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - runtime 壳层每种语境只保留一个明显主动作；其余动作降级为辅助动作，避免左侧动作卡和正文内联动作同时抢主路径。
 - 运行状态区只承担两件事：系统现在忙不忙、最近一条动作结果是什么；不要把长教学说明继续堆进状态卡。
 
+### 22. question 语境的 direct answer 语义
+
+- `插入回答` 继续只表示“我自己补一条 answer 节点”，保留为手动编辑入口，不再兼任 AI 自动起答语义。
+- `直接回答当前问题` 只存在于 runtime 的 `question` 语境里，表示“让 AI 先生成一版普通 answer 草稿”，生成后直接接回现有 answer-revision 闭环。
+- hand-authored question 与 system-generated question 统一按节点语义工作：只要当前选中节点是 `question` 且还没有可评估 `answer`，就走同一条 direct answer 入口，不按来源分叉。
+
 ## 后续需要重新评估这些决策的触发条件
 
 - 需要公开注册或公开商用

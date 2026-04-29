@@ -1,4 +1,5 @@
 import type {
+  AnswerNodeDraft,
   LearningActionDraftActionId,
   LearningNodeCitationDraft,
   JudgmentNodeDraft,
@@ -268,6 +269,8 @@ export function normalizeLearningActionDraft(
       });
     case 'insert-question':
       return normalizeStandaloneQuestionDraft(rawNode, options);
+    case 'insert-answer':
+      return normalizeActionAnswerDraft(rawNode, options);
     case 'insert-summary':
       return normalizeActionSummaryDraft(rawNode, options);
     case 'insert-judgment':
@@ -513,6 +516,29 @@ function normalizeStandaloneQuestionDraft(
     citations: normalizeCitationDrafts(
       rawNode.citations ?? rawNode.references,
       'question',
+    ),
+  };
+}
+
+function normalizeActionAnswerDraft(
+  rawNode: RawLearningNodeDraft,
+  options: {
+    currentQuestionTitle?: string;
+    planStepTitle?: string;
+  },
+): AnswerNodeDraft {
+  const title = normalizeActionAnswerTitle(
+    getText(rawNode.title) || getText(rawNode.prompt),
+  );
+  const rawContent =
+    getText(rawNode.content) || getText(rawNode.description) || '';
+
+  return {
+    type: 'answer',
+    title,
+    content: normalizeActionAnswerContent(rawContent, options),
+    citations: normalizeCitationDrafts(
+      rawNode.citations ?? rawNode.references,
     ),
   };
 }
@@ -1138,6 +1164,32 @@ function looksGenericQuestionContent(content: string) {
       '继续学习',
       '简单回答',
     ].some((keyword) => normalizedContent.includes(keyword))
+  );
+}
+
+function hasUsableAnswerDraftContent(content: string) {
+  return (
+    Boolean(content) &&
+    !looksGenericAnswerDraftContent(content) &&
+    (content.length >= MIN_SUMMARY_EXPLANATION_LENGTH ||
+      containsExplanatorySignal(content) ||
+      countSentences(content) >= 2)
+  );
+}
+
+function looksGenericAnswerDraftContent(content: string) {
+  return (
+    content.length < 14 ||
+    [
+      '请直接回答',
+      '先直接回答',
+      '请回答当前问题',
+      '回答这个问题',
+      '可以从几个方面理解',
+      '我会这样回答',
+      '可以这样回答',
+      '先说明核心结论',
+    ].some((keyword) => content.includes(keyword))
   );
 }
 
@@ -1961,6 +2013,10 @@ function normalizeActionSummaryTitle(title: string) {
   return `总结：${normalizedTitle}`;
 }
 
+function normalizeActionAnswerTitle(title: string) {
+  return title.trim() || '回答草稿';
+}
+
 function normalizeClosureSummaryTitle(title: string) {
   const normalizedTitle = title.trim();
 
@@ -2004,6 +2060,28 @@ function normalizeActionSummaryContent(
       : '先把当前要说明的对象、关系和边界讲清楚，再决定是否补充例子或机制。';
 
   return [reusableSentence, fallbackSentence].filter(Boolean).join('');
+}
+
+function normalizeActionAnswerContent(
+  rawContent: string,
+  options: {
+    currentQuestionTitle?: string;
+    planStepTitle?: string;
+  },
+) {
+  const normalizedContent = rawContent.trim();
+
+  if (hasUsableAnswerDraftContent(normalizedContent)) {
+    return ensureSentenceEnding(normalizedContent);
+  }
+
+  const questionLabel = options.currentQuestionTitle
+    ? `“${options.currentQuestionTitle}”`
+    : options.planStepTitle
+      ? `“${options.planStepTitle}”这一步`
+      : '当前问题';
+
+  return `先直接回答${questionLabel}，至少说明核心结论、它为什么成立，以及它会带来什么结果。`;
 }
 
 function normalizeStandaloneJudgmentTitle(title: string) {

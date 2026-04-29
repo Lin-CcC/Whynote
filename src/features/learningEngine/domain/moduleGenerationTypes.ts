@@ -18,6 +18,10 @@ interface BaseLearningNodeDraft {
   citations: LearningNodeCitationDraft[];
 }
 
+export interface AnswerNodeDraft extends BaseLearningNodeDraft {
+  type: 'answer';
+}
+
 export interface QuestionNodeDraft extends BaseLearningNodeDraft {
   type: 'question';
 }
