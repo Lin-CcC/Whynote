@@ -343,7 +343,7 @@ function getAnswerInsertIndex(tree: NodeTree, questionNode: Extract<TreeNode, { 
   for (const childId of questionNode.childIds) {
     const childNode = tree.nodes[childId];
 
-    if (childNode?.type === 'question' || childNode?.type === 'answer') {
+    if (childNode?.type === 'answer') {
       insertIndex = childNode.order + 1;
       continue;
     }

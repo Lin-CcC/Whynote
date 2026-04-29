@@ -149,7 +149,7 @@ test('inserts a new question after the selected question by default', () => {
   expect(insertChildSpy.mock.calls[0]?.[3]).toBe(2);
 });
 
-test('inserts an answer into the selected question before closing nodes', () => {
+test('inserts an answer into the selected question before follow-up or closing nodes', () => {
   const operations = createOperationSpies();
 
   render(<WorkspaceEditor operations={operations} />);
@@ -161,7 +161,59 @@ test('inserts an answer into the selected question before closing nodes', () => 
   expect(insertChildSpy).toHaveBeenCalledTimes(1);
   expect(insertChildSpy.mock.calls[0]?.[1]).toBe(DEMO_SELECTED_NODE_ID);
   expect(insertChildSpy.mock.calls[0]?.[2].type).toBe('answer');
-  expect(insertChildSpy.mock.calls[0]?.[3]).toBe(2);
+  expect(insertChildSpy.mock.calls[0]?.[3]).toBe(0);
+});
+
+test('keeps newly inserted answers in the current question answer block before follow-up questions', () => {
+  const operations = createOperationSpies();
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-order"
+      initialSelectedNodeId="question-parent"
+      initialSnapshot={createQuestionOrderSnapshot()}
+      operations={operations}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+
+  const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
+
+  expect(insertChildSpy).toHaveBeenCalledTimes(1);
+  expect(insertChildSpy.mock.calls[0]?.[1]).toBe('question-parent');
+  expect(insertChildSpy.mock.calls[0]?.[2].type).toBe('answer');
+  expect(insertChildSpy.mock.calls[0]?.[3]).toBe(1);
+});
+
+test('inserts an answer under the selected follow-up question instead of the previous question', () => {
+  const operations = createOperationSpies();
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-follow-up-answer"
+      initialSelectedNodeId="question-parent-follow-up"
+      initialSnapshot={createFollowUpAnswerPlacementSnapshot()}
+      operations={operations}
+    />,
+  );
+
+  fireEvent.focus(
+    screen.getByLabelText('追问：补充问题 1 内容'),
+  );
+  expect(screen.getByTestId('editor-node-question-follow-up')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+
+  const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
+
+  expect(insertChildSpy).toHaveBeenCalledTimes(1);
+  expect(insertChildSpy.mock.calls[0]?.[1]).toBe('question-follow-up');
+  expect(insertChildSpy.mock.calls[0]?.[2].type).toBe('answer');
+  expect(insertChildSpy.mock.calls[0]?.[3]).toBe(0);
 });
 
 test('shows scaffold teaching follow-up actions when a scaffold node is selected', () => {
@@ -850,6 +902,85 @@ function createQuestionOrderSnapshot(): WorkspaceSnapshot {
       content: '',
       createdAt: '2026-04-27T10:00:00.000Z',
       updatedAt: '2026-04-27T10:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createFollowUpAnswerPlacementSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '追问回答插入',
+    workspaceId: 'workspace-follow-up-answer',
+    rootId: 'theme-follow-up-answer',
+    createdAt: '2026-04-29T15:00:00.000Z',
+    updatedAt: '2026-04-29T15:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-follow-up-answer',
+      title: '追问模块',
+      content: '',
+      createdAt: '2026-04-29T15:00:00.000Z',
+      updatedAt: '2026-04-29T15:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-follow-up-answer',
+    createNode({
+      type: 'plan-step',
+      id: 'step-follow-up-answer',
+      title: '追问步骤',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-04-29T15:00:00.000Z',
+      updatedAt: '2026-04-29T15:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-follow-up-answer',
+    createNode({
+      type: 'question',
+      id: 'question-parent-follow-up',
+      title: '父问题',
+      content: '先有一轮回答，再出现追问。',
+      createdAt: '2026-04-29T15:00:00.000Z',
+      updatedAt: '2026-04-29T15:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-parent-follow-up',
+    createNode({
+      type: 'answer',
+      id: 'answer-parent-follow-up',
+      title: '上一版回答',
+      content: '这是上一题的回答。',
+      createdAt: '2026-04-29T15:00:00.000Z',
+      updatedAt: '2026-04-29T15:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-parent-follow-up',
+    createNode({
+      type: 'question',
+      id: 'question-follow-up',
+      title: '追问：补充问题 1',
+      content: '为什么6000万个参数的盲目试错复杂度是指数级，而不是线性的？',
+      createdAt: '2026-04-29T15:00:00.000Z',
+      updatedAt: '2026-04-29T15:00:00.000Z',
     }),
   );
 
