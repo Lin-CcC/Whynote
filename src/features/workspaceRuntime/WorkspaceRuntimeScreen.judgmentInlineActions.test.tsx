@@ -7,9 +7,11 @@ import type {
   AiProviderObjectResponse,
 } from '../learningEngine';
 import {
+  addNodeReference,
   createIndexedDbStorage,
   createLocalStorageStore,
   createNode,
+  createNodeReference,
   createWorkspaceSnapshot,
   insertChildNode,
   type StructuredDataStorage,
@@ -32,7 +34,7 @@ afterEach(async () => {
   }
 });
 
-test('renders inline judgment actions and generates a hint that stays distinct from the answer explanation', async () => {
+test('renders inline judgment actions and generates a hint that stays distinct from the explanation while exposing hint citations', async () => {
   let taskCount = 0;
   const dependencies = await createPreloadedDependencies(
     createJudgmentInlineSnapshot(),
@@ -47,9 +49,17 @@ test('renders inline judgment actions and generates a hint that stays distinct f
           hint: {
             focus: '为什么会减少重复渲染',
             background:
-              '关键不只是“更新被放在一起”，而是这些更新会在同一轮里先收集，再一起触发界面计算，所以不必为每次局部变化都单独重跑渲染。',
+              '关键不只是“更新被放在一起”，而是这些更新会在同一轮里先收集，再统一提交，所以不必为每次局部变化都单独重跑渲染。',
             thinkingQuestion:
-              '把“发生了什么变化 -> 为什么会这样 -> 最后带来什么结果”连成一条因果链时，中间少掉的是哪一环？',
+              '如果中间没有“统一提交”这一步，界面为什么会更容易重复计算？',
+            citations: [
+              {
+                targetNodeId: 'fragment-inline-feedback',
+                purpose: 'background',
+                note: '如果卡住，可以先看资料里解释“统一提交”的那一段。',
+                sourceLocator: 'useState > batching',
+              },
+            ],
           },
         });
 
@@ -90,21 +100,18 @@ test('renders inline judgment actions and generates a hint that stays distinct f
 
   expect(taskCount).toBe(1);
   expect(hintCallout).toHaveTextContent('微型铺垫');
-  expect(hintCallout).toHaveTextContent('先补哪块：为什么会减少重复渲染。');
+  expect(hintCallout).toHaveTextContent('先补哪块：为什么会减少重复渲染');
   expect(hintCallout).toHaveTextContent('关键背景：');
-  expect(hintCallout).toHaveTextContent(
-    '这些更新会在同一轮里先收集，再一起触发界面计算',
-  );
+  expect(hintCallout).toHaveTextContent('同一轮里先收集，再统一提交');
   expect(hintCallout).toHaveTextContent('可以先想：');
-  expect(hintCallout).toHaveTextContent(
-    '发生了什么变化 -> 为什么会这样 -> 最后带来什么结果',
-  );
-  expect(hintCallout).not.toHaveTextContent(
-    '还缺“为什么会减少重复渲染”这条因果关系。',
-  );
+  expect(hintCallout).not.toHaveTextContent('你还缺“为什么会减少重复渲染”这一条因果关系');
   expect(hintCallout).not.toHaveTextContent(
     '标准理解：React 会先收集同一轮事件里的更新，再统一提交，因此可以减少重复渲染。',
   );
+
+  expect(await screen.findByText('提示里可参考的资料')).toBeInTheDocument();
+  expect(screen.getByText('为什么会减少重复渲染')).toBeInTheDocument();
+  expect(screen.getByText('判断所依据的资料')).toBeInTheDocument();
 });
 
 test('jumps from judgment to the matching summary and shows it as an answer explanation', async () => {
@@ -200,7 +207,7 @@ function createJudgmentInlineSnapshot(): WorkspaceSnapshot {
       type: 'module',
       id: 'module-judgment-inline',
       title: '理解批处理',
-      content: '验证判断节点上的就地下一步。',
+      content: '验证 judgment 节点上的就地下一步。',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -245,7 +252,8 @@ function createJudgmentInlineSnapshot(): WorkspaceSnapshot {
       type: 'judgment',
       id: 'judgment-inline-primary',
       title: '判断：回答还差一点',
-      content: '还缺“为什么会减少重复渲染”这条因果关系。',
+      content:
+        '已答到的部分：\n- 你已经答到了“更新会先放在一起”这一层。\n\n还缺的关键点：\n1. 你还缺“为什么会减少重复渲染”这一条因果关系。\n\n为什么这些缺口关键：\n- 如果少了统一提交和重复计算之间的因果链，就还是停在现象层。',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -259,6 +267,43 @@ function createJudgmentInlineSnapshot(): WorkspaceSnapshot {
       content:
         '标准理解：React 会先收集同一轮事件里的更新，再统一提交，因此可以减少重复渲染。',
       createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'resource',
+      id: 'resource-inline-feedback',
+      title: 'React 官方文档',
+      content: '关于 useState batching 的资料概况。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'resource-inline-feedback',
+    createNode({
+      type: 'resource-fragment',
+      id: 'fragment-inline-feedback',
+      title: '批处理摘录',
+      excerpt: 'React 会先把同一轮事件里的更新收集起来，再统一提交。',
+      locator: 'useState > batching',
+      sourceResourceId: 'resource-inline-feedback',
+      createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = addNodeReference(
+    tree,
+    createNodeReference({
+      id: 'reference-inline-judgment-support',
+      sourceNodeId: 'judgment-inline-primary',
+      targetNodeId: 'fragment-inline-feedback',
+      focusText: '你还缺“为什么会减少重复渲染”这一条因果关系',
+      note: '这里支撑当前缺口判断。',
+      purpose: 'judgment',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
     }),
   );
 
@@ -375,7 +420,7 @@ function createMultiAnswerJudgmentSnapshot(): WorkspaceSnapshot {
       type: 'summary',
       id: 'summary-inline-current',
       title: '第二版标准理解',
-      content: '同一轮里的更新会被统一提交，所以界面不需要为每次更新都单独重渲染。',
+      content: '同一轮里的更新会被统一提交，所以界面不需要为每次更新都单独重跑渲染。',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );

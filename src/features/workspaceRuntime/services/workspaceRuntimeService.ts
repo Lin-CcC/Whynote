@@ -1,4 +1,5 @@
 import {
+  attachCitationDraftsToNode,
   appendLearningNodeDraftToTree,
   appendChildQuestionsToTree,
   appendPlanStepDraftsToModule,
@@ -287,9 +288,14 @@ export function createWorkspaceRuntimeService(
 
       nextJudgmentNode.hint = result.hint;
       nextJudgmentNode.updatedAt = new Date().toISOString();
+      const nextTreeWithHintCitations = attachCitationDraftsToNode(
+        nextTree,
+        judgmentNodeId,
+        result.citations,
+      );
 
       return {
-        snapshot: createSnapshot(nextTree, snapshot),
+        snapshot: createSnapshot(nextTreeWithHintCitations, snapshot),
         nextModuleId: context.moduleNode?.id ?? null,
         nextSelectedNodeId: judgmentNodeId,
         message: '已补一条围绕当前缺口的思考提示。',

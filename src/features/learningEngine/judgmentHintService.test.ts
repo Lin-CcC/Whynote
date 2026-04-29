@@ -29,7 +29,7 @@ function createMockProvider(
 }
 
 describe('judgmentHintService', () => {
-  it('asks the provider for a standalone hint that complements the judgment and explanation', async () => {
+  it('asks the provider for a hint that complements judgment and explanation without rewriting either', async () => {
     let capturedPrompt = '';
     const providerClient: AiProviderClient = {
       async generateObject<T>(
@@ -43,6 +43,14 @@ describe('judgmentHintService', () => {
               '参数一多，搜索空间会指数级膨胀，所以盲试不是慢一点，而是根本没有可行路径。',
             thinkingQuestion:
               '如果每个参数只看两种可能，6000 万个参数会把尝试次数推到什么量级？',
+            citations: [
+              {
+                targetNodeId: 'resource-search-space',
+                purpose: 'judgment',
+                note: '如果卡住，可以看资料里解释搜索空间量级的那一段。',
+                sourceLocator: '第 2 节 搜索空间',
+              },
+            ],
           },
         });
 
@@ -65,30 +73,36 @@ describe('judgmentHintService', () => {
       planStepTitle: '先看盲目调参为什么不可行',
       questionPath: [
         {
-          title: '为什么不能靠反复试错来训练 6000 万参数的模型？',
+          title: '如果没有反向传播，面对海量参数，模型训练为什么几乎不可能成立？',
           content: '请解释单纯试错为什么不构成可行训练方法。',
         },
       ],
       learnerAnswer: '因为参数太多了，靠人工试会很慢。',
       judgmentContent:
-        '评价：当前只答到了“成本很高”，但还缺 1. 组合爆炸的量级；2. 反馈的导向作用。',
+        '已答到的部分：\n- 你已经意识到参数规模会让训练成本失控。\n\n还缺的关键点：\n1. 组合爆炸的量级。\n2. 方向信息为什么必要。\n\n为什么这些缺口关键：\n- 不把这两点说清楚，就还是停留在“成本高”。',
       summaryContent:
-        '标准理解：参数空间巨大，而且训练需要知道每个参数朝哪个方向微调，损失函数正是在提供这种方向信息。',
+        '反向传播把误差逐层传回去，让每个参数都拿到和自己相关的调整信号。',
     });
 
-    expect(capturedPrompt).toContain('已有判断评价');
-    expect(capturedPrompt).toContain('已有答案解析');
-    expect(capturedPrompt).toContain('不补上会卡在哪里');
-    expect(capturedPrompt).toContain('接下来可以往哪想');
+    expect(capturedPrompt).toContain('先读 judgment 里“还缺的关键点 / 为什么这些缺口关键”');
+    expect(capturedPrompt).toContain('hint 只做三件事');
     expect(capturedPrompt).toContain('focus 只能指向一个具体缺口');
     expect(capturedPrompt).toContain('background 要补的不是结论本身');
-    expect(capturedPrompt).toContain('thinkingQuestion 要顺着这个卡点给出下一步思考抓手');
     expect(capturedPrompt).toContain(
-      '"hint":{"focus":"","background":"","thinkingQuestion":"","content":""}',
+      '"hint":{"focus":"","background":"","thinkingQuestion":"","content":"","citations":[{"targetNodeId":"","focusText":"","purpose":"mechanism","note":"","sourceExcerpt":"","sourceLocator":""}]}}',
     );
-    expect(result.hint).toContain('先补哪块：组合爆炸的量级。');
+    expect(result.hint).toContain('先补哪块：组合爆炸的量级');
     expect(result.hint).toContain('关键背景：参数一多，搜索空间会指数级膨胀');
     expect(result.hint).toContain('可以先想：如果每个参数只看两种可能');
+    expect(result.citations).toEqual([
+      {
+        targetNodeId: 'resource-search-space',
+        focusText: '组合爆炸的量级',
+        note: '如果卡住，可以看资料里解释搜索空间量级的那一段。',
+        purpose: 'background',
+        sourceLocator: '第 2 节 搜索空间',
+      },
+    ]);
   });
 
   it('repairs weak model output into a usable three-part hint', async () => {
@@ -109,15 +123,15 @@ describe('judgmentHintService', () => {
       planStepTitle: '先看盲目调参为什么不可行',
       questionPath: [
         {
-          title: '为什么不能靠反复试错来训练 6000 万参数的模型？',
+          title: '如果没有反向传播，面对海量参数，模型训练为什么几乎不可能成立？',
           content: '请解释单纯试错为什么不构成可行训练方法。',
         },
       ],
       learnerAnswer: '因为参数太多了，靠人工试会很慢。',
       judgmentContent:
-        '评价：当前还缺 1. 组合爆炸的量级；2. 反馈的导向作用。',
+        '已答到的部分：\n- 你已经意识到参数多会带来训练成本。\n\n还缺的关键点：\n1. 组合爆炸的量级。\n2. 方向信息为什么必要。\n\n为什么这些缺口关键：\n- 不把这两点说清楚，就还是停留在“成本高”。',
       summaryContent:
-        '标准理解：训练不只需要知道结果对错，还需要知道每个参数该往哪个方向调。',
+        '训练不只需要知道结果对错，还需要知道每个参数该往哪个方向调。',
     });
 
     expect(result.hint).toContain('先补哪块：');

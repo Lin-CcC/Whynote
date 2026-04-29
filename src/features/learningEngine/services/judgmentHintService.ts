@@ -9,10 +9,15 @@ import {
   extractJudgmentGapItemsFromText,
   normalizeClosureHintText,
 } from './closureHint';
-import { parseJsonObject } from './learningDraftNormalization';
+import {
+  normalizeHintCitationDrafts,
+  parseJsonObject,
+} from './learningDraftNormalization';
 
 interface RawJudgmentHintPayload {
   hint?: unknown;
+  citations?: unknown;
+  references?: unknown;
 }
 
 export function createJudgmentHintService(options: {
@@ -41,9 +46,14 @@ export function createJudgmentHintService(options: {
         judgmentContent: input.judgmentContent,
         summaryContent: input.summaryContent ?? '',
       });
+      const citations = normalizeHintCitationDrafts(
+        rawPayload.hint ?? rawPayload,
+        hint,
+      );
 
       return {
         hint,
+        citations,
         metadata: {
           model: response.model,
           providerLabel: response.providerLabel,

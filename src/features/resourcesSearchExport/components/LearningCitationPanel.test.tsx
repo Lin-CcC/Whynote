@@ -22,7 +22,7 @@ test('shows teaching citations at explanation-fragment granularity and expands i
     />,
   );
 
-  expect(screen.getByText('解释片段对应的资料依据')).toBeInTheDocument();
+  expect(screen.getByText('答案解析对应的资料依据')).toBeInTheDocument();
   expect(
     screen.getByText('批处理会先收集同一轮事件里的更新，再统一提交。'),
   ).toBeInTheDocument();
@@ -92,6 +92,35 @@ test('keeps generic references in supplemental sources instead of turning them i
   ).not.toBeInTheDocument();
 });
 
+test('splits judgment citations into hint-background references and diagnosis-support references', () => {
+  render(
+    <LearningCitationPanel
+      onFocusResourceNode={() => {}}
+      selectedEditorNodeId="judgment-split"
+      tree={createJudgmentCitationTree()}
+    />,
+  );
+
+  expect(screen.getByText('提示里可参考的资料')).toBeInTheDocument();
+  expect(screen.getByText('判断所依据的资料')).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      '这些引用只给继续思考的抓手。如果卡住，再去看资料里的对应片段；它们不是现成答案。',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      '这些引用只支撑当前判断为什么成立，帮助你看清缺口，不会在这里直接展开成完整答案解析。',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText('误差为什么必须传回隐藏层'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText('你还缺“为什么只知道结果错了还不够”这一层机制'),
+  ).toBeInTheDocument();
+});
+
 test('keeps focus-text citations without stable anchors in supplemental sources', () => {
   render(
     <LearningCitationPanel
@@ -115,7 +144,7 @@ test('keeps locator-only resource teaching citations honest instead of inventing
     />,
   );
 
-  expect(screen.getByText('解释片段对应的资料依据')).toBeInTheDocument();
+  expect(screen.getByText('答案解析对应的资料依据')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '展开依据' }));
   const expandedArticle = screen
@@ -320,6 +349,122 @@ function createGenericCitationTree(): NodeTree {
       id: 'reference-generic',
       sourceNodeId: 'answer-generic',
       targetNodeId: 'resource-generic',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+
+  return tree;
+}
+
+function createJudgmentCitationTree(): NodeTree {
+  const snapshot = createWorkspaceSnapshot({
+    title: 'Judgment citation workspace',
+    workspaceId: 'workspace-judgment-citation',
+    rootId: 'theme-judgment-citation',
+    createdAt: '2026-04-28T00:00:00.000Z',
+    updatedAt: '2026-04-28T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-judgment-citation',
+      title: 'Judgment citation module',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-judgment-citation',
+    createNode({
+      type: 'plan-step',
+      id: 'step-judgment-citation',
+      title: 'Step judgment citation',
+      status: 'doing',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-judgment-citation',
+    createNode({
+      type: 'question',
+      id: 'question-judgment-citation',
+      title: '反向传播到底解决了什么问题？',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-judgment-citation',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-split',
+      title: '判断：还差关键机制',
+      content:
+        '已答到的部分：\n- 你已经意识到盲目试错不够。\n\n还缺的关键点：\n1. 你还缺“为什么只知道结果错了还不够”这一层机制。\n\n为什么这些缺口关键：\n- 不把误差分配到具体参数，训练仍然没有方向。',
+      hint:
+        '先补哪块：误差为什么必须传回隐藏层。\n关键背景：如果卡住，可以先看资料里解释“误差如何回传”的那一段。\n可以先想：如果误差不能一路传回去，隐藏层参数凭什么知道自己该怎么改？',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'resource',
+      id: 'resource-backprop',
+      title: '反向传播资料',
+      content: '关于误差回传和梯度方向的资料概况。',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'resource-backprop',
+    createNode({
+      type: 'resource-fragment',
+      id: 'fragment-backprop',
+      title: '误差回传摘录',
+      excerpt: '误差会沿着网络结构逐层传回隐藏层，并分配给相关参数。',
+      locator: '第 3 节 误差回传',
+      sourceResourceId: 'resource-backprop',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = addNodeReference(
+    tree,
+    createNodeReference({
+      id: 'reference-judgment-support',
+      sourceNodeId: 'judgment-split',
+      targetNodeId: 'fragment-backprop',
+      focusText: '你还缺“为什么只知道结果错了还不够”这一层机制',
+      note: '这里支撑当前缺口判断。',
+      purpose: 'judgment',
+      createdAt: '2026-04-28T00:00:00.000Z',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+  tree = addNodeReference(
+    tree,
+    createNodeReference({
+      id: 'reference-hint-background',
+      sourceNodeId: 'judgment-split',
+      targetNodeId: 'fragment-backprop',
+      focusText: '误差为什么必须传回隐藏层',
+      note: '如果卡住，可以先看资料里解释“误差如何回传”的那一段。',
+      purpose: 'background',
       createdAt: '2026-04-28T00:00:00.000Z',
       updatedAt: '2026-04-28T00:00:00.000Z',
     }),

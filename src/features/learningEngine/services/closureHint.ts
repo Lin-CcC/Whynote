@@ -146,9 +146,11 @@ export function extractJudgmentGapItemsFromText(
 
   const fallbackGap = sanitizeGapItem(
     content
+      .replace(/^已答到的部分[:：][\s\S]*?(?=\n|$)/u, '')
       .replace(/^这次答得好的地方[:：][\s\S]*?(?=\n|$)/u, '')
       .replace(/^做得好的地方[:：][\s\S]*?(?=\n|$)/u, '')
       .replace(/^已答到[:：][\s\S]*?(?=\n|$)/u, '')
+      .replace(/^为什么这些缺口关键[:：][\s\S]*?(?=\n|$)/u, '')
       .replace(/^不补上会卡在哪里[:：][\s\S]*?(?=\n|$)/u, '')
       .replace(/^少了这些会带来什么问题[:：][\s\S]*?(?=\n|$)/u, '')
       .replace(/^为什么关键[:：][\s\S]*?(?=\n|$)/u, '')
@@ -591,7 +593,7 @@ function isQuestionLike(content: string) {
 function extractStructuredSection(content: string, labels: string[]) {
   for (const label of labels) {
     const sectionPattern = new RegExp(
-      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:这次答得好的地方|做得好的地方|已答到|还没答到的关键点|还缺的关键点|当前最关键缺口|还缺|不补上会卡在哪里|少了这些会带来什么问题|为什么关键|接下来可以往哪想|下一步往哪想|继续修改时可以先想|接下来的重点应放在)[:：]|$)`,
+      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:已答到的部分|这次答得好的地方|做得好的地方|已答到|还没答到的关键点|还缺的关键点|当前最关键缺口|还缺|为什么这些缺口关键|不补上会卡在哪里|少了这些会带来什么问题|为什么关键|接下来可以往哪想|下一步往哪想|继续修改时可以先想|接下来的重点应放在)[:：]|$)`,
       'u',
     );
     const matched = content.match(sectionPattern)?.[1]?.trim();
@@ -731,8 +733,10 @@ function normalizeGapPhrase(content: string) {
 function stripEvaluationLeadIn(content: string) {
   const normalizedContent = content
     .replace(/^学习现状评价[:：]\s*/u, '')
+    .replace(/^已答到的部分[:：]\s*/u, '')
     .replace(/^这次答得好的地方[:：]\s*/u, '')
     .replace(/^做得好的地方[:：]\s*/u, '')
+    .replace(/^为什么这些缺口关键[:：]\s*/u, '')
     .replace(/^不补上会卡在哪里[:：]\s*/u, '')
     .replace(/^少了这些会带来什么问题[:：]\s*/u, '')
     .replace(/^接下来可以往哪想[:：]\s*/u, '')

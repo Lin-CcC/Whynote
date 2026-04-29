@@ -110,7 +110,6 @@ interface NormalizedJudgmentDetails {
   answeredText: string;
   gapItems: string[];
   whyItMattersText: string;
-  nextStepText: string;
 }
 
 interface NormalizedJudgmentDraftResult {
@@ -218,6 +217,10 @@ export function normalizeQuestionClosure(
       summaryContent: summary.content,
     },
   );
+  const hintCitations = normalizeHintCitationDrafts(
+    rawPayload.hint ?? rawPayload.guidanceHint,
+    hint,
+  );
   const followUpQuestions = normalizeFollowUpQuestionDrafts(
     rawPayload,
     isAnswerSufficient,
@@ -229,6 +232,10 @@ export function normalizeQuestionClosure(
     judgment: {
       ...normalizedJudgment.draft,
       hint,
+      citations: dedupeCitations([
+        ...normalizedJudgment.draft.citations,
+        ...hintCitations,
+      ]),
     },
     summary,
     followUpQuestions,
@@ -413,6 +420,7 @@ function normalizeIntroductionDraft(
     content: normalizeIntroductionContent(rawContent, planStepTitle),
     citations: normalizeCitationDrafts(
       rawIntroduction.citations ?? rawIntroduction.references,
+      'summary',
     ),
   };
 }
@@ -437,6 +445,7 @@ function normalizeQuestionDraft(
     content: normalizeQuestionContent(content, title, planStepTitle),
     citations: normalizeCitationDrafts(
       rawQuestion.citations ?? rawQuestion.references,
+      'question',
     ),
   };
 }
@@ -466,7 +475,10 @@ function normalizeScaffoldActionDraft(
     type: 'summary',
     title: normalizeIntroductionTitle(title, planStepLabel, 0),
     content: normalizeIntroductionContent(rawContent, planStepLabel),
-    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+    citations: normalizeCitationDrafts(
+      rawNode.citations ?? rawNode.references,
+      'summary',
+    ),
   };
 }
 
@@ -498,7 +510,10 @@ function normalizeStandaloneQuestionDraft(
     type: 'question',
     title,
     content: normalizeQuestionContent(rawContent, title, planStepLabel),
-    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+    citations: normalizeCitationDrafts(
+      rawNode.citations ?? rawNode.references,
+      'question',
+    ),
   };
 }
 
@@ -522,7 +537,10 @@ function normalizeJudgmentDraft(
       type: 'judgment',
       title: normalizeJudgmentTitle(title, options.isAnswerSufficient),
       content: formatStructuredJudgmentContent(details, options.isAnswerSufficient),
-      citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+      citations: normalizeCitationDrafts(
+        rawNode.citations ?? rawNode.references,
+        'judgment',
+      ),
     },
   };
 }
@@ -549,7 +567,10 @@ function normalizeClosureSummaryDraft(
     type: 'summary',
     title: normalizeClosureSummaryTitle(title),
     content: normalizeClosureSummaryContent(rawContent, options),
-    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+    citations: normalizeCitationDrafts(
+      rawNode.citations ?? rawNode.references,
+      'summary',
+    ),
   };
 }
 
@@ -570,7 +591,10 @@ function normalizeActionSummaryDraft(
     type: 'summary',
     title,
     content: normalizeActionSummaryContent(rawContent, options),
-    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+    citations: normalizeCitationDrafts(
+      rawNode.citations ?? rawNode.references,
+      'summary',
+    ),
   };
 }
 
@@ -597,7 +621,10 @@ function normalizeActionJudgmentDraft(
         isAnswerSufficient,
         options.currentQuestionTitle,
       ),
-      citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+      citations: normalizeCitationDrafts(
+        rawNode.citations ?? rawNode.references,
+        'judgment',
+      ),
     };
   }
 
@@ -605,7 +632,10 @@ function normalizeActionJudgmentDraft(
     type: 'judgment',
     title: normalizeStandaloneJudgmentTitle(title),
     content: normalizeStandaloneJudgmentContent(rawContent, options),
-    citations: normalizeCitationDrafts(rawNode.citations ?? rawNode.references),
+    citations: normalizeCitationDrafts(
+      rawNode.citations ?? rawNode.references,
+      'judgment',
+    ),
   };
 }
 
@@ -693,7 +723,12 @@ function resolveAnswerSufficiency(rawPayload: RawQuestionClosurePayload) {
   return false;
 }
 
-function normalizeCitationDrafts(payload: unknown) {
+type CitationDraftRole = 'generic' | 'question' | 'judgment' | 'hint' | 'summary';
+
+function normalizeCitationDrafts(
+  payload: unknown,
+  role: CitationDraftRole = 'generic',
+) {
   if (!Array.isArray(payload)) {
     return [];
   }
@@ -724,10 +759,19 @@ function normalizeCitationDrafts(payload: unknown) {
       continue;
     }
 
-    citations.push({
-      targetNodeId,
-      focusText:
-        getText(entry.focusText) ||
+    const sourceExcerpt = normalizeCitationSourceExcerpt(
+      getText(entry.sourceExcerpt) || getText(entry.excerpt),
+    );
+    const sourceLocator = normalizeCitationSourceLocator(
+      getText(entry.sourceLocator) || getText(entry.locator),
+    );
+
+    citations.push(
+      finalizeCitationDraft(
+        {
+          targetNodeId,
+          focusText:
+            getText(entry.focusText) ||
         getText(entry.claimText) ||
         getText(entry.claim) ||
         getText(entry.segmentText) ||
@@ -744,14 +788,113 @@ function normalizeCitationDrafts(payload: unknown) {
             getText(entry.usage) ||
             getText(entry.role),
         ) ?? undefined,
-      sourceExcerpt:
-        getText(entry.sourceExcerpt) || getText(entry.excerpt) || undefined,
-      sourceLocator:
-        getText(entry.sourceLocator) || getText(entry.locator) || undefined,
-    });
+          sourceExcerpt: sourceExcerpt || undefined,
+          sourceLocator: sourceLocator || undefined,
+        },
+        role,
+      ),
+    );
   }
 
-  return dedupeCitations(citations);
+  return dedupeCitations(citations).slice(0, getCitationRoleLimit(role));
+}
+
+function finalizeCitationDraft(
+  citation: LearningNodeCitationDraft,
+  role: CitationDraftRole,
+): LearningNodeCitationDraft {
+  const normalizedCitation = {
+    ...citation,
+    focusText: normalizeCitationDisplayText(citation.focusText) ?? undefined,
+    note: normalizeCitationDisplayText(citation.note) ?? undefined,
+    sourceExcerpt: normalizeCitationSourceExcerpt(citation.sourceExcerpt) ?? undefined,
+    sourceLocator: normalizeCitationSourceLocator(citation.sourceLocator) ?? undefined,
+  };
+
+  switch (role) {
+    case 'judgment':
+      return {
+        ...normalizedCitation,
+        purpose:
+          normalizedCitation.purpose && normalizedCitation.purpose !== 'background'
+            ? normalizedCitation.purpose
+            : 'judgment',
+      };
+    case 'hint':
+      return {
+        ...normalizedCitation,
+        purpose:
+          normalizedCitation.purpose &&
+          normalizedCitation.purpose !== 'judgment'
+            ? normalizedCitation.purpose
+            : 'background',
+      };
+    case 'summary':
+      return {
+        ...normalizedCitation,
+        purpose:
+          normalizedCitation.purpose === 'judgment'
+            ? 'background'
+            : normalizedCitation.purpose,
+      };
+    default:
+      return normalizedCitation;
+  }
+}
+
+function getCitationRoleLimit(role: CitationDraftRole) {
+  switch (role) {
+    case 'question':
+      return 1;
+    case 'hint':
+      return 1;
+    case 'judgment':
+      return 2;
+    case 'summary':
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+function normalizeCitationSourceExcerpt(value: string | undefined) {
+  const normalizedValue = normalizeCitationDisplayText(value);
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const withoutBodyLabel = normalizedValue.replace(
+    /^正文基础（优先用于定位真实引用）[:：]\s*/u,
+    '',
+  );
+
+  if (
+    /资料概况/u.test(withoutBodyLabel) ||
+    /不是引用正文/u.test(withoutBodyLabel) ||
+    /AI 资料概况/u.test(withoutBodyLabel) ||
+    /暂无资料概况/u.test(withoutBodyLabel)
+  ) {
+    return null;
+  }
+
+  return withoutBodyLabel;
+}
+
+function normalizeCitationSourceLocator(value: string | undefined) {
+  const normalizedValue = normalizeCitationDisplayText(value);
+
+  if (!normalizedValue || /资料概况/u.test(normalizedValue)) {
+    return null;
+  }
+
+  return normalizedValue;
+}
+
+function normalizeCitationDisplayText(value: string | null | undefined) {
+  const normalizedValue = value?.trim().replace(/\s+/gu, ' ');
+
+  return normalizedValue ? normalizedValue : null;
 }
 
 function extractRawModules(payload: unknown): RawModuleDraft[] {
@@ -1063,12 +1206,21 @@ function buildClosureSummaryLearnerAngle(options: {
   isAnswerSufficient: boolean;
   learnerAnswer?: string;
 }) {
+  const learnerAnswerFocus = extractLearnerAnswerFocus(options.learnerAnswer);
   const answeredText = stripTrailingSentencePunctuation(options.judgment.answeredText);
 
   if (options.isAnswerSufficient) {
+    if (learnerAnswerFocus) {
+      return `你这版回答已经把“${learnerAnswerFocus}”这条主线说出来了，这个方向是对的。`;
+    }
+
     return answeredText
       ? `你这版回答已经把主线说到了：${answeredText}。`
       : '你这版回答已经把当前问题的主线说到了。';
+  }
+
+  if (learnerAnswerFocus) {
+    return `你现在的思路已经抓到了“${learnerAnswerFocus}”这一层，这个方向是对的。`;
   }
 
   return answeredText
@@ -1144,13 +1296,11 @@ function normalizeJudgmentDetails(
     options,
     gapItems,
   );
-  const nextStepText = normalizeJudgmentNextStepText(rawNode, options, gapItems);
 
   return {
     answeredText,
     gapItems,
     whyItMattersText,
-    nextStepText,
   };
 }
 
@@ -1168,17 +1318,14 @@ function formatStructuredJudgmentContent(
         ];
 
   return [
-    '这次答得好的地方：',
+    '已答到的部分：',
     `- ${details.answeredText}`,
     '',
-    '还没答到的关键点：',
+    '还缺的关键点：',
     ...gapLines,
     '',
-    '不补上会卡在哪里：',
+    '为什么这些缺口关键：',
     `- ${details.whyItMattersText}`,
-    '',
-    '接下来可以往哪想：',
-    `- ${details.nextStepText}`,
   ].join('\n');
 }
 
@@ -1192,6 +1339,7 @@ function normalizeJudgmentAnsweredText(
 ) {
   const rawAnsweredText =
     extractStructuredTextFromRawNode(rawNode, [
+      '已答到的部分',
       '这次答得好的地方',
       '做得好的地方',
       '已答到',
@@ -1279,6 +1427,7 @@ function normalizeJudgmentWhyItMattersText(
 ) {
   const rawWhyText =
     extractStructuredTextFromRawNode(rawNode, [
+      '为什么这些缺口关键',
       '不补上会卡在哪里',
       '少了这些会带来什么问题',
       '为什么关键',
@@ -1305,42 +1454,6 @@ function normalizeJudgmentWhyItMattersText(
   return buildJudgmentImpactFallback(questionLabel, gapItems[0]);
 }
 
-function normalizeJudgmentNextStepText(
-  rawNode: RawLearningNodeDraft,
-  options: {
-    currentQuestionTitle?: string;
-    isAnswerSufficient: boolean;
-  },
-  gapItems: string[],
-) {
-  const rawNextStepText =
-    extractStructuredTextFromRawNode(rawNode, [
-      '接下来可以往哪想',
-      '下一步往哪想',
-      '继续修改时可以先想',
-      '接下来的重点应放在',
-    ]) ||
-    getText((rawNode as Record<string, unknown>).nextStep) ||
-    getText((rawNode as Record<string, unknown>).nextDirection) ||
-    getText((rawNode as Record<string, unknown>).nextFocus) ||
-    getText((rawNode as Record<string, unknown>).thinkingDirection);
-
-  if (rawNextStepText && !looksGenericNextStepText(rawNextStepText)) {
-    return ensureSentenceEnding(rawNextStepText);
-  }
-
-  if (options.isAnswerSufficient) {
-    return ensureSentenceEnding(
-      '如果还想继续打磨，可以顺手补一下适用边界，或者把现在的表述再压缩得更清楚',
-    );
-  }
-
-  return buildJudgmentNextStepFallback(
-    gapItems[0],
-    options.currentQuestionTitle,
-  );
-}
-
 function normalizeClosureHint(
   rawHint: unknown,
   options: {
@@ -1357,6 +1470,37 @@ function normalizeClosureHint(
     judgmentContent: options.judgmentContent,
     summaryContent: options.summaryContent,
   });
+}
+
+export function normalizeHintCitationDrafts(
+  rawHint: unknown,
+  normalizedHint: string,
+) {
+  if (!isRecord(rawHint)) {
+    return [] satisfies LearningNodeCitationDraft[];
+  }
+
+  const nestedHint = isRecord(rawHint.hint) ? rawHint.hint : null;
+  const rawHintCitations =
+    rawHint.citations ?? rawHint.references ?? nestedHint?.citations;
+  const citations = normalizeCitationDrafts(rawHintCitations, 'hint');
+
+  if (citations.length === 0) {
+    return citations;
+  }
+
+  const hintFocusText = extractHintFocusText(normalizedHint);
+
+  return citations.map((citation) => ({
+    ...citation,
+    focusText: citation.focusText ?? hintFocusText ?? undefined,
+  }));
+}
+
+function extractHintFocusText(normalizedHint: string) {
+  const focusMatch = normalizedHint.match(/^先补哪块[:：]\s*(.+)$/mu)?.[1]?.trim();
+
+  return focusMatch ? stripTrailingSentencePunctuation(focusMatch) : null;
 }
 
 function buildJudgmentImpactFallback(
@@ -1389,46 +1533,6 @@ function buildJudgmentImpactFallback(
     default:
       return ensureSentenceEnding(
         `如果不把“${gapLabel || `${questionLabel}里还缺的关键点`}”说清楚，你的回答会停在当前直觉层，后面一旦要解释${questionLabel}为什么成立就接不上`,
-      );
-  }
-}
-
-function buildJudgmentNextStepFallback(
-  primaryGap: string | undefined,
-  currentQuestionTitle?: string,
-) {
-  const gapLabel = stripTrailingSentencePunctuation(primaryGap ?? '');
-
-  switch (classifyJudgmentGapKind(gapLabel)) {
-    case 'combinatorial-explosion':
-      return ensureSentenceEnding(
-        '继续修改时，先别急着直接讲损失函数，先把“盲目尝试为什么会在搜索空间上直接走不通”量化出来，再过渡到模型后来靠什么获得方向',
-      );
-    case 'feedback-direction':
-      return ensureSentenceEnding(
-        '继续修改时，先把“只知道错了为什么还不够”说清楚，再往下接模型究竟需要什么样的反馈信号',
-      );
-    case 'causal':
-      return ensureSentenceEnding(
-        `继续修改时，先把“${gapLabel || '中间那条因果链'}”补出来，再回头检查你的结论是不是自然推出的`,
-      );
-    case 'boundary':
-      return ensureSentenceEnding(
-        `继续修改时，先把“${gapLabel || '这条说法依赖的前提'}”交代清楚，再看当前结论离开这些条件后还成不成立`,
-      );
-    case 'mechanism':
-      return ensureSentenceEnding(
-        `继续修改时，先拆清楚“${gapLabel || '相关对象'}”各自做什么、先后顺序是什么，再把它们串成完整解释`,
-      );
-    default:
-      if (currentQuestionTitle) {
-        return ensureSentenceEnding(
-          `继续修改时，先别急着把“${currentQuestionTitle}”的答案铺满，优先把“${gapLabel || '这条关键缺口'}”背后的机制、因果或边界补清楚`,
-        );
-      }
-
-      return ensureSentenceEnding(
-        `继续修改时，先别急着把答案铺满，优先把“${gapLabel || '这条关键缺口'}”背后的机制、因果或边界补清楚`,
       );
   }
 }
@@ -1506,16 +1610,22 @@ function buildClosureSummaryBreakpoint(options: {
   currentQuestionTitle?: string;
   isAnswerSufficient: boolean;
   judgment: NormalizedJudgmentDetails;
+  learnerAnswer?: string;
 }) {
   if (options.isAnswerSufficient) {
     return '如果继续打磨，可以顺手检查自己有没有把适用边界也交代清楚。';
   }
 
+  const learnerAnswerFocus = extractLearnerAnswerFocus(options.learnerAnswer);
   const primaryGap =
     options.judgment.gapItems[0]?.replace(/[。！？!?；;]+$/u, '') ||
     (options.currentQuestionTitle
       ? `“${options.currentQuestionTitle}”里还缺的关键点`
       : '当前还缺的关键点');
+
+  if (learnerAnswerFocus) {
+    return `但如果只停在“${learnerAnswerFocus}”这一步，你会卡在“${primaryGap}”这里。`;
+  }
 
   return `如果沿着当前表述继续往下说，你会卡在“${primaryGap}”这一步。`;
 }
@@ -1535,7 +1645,7 @@ function buildClosureSummaryGuidance(options: {
       ? `“${options.currentQuestionTitle}”里还缺的关键点`
       : '当前还缺的关键点');
 
-  return `继续往下想：${toQuestionPromptFromGap(primaryGap, options.currentQuestionTitle)}如果只说结论，会漏掉哪一环？`;
+  return `你可以先追问自己：${toQuestionPromptFromGap(primaryGap, options.currentQuestionTitle)}如果只说结论，会漏掉哪一环？`;
 }
 
 function hasUsableStandardUnderstandingContent(content: string) {
@@ -1559,7 +1669,7 @@ function extractStructuredTextFromRawNode(
 
   for (const label of sectionLabels) {
     const sectionPattern = new RegExp(
-      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:这次答得好的地方|做得好的地方|已答到|还没答到的关键点|还缺的关键点|当前最关键缺口|还缺|不补上会卡在哪里|少了这些会带来什么问题|为什么关键|接下来可以往哪想|下一步往哪想|继续修改时可以先想|接下来的重点应放在)[:：]|$)`,
+      `${label}[:：]\\s*([\\s\\S]*?)(?=\\n(?:已答到的部分|这次答得好的地方|做得好的地方|已答到|还没答到的关键点|还缺的关键点|当前最关键缺口|还缺|为什么这些缺口关键|不补上会卡在哪里|少了这些会带来什么问题|为什么关键|接下来可以往哪想|下一步往哪想|继续修改时可以先想|接下来的重点应放在)[:：]|$)`,
       'u',
     );
     const matched = content.match(sectionPattern)?.[1]?.trim();
@@ -1608,9 +1718,11 @@ function sanitizeGapItem(item: string) {
 
 function stripJudgmentScaffoldText(content: string) {
   return content
+    .replace(/^已答到的部分[:：][\s\S]*?(?=\n|$)/u, '')
     .replace(/^这次答得好的地方[:：][\s\S]*?(?=\n|$)/u, '')
     .replace(/^做得好的地方[:：][\s\S]*?(?=\n|$)/u, '')
     .replace(/^已答到[:：][\s\S]*?(?=\n|$)/u, '')
+    .replace(/^为什么这些缺口关键[:：][\s\S]*?(?=\n|$)/u, '')
     .replace(/^不补上会卡在哪里[:：][\s\S]*?(?=\n|$)/u, '')
     .replace(/^少了这些会带来什么问题[:：][\s\S]*?(?=\n|$)/u, '')
     .replace(/^为什么关键[:：][\s\S]*?(?=\n|$)/u, '')
@@ -1710,16 +1822,6 @@ function looksGenericWhyItMattersText(content: string) {
   ].some((keyword) => content.includes(keyword));
 }
 
-function looksGenericNextStepText(content: string) {
-  return [
-    '继续想',
-    '再想想',
-    '继续补充',
-    '往这个方向想',
-    '再完善一下',
-  ].some((keyword) => content.includes(keyword));
-}
-
 function isGenericAnsweredText(content: string) {
   return [
     '关键点都提到了',
@@ -1748,6 +1850,7 @@ function normalizeFollowUpQuestionDraft(
     content: normalizeFollowUpQuestionContent(rawContent, currentQuestionTitle),
     citations: normalizeCitationDrafts(
       rawQuestion.citations ?? rawQuestion.references,
+      'question',
     ),
   };
 }
