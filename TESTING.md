@@ -108,6 +108,14 @@
 - 搜索作用域是否清晰，不会让用户在错误范围里迷失
 - 导出内容是否更像整理后的笔记，而不是原始系统日志
 
+### AI 配置模板与本地预设
+
+- 选择 `Gemini (OpenAI-compatible)` 后，`Base URL` 自动变为 `https://generativelanguage.googleapis.com/v1beta/openai`，`Model` 自动变为 `gemini-2.5-flash`
+- 在 Gemini 模板下填写 `API Key`，命名并保存一个本地预设；刷新后应能恢复该预设和三项配置
+- 再切到 `自定义 OpenAI-compatible`，填写另一组 `Base URL / API Key / Model` 并保存为第二个预设；切换预设时三项配置应同步变化
+- 对只有旧版 `ai.baseUrl / ai.apiKey / ai.model` 的本地数据做冷启动时，应能直接读出当前配置，不丢原值
+- 在模板/预设切换后继续触发“为当前模块规划学习路径”等现有 AI 动作，确认仍走原来的 OpenAI-compatible provider 主链
+
 ## 浏览器级 smoke
 
 ### 安装

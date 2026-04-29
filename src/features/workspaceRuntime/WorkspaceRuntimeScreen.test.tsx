@@ -183,7 +183,7 @@ test('runs learning-engine plan-step generation from UI and materializes the res
       value: 'gpt-test',
     },
   });
-  fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
+  fireEvent.click(screen.getByRole('button', { name: '保存当前配置' }));
   fireEvent.click(screen.getByRole('button', { name: '为当前模块规划学习路径' }));
 
   expect(await screen.findByDisplayValue('建立最小概念框架')).toBeInTheDocument();

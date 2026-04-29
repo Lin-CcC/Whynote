@@ -374,6 +374,19 @@ describe('nodeDomain storage', () => {
       values: {
         locale: 'zh-CN',
         autosave: true,
+        'ai.selectedTemplateId': 'gemini-openai-compatible',
+        'ai.presets': [
+          {
+            id: 'preset-gemini',
+            name: '我的 Gemini',
+            templateId: 'gemini-openai-compatible',
+            baseUrl:
+              'https://generativelanguage.googleapis.com/v1beta/openai',
+            apiKey: 'test-key',
+            model: 'gemini-2.5-flash',
+            updatedAt: '2026-04-27T00:00:00.000Z',
+          },
+        ],
       },
       updatedAt: '2026-04-27T00:00:00.000Z',
     });
@@ -395,6 +408,19 @@ describe('nodeDomain storage', () => {
       values: {
         locale: 'zh-CN',
         autosave: true,
+        'ai.selectedTemplateId': 'gemini-openai-compatible',
+        'ai.presets': [
+          {
+            id: 'preset-gemini',
+            name: '我的 Gemini',
+            templateId: 'gemini-openai-compatible',
+            baseUrl:
+              'https://generativelanguage.googleapis.com/v1beta/openai',
+            apiKey: 'test-key',
+            model: 'gemini-2.5-flash',
+            updatedAt: '2026-04-27T00:00:00.000Z',
+          },
+        ],
       },
       updatedAt: '2026-04-27T00:00:00.000Z',
     });

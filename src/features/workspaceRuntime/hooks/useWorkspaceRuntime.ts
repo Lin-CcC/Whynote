@@ -4,8 +4,14 @@ import type { AiConfig } from '../../learningEngine';
 import type { ResourceMetadataRecord, WorkspaceSnapshot } from '../../nodeDomain';
 import type { ResourceImportDraft } from '../../resourcesSearchExport/services/resourceIngestTypes';
 import type { WorkspaceEditorLearningActionRequest } from '../../workspaceEditor/workspaceEditorTypes';
-import { createWorkspaceRuntimeService } from '../services/workspaceRuntimeService';
+import {
+  getAiConfigTemplateById,
+  getDefaultAiPresetName,
+  type AiConfigPreset,
+  type StoredAiConfigPreferences,
+} from '../services/aiConfigPresets';
 import type { QuestionAnswerEvaluationTarget } from '../services/learningRuntimeContext';
+import { createWorkspaceRuntimeService } from '../services/workspaceRuntimeService';
 import type {
   WorkspaceRuntimeDependencies,
   WorkspaceMutationResult,
@@ -15,6 +21,10 @@ import type {
 
 interface WorkspaceRuntimeState extends WorkspaceRuntimeStatusState {
   aiConfig: AiConfig;
+  aiPresetDraftName: string;
+  aiPresets: AiConfigPreset[];
+  aiSelectedPresetId: string | null;
+  aiSelectedTemplateId: string;
   editorSessionKey: number;
   initialModuleId: string | null;
   initialSelectedNodeId: string | null;
@@ -34,23 +44,37 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
   const [runtimeService] = useState(() =>
     createWorkspaceRuntimeService(dependencies),
   );
-  const [state, setState] = useState<WorkspaceRuntimeState>(() => ({
-    aiConfig: runtimeService.loadAiConfig(),
-    aiError: null,
-    activeAiActionLabel: null,
-    completionSuggestion: null,
-    editorSessionKey: 0,
-    initialModuleId: null,
-    initialSelectedNodeId: null,
-    isAiRunning: false,
-    isInitializing: true,
-    loadError: null,
-    runtimeMessage: null,
-    resourceMetadataRecords: [],
-    saveError: null,
-    saveStatus: 'idle',
-    snapshot: null,
-  }));
+  const [state, setState] = useState<WorkspaceRuntimeState>(() => {
+    const initialAiPreferences = runtimeService.loadAiConfigPreferences();
+
+    return {
+      aiConfig: initialAiPreferences.config,
+      aiError: null,
+      activeAiActionLabel: null,
+      aiPresetDraftName: resolveAiPresetDraftName(initialAiPreferences),
+      aiPresets: initialAiPreferences.presets,
+      aiSelectedPresetId: initialAiPreferences.selectedPresetId,
+      aiSelectedTemplateId: initialAiPreferences.selectedTemplateId,
+      completionSuggestion: null,
+      editorSessionKey: 0,
+      initialModuleId: null,
+      initialSelectedNodeId: null,
+      isAiRunning: false,
+      isInitializing: true,
+      loadError: null,
+      resourceMetadataRecords: [],
+      runtimeMessage: null,
+      saveError: null,
+      saveStatus: 'idle',
+      snapshot: null,
+    };
+  });
+  const aiPreferencesRef = useRef<StoredAiConfigPreferences>({
+    config: state.aiConfig,
+    presets: state.aiPresets,
+    selectedPresetId: state.aiSelectedPresetId,
+    selectedTemplateId: state.aiSelectedTemplateId,
+  });
   const snapshotRef = useRef<WorkspaceSnapshot | null>(null);
   const selectionRef = useRef<WorkspaceRuntimeSelectionState>({
     currentModuleId: null,
@@ -117,21 +141,137 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
   }
 
   function handleAiConfigChange(patch: Partial<AiConfig>) {
+    const nextConfig = {
+      ...aiPreferencesRef.current.config,
+      ...patch,
+    } satisfies AiConfig;
+
+    applyAiPreferences({
+      ...aiPreferencesRef.current,
+      config: nextConfig,
+      selectedPresetId: shouldDetachSelectedPreset(
+        aiPreferencesRef.current,
+        nextConfig,
+      )
+        ? null
+        : aiPreferencesRef.current.selectedPresetId,
+    });
+  }
+
+  function handleAiTemplateChange(templateId: string) {
+    const template = getAiConfigTemplateById(templateId);
+    const nextPreferences = {
+      ...aiPreferencesRef.current,
+      config: {
+        ...aiPreferencesRef.current.config,
+        baseUrl: template.baseUrl,
+        model: template.defaultModel,
+      },
+      selectedPresetId: null,
+      selectedTemplateId: template.id,
+    } satisfies StoredAiConfigPreferences;
+
+    applyAiPreferences(nextPreferences, {
+      persist: true,
+      presetDraftName:
+        state.aiPresetDraftName.trim() || getDefaultAiPresetName(template.id),
+      runtimeMessage: `已切换到模板：${template.label}。`,
+    });
+  }
+
+  function handleAiPresetChange(presetId: string | null) {
+    if (!presetId) {
+      applyAiPreferences(
+        {
+          ...aiPreferencesRef.current,
+          selectedPresetId: null,
+        },
+        {
+          persist: true,
+          presetDraftName:
+            state.aiPresetDraftName.trim() ||
+            getDefaultAiPresetName(aiPreferencesRef.current.selectedTemplateId),
+          runtimeMessage: '当前配置已切换为未保存状态。',
+        },
+      );
+      return;
+    }
+
+    const selectedPreset = aiPreferencesRef.current.presets.find(
+      (preset) => preset.id === presetId,
+    );
+
+    if (!selectedPreset) {
+      return;
+    }
+
+    applyAiPreferences(
+      {
+        config: {
+          apiKey: selectedPreset.apiKey,
+          baseUrl: selectedPreset.baseUrl,
+          model: selectedPreset.model,
+        },
+        presets: aiPreferencesRef.current.presets,
+        selectedPresetId: selectedPreset.id,
+        selectedTemplateId: selectedPreset.templateId,
+      },
+      {
+        persist: true,
+        presetDraftName: selectedPreset.name,
+        runtimeMessage: `已切换到本地预设：${selectedPreset.name}。`,
+      },
+    );
+  }
+
+  function handleAiPresetDraftNameChange(name: string) {
     setState((previousState) => ({
       ...previousState,
-      aiConfig: {
-        ...previousState.aiConfig,
-        ...patch,
-      },
+      aiPresetDraftName: name,
     }));
   }
 
   function saveAiConfig() {
-    runtimeService.saveAiConfig(state.aiConfig);
+    runtimeService.saveAiConfigPreferences(aiPreferencesRef.current);
     setState((previousState) => ({
       ...previousState,
       runtimeMessage: 'AI 配置已保存到本地设置。',
     }));
+  }
+
+  function saveAiPreset() {
+    const presetName = state.aiPresetDraftName.trim();
+
+    if (!presetName) {
+      return;
+    }
+
+    const existingPresetId = aiPreferencesRef.current.selectedPresetId;
+    const nextPreset = {
+      id: existingPresetId ?? crypto.randomUUID(),
+      name: presetName,
+      templateId: aiPreferencesRef.current.selectedTemplateId,
+      baseUrl: aiPreferencesRef.current.config.baseUrl,
+      apiKey: aiPreferencesRef.current.config.apiKey,
+      model: aiPreferencesRef.current.config.model,
+      updatedAt: new Date().toISOString(),
+    } satisfies AiConfigPreset;
+    const nextPresets = upsertAiPreset(aiPreferencesRef.current.presets, nextPreset);
+
+    applyAiPreferences(
+      {
+        ...aiPreferencesRef.current,
+        presets: nextPresets,
+        selectedPresetId: nextPreset.id,
+      },
+      {
+        persist: true,
+        presetDraftName: presetName,
+        runtimeMessage: existingPresetId
+          ? `已覆盖本地预设：${presetName}。`
+          : `已保存本地预设：${presetName}。`,
+      },
+    );
   }
 
   async function upsertResourceMetadata(record: ResourceMetadataRecord) {
@@ -213,6 +353,9 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
   return {
     ...state,
     handleAiConfigChange,
+    handleAiPresetChange,
+    handleAiPresetDraftNameChange,
+    handleAiTemplateChange,
     handleSelectionChange,
     handleSnapshotChange,
     retryInitialization: initializeWorkspace,
@@ -224,6 +367,7 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
     runQuestionEvaluation,
     runQuestionSplit,
     saveAiConfig,
+    saveAiPreset,
     upsertResourceMetadata,
   };
 
@@ -426,6 +570,38 @@ export function useWorkspaceRuntime(dependencies: WorkspaceRuntimeDependencies) 
       }));
     }
   }
+
+  function applyAiPreferences(
+    nextPreferences: StoredAiConfigPreferences,
+    options?: {
+      persist?: boolean;
+      presetDraftName?: string;
+      runtimeMessage?: string;
+    },
+  ) {
+    aiPreferencesRef.current = nextPreferences;
+    setState((previousState) => ({
+      ...previousState,
+      aiConfig: nextPreferences.config,
+      aiPresets: nextPreferences.presets,
+      aiSelectedPresetId: nextPreferences.selectedPresetId,
+      aiSelectedTemplateId: nextPreferences.selectedTemplateId,
+      ...(options?.presetDraftName !== undefined
+        ? {
+            aiPresetDraftName: options.presetDraftName,
+          }
+        : {}),
+      ...(options?.runtimeMessage !== undefined
+        ? {
+            runtimeMessage: options.runtimeMessage,
+          }
+        : {}),
+    }));
+
+    if (options?.persist) {
+      runtimeService.saveAiConfigPreferences(nextPreferences);
+    }
+  }
 }
 
 function getLearningActionRuntimeLabel(
@@ -481,4 +657,50 @@ function upsertResourceMetadataRecord(
 
   nextRecords[existingIndex] = nextRecord;
   return nextRecords;
+}
+
+function resolveAiPresetDraftName(preferences: StoredAiConfigPreferences) {
+  const selectedPreset = preferences.presets.find(
+    (preset) => preset.id === preferences.selectedPresetId,
+  );
+
+  return selectedPreset?.name ?? getDefaultAiPresetName(preferences.selectedTemplateId);
+}
+
+function shouldDetachSelectedPreset(
+  preferences: StoredAiConfigPreferences,
+  nextConfig: AiConfig,
+) {
+  const selectedPreset = preferences.presets.find(
+    (preset) => preset.id === preferences.selectedPresetId,
+  );
+
+  if (!selectedPreset) {
+    return false;
+  }
+
+  return !doesAiConfigMatchPreset(nextConfig, selectedPreset);
+}
+
+function doesAiConfigMatchPreset(config: AiConfig, preset: AiConfigPreset) {
+  return (
+    config.baseUrl === preset.baseUrl &&
+    config.apiKey === preset.apiKey &&
+    config.model === preset.model
+  );
+}
+
+function upsertAiPreset(presets: AiConfigPreset[], nextPreset: AiConfigPreset) {
+  const existingIndex = presets.findIndex((preset) => preset.id === nextPreset.id);
+  const nextPresets = [...presets];
+
+  if (existingIndex === -1) {
+    nextPresets.unshift(nextPreset);
+  } else {
+    nextPresets[existingIndex] = nextPreset;
+  }
+
+  return nextPresets.toSorted((leftPreset, rightPreset) =>
+    rightPreset.updatedAt.localeCompare(leftPreset.updatedAt),
+  );
 }

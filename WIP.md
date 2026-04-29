@@ -131,6 +131,15 @@
 - [x] 为后续自动 fragment 保留最小运行时解析接口，但当前不扩展为完整自动摘录系统
 - [x] 补齐 `answer`、fragment 复用、resource 回退、刷新恢复与资料焦点链路测试
 
+## 当前工作树：`codex/ai-config-presets`
+
+- [x] 目标：把当前 AI 三项裸输入收成“内置 OpenAI-compatible 模板 + 本地用户预设 + 三项可编辑配置”
+- [x] 范围边界：不做远端模板仓库、不做云同步、不做完整设置页、不做多协议 provider、不做高级参数面板
+- [x] 交付：内置 Gemini 与自定义 OpenAI-compatible 模板，支持模板自动填充 Base URL / 推荐 Model
+- [x] 交付：支持本地保存与切换预设，并与现有 `ai.baseUrl / ai.apiKey / ai.model` 本地存储完全兼容
+- [x] 交付：补齐模板自动填充、预设保存切换、旧配置兼容、local preference 兼容、运行主链不回归测试
+- [x] 交付：同步更新 README / DEV_NOTE / TODO，并补充 TESTING 手工验证步骤
+
 ## 下一阶段验证重点
 
 ### 结构编辑

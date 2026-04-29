@@ -43,8 +43,28 @@ Whynote 是一个面向提问式学习的节点化笔记系统。它把学习过
 - 测试：Vitest
 - 存储：IndexedDB + localStorage
 - 导出：Markdown / TXT
-- AI 接入：用户自填 OpenAI-compatible 配置
+- AI 接入：内置 OpenAI-compatible 模板 + 本地预设，当前仍走单一 OpenAI-compatible 请求链路
 - 部署：静态前端优先，默认以 Vercel 为示例平台
+
+## AI 配置
+
+- 当前不做完整设置中心，只提供最小可运行的 OpenAI-compatible 配置卡
+- 用户可以先选内置模板，再局部修改 `Base URL / API Key / Model`
+- 用户可以把当前配置保存为本地预设，并在下次直接切换
+- 模板层与预设层分开：
+  - 模板只提供厂商默认壳子，不保存密钥
+  - 预设保存用户自己的本地配置实例
+
+当前内置模板：
+
+- `Gemini (OpenAI-compatible)`
+- `自定义 OpenAI-compatible`
+
+Gemini 示例：
+
+- Base URL：`https://generativelanguage.googleapis.com/v1beta/openai`
+- Model：`gemini-2.5-flash`
+- API Key：使用你自己的本地 Google AI / Gemini key
 
 ## 工程启动
 
