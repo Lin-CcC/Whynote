@@ -12,6 +12,7 @@ import {
   getNodePath,
   getNodeTypeLabel,
 } from '../utils/treeSelectors';
+import { getNodeSemanticVisibility } from '../utils/nodeSemanticVisibility';
 
 type SelectedNodeInspectorProps = {
   currentModuleId: string | null;
@@ -74,6 +75,17 @@ export default function SelectedNodeInspector({
     : '暂无';
   const selectedTagLabel =
     selectedTagNames.length > 0 ? selectedTagNames.join('、') : '暂无';
+  const semanticVisibility = selectedNode
+    ? getNodeSemanticVisibility(tree, selectedNode)
+    : { badges: [], notes: [] };
+  const selectedNodeSemanticLabel =
+    semanticVisibility.badges.length > 0
+      ? semanticVisibility.badges.map((badge) => badge.label).join('、')
+      : '暂无';
+  const selectedNodeSemanticNotesLabel =
+    semanticVisibility.notes.length > 0
+      ? semanticVisibility.notes.join('；')
+      : '暂无';
 
   return (
     <>
@@ -122,6 +134,24 @@ export default function SelectedNodeInspector({
             <dt>标签</dt>
             <dd className="workspace-inspectorClamp" title={selectedTagLabel}>
               {selectedTagLabel}
+            </dd>
+          </div>
+          <div>
+            <dt>语义状态</dt>
+            <dd
+              className="workspace-inspectorClamp"
+              title={selectedNodeSemanticLabel}
+            >
+              {selectedNodeSemanticLabel}
+            </dd>
+          </div>
+          <div>
+            <dt>语义关系</dt>
+            <dd
+              className="workspace-inspectorClamp"
+              title={selectedNodeSemanticNotesLabel}
+            >
+              {selectedNodeSemanticNotesLabel}
             </dd>
           </div>
         </dl>

@@ -66,8 +66,18 @@
 
 ### 7. 当前回答语义、过期判定与级联清理
 
+- 先看主视图卡片头部与 `question` 提示行，不要只靠左侧 runtime action card 猜：
+  - 当前 answer 卡片会显示 `当前回答`
+  - 旧 answer 卡片会显示 `旧回答`
+  - question 卡片会显示 `当前回答：...`
+- answer-closure judgment / 答案解析 / summary-check judgment 现在都要直接看卡片头部：
+  - 最新且仍对应当前主路径的结果显示 `当前结果`
+  - 旧轮次或旧回答对应的结果显示 `历史结果`
+  - 源 answer / 手写 summary 已改但结果仍保留时，额外显示 `已过期`
+  - 配对关系通过 `配对回答：...` 或 `检查对象：...` 直接确认
 - 在同一个 `question` 下连续用 `插入回答` 或 `直接回答当前问题` 生成多条 answer 后，runtime 主动作应始终围绕最新晋升的 `currentAnswerId` 工作；即使回头选中旧 answer、旧 judgment 或旧 `answer-closure summary`，`重新评估当前回答`、`查看答案解析`、`回到当前回答继续修改` 也应回到当前回答而不是旧答案。
 - 编辑旧 answer 的标题或正文，不应把它自动升格成当前回答；只有新建 answer 或把叶子节点切成 `answer` 时，`currentAnswerId` 才应切换。
+- 如果 question 已经有一条空的当前 answer 草稿，左侧学习推进卡应切到 `当前回答草稿` 语境，主动作是 `回到当前回答继续修改`，而不是重新退回唯一 `直接回答当前问题`。
 - 删除当前回答，或把当前回答切成非 `answer` 后，`currentAnswerId` 应按“优先前一个 surviving answer，再退后一个，否则清空”的顺序回退；对应 answer-closure 结果也应随失效源一起删除。
 - 先生成一轮 answer-closure judgment / summary，再修改当前 answer；旧结果应保留，但 runtime 应能把它识别成“过期、建议重新评估”。同样地，先对手写 `summary` 执行 `检查这个总结`，再修改该 summary；旧 summary-check judgment 也应进入过期状态而不是被覆盖删除。
 - 删除手写 `summary`，或把它切成非手写总结语义后，所有显式 `sourceSummaryId` 指向它的 summary-check judgment 都应被级联删除，不留下孤儿结果节点。

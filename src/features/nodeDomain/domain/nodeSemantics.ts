@@ -340,6 +340,10 @@ export function getDisplayNodeTypeLabel(tree: NodeTree, node: TreeNode): string 
     return '答案解析';
   }
 
+  if (isSummaryCheckJudgmentNode(tree, node)) {
+    return '总结检查结果';
+  }
+
   switch (node.type) {
     case 'theme-root':
       return '主题';
@@ -381,10 +385,14 @@ export function stripRedundantDisplayTypePrefix(
 }
 
 export function getDisplayNodeTitle(tree: NodeTree, node: TreeNode): string {
-  return stripRedundantDisplayTypePrefix(
-    node.title,
-    getDisplayNodeTypeLabel(tree, node),
-  );
+  const displayTypeLabel = getDisplayNodeTypeLabel(tree, node);
+  let displayTitle = stripRedundantDisplayTypePrefix(node.title, displayTypeLabel);
+
+  if (isSummaryCheckJudgmentNode(tree, node)) {
+    displayTitle = stripRedundantDisplayTypePrefix(displayTitle, '判断');
+  }
+
+  return displayTitle;
 }
 
 function resolveNode(

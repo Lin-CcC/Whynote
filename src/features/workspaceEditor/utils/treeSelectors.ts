@@ -2,10 +2,12 @@ import {
   getDisplayNodeTitle,
   getDisplayNodeTypeLabel,
   getAllowedChildTypes,
+  getJudgmentNodeKind,
   getNodeOrThrow,
   getModuleScopeId,
   isAnswerClosureSummaryNode,
   isScaffoldSummaryNode,
+  isSummaryCheckJudgmentNode,
   type ModuleNode,
   type NodeTree,
   type NodeType,
@@ -164,6 +166,10 @@ export function getNodeRoleDescription(tree: NodeTree, node: TreeNode) {
     return '这里负责答案解析和标准理解';
   }
 
+  if (isSummaryCheckJudgmentNode(tree, node)) {
+    return '这里展示手写总结的检查结果';
+  }
+
   switch (node.type) {
     case 'theme-root':
       return '这里承接整个学习主题';
@@ -178,7 +184,9 @@ export function getNodeRoleDescription(tree: NodeTree, node: TreeNode) {
     case 'summary':
       return '这里承接阶段总结';
     case 'judgment':
-      return '这里只负责判断缺口和反馈';
+      return getJudgmentNodeKind(tree, node) === 'answer-closure'
+        ? '这里只负责当前回答的判断缺口和反馈'
+        : '这里只负责判断缺口和反馈';
     case 'resource':
       return '这里记录资料概况与来源';
     case 'resource-fragment':

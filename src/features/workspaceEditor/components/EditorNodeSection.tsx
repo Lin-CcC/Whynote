@@ -25,6 +25,7 @@ import {
   getNodeInputPlaceholderForNode,
   getNodeRoleDescription,
 } from '../utils/treeSelectors';
+import { getNodeSemanticVisibility } from '../utils/nodeSemanticVisibility';
 import type {
   NodeContentPatch,
   WorkspaceEditorNodeRenderContext,
@@ -91,6 +92,7 @@ export default function EditorNodeSection({
     selectNode: onSelectNode,
     tree,
   });
+  const semanticVisibility = getNodeSemanticVisibility(tree, node);
 
   function handleEditableFocus(event: FocusEvent<HTMLElement>) {
     if (!isOwnedEditableTarget(event.target, {
@@ -160,6 +162,15 @@ export default function EditorNodeSection({
           <span className="workspace-nodeType">
             {getDisplayLabelForNode(tree, node)}
           </span>
+          {semanticVisibility.badges.map((badge) => (
+            <span
+              className="workspace-semanticBadge"
+              data-badge-tone={badge.tone}
+              key={badge.key}
+            >
+              {badge.label}
+            </span>
+          ))}
           {node.type === 'plan-step' ? (
             <select
               aria-label={`${displayTitle || getDisplayLabelForNode(tree, node)} 的步骤状态`}
@@ -189,6 +200,11 @@ export default function EditorNodeSection({
             {getNodeSelectionHint(tree, node, isEditing)}
           </p>
         ) : null}
+        {semanticVisibility.notes.map((note) => (
+          <p className="workspace-nodeHint" key={note}>
+            {note}
+          </p>
+        ))}
         {node.type === 'plan-step' && planStepRuntimeStatus ? (
           <>
             <p className="workspace-nodeHint">

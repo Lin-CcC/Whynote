@@ -501,6 +501,7 @@
 }
 
 .workspace-nodeType,
+.workspace-semanticBadge,
 .workspace-selectedBadge,
 .workspace-editingBadge {
   padding: 0.2rem 0.55rem;
@@ -512,6 +513,26 @@
 .workspace-nodeType {
   background: rgba(226, 232, 240, 0.8);
   color: #334155;
+}
+
+.workspace-semanticBadge {
+  background: rgba(226, 232, 240, 0.8);
+  color: #334155;
+}
+
+.workspace-semanticBadge[data-badge-tone='current'] {
+  background: rgba(13, 148, 136, 0.14);
+  color: #0f766e;
+}
+
+.workspace-semanticBadge[data-badge-tone='history'] {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+.workspace-semanticBadge[data-badge-tone='stale'] {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
 }
 
 .workspace-selectedBadge {

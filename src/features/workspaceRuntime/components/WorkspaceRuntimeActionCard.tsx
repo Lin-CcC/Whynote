@@ -11,6 +11,7 @@ type WorkspaceRuntimeActionCardProps = {
   answerFollowUpCount: number;
   canDirectAnswerCurrentQuestion: boolean;
   currentModule: TreeNode | null;
+  currentQuestionAnswerNodeId: string | null;
   evaluationTarget: QuestionAnswerEvaluationTarget | null;
   hasDirectAnswerCurrentQuestion: boolean;
   isAiRunning: boolean;
@@ -30,6 +31,7 @@ type WorkspaceRuntimeActionCardProps = {
 
 type RuntimeActionStage =
   | 'question-needs-answer'
+  | 'question-has-draft'
   | 'question'
   | 'answer'
   | 'judgment'
@@ -43,6 +45,7 @@ export default function WorkspaceRuntimeActionCard({
   answerFollowUpCount,
   canDirectAnswerCurrentQuestion,
   currentModule,
+  currentQuestionAnswerNodeId,
   evaluationTarget,
   hasDirectAnswerCurrentQuestion,
   isAiRunning,
@@ -70,6 +73,7 @@ export default function WorkspaceRuntimeActionCard({
   const runtimeActionStage = resolveRuntimeActionStage(
     selectedNode,
     evaluationTarget,
+    currentQuestionAnswerNodeId,
     hasDirectAnswerCurrentQuestion,
     summaryCheckJudgmentContext,
     summaryEvaluationTarget,
@@ -81,7 +85,7 @@ export default function WorkspaceRuntimeActionCard({
     runtimeActionStage !== null &&
     runtimeActionStage !== 'answer' &&
     runtimeActionStage !== 'summary-check-result' &&
-    evaluationTarget !== null &&
+    (evaluationTarget !== null || currentQuestionAnswerNodeId !== null) &&
     !isAiRunning;
   const canReturnToSummary =
     summaryCheckJudgmentContext !== null && !isAiRunning;
@@ -121,11 +125,13 @@ export default function WorkspaceRuntimeActionCard({
   }
 
   function handleReturnToAnswer() {
-    if (!evaluationTarget) {
+    const answerNodeId = evaluationTarget?.answerNodeId ?? currentQuestionAnswerNodeId;
+
+    if (!answerNodeId) {
       return;
     }
 
-    onSelectNode(evaluationTarget.answerNodeId);
+    onSelectNode(answerNodeId);
   }
 
   function handleSuggestCompletion() {
@@ -231,6 +237,31 @@ export default function WorkspaceRuntimeActionCard({
                   <>
                     <button
                       className="workspace-primaryAction"
+                      disabled={!canDirectAnswerCurrentQuestion}
+                      onClick={handleDirectAnswerCurrentQuestion}
+                      type="button"
+                    >
+                      直接回答当前问题
+                    </button>
+                    <button
+                      disabled={isAiRunning}
+                      onClick={handleInsertAnswer}
+                      type="button"
+                    >
+                      插入回答
+                    </button>
+                  </>
+                ) : runtimeActionStage === 'question-has-draft' ? (
+                  <>
+                    <button
+                      className="workspace-primaryAction"
+                      disabled={!canReturnToAnswer}
+                      onClick={handleReturnToAnswer}
+                      type="button"
+                    >
+                      回到当前回答继续修改
+                    </button>
+                    <button
                       disabled={!canDirectAnswerCurrentQuestion}
                       onClick={handleDirectAnswerCurrentQuestion}
                       type="button"
@@ -413,6 +444,7 @@ export default function WorkspaceRuntimeActionCard({
 function resolveRuntimeActionStage(
   selectedNode: TreeNode | null,
   evaluationTarget: QuestionAnswerEvaluationTarget | null,
+  currentQuestionAnswerNodeId: string | null,
   hasDirectAnswerCurrentQuestion: boolean,
   summaryCheckJudgmentContext: SummaryCheckJudgmentContext | null,
   summaryEvaluationTarget: SummaryEvaluationTarget | null,
@@ -432,6 +464,10 @@ function resolveRuntimeActionStage(
   if (selectedNode.type === 'question') {
     if (evaluationTarget) {
       return 'question';
+    }
+
+    if (currentQuestionAnswerNodeId) {
+      return 'question-has-draft';
     }
 
     return hasDirectAnswerCurrentQuestion ? 'question-needs-answer' : null;
@@ -455,6 +491,8 @@ function getSectionTitle(runtimeActionStage: RuntimeActionStage) {
   switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '当前问题起答';
+    case 'question-has-draft':
+      return '当前回答草稿';
     case 'question':
       return '当前问题闭环';
     case 'answer':
@@ -476,6 +514,8 @@ function getSectionHelpText(runtimeActionStage: RuntimeActionStage) {
   switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '这道题还没有可评估回答，先起一版 answer，再接回现有回答修订闭环。';
+    case 'question-has-draft':
+      return '这道题已经有当前回答草稿。即使正文还空着，主路径也先围绕这版回答继续写。';
     case 'question':
       return '这道题已经有可评估回答，主动作先补评估闭环。';
     case 'answer':
@@ -500,6 +540,10 @@ function getRuntimeActionCalloutTestId(
     return 'question-direct-answer-callout';
   }
 
+  if (runtimeActionStage === 'question-has-draft') {
+    return 'question-current-answer-draft-callout';
+  }
+
   if (runtimeActionStage === 'summary-check') {
     return 'summary-evaluation-callout';
   }
@@ -519,6 +563,8 @@ function getRuntimeActionCalloutTitle(
   switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '主动作：直接回答当前问题';
+    case 'question-has-draft':
+      return '主动作：回到当前回答继续修改';
     case 'question':
       return '主动作：先评估当前回答';
     case 'answer':
@@ -543,6 +589,8 @@ function getRuntimeActionCalloutDescription(
   switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '这道题还没有可评估回答。先让 AI 起一版普通 answer，或保留手动回答入口。';
+    case 'question-has-draft':
+      return '当前问题已经有 currentAnswerId。即使这版回答暂时还是空草稿，也先继续写这版，而不是退回唯一 direct answer 主动作。';
     case 'question':
       return hasAnswerExplanation
         ? '这道题已经有答案解析，但主动作仍然是先把当前回答评估完整。'
@@ -574,6 +622,8 @@ function getRuntimeActionHint(
   switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '新生成的回答会落成普通 answer 节点，并自动选中，后面直接接回评估、提示和答案解析主链。';
+    case 'question-has-draft':
+      return '当前回答即使还是空草稿，也继续占住主路径；只有新建、切换或删除回答时，这个锚点才会改变。';
     case 'question':
     case 'answer':
       if (answerFollowUpCount > 0) {
