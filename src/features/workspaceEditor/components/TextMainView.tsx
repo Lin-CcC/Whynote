@@ -16,7 +16,6 @@ import type {
 import { getDisplayLabelForNode, getDisplayTitleForNode } from '../utils/treeSelectors';
 import {
   getAnswerHistorySectionId,
-  getQuestionBlockHistorySectionId,
   getSummaryHistorySectionId,
 } from '../utils/workspaceViewState';
 import EditorNodeSection from './EditorNodeSection';
@@ -205,33 +204,7 @@ function expandWorkspaceViewStateForSelection(
   for (const questionId of ancestorQuestionIds) {
     const questionBlock = buildQuestionBlockData(tree, questionId);
 
-    if (
-      questionBlock.currentAnswerGroup?.historicalClosureNodes.some(
-        (node) => node.id === selectedNodeId,
-      )
-    ) {
-      nextViewState = expandHistorySection(
-        nextViewState,
-        getAnswerHistorySectionId(questionBlock.currentAnswerGroup.answer.id),
-      );
-    }
-
-    for (const answerGroup of questionBlock.previousAnswerGroups) {
-      const isPreviousAnswerNode =
-        answerGroup.answer.id === selectedNodeId ||
-        answerGroup.latestEvaluationNode?.id === selectedNodeId ||
-        answerGroup.latestExplanationNode?.id === selectedNodeId ||
-        answerGroup.historicalClosureNodes.some((node) => node.id === selectedNodeId);
-
-      if (!isPreviousAnswerNode) {
-        continue;
-      }
-
-      nextViewState = expandHistorySection(
-        nextViewState,
-        getQuestionBlockHistorySectionId(questionId),
-      );
-
+    for (const answerGroup of questionBlock.answerGroups) {
       if (
         answerGroup.historicalClosureNodes.some((node) => node.id === selectedNodeId)
       ) {

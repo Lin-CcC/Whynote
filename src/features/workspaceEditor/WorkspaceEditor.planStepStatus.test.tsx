@@ -21,7 +21,7 @@ test('keeps manual step status overrides until later content changes hand contro
   expect(screen.getByText(/系统判断：待开始/)).toBeInTheDocument();
 
   fireEvent.change(
-    screen.getByRole('combobox', { name: '起始步骤 的步骤状态' }),
+    screen.getByRole('combobox', { name: '起始步骤 状态' }),
     {
       target: {
         value: 'done',
@@ -39,7 +39,7 @@ test('keeps manual step status overrides until later content changes hand contro
 
   await waitFor(() => {
     expect(
-      screen.getByRole('combobox', { name: '起始步骤 的步骤状态' }),
+      screen.getByRole('combobox', { name: '起始步骤 状态' }),
     ).toHaveValue('todo');
   });
   expect(screen.queryByText(/当前状态已手动改为 已完成/)).not.toBeInTheDocument();

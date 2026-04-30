@@ -238,13 +238,13 @@ test('restores question block collapse state after remounting the runtime screen
 
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  const expandPreviousAnswersButton = screen.queryByRole('button', {
-    name: '展开早期回答',
-  });
-
-  if (expandPreviousAnswersButton) {
-    fireEvent.click(expandPreviousAnswersButton);
-  }
+  fireEvent.click(
+    within(
+      screen.getByTestId('question-block-answer-group-answer-runtime-current'),
+    ).getByRole('button', {
+      name: '展开历史评估与旧解析',
+    }),
+  );
 
   fireEvent.click(
     within(screen.getByTestId('editor-node-answer-runtime-current')).getByRole(
@@ -286,10 +286,14 @@ test('restores question block collapse state after remounting the runtime screen
     ),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole('button', { name: '收起早期回答' }),
+    within(
+      screen.getByTestId('question-block-answer-group-answer-runtime-current'),
+    ).getByRole('button', {
+      name: '收起历史评估与旧解析',
+    }),
   ).toBeInTheDocument();
   expect(
-    screen.getByTestId('question-block-previous-answers-question-runtime-main'),
+    screen.getByTestId('editor-node-judgment-runtime-current-history'),
   ).toBeInTheDocument();
 });
 
@@ -953,6 +957,21 @@ function createRuntimeQuestionBlockSnapshot(): WorkspaceSnapshot {
       content: '这是当前回答。',
       createdAt: '2026-04-30T10:03:00.000Z',
       updatedAt: '2026-04-30T10:03:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-runtime-main',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-runtime-current-history',
+      title: '当前旧评估',
+      content: '这是当前回答的旧评估。',
+      judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-runtime-current',
+      sourceAnswerUpdatedAt: '2026-04-30T10:03:00.000Z',
+      createdAt: '2026-04-30T10:03:30.000Z',
+      updatedAt: '2026-04-30T10:03:30.000Z',
     }),
   );
   tree = insertChildNode(

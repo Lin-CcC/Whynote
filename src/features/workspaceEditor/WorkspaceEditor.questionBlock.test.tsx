@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { expect, test, vi } from 'vitest';
 
 import {
   createNode,
@@ -10,32 +11,30 @@ import {
 import WorkspaceEditor from './WorkspaceEditor';
 import {
   DEFAULT_WORKSPACE_VIEW_STATE,
-  getQuestionBlockHistorySectionId,
+  getAnswerHistorySectionId,
+  getSummaryHistorySectionId,
 } from './utils/workspaceViewState';
 import type { WorkspaceEditorProps, WorkspaceViewState } from './workspaceEditorTypes';
 
 test.each([
   'question-main',
-  'answer-current',
-  'judgment-current-latest',
+  'answer-first',
+  'judgment-first-latest',
   'summary-manual',
   'judgment-summary-latest',
-])(
-  'activates the same question block when selecting %s',
-  (selectedNodeId) => {
-    renderQuestionBlockEditor({
-      initialSelectedNodeId: selectedNodeId,
-    });
+])('activates the same question block when selecting %s', (selectedNodeId) => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: selectedNodeId,
+  });
 
-    expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
-      'data-active',
-      'true',
-    );
-    expect(
-      screen.getByTestId('question-block-question-secondary'),
-    ).toHaveAttribute('data-active', 'false');
-  },
-);
+  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+    'data-active',
+    'true',
+  );
+  expect(
+    screen.getByTestId('question-block-question-secondary'),
+  ).toHaveAttribute('data-active', 'false');
+});
 
 test('shows question block actions only on the active block', () => {
   renderQuestionBlockEditor({
@@ -77,58 +76,66 @@ test('shows question block actions only on the active block', () => {
   ).toBeInTheDocument();
 });
 
-test('splits current answer from previous answers and keeps previous answers collapsed by default', () => {
+test('keeps each answer adjacent to its own latest closure nodes in reading-chain order', () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
   });
 
-  const currentAnswerSection = screen.getByTestId(
-    'question-block-current-answer-question-main',
+  const firstAnswerGroup = screen.getByTestId(
+    'question-block-answer-group-answer-first',
+  );
+  const secondAnswerGroup = screen.getByTestId(
+    'question-block-answer-group-answer-second',
   );
 
   expect(
-    within(currentAnswerSection).getByTestId('editor-node-answer-current'),
+    within(firstAnswerGroup).getByTestId('editor-node-answer-first'),
   ).toBeInTheDocument();
   expect(
-    within(currentAnswerSection).getByTestId('editor-node-judgment-current-latest'),
+    within(firstAnswerGroup).getByTestId('editor-node-judgment-first-latest'),
   ).toBeInTheDocument();
   expect(
-    within(currentAnswerSection).getByTestId('editor-node-summary-current-latest'),
+    within(firstAnswerGroup).getByTestId('editor-node-summary-first-latest'),
   ).toBeInTheDocument();
   expect(
-    within(currentAnswerSection).queryByTestId('editor-node-answer-old'),
-  ).not.toBeInTheDocument();
+    within(secondAnswerGroup).getByTestId('editor-node-answer-second'),
+  ).toBeInTheDocument();
   expect(
-    screen.queryByTestId('question-block-previous-answers-question-main'),
-  ).not.toBeInTheDocument();
+    within(secondAnswerGroup).getByTestId('editor-node-judgment-second-latest'),
+  ).toBeInTheDocument();
+  expect(
+    within(secondAnswerGroup).getByTestId('editor-node-summary-second-latest'),
+  ).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '展开早期回答' }));
-
-  const previousAnswersSection = screen.getByTestId(
-    'question-block-previous-answers-question-main',
-  );
-
-  expect(
-    within(previousAnswersSection).getByTestId('editor-node-answer-old'),
-  ).toBeInTheDocument();
-  expect(
-    within(previousAnswersSection).getByTestId('editor-node-judgment-old-latest'),
-  ).toBeInTheDocument();
-  expect(
-    within(previousAnswersSection).getByTestId('editor-node-summary-old-latest'),
-  ).toBeInTheDocument();
+  expectVisibleNodeOrder('question-main', [
+    'answer-first',
+    'judgment-first-latest',
+    'summary-first-latest',
+    'answer-second',
+    'judgment-second-latest',
+    'summary-second-latest',
+    'question-follow-up',
+    'summary-manual',
+    'judgment-summary-latest',
+  ]);
 });
 
-test('keeps the set-current-answer action reachable and re-groups answers after switching', async () => {
+test('currentAnswerId only changes emphasis and does not reorder answer groups', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
   });
 
-  fireEvent.click(screen.getByRole('button', { name: '展开早期回答' }));
+  expectAnswerGroupOrder('question-main', ['answer-first', 'answer-second']);
+  expect(
+    screen.getByTestId('question-block-answer-group-answer-first'),
+  ).toHaveAttribute('data-current-answer', 'false');
+  expect(
+    screen.getByTestId('question-block-answer-group-answer-second'),
+  ).toHaveAttribute('data-current-answer', 'true');
 
   fireEvent.click(
     within(
-      screen.getByTestId('question-block-previous-answers-question-main'),
+      screen.getByTestId('question-block-answer-group-answer-first'),
     ).getByRole('button', {
       name: '设为当前回答',
     }),
@@ -136,50 +143,107 @@ test('keeps the set-current-answer action reachable and re-groups answers after 
 
   await waitFor(() => {
     expect(
-      within(
-        screen.getByTestId('question-block-current-answer-question-main'),
-      ).getByTestId('editor-node-answer-old'),
-    ).toBeInTheDocument();
+      screen.getByTestId('question-block-answer-group-answer-first'),
+    ).toHaveAttribute('data-current-answer', 'true');
   });
 
   expect(
-    within(
-      screen.getByTestId('question-block-previous-answers-question-main'),
-    ).getByTestId('editor-node-answer-current'),
+    within(screen.getByTestId('question-block-answer-group-answer-first')).getByText(
+      '当前回答',
+    ),
   ).toBeInTheDocument();
+  expect(
+    screen.getByTestId('question-block-answer-group-answer-second'),
+  ).toHaveAttribute('data-current-answer', 'false');
+  expectAnswerGroupOrder('question-main', ['answer-first', 'answer-second']);
+  expectVisibleNodeOrder('question-main', [
+    'answer-first',
+    'judgment-first-latest',
+    'summary-first-latest',
+    'answer-second',
+    'judgment-second-latest',
+    'summary-second-latest',
+    'question-follow-up',
+    'summary-manual',
+    'judgment-summary-latest',
+  ]);
 });
 
-test('renders answer explanation, manual summary, and summary check result as separate display semantics', () => {
+test('keeps manual summary and summary-check results adjacent with group-local history', () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
   });
 
+  const summaryGroup = screen.getByTestId(
+    'question-block-summary-group-summary-manual',
+  );
+
   expect(
-    within(screen.getByTestId('editor-node-summary-current-latest')).getByText(
+    within(screen.getByTestId('editor-node-summary-first-latest')).getByText(
       '答案解析',
     ),
   ).toBeInTheDocument();
-  expect(screen.getByDisplayValue('当前最新解析')).toBeInTheDocument();
-
   expect(
     within(screen.getByTestId('editor-node-summary-manual')).getByText('总结'),
   ).toBeInTheDocument();
-  expect(screen.getByDisplayValue('我的总结')).toBeInTheDocument();
-  expect(
-    within(screen.getByTestId('editor-node-summary-manual')).getByRole('button', {
-      name: '检查这个总结',
-    }),
-  ).toBeInTheDocument();
-
   expect(
     within(screen.getByTestId('editor-node-judgment-summary-latest')).getByText(
       '总结检查结果',
     ),
   ).toBeInTheDocument();
-  expect(screen.getByDisplayValue('最新检查结果')).toBeInTheDocument();
+  expect(
+    within(summaryGroup).getByTestId('editor-node-judgment-summary-latest'),
+  ).toBeInTheDocument();
+  expect(
+    within(summaryGroup).queryByTestId('editor-node-judgment-summary-old'),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: '展开早期回答' }),
+  ).not.toBeInTheDocument();
+
+  fireEvent.click(
+    within(summaryGroup).getByRole('button', {
+      name: '展开历史检查结果',
+    }),
+  );
+
+  expect(
+    within(summaryGroup).getByTestId('editor-node-judgment-summary-old'),
+  ).toBeInTheDocument();
 });
 
-test('tracks block, body, and history collapse in workspace view state', () => {
+test('keeps follow-up questions after the answer closure chain instead of under old closures', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+  });
+
+  const mainBlock = screen.getByTestId('question-block-question-main');
+  const followUpNode = screen.getByTestId('editor-node-question-follow-up');
+  const summaryGroup = screen.getByTestId(
+    'question-block-summary-group-summary-manual',
+  );
+
+  expect(mainBlock.compareDocumentPosition(followUpNode)).not.toBe(0);
+  expect(
+    screen.queryByTestId('editor-node-judgment-first-history'),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByTestId('editor-node-summary-first-history'),
+  ).not.toBeInTheDocument();
+
+  const orderedNodeIds = getRenderedNodeIds('question-main');
+  const followUpIndex = orderedNodeIds.indexOf('question-follow-up');
+  const secondExplanationIndex = orderedNodeIds.indexOf('summary-second-latest');
+  const summaryIndex = orderedNodeIds.indexOf('summary-manual');
+
+  expect(followUpIndex).toBeGreaterThan(secondExplanationIndex);
+  expect(followUpIndex).toBeLessThan(summaryIndex);
+  expect(
+    summaryGroup.compareDocumentPosition(followUpNode),
+  ).toBe(Node.DOCUMENT_POSITION_PRECEDING);
+});
+
+test('tracks block, body, and group-local history collapse in workspace view state', () => {
   const viewStateChanges: WorkspaceViewState[] = [];
 
   renderQuestionBlockEditor({
@@ -190,21 +254,45 @@ test('tracks block, body, and history collapse in workspace view state', () => {
   });
 
   fireEvent.click(
-    within(screen.getByTestId('editor-node-answer-current')).getByRole('button', {
+    within(screen.getByTestId('editor-node-answer-first')).getByRole('button', {
       name: '收起正文',
     }),
   );
 
-  expect(viewStateChanges.at(-1)?.collapsedNodeBodyIds).toContain('answer-current');
-  expect(screen.queryByLabelText('当前回答 内容')).not.toBeInTheDocument();
+  expect(viewStateChanges.at(-1)?.collapsedNodeBodyIds).toContain('answer-first');
+  expect(screen.queryByLabelText('第一版回答 内容')).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '展开早期回答' }));
+  fireEvent.click(
+    within(
+      screen.getByTestId('question-block-answer-group-answer-first'),
+    ).getByRole('button', {
+      name: '展开历史评估与旧解析',
+    }),
+  );
 
   expect(viewStateChanges.at(-1)?.expandedHistorySectionIds).toContain(
-    getQuestionBlockHistorySectionId('question-main'),
+    getAnswerHistorySectionId('answer-first'),
   );
   expect(
-    screen.getByTestId('question-block-previous-answers-question-main'),
+    screen.getByTestId('editor-node-judgment-first-history'),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    within(
+      screen.getByTestId('question-block-summary-group-summary-manual'),
+    ).getByRole('button', {
+      name: '展开历史检查结果',
+    }),
+  );
+
+  expect(viewStateChanges.at(-1)?.expandedHistorySectionIds).toEqual(
+    expect.arrayContaining([
+      getAnswerHistorySectionId('answer-first'),
+      getSummaryHistorySectionId('summary-manual'),
+    ]),
+  );
+  expect(
+    screen.getByTestId('editor-node-judgment-summary-old'),
   ).toBeInTheDocument();
 
   fireEvent.click(
@@ -220,111 +308,56 @@ test('tracks block, body, and history collapse in workspace view state', () => {
     'question-main',
   );
   expect(
-    screen.queryByTestId('question-block-current-answer-question-main'),
+    screen.getByTestId('question-block-question-main'),
+  ).toHaveAttribute('data-collapsed', 'true');
+  expect(
+    screen.queryByTestId('question-block-answer-group-answer-first'),
   ).not.toBeInTheDocument();
 });
 
-test('does not auto-reopen the selected node body after the user collapses it', async () => {
+test('does not auto-reopen a group history section after the user collapses it', async () => {
   renderQuestionBlockEditor({
-    initialSelectedNodeId: 'answer-current',
+    initialSelectedNodeId: 'judgment-first-history',
+    initialWorkspaceViewState: {
+      collapsedQuestionBlockIds: [],
+      collapsedNodeBodyIds: [],
+      expandedHistorySectionIds: [getAnswerHistorySectionId('answer-first')],
+    },
   });
 
+  expect(
+    screen.getByTestId('editor-node-judgment-first-history'),
+  ).toBeInTheDocument();
+
   fireEvent.click(
-    within(screen.getByTestId('editor-node-answer-current')).getByRole('button', {
-      name: '收起正文',
+    within(
+      screen.getByTestId('question-block-answer-group-answer-first'),
+    ).getByRole('button', {
+      name: '收起历史评估与旧解析',
     }),
   );
 
   await waitFor(() => {
     expect(
-      within(screen.getByTestId('editor-node-answer-current')).getByRole(
-        'button',
-        {
-          name: '展开正文',
-        },
-      ),
+      within(
+        screen.getByTestId('question-block-answer-group-answer-first'),
+      ).getByRole('button', {
+        name: '展开历史评估与旧解析',
+      }),
     ).toBeInTheDocument();
   });
-  expect(screen.queryByLabelText('当前回答 内容')).not.toBeInTheDocument();
-});
-
-test('does not auto-reopen the selected history section after the user collapses it', async () => {
-  renderQuestionBlockEditor({
-    initialSelectedNodeId: 'answer-old',
-  });
 
   expect(
-    screen.getByTestId('question-block-previous-answers-question-main'),
-  ).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole('button', { name: '收起早期回答' }));
-
-  await waitFor(() => {
-    expect(
-      screen.getByRole('button', { name: '展开早期回答' }),
-    ).toBeInTheDocument();
-  });
-  expect(
-    screen.queryByTestId('question-block-previous-answers-question-main'),
+    screen.queryByTestId('editor-node-judgment-first-history'),
   ).not.toBeInTheDocument();
 });
 
-test('does not auto-reopen the selected question block after the user collapses it', async () => {
-  renderQuestionBlockEditor({
-    initialSelectedNodeId: 'question-main',
-  });
-
-  fireEvent.click(
-    within(screen.getByTestId('question-block-question-main')).getAllByRole(
-      'button',
-      {
-        name: /收起 block/,
-      },
-    )[0],
-  );
-
-  await waitFor(() => {
-    expect(
-      screen.getByTestId('question-block-question-main'),
-    ).toHaveAttribute('data-collapsed', 'true');
-  });
-  expect(
-    screen.queryByTestId('question-block-current-answer-question-main'),
-  ).not.toBeInTheDocument();
-});
-
-test('falls back to the latest non-empty answer when currentAnswerId is missing', () => {
-  renderQuestionBlockEditor({
-    initialSnapshot: createLegacyAnswerFallbackSnapshot(),
-    initialSelectedNodeId: 'question-legacy',
-  });
-
-  const currentAnswerSection = screen.getByTestId(
-    'question-block-current-answer-question-legacy',
-  );
-
-  expect(
-    within(currentAnswerSection).getByTestId('editor-node-answer-legacy-filled'),
-  ).toBeInTheDocument();
-  expect(
-    within(currentAnswerSection).queryByTestId('editor-node-answer-legacy-empty'),
-  ).not.toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole('button', { name: '展开早期回答' }));
-
-  expect(
-    within(
-      screen.getByTestId('question-block-previous-answers-question-legacy'),
-    ).getByTestId('editor-node-answer-legacy-empty'),
-  ).toBeInTheDocument();
-});
-
-test('auto-expands a collapsed question block when a node inside it is selected from the structure tree', async () => {
+test('auto-expands a collapsed block and its hidden history when selecting a historical node from the structure tree', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'step-question-block',
     initialWorkspaceViewState: {
       collapsedQuestionBlockIds: ['question-main'],
-      collapsedNodeBodyIds: ['answer-old'],
+      collapsedNodeBodyIds: ['judgment-first-history'],
       expandedHistorySectionIds: [],
     },
   });
@@ -336,7 +369,7 @@ test('auto-expands a collapsed question block when a node inside it is selected 
   fireEvent.click(
     within(screen.getByRole('tree', { name: '当前模块结构' })).getByRole(
       'button',
-      { name: /^回答.*旧回答$/ },
+      { name: /第一版历史评估/ },
     ),
   );
 
@@ -347,14 +380,30 @@ test('auto-expands a collapsed question block when a node inside it is selected 
   });
 
   expect(
-    screen.getByTestId('question-block-previous-answers-question-main'),
+    screen.getByTestId('editor-node-judgment-first-history'),
   ).toBeInTheDocument();
-  expect(screen.getByTestId('editor-node-answer-old')).toBeInTheDocument();
   expect(
-    within(screen.getByTestId('editor-node-answer-old')).getByRole('button', {
-      name: '收起正文',
-    }),
+    within(screen.getByTestId('editor-node-judgment-first-history')).getByRole(
+      'button',
+      {
+        name: '收起正文',
+      },
+    ),
   ).toBeInTheDocument();
+});
+
+test('falls back to the latest non-empty answer when currentAnswerId is missing', () => {
+  renderQuestionBlockEditor({
+    initialSnapshot: createLegacyAnswerFallbackSnapshot(),
+    initialSelectedNodeId: 'question-legacy',
+  });
+
+  expect(
+    screen.getByTestId('question-block-answer-group-answer-legacy-filled'),
+  ).toHaveAttribute('data-current-answer', 'true');
+  expect(
+    screen.getByTestId('question-block-answer-group-answer-legacy-empty'),
+  ).toHaveAttribute('data-current-answer', 'false');
 });
 
 function renderQuestionBlockEditor(
@@ -377,7 +426,9 @@ function renderQuestionBlockEditor(
 
     return (
       <WorkspaceEditor
-        initialModuleId="module-question-block"
+        initialModuleId={
+          options?.initialModuleId ?? snapshot.tree.nodes[snapshot.workspace.rootNodeId].childIds[0]
+        }
         initialSelectedNodeId={options?.initialSelectedNodeId ?? 'question-main'}
         initialSnapshot={snapshot}
         onDirectAnswerQuestion={onDirectAnswerQuestion}
@@ -438,8 +489,8 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
       type: 'question',
       id: 'question-main',
       title: '主问题',
-      content: '围绕当前回答、旧回答和总结结果建立主视图。',
-      currentAnswerId: 'answer-current',
+      content: '围绕回答、判断、答案解析、总结检查和追问验证 question block 排序。',
+      currentAnswerId: 'answer-second',
       createdAt: '2026-04-30T09:00:00.000Z',
       updatedAt: '2026-04-30T09:00:00.000Z',
     }),
@@ -449,9 +500,9 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
     'question-main',
     createNode({
       type: 'answer',
-      id: 'answer-old',
-      title: '旧回答',
-      content: '这是旧回答。',
+      id: 'answer-first',
+      title: '第一版回答',
+      content: '先给出第一版回答。',
       createdAt: '2026-04-30T09:01:00.000Z',
       updatedAt: '2026-04-30T09:01:00.000Z',
     }),
@@ -460,12 +511,10 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
     tree,
     'question-main',
     createNode({
-      type: 'judgment',
-      id: 'judgment-old-latest',
-      title: '旧回答评估',
-      content: '旧回答的最新评估。',
-      judgmentKind: 'answer-closure',
-      sourceAnswerId: 'answer-old',
+      type: 'answer',
+      id: 'answer-second',
+      title: '第二版回答',
+      content: '这是当前工作的第二版回答。',
       createdAt: '2026-04-30T09:02:00.000Z',
       updatedAt: '2026-04-30T09:02:00.000Z',
     }),
@@ -474,12 +523,13 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
     tree,
     'question-main',
     createNode({
-      type: 'summary',
-      id: 'summary-old-latest',
-      title: '旧回答解析',
-      content: '旧回答的最新解析。',
-      summaryKind: 'answer-closure',
-      sourceAnswerId: 'answer-old',
+      type: 'judgment',
+      id: 'judgment-second-latest',
+      title: '第二版最新评估',
+      content: '第二版回答的最新判断。',
+      judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-second',
+      sourceAnswerUpdatedAt: '2026-04-30T09:02:00.000Z',
       createdAt: '2026-04-30T09:03:00.000Z',
       updatedAt: '2026-04-30T09:03:00.000Z',
     }),
@@ -488,10 +538,13 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
     tree,
     'question-main',
     createNode({
-      type: 'answer',
-      id: 'answer-current',
-      title: '当前回答',
-      content: '这是当前回答。',
+      type: 'summary',
+      id: 'summary-second-latest',
+      title: '第二版最新解析',
+      content: '第二版回答的答案解析。',
+      summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-second',
+      sourceAnswerUpdatedAt: '2026-04-30T09:02:00.000Z',
       createdAt: '2026-04-30T09:04:00.000Z',
       updatedAt: '2026-04-30T09:04:00.000Z',
     }),
@@ -500,12 +553,10 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
     tree,
     'question-main',
     createNode({
-      type: 'judgment',
-      id: 'judgment-current-history',
-      title: '当前历史评估',
-      content: '当前回答的旧评估。',
-      judgmentKind: 'answer-closure',
-      sourceAnswerId: 'answer-current',
+      type: 'question',
+      id: 'question-follow-up',
+      title: '追问：下一轮问题',
+      content: '这个追问应该紧跟在对应回答闭环之后显示。',
       createdAt: '2026-04-30T09:05:00.000Z',
       updatedAt: '2026-04-30T09:05:00.000Z',
     }),
@@ -515,11 +566,12 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
     'question-main',
     createNode({
       type: 'judgment',
-      id: 'judgment-current-latest',
-      title: '当前最新评估',
-      content: '当前回答的最新评估。',
+      id: 'judgment-first-history',
+      title: '第一版历史评估',
+      content: '这是第一版回答的旧评估。',
       judgmentKind: 'answer-closure',
-      sourceAnswerId: 'answer-current',
+      sourceAnswerId: 'answer-first',
+      sourceAnswerUpdatedAt: '2026-04-30T09:01:00.000Z',
       createdAt: '2026-04-30T09:06:00.000Z',
       updatedAt: '2026-04-30T09:06:00.000Z',
     }),
@@ -529,11 +581,12 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
     'question-main',
     createNode({
       type: 'summary',
-      id: 'summary-current-history',
-      title: '当前旧解析',
-      content: '当前回答的旧解析。',
+      id: 'summary-first-history',
+      title: '第一版旧解析',
+      content: '这是第一版回答的旧答案解析。',
       summaryKind: 'answer-closure',
-      sourceAnswerId: 'answer-current',
+      sourceAnswerId: 'answer-first',
+      sourceAnswerUpdatedAt: '2026-04-30T09:01:00.000Z',
       createdAt: '2026-04-30T09:07:00.000Z',
       updatedAt: '2026-04-30T09:07:00.000Z',
     }),
@@ -542,14 +595,30 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
     tree,
     'question-main',
     createNode({
-      type: 'summary',
-      id: 'summary-current-latest',
-      title: '当前最新解析',
-      content: '当前回答的最新解析。',
-      summaryKind: 'answer-closure',
-      sourceAnswerId: 'answer-current',
+      type: 'judgment',
+      id: 'judgment-first-latest',
+      title: '第一版最新评估',
+      content: '这是第一版回答的最新评估。',
+      judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-first',
+      sourceAnswerUpdatedAt: '2026-04-30T09:01:00.000Z',
       createdAt: '2026-04-30T09:08:00.000Z',
       updatedAt: '2026-04-30T09:08:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-main',
+    createNode({
+      type: 'summary',
+      id: 'summary-first-latest',
+      title: '第一版最新解析',
+      content: '这是第一版回答的最新答案解析。',
+      summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-first',
+      sourceAnswerUpdatedAt: '2026-04-30T09:01:00.000Z',
+      createdAt: '2026-04-30T09:09:00.000Z',
+      updatedAt: '2026-04-30T09:09:00.000Z',
     }),
   );
   tree = insertChildNode(
@@ -561,20 +630,6 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
       title: '我的总结',
       content: '这是我手写的总结。',
       summaryKind: 'manual',
-      createdAt: '2026-04-30T09:09:00.000Z',
-      updatedAt: '2026-04-30T09:09:00.000Z',
-    }),
-  );
-  tree = insertChildNode(
-    tree,
-    'question-main',
-    createNode({
-      type: 'judgment',
-      id: 'judgment-summary-history',
-      title: '旧检查结果',
-      content: '总结的旧检查结果。',
-      judgmentKind: 'summary-check',
-      sourceSummaryId: 'summary-manual',
       createdAt: '2026-04-30T09:10:00.000Z',
       updatedAt: '2026-04-30T09:10:00.000Z',
     }),
@@ -584,11 +639,14 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
     'question-main',
     createNode({
       type: 'judgment',
-      id: 'judgment-summary-latest',
-      title: '最新检查结果',
-      content: '总结的最新检查结果。',
+      id: 'judgment-summary-old',
+      title: '旧总结检查结果',
+      content: '这是总结的旧检查结果。',
       judgmentKind: 'summary-check',
       sourceSummaryId: 'summary-manual',
+      sourceSummaryUpdatedAt: '2026-04-30T09:10:00.000Z',
+      sourceAnswerId: 'answer-second',
+      sourceAnswerUpdatedAt: '2026-04-30T09:02:00.000Z',
       createdAt: '2026-04-30T09:11:00.000Z',
       updatedAt: '2026-04-30T09:11:00.000Z',
     }),
@@ -597,10 +655,15 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
     tree,
     'question-main',
     createNode({
-      type: 'question',
-      id: 'question-follow-up',
-      title: '后续追问',
-      content: '这个追问仍然保留为真实子节点。',
+      type: 'judgment',
+      id: 'judgment-summary-latest',
+      title: '最新总结检查结果',
+      content: '这是总结的最新检查结果。',
+      judgmentKind: 'summary-check',
+      sourceSummaryId: 'summary-manual',
+      sourceSummaryUpdatedAt: '2026-04-30T09:10:00.000Z',
+      sourceAnswerId: 'answer-second',
+      sourceAnswerUpdatedAt: '2026-04-30T09:02:00.000Z',
       createdAt: '2026-04-30T09:12:00.000Z',
       updatedAt: '2026-04-30T09:12:00.000Z',
     }),
@@ -612,7 +675,7 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
       type: 'question',
       id: 'question-secondary',
       title: '旁支问题',
-      content: '用来验证只有当前激活 block 会显示 block 级动作。',
+      content: '用来验证 block 激活只跟当前 question block 走。',
       createdAt: '2026-04-30T09:13:00.000Z',
       updatedAt: '2026-04-30T09:13:00.000Z',
     }),
@@ -700,20 +763,44 @@ function createLegacyAnswerFallbackSnapshot(): WorkspaceSnapshot {
   const legacyQuestionNode = tree.nodes['question-legacy'];
 
   if (legacyQuestionNode?.type === 'question') {
-    const { currentAnswerId: _ignoredCurrentAnswerId, ...questionWithoutCurrentAnswer } =
-      legacyQuestionNode;
-
-    tree = {
-      ...tree,
-      nodes: {
-        ...tree.nodes,
-        'question-legacy': questionWithoutCurrentAnswer,
-      },
-    };
+    delete legacyQuestionNode.currentAnswerId;
   }
 
   return {
     ...snapshot,
     tree,
   };
+}
+
+function getRenderedNodeIds(questionNodeId: string) {
+  return Array.from(
+    screen
+      .getByTestId(`question-block-${questionNodeId}`)
+      .querySelectorAll('[data-testid^="editor-node-"]'),
+  )
+    .map((element) => element.getAttribute('data-testid') ?? '')
+    .filter((testId) => testId !== `editor-node-${questionNodeId}`)
+    .map((testId) => testId.replace('editor-node-', ''));
+}
+
+function expectVisibleNodeOrder(questionNodeId: string, expectedNodeIds: string[]) {
+  expect(getRenderedNodeIds(questionNodeId)).toEqual(expectedNodeIds);
+}
+
+function expectAnswerGroupOrder(
+  questionNodeId: string,
+  expectedAnswerIds: string[],
+) {
+  const answerGroupIds = Array.from(
+    screen
+      .getByTestId(`question-block-${questionNodeId}`)
+      .querySelectorAll('[data-testid^="question-block-answer-group-"]'),
+  ).map((element) =>
+    (element.getAttribute('data-testid') ?? '').replace(
+      'question-block-answer-group-',
+      '',
+    ),
+  );
+
+  expect(answerGroupIds).toEqual(expectedAnswerIds);
 }

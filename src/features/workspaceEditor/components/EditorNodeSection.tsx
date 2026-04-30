@@ -80,7 +80,7 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
                 <span className="workspace-counter">{questionChildCount} 个问题块</span>
               </div>
               <p className="workspace-helpText">
-                question、当前回答、旧回答和追问会在主视图区按 block 重新组织显示，但底层树顺序保持不变。
+                question block 会把回答、对应结果和追问按链条重新组织显示，但底层树顺序保持不变。
               </p>
             </div>
           ) : null}

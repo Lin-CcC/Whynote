@@ -1,8 +1,4 @@
-import {
-  getCurrentQuestionAnswerNodeId,
-  getJudgmentNodeKind,
-  getSummaryNodeKind,
-} from './nodeSemantics';
+import { getJudgmentNodeKind, getSummaryNodeKind } from './nodeSemantics';
 import { getNodeOrThrow } from './treeDocument';
 import type {
   AnswerNode,
@@ -25,6 +21,20 @@ interface MutableQuestionBlockSummaryGroup {
   summary: SummaryNode;
 }
 
+type PendingQuestionBlockEntry =
+  | {
+      type: 'answer-group';
+      answerId: string;
+    }
+  | {
+      type: 'summary-group';
+      summaryId: string;
+    }
+  | {
+      node: TreeNode;
+      type: 'node';
+    };
+
 export interface QuestionBlockAnswerGroup {
   answer: AnswerNode;
   historicalClosureNodes: QuestionBlockAnswerClosureNode[];
@@ -38,11 +48,24 @@ export interface QuestionBlockSummaryGroup {
   summary: SummaryNode;
 }
 
+export type QuestionBlockEntry =
+  | {
+      group: QuestionBlockAnswerGroup;
+      type: 'answer-group';
+    }
+  | {
+      group: QuestionBlockSummaryGroup;
+      type: 'summary-group';
+    }
+  | {
+      node: TreeNode;
+      type: 'node';
+    };
+
 export interface QuestionBlockData {
-  currentAnswerGroup: QuestionBlockAnswerGroup | null;
-  fallbackNodes: TreeNode[];
-  followUpQuestionIds: string[];
-  previousAnswerGroups: QuestionBlockAnswerGroup[];
+  answerGroups: QuestionBlockAnswerGroup[];
+  currentAnswerNodeId: string | null;
+  entries: QuestionBlockEntry[];
   question: QuestionNode;
   summaryGroups: QuestionBlockSummaryGroup[];
 }
@@ -75,7 +98,36 @@ export function resolveQuestionCurrentAnswerNodeId(
   tree: NodeTree,
   questionNodeId: string,
 ) {
-  return getCurrentQuestionAnswerNodeId(tree, questionNodeId);
+  const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+  if (questionNode.type !== 'question') {
+    return null;
+  }
+
+  const answerNodes = getQuestionChildNodes(tree, questionNode.id).filter(
+    (childNode): childNode is AnswerNode => childNode.type === 'answer',
+  );
+
+  if (answerNodes.length === 0) {
+    return null;
+  }
+
+  if (
+    questionNode.currentAnswerId &&
+    answerNodes.some((answerNode) => answerNode.id === questionNode.currentAnswerId)
+  ) {
+    return questionNode.currentAnswerId;
+  }
+
+  for (let index = answerNodes.length - 1; index >= 0; index -= 1) {
+    const answerNode = answerNodes[index];
+
+    if (answerNode && answerNode.content.trim().length > 0) {
+      return answerNode.id;
+    }
+  }
+
+  return answerNodes[answerNodes.length - 1]?.id ?? null;
 }
 
 export function buildQuestionBlockData(
@@ -102,16 +154,22 @@ export function buildQuestionBlockData(
     ]),
   );
   const summaryGroupsById = new Map<string, MutableQuestionBlockSummaryGroup>();
-  const followUpQuestionIds: string[] = [];
-  const fallbackNodes: TreeNode[] = [];
+  const pendingEntries: PendingQuestionBlockEntry[] = [];
 
   for (const childNode of childNodes) {
     if (childNode.type === 'answer') {
+      pendingEntries.push({
+        answerId: childNode.id,
+        type: 'answer-group',
+      });
       continue;
     }
 
     if (childNode.type === 'question') {
-      followUpQuestionIds.push(childNode.id);
+      pendingEntries.push({
+        node: childNode,
+        type: 'node',
+      });
       continue;
     }
 
@@ -122,6 +180,10 @@ export function buildQuestionBlockData(
         summaryGroupsById.set(childNode.id, {
           checkNodes: [],
           summary: childNode,
+        });
+        pendingEntries.push({
+          summaryId: childNode.id,
+          type: 'summary-group',
         });
         continue;
       }
@@ -139,7 +201,10 @@ export function buildQuestionBlockData(
         }
       }
 
-      fallbackNodes.push(childNode);
+      pendingEntries.push({
+        node: childNode,
+        type: 'node',
+      });
       continue;
     }
 
@@ -173,34 +238,72 @@ export function buildQuestionBlockData(
         }
       }
 
-      fallbackNodes.push(childNode);
+      pendingEntries.push({
+        node: childNode,
+        type: 'node',
+      });
       continue;
     }
 
-    fallbackNodes.push(childNode);
+    pendingEntries.push({
+      node: childNode,
+      type: 'node',
+    });
   }
 
   const currentAnswerNodeId = resolveQuestionCurrentAnswerNodeId(tree, questionNode.id);
-  const currentAnswerGroup = currentAnswerNodeId
-    ? buildAnswerGroup(answerGroupsById.get(currentAnswerNodeId) ?? null)
-    : null;
-  const previousAnswerGroups = answerNodes
-    .filter((answerNode) => answerNode.id !== currentAnswerNodeId)
+  const answerGroups = answerNodes
     .map((answerNode) => buildAnswerGroup(answerGroupsById.get(answerNode.id) ?? null))
-    .filter((answerGroup): answerGroup is QuestionBlockAnswerGroup => answerGroup !== null);
+    .filter((group): group is QuestionBlockAnswerGroup => group !== null);
   const summaryGroups = childNodes
     .filter(
       (childNode): childNode is SummaryNode =>
         childNode.type === 'summary' && getSummaryNodeKind(tree, childNode) === 'manual',
     )
     .map((summaryNode) => buildSummaryGroup(summaryGroupsById.get(summaryNode.id) ?? null))
-    .filter((summaryGroup): summaryGroup is QuestionBlockSummaryGroup => summaryGroup !== null);
+    .filter((group): group is QuestionBlockSummaryGroup => group !== null);
+  const builtAnswerGroupsById = new Map(
+    answerGroups.map((group) => [group.answer.id, group] as const),
+  );
+  const builtSummaryGroupsById = new Map(
+    summaryGroups.map((group) => [group.summary.id, group] as const),
+  );
+  const entries: QuestionBlockEntry[] = [];
+
+  for (const entry of pendingEntries) {
+    if (entry.type === 'answer-group') {
+      const group = builtAnswerGroupsById.get(entry.answerId);
+
+      if (group) {
+        entries.push({
+          group,
+          type: 'answer-group',
+        });
+      }
+
+      continue;
+    }
+
+    if (entry.type === 'summary-group') {
+      const group = builtSummaryGroupsById.get(entry.summaryId);
+
+      if (group) {
+        entries.push({
+          group,
+          type: 'summary-group',
+        });
+      }
+
+      continue;
+    }
+
+    entries.push(entry);
+  }
 
   return {
-    currentAnswerGroup,
-    fallbackNodes,
-    followUpQuestionIds,
-    previousAnswerGroups,
+    answerGroups,
+    currentAnswerNodeId,
+    entries,
     question: questionNode,
     summaryGroups,
   };

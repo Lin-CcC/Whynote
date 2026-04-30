@@ -2,15 +2,14 @@ import { Fragment, type ReactNode } from 'react';
 
 import {
   buildQuestionBlockData,
-  getNodeOrThrow,
   type QuestionBlockAnswerGroup,
+  type QuestionBlockEntry,
   type QuestionBlockSummaryGroup,
   type TreeNode,
 } from '../../nodeDomain';
 import { getDisplayTitleForNode } from '../utils/treeSelectors';
 import {
   getAnswerHistorySectionId,
-  getQuestionBlockHistorySectionId,
   getSummaryHistorySectionId,
 } from '../utils/workspaceViewState';
 import type { MainViewNodeProps } from './mainViewTypes';
@@ -47,51 +46,8 @@ export default function QuestionBlockSection({
   const isActive = activeQuestionBlockId === question.id;
   const isCollapsed =
     workspaceViewState.collapsedQuestionBlockIds.includes(question.id);
-  const previousAnswersHistoryId = getQuestionBlockHistorySectionId(question.id);
-  const isPreviousAnswersExpanded =
-    workspaceViewState.expandedHistorySectionIds.includes(
-      previousAnswersHistoryId,
-    );
-  const firstFollowUpQuestionId = questionBlock.followUpQuestionIds[0] ?? null;
-  const relocatedNodeIds = new Set<string>();
-
-  if (questionBlock.currentAnswerGroup) {
-    relocatedNodeIds.add(questionBlock.currentAnswerGroup.answer.id);
-    if (questionBlock.currentAnswerGroup.latestEvaluationNode) {
-      relocatedNodeIds.add(questionBlock.currentAnswerGroup.latestEvaluationNode.id);
-    }
-    if (questionBlock.currentAnswerGroup.latestExplanationNode) {
-      relocatedNodeIds.add(questionBlock.currentAnswerGroup.latestExplanationNode.id);
-    }
-    questionBlock.currentAnswerGroup.historicalClosureNodes.forEach((node) =>
-      relocatedNodeIds.add(node.id),
-    );
-  }
-
-  questionBlock.previousAnswerGroups.forEach((answerGroup) => {
-    relocatedNodeIds.add(answerGroup.answer.id);
-    if (answerGroup.latestEvaluationNode) {
-      relocatedNodeIds.add(answerGroup.latestEvaluationNode.id);
-    }
-    if (answerGroup.latestExplanationNode) {
-      relocatedNodeIds.add(answerGroup.latestExplanationNode.id);
-    }
-    answerGroup.historicalClosureNodes.forEach((node) =>
-      relocatedNodeIds.add(node.id),
-    );
-  });
-
-  questionBlock.summaryGroups.forEach((summaryGroup) => {
-    if (summaryGroup.latestCheckNode) {
-      relocatedNodeIds.add(summaryGroup.latestCheckNode.id);
-    }
-    summaryGroup.historicalCheckNodes.forEach((node) =>
-      relocatedNodeIds.add(node.id),
-    );
-  });
-
-  const mainFlowNodeIds = question.childIds.filter(
-    (childId) => !relocatedNodeIds.has(childId),
+  const firstFollowUpEntryIndex = questionBlock.entries.findIndex(
+    (entry) => entry.type === 'node' && entry.node.type === 'question',
   );
 
   function updateViewState(
@@ -219,7 +175,17 @@ export default function QuestionBlockSection({
     );
 
     return (
-      <div className="workspace-questionBlockGroup" key={answerGroup.answer.id}>
+      <div
+        className="workspace-questionBlockGroup"
+        data-current-answer={options.isCurrent}
+        data-testid={`question-block-answer-group-${answerGroup.answer.id}`}
+        key={answerGroup.answer.id}
+      >
+        {options.isCurrent ? (
+          <div className="workspace-questionBlockSectionHeader">
+            <p className="workspace-kicker">当前回答</p>
+          </div>
+        ) : null}
         <EditableNodeCard
           actions={answerActions}
           bodyCollapsed={workspaceViewState.collapsedNodeBodyIds.includes(
@@ -303,7 +269,11 @@ export default function QuestionBlockSection({
     );
 
     return (
-      <div className="workspace-questionBlockGroup" key={summaryGroup.summary.id}>
+      <div
+        className="workspace-questionBlockGroup"
+        data-testid={`question-block-summary-group-${summaryGroup.summary.id}`}
+        key={summaryGroup.summary.id}
+      >
         <EditableNodeCard
           actions={summaryActions}
           bodyCollapsed={workspaceViewState.collapsedNodeBodyIds.includes(
@@ -363,7 +333,7 @@ export default function QuestionBlockSection({
         </div>
         <div className="workspace-questionBlockHeaderActions">
           <span className="workspace-counter">
-            {questionBlock.currentAnswerGroup ? '已有当前回答' : '还没有当前回答'}
+            {questionBlock.currentAnswerNodeId ? '已有当前回答' : '还没有当前回答'}
           </span>
           <button
             className="workspace-historyToggle"
@@ -396,7 +366,7 @@ export default function QuestionBlockSection({
                 <button
                   className="workspace-nodeActionButton"
                   disabled={
-                    isInteractionLocked || questionBlock.currentAnswerGroup !== null
+                    isInteractionLocked || questionBlock.currentAnswerNodeId !== null
                   }
                   onClick={() => onDirectAnswerQuestion(question.id)}
                   type="button"
@@ -430,87 +400,68 @@ export default function QuestionBlockSection({
               </button>
             </div>
           ) : null}
-          {questionBlock.currentAnswerGroup ? (
-            <div
-              className="workspace-questionBlockPrimary"
-              data-testid={`question-block-current-answer-${question.id}`}
-            >
-              <div className="workspace-questionBlockSectionHeader">
-                <p className="workspace-kicker">当前回答</p>
-              </div>
-              {renderAnswerGroup(questionBlock.currentAnswerGroup, {
-                isCurrent: true,
-              })}
-            </div>
-          ) : isActive ? (
+          {!questionBlock.currentAnswerNodeId && isActive ? (
             <div className="workspace-questionBlockEmpty">
               <p className="workspace-helpText">
                 这个问题块还没有当前回答。可以直接回答，也可以先插入一个空白回答再继续修改。
               </p>
             </div>
           ) : null}
-          {mainFlowNodeIds.map((childId) => {
-            const childNode = getNodeOrThrow(tree, childId);
-            const summaryGroup = questionBlock.summaryGroups.find(
-              (candidateGroup) => candidateGroup.summary.id === childId,
-            );
-
+          {questionBlock.entries.map((entry, entryIndex) => {
             return (
-              <Fragment key={childNode.id}>
-                {childNode.id === firstFollowUpQuestionId ? (
+              <Fragment key={getQuestionBlockEntryKey(entry)}>
+                {entryIndex === firstFollowUpEntryIndex ? (
                   <div className="workspace-splitHint">
                     <div className="workspace-splitHeader">
                       <div>
                         <p className="workspace-kicker">追问区</p>
                         <h3 className="workspace-splitTitle">下面进入 follow-up question</h3>
                       </div>
-                      <span className="workspace-counter">
-                        {questionBlock.followUpQuestionIds.length} 个追问
-                      </span>
+                      <span className="workspace-counter">按真实链条继续展开</span>
                     </div>
                     <p className="workspace-helpText">
-                      追问仍然是原始子节点，只是在主视图里被放到当前回答区和历史区之后。
+                      追问仍然是原始子节点，只是在主视图里紧接所属回答闭环之后显示。
                     </p>
                   </div>
                 ) : null}
-                {summaryGroup
-                  ? renderSummaryGroup(summaryGroup)
-                  : renderChildNode(childNode.id, depth + 1)}
+                {renderQuestionBlockEntry(entry)}
               </Fragment>
             );
           })}
-          {questionBlock.previousAnswerGroups.length > 0 ? (
-            <div className="workspace-historySection">
-              <button
-                className="workspace-historyToggle"
-                disabled={isInteractionLocked}
-                onClick={() => toggleHistorySection(previousAnswersHistoryId)}
-                type="button"
-              >
-                {isPreviousAnswersExpanded ? '收起早期回答' : '展开早期回答'}
-              </button>
-              {isPreviousAnswersExpanded ? (
-                <div
-                  className="workspace-historyStack"
-                  data-testid={`question-block-previous-answers-${question.id}`}
-                >
-                  {questionBlock.previousAnswerGroups.map((answerGroup) =>
-                    renderAnswerGroup(answerGroup, {
-                      isCurrent: false,
-                    }),
-                  )}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       )}
     </section>
   );
+
+  function renderQuestionBlockEntry(entry: QuestionBlockEntry) {
+    if (entry.type === 'answer-group') {
+      return renderAnswerGroup(entry.group, {
+        isCurrent: entry.group.answer.id === questionBlock.currentAnswerNodeId,
+      });
+    }
+
+    if (entry.type === 'summary-group') {
+      return renderSummaryGroup(entry.group);
+    }
+
+    return renderChildNode(entry.node.id, depth + 1);
+  }
 }
 
 function toggleId(ids: string[], id: string) {
   return ids.includes(id)
     ? ids.filter((currentId) => currentId !== id)
     : [...ids, id];
+}
+
+function getQuestionBlockEntryKey(entry: QuestionBlockEntry) {
+  if (entry.type === 'answer-group') {
+    return entry.group.answer.id;
+  }
+
+  if (entry.type === 'summary-group') {
+    return entry.group.summary.id;
+  }
+
+  return entry.node.id;
 }

@@ -68,10 +68,6 @@ export function writeWorkspaceViewState(
   };
 }
 
-export function getQuestionBlockHistorySectionId(questionNodeId: string) {
-  return `question:${questionNodeId}:previous-answers`;
-}
-
 export function getAnswerHistorySectionId(answerNodeId: string) {
   return `answer:${answerNodeId}:history`;
 }

@@ -55,7 +55,11 @@ test('creates a judgment-linked answer explanation on the first evaluation', asy
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   await screen.findByDisplayValue('手动回答草稿');
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(
+    within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
+      name: '重新评估当前回答',
+    }),
+  );
 
   await screen.findByDisplayValue('回答还不完整');
   await screen.findByDisplayValue('标准理解');
@@ -108,7 +112,11 @@ test('evaluates a manually inserted question and answer through the same closure
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   await screen.findByDisplayValue('手动回答草稿');
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(
+    within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
+      name: '重新评估当前回答',
+    }),
+  );
 
   expect(await screen.findByDisplayValue('手动问题还差关键因果')).toBeInTheDocument();
   expect(await screen.findByDisplayValue('标准理解')).toBeInTheDocument();
@@ -138,7 +146,11 @@ test('keeps answer explanation available on the first evaluation even when summa
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   await screen.findByDisplayValue('手动回答草稿');
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(
+    within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
+      name: '重新评估当前回答',
+    }),
+  );
 
   expect(
     await screen.findByDisplayValue('还缺最后一步'),
@@ -155,10 +167,10 @@ test('keeps answer explanation available on the first evaluation even when summa
 
   fireEvent.click(judgmentNode);
   expect(
-    screen.getByRole('button', { name: '查看答案解析' }),
+    within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
   ).toBeEnabled();
   fireEvent.click(
-    screen.getByRole('button', { name: '查看答案解析' }),
+    within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
   );
 
   await waitFor(() => {
@@ -178,7 +190,7 @@ test('keeps a manual summary before a manual judgment on the separate summary-ch
 
   fireEvent.click(summaryNode);
   expect(
-    screen.getByRole('button', { name: '检查这个总结' }),
+    within(summaryNode).getByRole('button', { name: '检查这个总结' }),
   ).toBeEnabled();
   expect(screen.queryByRole('button', { name: '查看答案解析' })).not.toBeInTheDocument();
   expect(summaryNode).toHaveTextContent('总结');
