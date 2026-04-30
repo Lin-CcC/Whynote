@@ -352,24 +352,19 @@ export function useWorkspaceEditor({
       return;
     }
 
-    const placement = resolveLearningActionPlacement(tree, selectedNodeId, actionId);
-
-    if (!placement) {
-      return;
-    }
-
-    const isHandledByExternalRuntime =
-      selectedNodeId &&
-      onLearningActionRequest?.({
-        actionId,
-        currentModuleId,
-        placement,
-        selectedNodeId,
-        tree,
-      }) === true;
+    const isHandledByExternalRuntime = requestExternalLearningAction(
+      actionId,
+      selectedNodeId,
+    );
 
     if (isHandledByExternalRuntime) {
       setOperationError(null);
+      return;
+    }
+
+    const placement = resolveLearningActionPlacement(tree, selectedNodeId, actionId);
+
+    if (!placement) {
       return;
     }
 
@@ -640,6 +635,16 @@ export function useWorkspaceEditor({
       return;
     }
 
+    const isHandledByExternalRuntime = requestExternalLearningAction(
+      'insert-summary',
+      questionNodeId,
+    );
+
+    if (isHandledByExternalRuntime) {
+      setOperationError(null);
+      return;
+    }
+
     const placement = resolveLearningActionPlacement(
       tree,
       questionNodeId,
@@ -773,6 +778,31 @@ export function useWorkspaceEditor({
         error instanceof Error ? error.message : '结构操作失败，请检查当前节点。',
       );
     }
+  }
+
+  function requestExternalLearningAction(
+    actionId: LearningActionId,
+    anchorNodeId: string | null,
+  ) {
+    if (!anchorNodeId || !tree.nodes[anchorNodeId]) {
+      return false;
+    }
+
+    const placement = resolveLearningActionPlacement(tree, anchorNodeId, actionId);
+
+    if (!placement) {
+      return false;
+    }
+
+    return (
+      onLearningActionRequest?.({
+        actionId,
+        currentModuleId: resolveModuleId(tree, anchorNodeId, currentModuleId),
+        placement,
+        selectedNodeId: anchorNodeId,
+        tree,
+      }) === true
+    );
   }
 
   return {
