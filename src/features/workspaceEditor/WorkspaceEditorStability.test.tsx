@@ -14,24 +14,24 @@ test('keeps the selected textarea focused across consecutive input updates', asy
 
   fireEvent.change(textarea, {
     target: {
-      value: '第一次连续输入',
+      value: 'first focused edit',
     },
   });
 
   await waitFor(() => {
     expect(textarea).toHaveFocus();
-    expect(textarea).toHaveValue('第一次连续输入');
+    expect(textarea).toHaveValue('first focused edit');
   });
 
   fireEvent.change(textarea, {
     target: {
-      value: '第一次连续输入，第二次继续输入更多内容',
+      value: 'first focused edit, then keep typing more content',
     },
   });
 
   await waitFor(() => {
     expect(textarea).toHaveFocus();
-    expect(textarea).toHaveValue('第一次连续输入，第二次继续输入更多内容');
+    expect(textarea).toHaveValue('first focused edit, then keep typing more content');
   });
 });
 
@@ -62,7 +62,7 @@ test('respects the real focused input when the user starts editing another node 
     );
   });
   expect(screen.getByTestId('editor-node-question-render-boundary')).toHaveTextContent(
-    '当前正在编辑输入框。',
+    '这里承接要回答的问题。现在可以直接修改标题或正文。',
   );
   expect(screen.getByTestId('editor-node-question-render-boundary')).toHaveTextContent(
     '编辑中',
@@ -71,13 +71,15 @@ test('respects the real focused input when the user starts editing another node 
 
   fireEvent.change(textarea, {
     target: {
-      value: '直接从另一个节点开始编辑，也不应该被外层卡片抢走焦点。',
+      value: 'editing another node directly should keep focus on its own textarea',
     },
   });
 
   await waitFor(() => {
     expect(textarea).toHaveFocus();
-    expect(textarea).toHaveValue('直接从另一个节点开始编辑，也不应该被外层卡片抢走焦点。');
+    expect(textarea).toHaveValue(
+      'editing another node directly should keep focus on its own textarea',
+    );
   });
 });
 
@@ -95,7 +97,7 @@ test('selects a node by clicking its card without requiring textarea focus first
     expect(node).toHaveFocus();
   });
   expect(textarea).not.toHaveFocus();
-  expect(node).toHaveTextContent('卡片只选中，输入框才会编辑。');
+  expect(node).toHaveTextContent('这里承接要回答的问题。点击输入框后会进入正文编辑。');
   expect(node).not.toHaveTextContent('编辑中');
 });
 
@@ -104,7 +106,7 @@ test('keeps the title input focused while side panels reflect title edits', asyn
 
   const titleInput = getNodeTitleInput('question-render-boundary');
   const nextTitle =
-    '这是一个会把侧栏文本一起带着更新的超长标题，用来验证输入焦点不会因为侧栏重排而丢失';
+    'A very long title that forces the side panels to rerender while focus stays put';
 
   titleInput.focus();
   expect(titleInput).toHaveFocus();

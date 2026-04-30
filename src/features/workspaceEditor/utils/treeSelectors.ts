@@ -1,10 +1,10 @@
 import {
+  getAllowedChildTypes,
   getDisplayNodeTitle,
   getDisplayNodeTypeLabel,
-  getAllowedChildTypes,
   getJudgmentNodeKind,
-  getNodeOrThrow,
   getModuleScopeId,
+  getNodeOrThrow,
   isAnswerClosureSummaryNode,
   isScaffoldSummaryNode,
   isSummaryCheckJudgmentNode,
@@ -167,7 +167,7 @@ export function getNodeRoleDescription(tree: NodeTree, node: TreeNode) {
   }
 
   if (isSummaryCheckJudgmentNode(tree, node)) {
-    return '这里展示手写总结的检查结果';
+    return '这里负责总结检查结果，而不是普通回答评估';
   }
 
   switch (node.type) {
@@ -190,7 +190,7 @@ export function getNodeRoleDescription(tree: NodeTree, node: TreeNode) {
     case 'resource':
       return '这里记录资料概况与来源';
     case 'resource-fragment':
-      return '这里固定可回跳的资料片段';
+      return '这里固定可回溯的资料片段';
   }
 }
 
@@ -204,7 +204,7 @@ export function getNodeInputPlaceholder(
 
   switch (nodeType) {
     case 'module':
-      return '补充该模块的学习目标、边界或导读。';
+      return '补充这个模块的学习目标、边界或导读。';
     case 'plan-step':
       return '记录这一步的关注点、完成标准或提示。';
     case 'question':
@@ -212,7 +212,7 @@ export function getNodeInputPlaceholder(
     case 'answer':
       return '在这里承接回答正文。';
     case 'summary':
-      return '在这里承接阶段总结。';
+      return '在这里承接总结正文。';
     case 'judgment':
       return '在这里承接判断、评估或纠偏意见。';
     case 'resource':

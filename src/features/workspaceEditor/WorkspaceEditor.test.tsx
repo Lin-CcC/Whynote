@@ -1,4 +1,12 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+﻿import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 
 import {
   createNode,
@@ -11,7 +19,7 @@ import {
   type WorkspaceSnapshot,
 } from '../nodeDomain';
 import WorkspaceEditor from './WorkspaceEditor';
-import { getActionAvailability } from './hooks/useWorkspaceEditor';
+import { getActionAvailability, useWorkspaceEditor } from './hooks/useWorkspaceEditor';
 import {
   DEMO_SELECTED_NODE_ID,
 } from './utils/createDemoWorkspace';
@@ -154,7 +162,11 @@ test('inserts an answer into the selected question before follow-up or closing n
 
   render(<WorkspaceEditor operations={operations} />);
 
-  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+  fireEvent.click(
+    within(screen.getByTestId('learning-action-grid')).getByRole('button', {
+      name: '插入回答',
+    }),
+  );
 
   const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
 
@@ -176,7 +188,14 @@ test('keeps newly inserted answers in the current question answer block before f
     />,
   );
 
-  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+  fireEvent.click(
+    within(screen.getByTestId('question-block-actions-question-parent')).getByRole(
+      'button',
+      {
+        name: '插入回答',
+      },
+    ),
+  );
 
   const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
 
@@ -206,7 +225,13 @@ test('inserts an answer under the selected follow-up question instead of the pre
     'true',
   );
 
-  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+  fireEvent.click(
+    within(
+      screen.getByTestId('question-block-actions-question-follow-up'),
+    ).getByRole('button', {
+      name: '插入回答',
+    }),
+  );
 
   const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
 
@@ -229,9 +254,13 @@ test('allows switching a newly inserted leaf node between safe types while prese
     />,
   );
 
-  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+  fireEvent.click(
+    within(screen.getByTestId('learning-action-grid')).getByRole('button', {
+      name: '插入回答',
+    }),
+  );
 
-  const titleInput = await screen.findByDisplayValue('新回答');
+  await screen.findByDisplayValue('新回答');
   const contentInput = screen.getByLabelText('新回答 内容');
 
   fireEvent.change(contentInput, {
@@ -241,9 +270,11 @@ test('allows switching a newly inserted leaf node between safe types while prese
   });
   fireEvent.click(screen.getByRole('button', { name: '切换为总结' }));
 
-  const switchedNode = titleInput.closest('[data-testid^="editor-node-"]');
-
   await waitFor(() => {
+    const switchedNode = screen
+      .getByDisplayValue('新回答')
+      .closest('[data-testid^="editor-node-"]');
+
     expect(switchedNode).toHaveAttribute('data-node-type', 'summary');
     expect(switchedNode).toHaveTextContent('总结');
     expect(contentInput).toHaveValue('这段内容在切换成总结后也应该保留。');
@@ -266,28 +297,22 @@ test('allows switching a newly inserted leaf node between safe types while prese
   });
 });
 
-test('does not promote an older edited answer to currentAnswerId', async () => {
-  const snapshots: WorkspaceSnapshot[] = [];
-
-  render(
-    <WorkspaceEditor
-      initialModuleId="module-current-answer-editor"
-      initialSelectedNodeId="answer-editor-previous"
-      initialSnapshot={createCurrentAnswerEditorSnapshot()}
-      onSnapshotChange={(snapshot) => {
-        snapshots.push(snapshot);
-      }}
-    />,
+test('does not promote an older edited answer to currentAnswerId', () => {
+  const { result } = renderHook(() =>
+    useWorkspaceEditor({
+      initialModuleId: 'module-current-answer-editor',
+      initialSelectedNodeId: 'answer-editor-previous',
+      initialSnapshot: createCurrentAnswerEditorSnapshot(),
+    }),
   );
 
-  fireEvent.change(screen.getByLabelText('第一版回答 内容'), {
-    target: {
-      value: '补充旧回答，但不升格为当前回答。',
-    },
+  act(() => {
+    result.current.updateNode('answer-editor-previous', {
+      content: '补充旧回答，但不升格为当前回答。',
+    });
   });
 
-  const latestSnapshot = snapshots[snapshots.length - 1];
-  const questionNode = latestSnapshot.tree.nodes['question-current-answer-editor'];
+  const questionNode = result.current.tree.nodes['question-current-answer-editor'];
 
   expect(questionNode).toMatchObject({
     type: 'question',
@@ -486,7 +511,7 @@ test('renders plan-step with weaker emphasis than learning nodes', () => {
   );
   expect(
     screen.getByRole('combobox', {
-      name: /梳理 state \/ props \/ render 的关系 的步骤状态/i,
+      name: /梳理 state \/ props \/ render 的关系.*状态/i,
     }),
   ).toBeInTheDocument();
 });
@@ -589,10 +614,12 @@ test('keeps text main view in the same order as the underlying question children
     />,
   );
 
-  const parentNode = screen.getByTestId('editor-node-question-parent');
+  const parentNode = screen.getByTestId('question-block-question-parent');
   const renderedNodeIds = Array.from(
     parentNode.querySelectorAll('[data-testid^="editor-node-"]'),
-  ).map((element) => element.getAttribute('data-testid'));
+  )
+    .map((element) => element.getAttribute('data-testid'))
+    .filter((testId) => testId !== 'editor-node-question-parent');
 
   expect(renderedNodeIds).toEqual([
     'editor-node-answer-first',
@@ -600,7 +627,7 @@ test('keeps text main view in the same order as the underlying question children
     'editor-node-summary-third',
   ]);
   expect(
-    screen.getByRole('heading', { name: '父问题保留，子问题显式承接' }),
+    screen.getByDisplayValue('父问题保留并承接子节点顺序。'),
   ).toBeInTheDocument();
 });
 
@@ -1212,6 +1239,19 @@ function createCurrentAnswerEditorSnapshot(): WorkspaceSnapshot {
   tree = insertChildNode(
     tree,
     'module-current-answer-editor',
+    createNode({
+      type: 'plan-step',
+      id: 'step-current-answer-editor',
+      title: '当前回答步骤',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-current-answer-editor',
     createNode({
       type: 'question',
       id: 'question-current-answer-editor',

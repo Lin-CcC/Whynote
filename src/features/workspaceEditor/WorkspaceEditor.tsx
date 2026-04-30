@@ -7,10 +7,15 @@ import SelectedNodeInspector from './components/SelectedNodeInspector';
 import StructureActionBar from './components/StructureActionBar';
 import StructureTree from './components/StructureTree';
 import TextMainView from './components/TextMainView';
+import { DEFAULT_WORKSPACE_VIEW_STATE } from './utils/workspaceViewState';
 import './workspaceEditor.css';
 
 export default function WorkspaceEditor(props: WorkspaceEditorProps) {
   const workspaceEditor = useWorkspaceEditor(props);
+  const workspaceViewState =
+    props.workspaceViewState ?? DEFAULT_WORKSPACE_VIEW_STATE;
+  const handleWorkspaceViewStateChange =
+    props.onWorkspaceViewStateChange ?? (() => {});
   const renderContext = {
     applyTreeChange: workspaceEditor.applyTreeChange,
     createModule: workspaceEditor.createModule,
@@ -84,12 +89,21 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           interactionLockReason={props.interactionLockReason ?? null}
           isInteractionLocked={props.isInteractionLocked ?? false}
           onCreateModule={workspaceEditor.createModule}
+          onDirectAnswerQuestion={props.onDirectAnswerQuestion}
+          onEvaluateAnswer={props.onEvaluateAnswer}
+          onEvaluateSummary={props.onEvaluateSummary}
+          onInsertAnswerForQuestion={workspaceEditor.insertAnswerForQuestion}
+          onInsertFollowUpQuestion={workspaceEditor.insertFollowUpQuestion}
+          onInsertSummaryForQuestion={workspaceEditor.insertSummaryForQuestion}
           onSelectNode={workspaceEditor.selectNode}
+          onSetCurrentAnswer={workspaceEditor.setCurrentAnswer}
           onUpdateNode={workspaceEditor.updateNode}
+          onWorkspaceViewStateChange={handleWorkspaceViewStateChange}
           renderNodeInlineActions={props.renderNodeInlineActions}
           registerNodeElement={workspaceEditor.registerNodeElement}
           selectedNodeId={workspaceEditor.selectedNodeId}
           tree={workspaceEditor.tree}
+          workspaceViewState={workspaceViewState}
         />
       }
       rightPanel={

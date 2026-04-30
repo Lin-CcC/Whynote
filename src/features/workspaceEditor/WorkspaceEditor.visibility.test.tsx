@@ -1,3 +1,4 @@
+import { cloneElement, type ReactElement, useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import {
@@ -9,7 +10,11 @@ import {
 } from '../nodeDomain';
 import WorkspaceEditor from './WorkspaceEditor';
 import { getNodeSemanticVisibility } from './utils/nodeSemanticVisibility';
-import type { WorkspaceEditorRenderContext } from './workspaceEditorTypes';
+import { DEFAULT_WORKSPACE_VIEW_STATE } from './utils/workspaceViewState';
+import type {
+  WorkspaceEditorProps,
+  WorkspaceEditorRenderContext,
+} from './workspaceEditorTypes';
 
 test('shows the current answer badge and legacy fallback note for older questions', () => {
   render(
@@ -97,8 +102,8 @@ test('promotes a leaf node to current answer visibility after switching it to an
   expect(within(promotedNode).getByText('当前回答')).toBeInTheDocument();
 });
 
-test('shows current or historical result badges, stale markers, and pairing notes for answer and summary results', () => {
-  render(
+test('shows current or historical result badges, stale markers, and pairing notes for answer and summary results', async () => {
+  renderWorkspaceEditorWithViewState(
     <WorkspaceEditor
       initialModuleId="module-visibility-results"
       initialSelectedNodeId="question-visibility-results"
@@ -109,11 +114,11 @@ test('shows current or historical result badges, stale markers, and pairing note
   const questionNode = screen.getByTestId('editor-node-question-visibility-results');
   const oldJudgmentNode = screen.getByTestId('editor-node-judgment-visibility-v1');
   const currentSummaryNode = screen.getByTestId('editor-node-summary-visibility-v2');
-  const oldSummaryCheckNode = screen.getByTestId(
-    'editor-node-judgment-summary-check-old',
-  );
   const currentSummaryCheckNode = screen.getByTestId(
     'editor-node-judgment-summary-check-current',
+  );
+  const summaryGroup = screen.getByTestId(
+    'question-block-summary-group-summary-summary-check-source',
   );
 
   expect(
@@ -134,6 +139,12 @@ test('shows current or historical result badges, stale markers, and pairing note
   expect(
     within(currentSummaryCheckNode).getByText('检查对象：手写总结'),
   ).toBeInTheDocument();
+  fireEvent.click(
+    within(summaryGroup).getByRole('button', { name: '展开历史检查结果' }),
+  );
+  const oldSummaryCheckNode = await screen.findByTestId(
+    'editor-node-judgment-summary-check-old',
+  );
   expect(oldSummaryCheckNode).toHaveTextContent('历史结果');
 });
 
@@ -268,6 +279,21 @@ function CrossQuestionMoveHarness() {
       )}
     />
   );
+}
+
+function renderWorkspaceEditorWithViewState(element: ReactElement<WorkspaceEditorProps>) {
+  function Harness() {
+    const [workspaceViewState, setWorkspaceViewState] = useState(
+      DEFAULT_WORKSPACE_VIEW_STATE,
+    );
+
+    return cloneElement(element, {
+      onWorkspaceViewStateChange: setWorkspaceViewState,
+      workspaceViewState,
+    });
+  }
+
+  return render(<Harness />);
 }
 
 function createLegacyCurrentAnswerSnapshot(): WorkspaceSnapshot {
