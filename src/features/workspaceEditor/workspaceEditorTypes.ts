@@ -70,6 +70,12 @@ export interface LearningActionOption {
   label: string;
 }
 
+export interface WorkspaceViewState {
+  expandedHistorySectionIds: string[];
+  collapsedNodeBodyIds: string[];
+  collapsedQuestionBlockIds: string[];
+}
+
 export interface WorkspaceEditorSelectionState {
   currentModuleId: string | null;
   selectedNodeId: string | null;
@@ -116,12 +122,16 @@ export interface WorkspaceEditorProps {
   initialSelectedNodeId?: string;
   interactionLockReason?: string | null;
   isInteractionLocked?: boolean;
+  onDirectAnswerQuestion?: (questionNodeId: string) => void;
+  onEvaluateAnswer?: (questionNodeId: string, answerNodeId: string) => void;
+  onEvaluateSummary?: (summaryNodeId: string) => void;
   onLearningActionRequest?: (
     request: WorkspaceEditorLearningActionRequest,
   ) => boolean | void;
   operations?: WorkspaceEditorOperations;
   onSnapshotChange?: (snapshot: WorkspaceSnapshot) => void;
   onSelectionChange?: (selection: WorkspaceEditorSelectionState) => void;
+  onWorkspaceViewStateChange?: (state: WorkspaceViewState) => void;
   renderLeftPanelExtra?: (
     context: WorkspaceEditorRenderContext,
   ) => ReactNode;
@@ -131,4 +141,5 @@ export interface WorkspaceEditorProps {
   renderNodeInlineActions?: (
     context: WorkspaceEditorNodeRenderContext,
   ) => ReactNode;
+  workspaceViewState?: WorkspaceViewState;
 }

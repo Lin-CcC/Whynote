@@ -340,6 +340,10 @@ export function getDisplayNodeTypeLabel(tree: NodeTree, node: TreeNode): string 
     return '答案解析';
   }
 
+  if (isSummaryCheckJudgmentNode(tree, node)) {
+    return '总结检查结果';
+  }
+
   switch (node.type) {
     case 'theme-root':
       return '主题';

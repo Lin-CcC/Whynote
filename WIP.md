@@ -1,18 +1,18 @@
 # WIP
 
-本文档只记录当前短期执行面，不再堆历史工作流水。已稳定的长期决策进入 [DEV_NOTE.md](DEV_NOTE.md)，中长期演进进入 [TODO.md](TODO.md)。
+鏈枃妗ｅ彧璁板綍褰撳墠鐭湡鎵ц闈紝涓嶅啀鍫嗗巻鍙插伐浣滄祦姘淬€傚凡绋冲畾鐨勯暱鏈熷喅绛栬繘鍏?[DEV_NOTE.md](DEV_NOTE.md)锛屼腑闀挎湡婕旇繘杩涘叆 [TODO.md](TODO.md)銆?
 
-## 当前工作面
+## 褰撳墠宸ヤ綔闈?
 
-- 当前工作树：`codex/v11-current-answer-semantics`
-- 当前短期目标：完成 V1.1 第一轮里的“当前回答语义 + 显式 source 配对 + 过期判定 + 级联清理”，只落数据契约、runtime 语义、学习结果配对与清理规则，不扩到主视图 block UI、折叠 UI、导出模式、思维导图或资料系统重构。
+- 当前工作树：`codex/v11-question-block-editor`
+- 当前短期目标：完成 V1.1 第一轮的 question block 主视图、block 级动作、当前回答 / 旧回答分区、显示语义拆分、折叠 UI 与 workspace 级本地视图状态，不扩展到导出模式、思维导图、资料区深嵌或新节点类型。
 
 ## 当前短期任务
 
-- 当前执行项已完成；本轮 `currentAnswerId`、显式 source 配对、过期判定、级联清理、兼容兜底、回归测试与文档更新已落地，等待下一轮回归或反馈。
+- 当前执行项已完成；question block 主视图编辑流、折叠状态持久化、自动展开回流、左侧 runtime action card 降级与回归测试已落地，等待下一轮回归或反馈。
 
 ## 本轮明确不做
 
-- 不做主视图 `question` block UI 或折叠交互
-- 不做导出模式、思维导图或资料系统重构
-- 不做完整回答历史系统、主链外 runtime 改版或无关壳层整理
+- 不做导出模式、思维导图、资料区深嵌或新的学习节点类型
+- 不重做 `currentAnswerId`、`sourceId`、过期判定与级联清理语义
+- 不把左侧 runtime action card 重新抬回问答总结链主操作面

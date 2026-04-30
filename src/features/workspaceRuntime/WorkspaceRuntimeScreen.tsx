@@ -2,7 +2,14 @@ import { useState } from 'react';
 
 import AppLayout from '../../ui/AppLayout';
 import SectionCard from '../../ui/SectionCard';
+import { getModuleScopeId } from '../nodeDomain';
+import ResourcesSearchExportPanel from '../resourcesSearchExport/ResourcesSearchExportPanel';
 import WorkspaceEditor from '../workspaceEditor/WorkspaceEditor';
+import { resolveLearningActionPlacement } from '../workspaceEditor/utils/learningActions';
+import {
+  readWorkspaceViewState,
+  writeWorkspaceViewState,
+} from '../workspaceEditor/utils/workspaceViewState';
 import type {
   LearningActionId,
   WorkspaceEditorLearningActionRequest,
@@ -10,8 +17,6 @@ import type {
   WorkspaceEditorRenderContext,
   WorkspaceEditorSelectionState,
 } from '../workspaceEditor/workspaceEditorTypes';
-import { resolveLearningActionPlacement } from '../workspaceEditor/utils/learningActions';
-import ResourcesSearchExportPanel from '../resourcesSearchExport/ResourcesSearchExportPanel';
 import WorkspaceRuntimeActionCard from './components/WorkspaceRuntimeActionCard';
 import WorkspaceRuntimeAiConfigCard from './components/WorkspaceRuntimeAiConfigCard';
 import WorkspaceRuntimeJudgmentActions from './components/WorkspaceRuntimeJudgmentActions';
@@ -22,9 +27,9 @@ import {
   countQuestionFollowUpNodes,
   getJudgmentInlineActionContext,
   getLatestQuestionAnswerExplanationNodeId,
+  resolveQuestionAnswerEvaluationTarget,
   resolveSummaryCheckJudgmentContext,
   resolveSummaryEvaluationTarget,
-  resolveQuestionAnswerEvaluationTarget,
 } from './services/learningRuntimeContext';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 
@@ -38,6 +43,9 @@ export default function WorkspaceRuntimeScreen({
   const [resolvedDependencies] = useState(
     () => dependencies ?? createDefaultWorkspaceRuntimeDependencies(),
   );
+  const [uiPreferences, setUiPreferences] = useState(() =>
+    resolvedDependencies.localPreferenceStorage.loadUiPreferences(),
+  );
   const [activeResourceNodeId, setActiveResourceNodeId] = useState<string | null>(
     null,
   );
@@ -45,6 +53,10 @@ export default function WorkspaceRuntimeScreen({
     string | null
   >(null);
   const runtime = useWorkspaceRuntime(resolvedDependencies);
+  const workspaceViewState = readWorkspaceViewState(
+    uiPreferences,
+    runtime.snapshot?.workspace.id ?? null,
+  );
   const resourceMetadataByNodeId = Object.fromEntries(
     runtime.resourceMetadataRecords.map((record) => [record.nodeId, record]),
   );
@@ -59,10 +71,11 @@ export default function WorkspaceRuntimeScreen({
           <SectionCard>
             <p className="section-label">运行时集成</p>
             <h2 className="section-title">
-              {runtime.isInitializing ? '正在初始化工作区' : '工作区暂不可用'}
+              {runtime.isInitializing ? '正在初始化工作区' : '工作区暂时不可用'}
             </h2>
             <p className="section-description">
-              {runtime.loadError ?? '正在从 IndexedDB 读取工作区，并准备最小可用数据。'}
+              {runtime.loadError ??
+                '正在从 IndexedDB 读取工作区，并准备最小可用数据。'}
             </p>
           </SectionCard>
         }
@@ -89,7 +102,7 @@ export default function WorkspaceRuntimeScreen({
             <p className="section-label">范围说明</p>
             <h2 className="section-title">当前工作树目标</h2>
             <p className="section-description">
-              只负责把真实工作区、持久化和 learning-engine 闭环接起来，不扩展新产品能力。
+              这里只负责把真实工作区、持久化和 learning engine 闭环接起来，不扩展新的产品能力。
             </p>
           </SectionCard>
         }
@@ -97,14 +110,26 @@ export default function WorkspaceRuntimeScreen({
     );
   }
 
+  const workspaceSnapshot = runtime.snapshot;
+
   return (
     <WorkspaceEditor
       initialModuleId={runtime.initialModuleId ?? undefined}
       initialSelectedNodeId={runtime.initialSelectedNodeId ?? undefined}
-      initialSnapshot={runtime.snapshot}
+      initialSnapshot={workspaceSnapshot}
       interactionLockReason={interactionLockReason}
       isInteractionLocked={runtime.isAiRunning}
-      key={`${runtime.snapshot.workspace.id}:${String(runtime.editorSessionKey)}`}
+      key={`${workspaceSnapshot.workspace.id}:${String(runtime.editorSessionKey)}`}
+      onDirectAnswerQuestion={handleDirectAnswerQuestion}
+      onEvaluateAnswer={(questionNodeId, answerNodeId) => {
+        void runtime.runQuestionEvaluation({
+          answerNodeId,
+          questionNodeId,
+        });
+      }}
+      onEvaluateSummary={(summaryNodeId) => {
+        void runtime.runSummaryEvaluation(summaryNodeId);
+      }}
       onLearningActionRequest={(request) => {
         if (!canRunAiLearningAction(request.actionId)) {
           return false;
@@ -115,9 +140,11 @@ export default function WorkspaceRuntimeScreen({
       }}
       onSelectionChange={handleEditorSelectionChange}
       onSnapshotChange={runtime.handleSnapshotChange}
+      onWorkspaceViewStateChange={handleWorkspaceViewStateChange}
       renderLeftPanelExtra={renderLeftPanelExtra}
       renderNodeInlineActions={renderNodeInlineActions}
       renderRightPanelExtra={renderRightPanelExtra}
+      workspaceViewState={workspaceViewState}
     />
   );
 
@@ -226,10 +253,7 @@ export default function WorkspaceRuntimeScreen({
           context.selectNode(actionContext.answerNodeId);
         }}
         onToggleHint={() => {
-          void handleJudgmentHintToggle(
-            context.node.id,
-            hasPersistedHint,
-          );
+          void handleJudgmentHintToggle(context.node.id, hasPersistedHint);
         }}
         onViewSummary={() => {
           if (!actionContext.summaryNodeId) {
@@ -264,7 +288,7 @@ export default function WorkspaceRuntimeScreen({
           resourceMetadataByNodeId={resourceMetadataByNodeId}
           selectedEditorNodeId={context.selectedNodeId}
           tree={context.tree}
-          workspaceId={runtime.snapshot!.workspace.id}
+          workspaceId={workspaceSnapshot.workspace.id}
           workspaceTitle={context.workspaceTitle}
         />
         <WorkspaceRuntimeStatusCard
@@ -303,6 +327,37 @@ export default function WorkspaceRuntimeScreen({
   ) {
     setActiveResourceNodeId(null);
     runtime.handleSelectionChange(selection);
+  }
+
+  function handleWorkspaceViewStateChange(state: typeof workspaceViewState) {
+    const workspaceId = runtime.snapshot?.workspace.id;
+
+    if (!workspaceId) {
+      return;
+    }
+
+    const nextPreferences = writeWorkspaceViewState(
+      uiPreferences,
+      workspaceId,
+      state,
+    );
+
+    setUiPreferences(nextPreferences);
+    resolvedDependencies.localPreferenceStorage.saveUiPreferences(nextPreferences);
+  }
+
+  function handleDirectAnswerQuestion(questionNodeId: string) {
+    const directAnswerRequest = resolveDirectAnswerRequestForQuestion(
+      runtime.snapshot?.tree ?? null,
+      runtime.initialModuleId,
+      questionNodeId,
+    );
+
+    if (!directAnswerRequest) {
+      return;
+    }
+
+    void runtime.runQuestionDirectAnswer(directAnswerRequest);
   }
 
   async function handleJudgmentHintToggle(
@@ -351,9 +406,25 @@ function resolveDirectAnswerRequest(
     return null;
   }
 
-  const placement = resolveLearningActionPlacement(
+  return resolveDirectAnswerRequestForQuestion(
     context.tree,
+    context.currentModuleId,
     context.selectedNode.id,
+  );
+}
+
+function resolveDirectAnswerRequestForQuestion(
+  tree: WorkspaceEditorRenderContext['tree'] | null,
+  currentModuleId: string | null,
+  questionNodeId: string | null,
+): WorkspaceEditorLearningActionRequest | null {
+  if (!tree || !questionNodeId || tree.nodes[questionNodeId]?.type !== 'question') {
+    return null;
+  }
+
+  const placement = resolveLearningActionPlacement(
+    tree,
+    questionNodeId,
     'insert-answer',
   );
 
@@ -363,9 +434,9 @@ function resolveDirectAnswerRequest(
 
   return {
     actionId: 'insert-answer',
-    currentModuleId: context.currentModuleId,
+    currentModuleId: getModuleScopeId(tree, questionNodeId) ?? currentModuleId,
     placement,
-    selectedNodeId: context.selectedNode.id,
-    tree: context.tree,
+    selectedNodeId: questionNodeId,
+    tree,
   };
 }

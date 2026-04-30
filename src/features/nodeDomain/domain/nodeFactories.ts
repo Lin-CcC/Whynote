@@ -144,7 +144,7 @@ export function createNode(input: CreateNodeInput): NonRootNode {
     case 'answer':
       return {
         ...baseNode,
-        type: input.type,
+        type: 'answer',
       };
     case 'question':
       return {

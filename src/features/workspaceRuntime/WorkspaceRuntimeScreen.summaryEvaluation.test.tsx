@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+﻿import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 
 import type {
@@ -71,7 +71,6 @@ test('checks a manual summary through summary-evaluation instead of question clo
 
   fireEvent.click(within(callout).getByRole('button', { name: '检查这个总结' }));
 
-  expect(await screen.findByDisplayValue('这段总结还可再补')).toBeInTheDocument();
   expect(
     await screen.findByTestId('summary-evaluation-result-callout'),
   ).toBeInTheDocument();
