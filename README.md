@@ -120,6 +120,8 @@ theme-root
 ## 文档索引
 
 - [docs/PRD.md](docs/PRD.md)：正式产品需求文档
+- [docs/v1.1-question-chain-editor.md](docs/v1.1-question-chain-editor.md)：V1.1 第一轮问题链条编辑器规格
+- [docs/WORKTREE_PLAN.md](docs/WORKTREE_PLAN.md)：V1.1 并行工作树拆分与派发指令
 - [TESTING.md](TESTING.md)：测试基线与验证范围
 - [DEPLOYMENT.md](DEPLOYMENT.md)：部署基线与平台示例
 - [DEV_NOTE.md](DEV_NOTE.md)：长期有效的产品与架构决策
