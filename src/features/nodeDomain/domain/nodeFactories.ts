@@ -29,7 +29,16 @@ type CreateNodeInput =
       updatedAt?: string;
     }
   | {
-      type: 'question' | 'answer';
+      type: 'question';
+      id?: string;
+      title: string;
+      content?: string;
+      currentAnswerId?: string;
+      createdAt?: string;
+      updatedAt?: string;
+    }
+  | {
+      type: 'answer';
       id?: string;
       title: string;
       content?: string;
@@ -42,6 +51,8 @@ type CreateNodeInput =
       title: string;
       content?: string;
       summaryKind?: SummaryNodeKind;
+      sourceAnswerId?: string;
+      sourceAnswerUpdatedAt?: string;
       createdAt?: string;
       updatedAt?: string;
     }
@@ -52,6 +63,10 @@ type CreateNodeInput =
       content?: string;
       hint?: string;
       judgmentKind?: JudgmentNodeKind;
+      sourceAnswerId?: string;
+      sourceAnswerUpdatedAt?: string;
+      sourceSummaryId?: string;
+      sourceSummaryUpdatedAt?: string;
       createdAt?: string;
       updatedAt?: string;
     }
@@ -127,16 +142,29 @@ export function createNode(input: CreateNodeInput): NonRootNode {
         status: input.status ?? 'todo',
       };
     case 'question':
+      return {
+        ...baseNode,
+        type: 'question',
+        ...(input.currentAnswerId
+          ? { currentAnswerId: input.currentAnswerId }
+          : {}),
+      };
     case 'answer':
       return {
         ...baseNode,
-        type: input.type,
+        type: 'answer',
       };
     case 'summary':
       return {
         ...baseNode,
         type: 'summary',
         ...(input.summaryKind ? { summaryKind: input.summaryKind } : {}),
+        ...(input.sourceAnswerId
+          ? { sourceAnswerId: input.sourceAnswerId }
+          : {}),
+        ...(input.sourceAnswerUpdatedAt
+          ? { sourceAnswerUpdatedAt: input.sourceAnswerUpdatedAt }
+          : {}),
       };
     case 'judgment':
       return {
@@ -144,6 +172,18 @@ export function createNode(input: CreateNodeInput): NonRootNode {
         type: 'judgment',
         hint: input.hint,
         ...(input.judgmentKind ? { judgmentKind: input.judgmentKind } : {}),
+        ...(input.sourceAnswerId
+          ? { sourceAnswerId: input.sourceAnswerId }
+          : {}),
+        ...(input.sourceAnswerUpdatedAt
+          ? { sourceAnswerUpdatedAt: input.sourceAnswerUpdatedAt }
+          : {}),
+        ...(input.sourceSummaryId
+          ? { sourceSummaryId: input.sourceSummaryId }
+          : {}),
+        ...(input.sourceSummaryUpdatedAt
+          ? { sourceSummaryUpdatedAt: input.sourceSummaryUpdatedAt }
+          : {}),
       };
     case 'resource':
       return {

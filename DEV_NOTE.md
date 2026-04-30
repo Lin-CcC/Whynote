@@ -235,6 +235,22 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - `StructureActionBar`、`SelectedNodeInspector`、学习节点引用上下文和运行状态卡这类高频刷新块，默认使用固定文本槽位、clamp 或局部可滚动明细承接长标题 / 长路径 / 长状态文案，不改变卡片 box model。
 - inspector 已单独展示 `主题` 时，`路径` 不再重复带一遍 theme-root 标题；侧栏上下文优先展示必要信息，而不是堆重复路径。
 
+### 27. question block 主视图是显示层重组，不是新节点类型
+
+- `question block` 只存在于主视图显示与交互层；底层树仍然只有 `question / answer / summary / judgment` 等真实节点，follow-up question 继续作为真实子节点存在。
+- 主视图允许围绕当前激活 `question` 做显示重组，但不改写底层树顺序：当前回答及其最新 `judgment / 答案解析` 进入主内容区，旧回答及其历史结果进入默认折叠的历史区，手写 `summary` 和 `summary-check judgment` 继续按真实顺序出现在 block 主流里。
+- 当前激活 block 的判定一律由“当前选中节点向上追溯到最近的 `question`”决定；选中 `question / answer / judgment / 答案解析 / 手写总结 / 总结检查结果` 中任一节点，都应激活同一个 block。
+- `answer-closure summary` 必须显示为 `答案解析`，手写 `summary` 必须显示为 `总结`，`summary-check judgment` 必须显示为 `总结检查结果`；不要再把这三类内容混到一个“总结”语义里。
+- block 级动作只挂在当前激活 block：`直接回答当前问题`、`插入回答`、`插入追问`、`插入总结`。`answer` 与手写 `summary` 的继续修改、评估、设为当前回答、检查总结等动作继续留在对应节点卡片上。
+- 左侧 `WorkspaceRuntimeActionCard` 保留为“状态概览 + 下一步建议 + 冗余入口”，不再和主视图 question block 一起争夺问答总结链的主操作路径。
+
+### 28. question block 折叠状态属于 workspace 级本地视图状态
+
+- `question block` 整体折叠、`answer / judgment / summary` 正文折叠、`早期回答 / 历史评估 / 历史检查结果` 历史区折叠，统一存入 `UiPreferences.values.workspaceViews[workspaceId]`。
+- 这类折叠状态只属于当前 workspace 的本地视图偏好，不写入 snapshot，不参与结构树持久化，也不能复用 `StructureTree.expandedNodeIds`。
+- 默认语义要区分“默认展开”和“默认收起”：block 与正文用 `collapsed...Ids` 表达，历史区用 `expandedHistorySectionIds` 表达，避免把默认收起的历史区误持久化成“已折叠”。
+- 来自结构树、搜索或 runtime 入口的外部选中必须反向驱动主视图自动展开：如果目标节点位于折叠 block、折叠正文或折叠历史区内，主视图需要自动把对应区域展开到可见，而不是要求用户先手工找回入口。
+
 ## 后续需要重新评估这些决策的触发条件
 
 - 需要公开注册或公开商用

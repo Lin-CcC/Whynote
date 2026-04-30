@@ -30,10 +30,7 @@ export function getSummaryNodeKind(
   tree: NodeTree,
   nodeOrId: TreeNode | string | null | undefined,
 ): SummaryNodeKind | null {
-  const node =
-    typeof nodeOrId === 'string'
-      ? tree.nodes[nodeOrId]
-      : nodeOrId;
+  const node = typeof nodeOrId === 'string' ? tree.nodes[nodeOrId] : nodeOrId;
 
   if (!node || node.type !== 'summary') {
     return null;
@@ -69,10 +66,7 @@ export function getJudgmentNodeKind(
   tree: NodeTree,
   nodeOrId: TreeNode | string | null | undefined,
 ): JudgmentNodeKind | null {
-  const node =
-    typeof nodeOrId === 'string'
-      ? tree.nodes[nodeOrId]
-      : nodeOrId;
+  const node = typeof nodeOrId === 'string' ? tree.nodes[nodeOrId] : nodeOrId;
 
   if (!node || node.type !== 'judgment') {
     return null;
@@ -109,6 +103,10 @@ export function getDisplayNodeTypeLabel(tree: NodeTree, node: TreeNode): string 
 
   if (isAnswerClosureSummaryNode(tree, node)) {
     return '答案解析';
+  }
+
+  if (isSummaryCheckJudgmentNode(tree, node)) {
+    return '总结检查结果';
   }
 
   switch (node.type) {

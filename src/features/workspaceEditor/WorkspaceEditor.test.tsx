@@ -154,7 +154,11 @@ test('inserts an answer into the selected question before follow-up or closing n
 
   render(<WorkspaceEditor operations={operations} />);
 
-  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+  fireEvent.click(
+    within(screen.getByTestId('learning-action-grid')).getByRole('button', {
+      name: '插入回答',
+    }),
+  );
 
   const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
 
@@ -176,7 +180,14 @@ test('keeps newly inserted answers in the current question answer block before f
     />,
   );
 
-  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+  fireEvent.click(
+    within(screen.getByTestId('question-block-actions-question-parent')).getByRole(
+      'button',
+      {
+        name: '插入回答',
+      },
+    ),
+  );
 
   const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
 
@@ -206,7 +217,13 @@ test('inserts an answer under the selected follow-up question instead of the pre
     'true',
   );
 
-  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+  fireEvent.click(
+    within(
+      screen.getByTestId('question-block-actions-question-follow-up'),
+    ).getByRole('button', {
+      name: '插入回答',
+    }),
+  );
 
   const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
 
@@ -229,9 +246,13 @@ test('allows switching a newly inserted leaf node between safe types while prese
     />,
   );
 
-  fireEvent.click(screen.getByRole('button', { name: '插入回答' }));
+  fireEvent.click(
+    within(screen.getByTestId('learning-action-grid')).getByRole('button', {
+      name: '插入回答',
+    }),
+  );
 
-  const titleInput = await screen.findByDisplayValue('新回答');
+  await screen.findByDisplayValue('新回答');
   const contentInput = screen.getByLabelText('新回答 内容');
 
   fireEvent.change(contentInput, {
@@ -241,9 +262,11 @@ test('allows switching a newly inserted leaf node between safe types while prese
   });
   fireEvent.click(screen.getByRole('button', { name: '切换为总结' }));
 
-  const switchedNode = titleInput.closest('[data-testid^="editor-node-"]');
-
   await waitFor(() => {
+    const switchedNode = screen
+      .getByDisplayValue('新回答')
+      .closest('[data-testid^="editor-node-"]');
+
     expect(switchedNode).toHaveAttribute('data-node-type', 'summary');
     expect(switchedNode).toHaveTextContent('总结');
     expect(contentInput).toHaveValue('这段内容在切换成总结后也应该保留。');
@@ -422,7 +445,7 @@ test('renders plan-step with weaker emphasis than learning nodes', () => {
   );
   expect(
     screen.getByRole('combobox', {
-      name: /梳理 state \/ props \/ render 的关系 的步骤状态/i,
+      name: /梳理 state \/ props \/ render 的关系.*状态/i,
     }),
   ).toBeInTheDocument();
 });
@@ -525,10 +548,12 @@ test('keeps text main view in the same order as the underlying question children
     />,
   );
 
-  const parentNode = screen.getByTestId('editor-node-question-parent');
+  const parentNode = screen.getByTestId('question-block-question-parent');
   const renderedNodeIds = Array.from(
     parentNode.querySelectorAll('[data-testid^="editor-node-"]'),
-  ).map((element) => element.getAttribute('data-testid'));
+  )
+    .map((element) => element.getAttribute('data-testid'))
+    .filter((testId) => testId !== 'editor-node-question-parent');
 
   expect(renderedNodeIds).toEqual([
     'editor-node-answer-first',
@@ -536,7 +561,7 @@ test('keeps text main view in the same order as the underlying question children
     'editor-node-summary-third',
   ]);
   expect(
-    screen.getByRole('heading', { name: '父问题保留，子问题显式承接' }),
+    screen.getByDisplayValue('父问题保留并承接子节点顺序。'),
   ).toBeInTheDocument();
 });
 
