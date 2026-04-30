@@ -67,11 +67,9 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
 
   fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
   await waitFor(() => {
-    expect(
-      screen.getByRole('button', { name: '重新评估当前回答' }),
-    ).toBeEnabled();
+    expect(getAnswerEvaluationButton()).toBeEnabled();
   });
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('回答还不完整'),
@@ -171,9 +169,7 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
 
   fireEvent.focus(screen.getByLabelText('回答草稿 标题'));
   await waitFor(() => {
-    expect(
-      screen.getByRole('button', { name: '重新评估当前回答' }),
-    ).toBeEnabled();
+    expect(getAnswerEvaluationButton()).toBeEnabled();
   });
   expect(screen.getByTestId('answer-evaluation-callout')).toHaveTextContent(
     '改完这版回答再重评',
@@ -183,7 +179,7 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
   );
   expect(screen.getByText('当前回答修订')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('回答还不完整'),
@@ -258,11 +254,9 @@ test('directly answers a hand-authored question and keeps the answer-revision pa
   expect(screen.getByText('当前回答修订')).toBeInTheDocument();
 
   await waitFor(() => {
-    expect(
-      screen.getByRole('button', { name: '重新评估当前回答' }),
-    ).toBeEnabled();
+    expect(getAnswerEvaluationButton()).toBeEnabled();
   });
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('AI 回答还可再补'),
@@ -370,11 +364,9 @@ test('evaluates a sufficient answer into a closed question and promotes the step
 
   fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
   await waitFor(() => {
-    expect(
-      screen.getByRole('button', { name: '重新评估当前回答' }),
-    ).toBeEnabled();
+    expect(getAnswerEvaluationButton()).toBeEnabled();
   });
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('已答到当前问题'),
@@ -442,7 +434,7 @@ test('re-evaluates the question current answer instead of the selected old answe
   await screen.findByRole('heading', { name: '当前学习模块' });
 
   fireEvent.focus(screen.getByLabelText('第一版回答 标题'));
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('第二版回答还不完整'),
@@ -550,7 +542,9 @@ test('keeps judgment nodes actionable within the current answer revision path', 
     within(inlineActions).getByRole('button', { name: '回到当前回答继续修改' }),
   ).toBeInTheDocument();
   expect(
-    screen.queryByRole('button', { name: '重新评估当前回答' }),
+    within(screen.getByTestId('answer-evaluation-callout')).queryByRole('button', {
+      name: '重新评估当前回答',
+    }),
   ).not.toBeInTheDocument();
   expect(
     screen.getByText(
@@ -744,11 +738,9 @@ test('tolerates question-closure JSON wrapped in explanation text and code fence
 
   fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
   await waitFor(() => {
-    expect(
-      screen.getByRole('button', { name: '重新评估当前回答' }),
-    ).toBeEnabled();
+    expect(getAnswerEvaluationButton()).toBeEnabled();
   });
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('已答到当前问题'),
@@ -780,7 +772,7 @@ test('preserves a manual step status override across save and reload', async () 
   );
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(screen.getByRole('combobox', { name: '起始步骤 的步骤状态' }), {
+  fireEvent.change(screen.getByRole('combobox', { name: '起始步骤 状态' }), {
     target: {
       value: 'done',
     },
@@ -803,9 +795,18 @@ test('preserves a manual step status override across save and reload', async () 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   expect(
-    await screen.findByRole('combobox', { name: '起始步骤 的步骤状态' }),
+    await screen.findByRole('combobox', { name: '起始步骤 状态' }),
   ).toHaveValue('done');
 });
+
+function getAnswerEvaluationButton() {
+  return within(screen.getByTestId('answer-evaluation-callout')).getByRole(
+    'button',
+    {
+      name: '重新评估当前回答',
+    },
+  );
+}
 
 async function createPreloadedDependencies(
   snapshot: WorkspaceSnapshot,

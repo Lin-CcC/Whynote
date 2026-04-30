@@ -600,6 +600,20 @@
   cursor: not-allowed;
 }
 
+.workspace-nodeBodyToggle {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.92);
+  color: #334155;
+  cursor: pointer;
+}
+
+.workspace-nodeBodyToggle:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
 .workspace-judgmentActionsHeader {
   display: grid;
   gap: 0.3rem;
@@ -642,6 +656,99 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.workspace-questionBlock {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 1.35rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.06);
+}
+
+.workspace-questionBlock[data-active='true'] {
+  border-color: rgba(13, 148, 136, 0.36);
+  box-shadow:
+    0 0 0 3px rgba(13, 148, 136, 0.08),
+    0 18px 34px rgba(15, 23, 42, 0.08);
+}
+
+.workspace-questionBlockHeader,
+.workspace-questionBlockSectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.workspace-questionBlockTitle {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.05rem;
+}
+
+.workspace-questionBlockHeaderActions,
+.workspace-questionBlockActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.workspace-questionBlockStack,
+.workspace-questionBlockPrimary,
+.workspace-questionBlockGroup {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.workspace-questionBlockActions {
+  padding: 0.85rem 0.9rem;
+  border: 1px solid rgba(13, 148, 136, 0.16);
+  border-radius: 1rem;
+  background: rgba(240, 253, 250, 0.92);
+}
+
+.workspace-questionBlockPrimary {
+  padding: 0.9rem;
+  border: 1px solid rgba(14, 116, 144, 0.16);
+  border-radius: 1rem;
+  background: rgba(240, 249, 255, 0.76);
+}
+
+.workspace-questionBlockEmpty {
+  padding: 0.9rem;
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.workspace-historySection {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.workspace-historyToggle {
+  justify-self: start;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.92);
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.workspace-historyToggle:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.workspace-historyStack {
+  display: grid;
+  gap: 0.85rem;
+  padding-left: 0.85rem;
+  border-left: 1px solid rgba(148, 163, 184, 0.28);
 }
 
 .workspace-inspectorList {

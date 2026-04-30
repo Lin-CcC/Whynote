@@ -429,7 +429,8 @@ export function resolveSummaryEvaluationTarget(
   }
 
   return {
-    answerNodeId: getCurrentQuestionAnswerNodeId(tree, parentNode.id),
+    answerNodeId:
+      resolveAnswerNodeForSummary(tree, parentNode.id, selectedNode)?.id ?? null,
     questionNodeId: parentNode.id,
     summaryNodeId: selectedNode.id,
   };
@@ -466,11 +467,11 @@ export function buildSummaryEvaluationRuntimeContext(
     throw new Error('当前总结不在任何学习步骤下，无法生成理解检查。');
   }
 
-  const answerNodeId = getCurrentQuestionAnswerNodeId(tree, questionNode.id);
-  const answerNode =
-    answerNodeId && tree.nodes[answerNodeId]?.type === 'answer'
-      ? tree.nodes[answerNodeId]
-      : null;
+  const answerNode = resolveAnswerNodeForSummary(
+    tree,
+    questionNode.id,
+    summaryNode,
+  );
 
   return {
     answerNodeId: answerNode?.id ?? null,
@@ -522,11 +523,8 @@ export function resolveSummaryCheckJudgmentContext(
   }
 
   return {
-    answerNodeId: resolveAnswerNodeIdForSummaryCheckJudgment(
-      tree,
-      questionNode.id,
-      selectedNode.id,
-    ),
+    answerNodeId:
+      resolveAnswerNodeForSummary(tree, questionNode.id, summaryNode)?.id ?? null,
     judgmentNodeId: selectedNode.id,
     questionNodeId: questionNode.id,
     summaryNodeId: summaryNode.id,
@@ -750,33 +748,19 @@ function resolveSummaryNodeForSummaryCheckJudgment(
 
   if (
     judgmentNode?.type === 'judgment' &&
-    judgmentNode.sourceSummaryId &&
-    tree.nodes[judgmentNode.sourceSummaryId]?.type === 'summary' &&
-    tree.nodes[judgmentNode.sourceSummaryId]?.parentId === questionNodeId
+    judgmentNode.sourceSummaryId
   ) {
-    return tree.nodes[judgmentNode.sourceSummaryId];
+    const linkedSummaryNode = tree.nodes[judgmentNode.sourceSummaryId];
+
+    if (
+      linkedSummaryNode?.type === 'summary' &&
+      linkedSummaryNode.parentId === questionNodeId
+    ) {
+      return linkedSummaryNode;
+    }
   }
 
   return findImmediatePreviousSummarySibling(tree, questionNodeId, judgmentNodeId);
-}
-
-function resolveAnswerNodeIdForSummaryCheckJudgment(
-  tree: NodeTree,
-  questionNodeId: string,
-  judgmentNodeId: string,
-) {
-  const judgmentNode = tree.nodes[judgmentNodeId];
-
-  if (
-    judgmentNode?.type === 'judgment' &&
-    judgmentNode.sourceAnswerId &&
-    tree.nodes[judgmentNode.sourceAnswerId]?.type === 'answer' &&
-    tree.nodes[judgmentNode.sourceAnswerId]?.parentId === questionNodeId
-  ) {
-    return judgmentNode.sourceAnswerId;
-  }
-
-  return getCurrentQuestionAnswerNodeId(tree, questionNodeId);
 }
 
 export function getLatestSummaryNodeIdForAnswer(
@@ -802,7 +786,9 @@ export function getLatestSummaryNodeIdForAnswer(
   );
   const summaryNodes = scopedChildNodes.filter(
     (childNode): childNode is Extract<TreeNode, { type: 'summary' }> =>
-      childNode.type === 'summary',
+      childNode.type === 'summary' &&
+      getSummaryNodeKind(tree, childNode) === 'answer-closure' &&
+      (!childNode.sourceAnswerId || childNode.sourceAnswerId === answerNodeId),
   );
 
   return summaryNodes[summaryNodes.length - 1]?.id ?? null;
@@ -831,6 +817,25 @@ export function findLatestAnswerBeforeQuestionChild(
   }
 
   return null;
+}
+
+function resolveAnswerNodeForSummary(
+  tree: NodeTree,
+  questionNodeId: string,
+  summaryNode: Extract<TreeNode, { type: 'summary' }>,
+): Extract<TreeNode, { type: 'answer' }> | null {
+  const linkedAnswerNode = summaryNode.sourceAnswerId
+    ? tree.nodes[summaryNode.sourceAnswerId]
+    : null;
+
+  if (
+    linkedAnswerNode?.type === 'answer' &&
+    linkedAnswerNode.parentId === questionNodeId
+  ) {
+    return linkedAnswerNode;
+  }
+
+  return findLatestAnswerBeforeQuestionChild(tree, questionNodeId, summaryNode.id);
 }
 
 function collectQuestionChildNodes(tree: NodeTree, questionNodeId: string) {
@@ -862,7 +867,10 @@ function findImmediatePreviousSummarySibling(
 
   const previousNode = questionChildNodes[judgmentIndex - 1];
 
-  return previousNode?.type === 'summary' ? previousNode : null;
+  return previousNode?.type === 'summary' &&
+    getSummaryNodeKind(tree, previousNode) === 'manual'
+    ? previousNode
+    : null;
 }
 
 function collectDirectQuestionTitles(tree: NodeTree, planStepNodeId: string) {

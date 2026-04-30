@@ -3,6 +3,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -217,13 +218,125 @@ test('guides recovery from the AI action card when no module exists', async () =
   await screen.findByRole('heading', { name: '当前学习模块' });
 
   expect(
-    screen.getByText(/当前还没有可供 AI 操作的学习模块/),
+    screen.getByText(/当前还没有可供运行时动作使用的学习模块/),
   ).toBeInTheDocument();
   fireEvent.click(screen.getAllByRole('button', { name: '新建模块' })[0]);
 
   expect(await screen.findByDisplayValue('新模块')).toBeInTheDocument();
   expect(
     screen.getByRole('button', { name: '为当前模块规划学习路径' }),
+  ).toBeInTheDocument();
+});
+
+test('restores question block collapse state after remounting the runtime screen', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createRuntimeQuestionBlockSnapshot(),
+  );
+  const firstRender = render(
+    <WorkspaceRuntimeScreen dependencies={dependencies} />,
+  );
+
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(
+    within(
+      screen.getByTestId('question-block-answer-group-answer-runtime-current'),
+    ).getByRole('button', {
+      name: '展开历史评估与旧解析',
+    }),
+  );
+
+  fireEvent.click(
+    within(screen.getByTestId('editor-node-answer-runtime-current')).getByRole(
+      'button',
+      {
+        name: '收起正文',
+      },
+    ),
+  );
+  fireEvent.click(
+    within(
+      screen.getByTestId('question-block-question-runtime-main'),
+    ).getByRole('button', {
+      name: '收起 block',
+    }),
+  );
+
+  firstRender.unmount();
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  const questionBlock = screen.getByTestId('question-block-question-runtime-main');
+
+  expect(questionBlock).toHaveAttribute('data-collapsed', 'true');
+
+  fireEvent.click(
+    within(questionBlock).getByRole('button', {
+      name: '展开 block',
+    }),
+  );
+
+  expect(
+    within(screen.getByTestId('editor-node-answer-runtime-current')).getByRole(
+      'button',
+      {
+        name: '展开正文',
+      },
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(
+      screen.getByTestId('question-block-answer-group-answer-runtime-current'),
+    ).getByRole('button', {
+      name: '收起历史评估与旧解析',
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByTestId('editor-node-judgment-runtime-current-history'),
+  ).toBeInTheDocument();
+});
+
+test('keeps the left runtime action card auxiliary while the main question block path stays reachable', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createRuntimeQuestionNeedingAnswerSnapshot(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(
+    within(screen.getByRole('tree', { name: '当前模块结构' })).getByRole(
+      'button',
+      {
+        name: /待回答问题/,
+      },
+    ),
+  );
+
+  expect(screen.getByText('辅助概览')).toBeInTheDocument();
+  expect(screen.getByText('下一步建议')).toBeInTheDocument();
+  expect(screen.getByText('冗余入口')).toBeInTheDocument();
+  expect(screen.getByTestId('question-direct-answer-callout')).toBeInTheDocument();
+
+  const blockActions = screen.getByTestId(
+    'question-block-actions-question-runtime-open',
+  );
+
+  expect(
+    within(blockActions).getByRole('button', { name: '直接回答当前问题' }),
+  ).toBeInTheDocument();
+  expect(
+    within(blockActions).getByRole('button', { name: '插入回答' }),
+  ).toBeInTheDocument();
+  expect(
+    within(blockActions).getByRole('button', { name: '插入追问' }),
+  ).toBeInTheDocument();
+  expect(
+    within(blockActions).getByRole('button', { name: '插入总结' }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText(/主编辑流已经收口到中间的 question block/),
   ).toBeInTheDocument();
 });
 
@@ -756,6 +869,186 @@ function createEmptyWorkspaceSnapshot(): WorkspaceSnapshot {
     createdAt: '2026-04-28T00:00:00.000Z',
     updatedAt: '2026-04-28T00:00:00.000Z',
   });
+}
+
+function createRuntimeQuestionBlockSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '运行时问题块主题',
+    workspaceId: 'workspace-runtime-question-block',
+    rootId: 'theme-runtime-question-block',
+    createdAt: '2026-04-30T10:00:00.000Z',
+    updatedAt: '2026-04-30T10:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-runtime-question-block',
+      title: '运行时问题块模块',
+      content: '',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-runtime-question-block',
+    createNode({
+      type: 'plan-step',
+      id: 'step-runtime-question-block',
+      title: '运行时问题块步骤',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-runtime-question-block',
+    createNode({
+      type: 'question',
+      id: 'question-runtime-main',
+      title: '运行时主问题',
+      content: '用于验证主视图折叠状态持久化。',
+      currentAnswerId: 'answer-runtime-current',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-runtime-main',
+    createNode({
+      type: 'answer',
+      id: 'answer-runtime-old',
+      title: '早期回答',
+      content: '这是早期回答。',
+      createdAt: '2026-04-30T10:01:00.000Z',
+      updatedAt: '2026-04-30T10:01:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-runtime-main',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-runtime-old',
+      title: '早期评估',
+      content: '这是早期评估。',
+      judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-runtime-old',
+      sourceAnswerUpdatedAt: '2026-04-30T10:01:00.000Z',
+      createdAt: '2026-04-30T10:02:00.000Z',
+      updatedAt: '2026-04-30T10:02:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-runtime-main',
+    createNode({
+      type: 'answer',
+      id: 'answer-runtime-current',
+      title: '当前回答',
+      content: '这是当前回答。',
+      createdAt: '2026-04-30T10:03:00.000Z',
+      updatedAt: '2026-04-30T10:03:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-runtime-main',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-runtime-current-history',
+      title: '当前旧评估',
+      content: '这是当前回答的旧评估。',
+      judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-runtime-current',
+      sourceAnswerUpdatedAt: '2026-04-30T10:03:00.000Z',
+      createdAt: '2026-04-30T10:03:30.000Z',
+      updatedAt: '2026-04-30T10:03:30.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-runtime-main',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-runtime-current',
+      title: '当前评估',
+      content: '这是当前评估。',
+      judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-runtime-current',
+      sourceAnswerUpdatedAt: '2026-04-30T10:03:00.000Z',
+      createdAt: '2026-04-30T10:04:00.000Z',
+      updatedAt: '2026-04-30T10:04:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createRuntimeQuestionNeedingAnswerSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '运行时待答主题',
+    workspaceId: 'workspace-runtime-open-question',
+    rootId: 'theme-runtime-open-question',
+    createdAt: '2026-04-30T10:30:00.000Z',
+    updatedAt: '2026-04-30T10:30:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-runtime-open-question',
+      title: '运行时待答模块',
+      content: '',
+      createdAt: '2026-04-30T10:30:00.000Z',
+      updatedAt: '2026-04-30T10:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-runtime-open-question',
+    createNode({
+      type: 'plan-step',
+      id: 'step-runtime-open-question',
+      title: '运行时待答步骤',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-04-30T10:30:00.000Z',
+      updatedAt: '2026-04-30T10:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-runtime-open-question',
+    createNode({
+      type: 'question',
+      id: 'question-runtime-open',
+      title: '待回答问题',
+      content: '用于验证左侧 action card 已经降级为辅助概览。',
+      createdAt: '2026-04-30T10:30:00.000Z',
+      updatedAt: '2026-04-30T10:30:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
 }
 
 function getAiCurrentConfigSelect() {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 
 import {
   reconcilePlanStepStatuses,
@@ -9,6 +9,7 @@ import {
   attachTagToNode,
   canParentAcceptChild,
   canNodeHaveChildren,
+  cloneNodeTree,
   createNode,
   deleteNode,
   detachTagFromNode,
@@ -561,6 +562,140 @@ export function useWorkspaceEditor({
     );
   }
 
+  function insertAnswerForQuestion(questionNodeId: string) {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    const placement = resolveLearningActionPlacement(
+      tree,
+      questionNodeId,
+      'insert-answer',
+    );
+
+    if (!placement) {
+      return;
+    }
+
+    const nextNode = createEditorNode('answer', questionNodeId);
+
+    runStructuralOperation(
+      () => {
+        const insertedTree = operations.insertChildNode(
+          tree,
+          placement.parentNodeId,
+          nextNode,
+          placement.insertIndex,
+        );
+        const nextTree = setQuestionCurrentAnswerId(
+          insertedTree,
+          questionNodeId,
+          nextNode.id,
+        );
+
+        return {
+          nextSelectedNodeId: nextNode.id,
+          nextTree,
+          preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
+        };
+      },
+      '插入回答失败，请检查当前问题节点。',
+    );
+  }
+
+  function insertFollowUpQuestion(questionNodeId: string) {
+    if (isInteractionLocked || !tree.nodes[questionNodeId]) {
+      return;
+    }
+
+    const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+    if (questionNode.type !== 'question') {
+      return;
+    }
+
+    const nextNode = createEditorNode('question', questionNodeId);
+
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.insertChildNode(
+          tree,
+          questionNodeId,
+          nextNode,
+          questionNode.childIds.length,
+        );
+
+        return {
+          nextSelectedNodeId: nextNode.id,
+          nextTree,
+          preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
+        };
+      },
+      '插入追问失败，请检查当前问题节点。',
+    );
+  }
+
+  function insertSummaryForQuestion(questionNodeId: string) {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    const placement = resolveLearningActionPlacement(
+      tree,
+      questionNodeId,
+      'insert-summary',
+    );
+
+    if (!placement) {
+      return;
+    }
+
+    const nextNode = createEditorNode('summary', questionNodeId, {
+      summaryKind: 'manual',
+    });
+
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.insertChildNode(
+          tree,
+          placement.parentNodeId,
+          nextNode,
+          placement.insertIndex,
+        );
+
+        return {
+          nextSelectedNodeId: nextNode.id,
+          nextTree,
+          preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
+        };
+      },
+      '插入总结失败，请检查当前问题节点。',
+    );
+  }
+
+  function setCurrentAnswer(questionNodeId: string, answerNodeId: string) {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    runStructuralOperation(
+      () => {
+        const nextTree = setQuestionCurrentAnswerId(
+          tree,
+          questionNodeId,
+          answerNodeId,
+        );
+
+        return {
+          nextSelectedNodeId: answerNodeId,
+          nextTree,
+          preferredModuleId: resolveModuleId(nextTree, answerNodeId, currentModuleId),
+        };
+      },
+      '设为当前回答失败，请检查问题与回答的归属关系。',
+    );
+  }
+
   function registerNodeElement(nodeId: string, element: HTMLElement | null) {
     if (!element) {
       nodeElementMapRef.current.delete(nodeId);
@@ -647,6 +782,9 @@ export function useWorkspaceEditor({
     childInsertOptions,
     createModule,
     expandedNodeIds,
+    insertAnswerForQuestion,
+    insertFollowUpQuestion,
+    insertSummaryForQuestion,
     learningActions,
     moduleNodes,
     operationError,
@@ -666,6 +804,7 @@ export function useWorkspaceEditor({
     tree,
     toggleSelectedNodeTag,
     updateNode,
+    setCurrentAnswer,
     workspaceTitle: initialSnapshot.workspace.title,
     insertChildAtSelection,
     insertSiblingAtSelection,
@@ -1191,6 +1330,36 @@ function applyNodePatch(tree: NodeTree, nodeId: string, patch: NodeContentPatch)
   }
 
   nextNode.updatedAt = new Date().toISOString();
+
+  return nextTree;
+}
+
+function setQuestionCurrentAnswerId(
+  tree: NodeTree,
+  questionNodeId: string,
+  answerNodeId: string,
+) {
+  const questionNode = tree.nodes[questionNodeId];
+  const answerNode = tree.nodes[answerNodeId];
+
+  if (
+    questionNode?.type !== 'question' ||
+    answerNode?.type !== 'answer' ||
+    answerNode.parentId !== questionNodeId ||
+    questionNode.currentAnswerId === answerNodeId
+  ) {
+    return tree;
+  }
+
+  const nextTree = cloneNodeTree(tree);
+  const nextQuestionNode = getNodeOrThrow(nextTree, questionNodeId);
+
+  if (nextQuestionNode.type !== 'question') {
+    return tree;
+  }
+
+  nextQuestionNode.currentAnswerId = answerNodeId;
+  nextQuestionNode.updatedAt = new Date().toISOString();
 
   return nextTree;
 }

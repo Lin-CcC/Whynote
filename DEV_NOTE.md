@@ -246,6 +246,24 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - 当源节点当前 `updatedAt` 晚于结果节点记录的 `source...UpdatedAt` 时，该结果进入“过期但保留”状态，供 runtime / 主视图提示“建议重新评估 / 重新检查”。
 - 当 answer 被删除或切成非 `answer` 时，所有 `sourceAnswerId` 指向它的 answer-closure `summary / judgment` 一律级联删除；当手写 `summary` 被删除或切成非手写总结语义时，所有 `sourceSummaryId` 指向它的 `summary-check judgment` 一律级联删除，不保留孤儿结果节点。
 
+### 28. question block 主视图是显示层重组，不是新节点类型
+
+- `question block` 只存在于主视图显示与交互层；底层树仍然只有 `question / answer / summary / judgment` 等真实节点，follow-up question 继续作为真实子节点存在。
+- 主视图允许围绕当前激活 `question` 做显示重组，但不改写底层树顺序；重组目标是还原真实学习链，而不是制造“当前回答区 / 旧回答区 / 全局历史结果区”这种跨组搬运。
+- `currentAnswerId` 只决定当前工作 answer、runtime 主路径、节点强调与“当前结果”归属，不再决定 question block 内 answer group 的前后顺序。
+- 每条 `answer` 必须与它自己的 `judgment / 答案解析` 就近显示；每条手写 `summary` 必须与它自己的 `summary-check judgment` 就近显示；不要把旧 answer 的 closure 结果挤到后续 answer 或 follow-up 下面。
+- `answer-closure summary` 必须显示为 `答案解析`，手写 `summary` 必须显示为 `总结`，`summary-check judgment` 必须显示为 `总结检查结果`；不要再把这三类内容混到一个“总结”语义里。
+- block 级动作只挂在当前激活 block：`直接回答当前问题`、`插入回答`、`插入追问`、`插入总结`。`answer` 与手写 `summary` 的继续修改、评估、设为当前回答、检查总结等动作继续留在对应节点卡片上。
+- 左侧 `WorkspaceRuntimeActionCard` 保留为“状态概览 + 下一步建议 + 冗余入口”，不再和主视图 question block 一起争夺问答总结链的主操作路径。
+
+### 29. question block 折叠状态属于 workspace 级本地视图状态
+
+- `question block` 整体折叠、`answer / judgment / summary` 正文折叠、组内历史区折叠，统一存入 workspace 级本地视图状态。
+- 这类折叠状态只属于当前 workspace 的本地视图偏好，不写入 snapshot，不参与结构树持久化，也不能复用 `StructureTree.expandedNodeIds`。
+- 默认语义要区分“默认展开”和“默认收起”：block 与正文用 `collapsed...Ids` 表达，历史区用 `expandedHistorySectionIds` 表达，避免把默认收起的历史区误持久化成“已折叠”。
+- 历史折叠必须收回各自 answer / summary 组内；不要再维护一个把旧回答本体和旧 closure 结果拆开的全局历史区。
+- 来自结构树、搜索或 runtime 入口的外部选中必须反向驱动主视图自动展开：如果目标节点位于折叠 block、折叠正文或折叠历史区内，主视图需要自动把对应区域展开到可见，而不是要求用户先手工找回入口。
+
 ## 后续需要重新评估这些决策的触发条件
 
 - 需要公开注册或公开商用

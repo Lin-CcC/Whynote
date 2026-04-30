@@ -4,15 +4,18 @@
 
 ## 当前工作面
 
-- 当前工作树：`codex/v11-current-answer-semantics`
-- 当前短期目标：完成 V1.1 第一轮里的“当前回答语义 + 显式 source 配对 + 过期判定 + 级联清理”，只落数据契约、runtime 语义、学习结果配对与清理规则，不扩到主视图 block UI、折叠 UI、导出模式、思维导图或资料系统重构。
+- 当前工作树：`codex/question-block-order-fix`
+- 当前短期目标：修复 `question block` 主视图里 `answer / judgment / 答案解析 / 手写 summary / 总结检查结果 / follow-up question` 的链条顺序割裂，只改主视图分组与排序逻辑，不扩展到思维导图、导出、资料系统重构、AI provider、完整阅读态/编辑态系统或新节点类型。
 
 ## 当前短期任务
 
-- 当前执行项已完成；本轮 `currentAnswerId`、显式 source 配对、过期判定、级联清理、兼容兜底、回归测试与文档更新已落地，等待下一轮回归或反馈。
+- 修复 question block 内 `answer / closure / follow-up` 被拆开的排序问题。
+- 收紧 `currentAnswerId` 的职责边界：只决定当前工作 answer 与视觉强调，不再驱动主视图跨组重排。
+- 把历史结果收回各自 answer / summary 组内折叠，替代全局“旧回答 / 历史结果”割裂区。
+- 补多 answer、多 closure、summary-check、follow-up 与折叠回归测试。
 
 ## 本轮明确不做
 
-- 不做主视图 `question` block UI 或折叠交互
-- 不做导出模式、思维导图或资料系统重构
-- 不做完整回答历史系统、主链外 runtime 改版或无关壳层整理
+- 不做思维导图、导出模式或资料系统重构
+- 不重写 `currentAnswerId`、显式 `sourceId + sourceUpdatedAt`、过期判定或 block 激活语义
+- 不引入新的学习节点类型，不重做 judgment / hint / 答案解析 入口
