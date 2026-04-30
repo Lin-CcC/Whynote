@@ -697,6 +697,21 @@ function createLegacyAnswerFallbackSnapshot(): WorkspaceSnapshot {
     }),
   );
 
+  const legacyQuestionNode = tree.nodes['question-legacy'];
+
+  if (legacyQuestionNode?.type === 'question') {
+    const { currentAnswerId: _ignoredCurrentAnswerId, ...questionWithoutCurrentAnswer } =
+      legacyQuestionNode;
+
+    tree = {
+      ...tree,
+      nodes: {
+        ...tree.nodes,
+        'question-legacy': questionWithoutCurrentAnswer,
+      },
+    };
+  }
+
   return {
     ...snapshot,
     tree,

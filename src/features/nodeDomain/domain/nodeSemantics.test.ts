@@ -1,13 +1,18 @@
 import {
   createNode,
   createWorkspaceSnapshot,
+  getCurrentQuestionAnswerNodeId,
   getJudgmentNodeKind,
   getDisplayNodeTitle,
   getDisplayNodeTypeLabel,
+  getQuestionAnswerClosureSummaryNodeId,
+  getQuestionSummaryCheckJudgmentNodeId,
   getSummaryNodeKind,
+  isAnswerClosureResultNodeStale,
   insertChildNode,
   isAnswerClosureSummaryNode,
   isScaffoldSummaryNode,
+  isSummaryCheckJudgmentNodeStale,
   isSummaryCheckJudgmentNode,
   stripRedundantDisplayTypePrefix,
 } from '..';
@@ -56,6 +61,61 @@ test('treats explicitly marked summary-check judgments as a separate judgment ki
 
   expect(getJudgmentNodeKind(tree, 'judgment-summary-check')).toBe('summary-check');
   expect(isSummaryCheckJudgmentNode(tree, 'judgment-summary-check')).toBe(true);
+});
+
+test('falls back to the latest filled answer when legacy questions do not have currentAnswerId', () => {
+  const tree = createLegacyCurrentAnswerSnapshot().tree;
+
+  expect(getCurrentQuestionAnswerNodeId(tree, 'question-legacy-current-answer')).toBe(
+    'answer-legacy-current-answer-v2',
+  );
+});
+
+test('falls back to legacy sibling heuristics when explicit source fields are missing', () => {
+  const tree = createLegacyClosurePairSnapshot().tree;
+
+  expect(
+    getQuestionAnswerClosureSummaryNodeId(
+      tree,
+      'question-legacy-closure-pair',
+      'answer-legacy-closure-pair',
+    ),
+  ).toBe('summary-legacy-closure-pair');
+  expect(
+    getQuestionSummaryCheckJudgmentNodeId(
+      tree,
+      'question-legacy-closure-pair',
+      'summary-legacy-manual',
+    ),
+  ).toBe('judgment-legacy-summary-check');
+});
+
+test('marks explicit answer-closure and summary-check results as stale after the source updates', () => {
+  const snapshot = createExplicitSourcePairSnapshot();
+  const tree = structuredClone(snapshot.tree);
+  const answerNode = tree.nodes['answer-explicit-source-pair'];
+  const summaryNode = tree.nodes['summary-manual-explicit-source-pair'];
+
+  expect(answerNode?.type).toBe('answer');
+  expect(summaryNode?.type).toBe('summary');
+
+  if (answerNode?.type === 'answer') {
+    answerNode.updatedAt = '2026-04-30T12:00:00.000Z';
+  }
+
+  if (summaryNode?.type === 'summary') {
+    summaryNode.updatedAt = '2026-04-30T12:00:00.000Z';
+  }
+
+  expect(
+    isAnswerClosureResultNodeStale(tree, 'judgment-explicit-answer-closure'),
+  ).toBe(true);
+  expect(
+    isAnswerClosureResultNodeStale(tree, 'summary-explicit-answer-closure'),
+  ).toBe(true);
+  expect(
+    isSummaryCheckJudgmentNodeStale(tree, 'judgment-explicit-summary-check'),
+  ).toBe(true);
 });
 
 test('strips only the redundant type prefix from display titles when the label is already visible', () => {
@@ -332,6 +392,303 @@ function createExplicitManualSummarySnapshot() {
       judgmentKind: 'summary-check',
       createdAt: '2026-04-30T00:00:00.000Z',
       updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createLegacyCurrentAnswerSnapshot() {
+  const snapshot = createWorkspaceSnapshot({
+    title: 'legacy current answer',
+    workspaceId: 'workspace-legacy-current-answer',
+    rootId: 'theme-legacy-current-answer',
+    createdAt: '2026-04-30T10:00:00.000Z',
+    updatedAt: '2026-04-30T10:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-legacy-current-answer',
+      title: 'module',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-legacy-current-answer',
+    createNode({
+      type: 'question',
+      id: 'question-legacy-current-answer',
+      title: 'legacy question',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-legacy-current-answer',
+    createNode({
+      type: 'answer',
+      id: 'answer-legacy-current-answer-v1',
+      title: 'answer v1',
+      content: 'first answer',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-legacy-current-answer',
+    createNode({
+      type: 'answer',
+      id: 'answer-legacy-current-answer-v2',
+      title: 'answer v2',
+      content: 'second answer',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-legacy-current-answer',
+    createNode({
+      type: 'answer',
+      id: 'answer-legacy-current-answer-v3',
+      title: 'answer v3 draft',
+      content: '',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    }),
+  );
+
+  const questionNode = tree.nodes['question-legacy-current-answer'];
+
+  if (questionNode?.type === 'question') {
+    delete questionNode.currentAnswerId;
+  }
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createLegacyClosurePairSnapshot() {
+  const snapshot = createWorkspaceSnapshot({
+    title: 'legacy closure pair',
+    workspaceId: 'workspace-legacy-closure-pair',
+    rootId: 'theme-legacy-closure-pair',
+    createdAt: '2026-04-30T10:30:00.000Z',
+    updatedAt: '2026-04-30T10:30:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-legacy-closure-pair',
+      title: 'module',
+      createdAt: '2026-04-30T10:30:00.000Z',
+      updatedAt: '2026-04-30T10:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-legacy-closure-pair',
+    createNode({
+      type: 'question',
+      id: 'question-legacy-closure-pair',
+      title: 'question',
+      createdAt: '2026-04-30T10:30:00.000Z',
+      updatedAt: '2026-04-30T10:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-legacy-closure-pair',
+    createNode({
+      type: 'answer',
+      id: 'answer-legacy-closure-pair',
+      title: 'answer',
+      content: 'answer',
+      createdAt: '2026-04-30T10:30:00.000Z',
+      updatedAt: '2026-04-30T10:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-legacy-closure-pair',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-legacy-closure-pair',
+      title: 'closure judgment',
+      content: 'needs more detail',
+      hint: 'legacy closure hint',
+      createdAt: '2026-04-30T10:30:00.000Z',
+      updatedAt: '2026-04-30T10:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-legacy-closure-pair',
+    createNode({
+      type: 'summary',
+      id: 'summary-legacy-closure-pair',
+      title: 'closure summary',
+      content: 'closure summary',
+      createdAt: '2026-04-30T10:30:00.000Z',
+      updatedAt: '2026-04-30T10:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-legacy-closure-pair',
+    createNode({
+      type: 'summary',
+      id: 'summary-legacy-manual',
+      title: 'manual summary',
+      content: 'manual summary',
+      summaryKind: 'manual',
+      createdAt: '2026-04-30T10:30:00.000Z',
+      updatedAt: '2026-04-30T10:30:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-legacy-closure-pair',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-legacy-summary-check',
+      title: 'summary check judgment',
+      content: 'summary check',
+      judgmentKind: 'summary-check',
+      createdAt: '2026-04-30T10:30:00.000Z',
+      updatedAt: '2026-04-30T10:30:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createExplicitSourcePairSnapshot() {
+  const snapshot = createWorkspaceSnapshot({
+    title: 'explicit source pair',
+    workspaceId: 'workspace-explicit-source-pair',
+    rootId: 'theme-explicit-source-pair',
+    createdAt: '2026-04-30T11:00:00.000Z',
+    updatedAt: '2026-04-30T11:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-explicit-source-pair',
+      title: 'module',
+      createdAt: '2026-04-30T11:00:00.000Z',
+      updatedAt: '2026-04-30T11:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-explicit-source-pair',
+    createNode({
+      type: 'question',
+      id: 'question-explicit-source-pair',
+      title: 'question',
+      createdAt: '2026-04-30T11:00:00.000Z',
+      updatedAt: '2026-04-30T11:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-explicit-source-pair',
+    createNode({
+      type: 'answer',
+      id: 'answer-explicit-source-pair',
+      title: 'answer',
+      content: 'answer',
+      createdAt: '2026-04-30T11:00:00.000Z',
+      updatedAt: '2026-04-30T11:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-explicit-source-pair',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-explicit-answer-closure',
+      title: 'closure judgment',
+      content: 'closure judgment',
+      judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-explicit-source-pair',
+      sourceAnswerUpdatedAt: '2026-04-30T11:00:00.000Z',
+      createdAt: '2026-04-30T11:00:00.000Z',
+      updatedAt: '2026-04-30T11:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-explicit-source-pair',
+    createNode({
+      type: 'summary',
+      id: 'summary-explicit-answer-closure',
+      title: 'closure summary',
+      content: 'closure summary',
+      summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-explicit-source-pair',
+      sourceAnswerUpdatedAt: '2026-04-30T11:00:00.000Z',
+      createdAt: '2026-04-30T11:00:00.000Z',
+      updatedAt: '2026-04-30T11:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-explicit-source-pair',
+    createNode({
+      type: 'summary',
+      id: 'summary-manual-explicit-source-pair',
+      title: 'manual summary',
+      content: 'manual summary',
+      summaryKind: 'manual',
+      createdAt: '2026-04-30T11:00:00.000Z',
+      updatedAt: '2026-04-30T11:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-explicit-source-pair',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-explicit-summary-check',
+      title: 'summary check judgment',
+      content: 'summary check judgment',
+      judgmentKind: 'summary-check',
+      sourceAnswerId: 'answer-explicit-source-pair',
+      sourceAnswerUpdatedAt: '2026-04-30T11:00:00.000Z',
+      sourceSummaryId: 'summary-manual-explicit-source-pair',
+      sourceSummaryUpdatedAt: '2026-04-30T11:00:00.000Z',
+      createdAt: '2026-04-30T11:00:00.000Z',
+      updatedAt: '2026-04-30T11:00:00.000Z',
     }),
   );
 

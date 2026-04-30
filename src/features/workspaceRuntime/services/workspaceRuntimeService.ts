@@ -18,7 +18,6 @@ import {
 } from '../../learningEngine';
 import {
   cloneNodeTree,
-  deleteNode,
   getModuleScopeId,
   getNodeOrThrow,
   type ModuleNode,
@@ -206,6 +205,7 @@ export function createWorkspaceRuntimeService(
         },
       );
       const previousChildIds = new Set(questionNode.childIds);
+      const sourceAnswerNode = getNodeOrThrow(snapshot.tree, context.answerNodeId);
       const closureResult = await questionClosureService.generate({
         topic: snapshot.workspace.title,
         moduleTitle: context.moduleNode?.title,
@@ -220,6 +220,12 @@ export function createWorkspaceRuntimeService(
         snapshot.tree,
         questionNodeId,
         closureResult,
+        sourceAnswerNode.type === 'answer'
+          ? {
+              sourceAnswerId: sourceAnswerNode.id,
+              sourceAnswerUpdatedAt: sourceAnswerNode.updatedAt,
+            }
+          : undefined,
       );
       const nextSnapshot = createSnapshot(nextTree, snapshot);
 
@@ -282,6 +288,21 @@ export function createWorkspaceRuntimeService(
         context.questionNodeId,
         context.summaryNodeId,
         result.judgment,
+        {
+          ...(context.answerNodeId &&
+          snapshot.tree.nodes[context.answerNodeId]?.type === 'answer'
+            ? {
+                sourceAnswerId: context.answerNodeId,
+                sourceAnswerUpdatedAt:
+                  snapshot.tree.nodes[context.answerNodeId].updatedAt,
+              }
+            : {}),
+          sourceSummaryId: context.summaryNodeId,
+          sourceSummaryUpdatedAt:
+            snapshot.tree.nodes[context.summaryNodeId]?.type === 'summary'
+              ? snapshot.tree.nodes[context.summaryNodeId].updatedAt
+              : undefined,
+        },
       );
       const nextSnapshot = createSnapshot(nextTree, snapshot);
       const nextJudgmentNodeId = findImmediateSummaryCheckJudgmentId(
@@ -444,19 +465,26 @@ export function createWorkspaceRuntimeService(
       );
 
       if (recentSnapshot) {
+        const normalizedRecentTree = normalizeTreeForCurrentAnswerCompatibility(
+          recentSnapshot.tree,
+        );
+        const normalizedRecentSnapshot =
+          normalizedRecentTree === recentSnapshot.tree
+            ? recentSnapshot
+            : createSnapshot(normalizedRecentTree, recentSnapshot);
         const resourceMetadataRecords =
           await dependencies.structuredDataStorage.listResourceMetadata(
-            recentSnapshot.workspace.id,
+            normalizedRecentSnapshot.workspace.id,
           );
 
         return {
-          snapshot: recentSnapshot,
+          snapshot: normalizedRecentSnapshot,
           initialModuleId: resolveInitialModuleId(
-            recentSnapshot.tree,
+            normalizedRecentSnapshot.tree,
             recentState.moduleId,
           ),
           initialSelectedNodeId: resolveInitialSelectedNodeId(
-            recentSnapshot.tree,
+            normalizedRecentSnapshot.tree,
             recentState.focusedNodeId,
           ),
           resourceMetadataRecords,
@@ -478,21 +506,30 @@ export function createWorkspaceRuntimeService(
         throw new Error(`工作区 ${latestWorkspace.id} 读取为空。`);
       }
 
+      const normalizedTree = normalizeTreeForCurrentAnswerCompatibility(
+        snapshot.tree,
+      );
+      const normalizedSnapshot =
+        normalizedTree === snapshot.tree
+          ? snapshot
+          : createSnapshot(normalizedTree, snapshot);
       const resourceMetadataRecords =
         await dependencies.structuredDataStorage.listResourceMetadata(
           latestWorkspace.id,
         );
 
-      const initialModuleId = resolveInitialModuleId(snapshot.tree);
-      const initialSelectedNodeId = resolveInitialSelectedNodeId(snapshot.tree);
+      const initialModuleId = resolveInitialModuleId(normalizedSnapshot.tree);
+      const initialSelectedNodeId = resolveInitialSelectedNodeId(
+        normalizedSnapshot.tree,
+      );
 
-      rememberSelectionState(snapshot.workspace.id, {
+      rememberSelectionState(normalizedSnapshot.workspace.id, {
         currentModuleId: initialModuleId,
         selectedNodeId: initialSelectedNodeId,
       });
 
       return {
-        snapshot,
+        snapshot: normalizedSnapshot,
         initialModuleId,
         initialSelectedNodeId,
         resourceMetadataRecords,
@@ -605,13 +642,72 @@ function createSnapshot(
   tree: NodeTree,
   snapshot: WorkspaceSnapshot,
 ): WorkspaceSnapshot {
+  const normalizedTree = normalizeTreeForCurrentAnswerCompatibility(tree);
+
   return {
     workspace: {
       ...snapshot.workspace,
       updatedAt: new Date().toISOString(),
     },
-    tree: reconcilePlanStepStatuses(tree),
+    tree: reconcilePlanStepStatuses(normalizedTree),
   };
+}
+
+function normalizeTreeForCurrentAnswerCompatibility(tree: NodeTree) {
+  let nextTree = tree;
+  let hasChange = false;
+
+  for (const node of Object.values(tree.nodes)) {
+    if (node.type !== 'question' || node.currentAnswerId) {
+      continue;
+    }
+
+    const fallbackCurrentAnswerId = resolveLegacyInitialCurrentAnswerId(
+      tree,
+      node.id,
+    );
+
+    if (!fallbackCurrentAnswerId) {
+      continue;
+    }
+
+    if (!hasChange) {
+      nextTree = cloneNodeTree(tree);
+      hasChange = true;
+    }
+
+    const nextQuestionNode = getNodeOrThrow(nextTree, node.id);
+
+    if (nextQuestionNode.type === 'question' && !nextQuestionNode.currentAnswerId) {
+      nextQuestionNode.currentAnswerId = fallbackCurrentAnswerId;
+    }
+  }
+
+  return nextTree;
+}
+
+function resolveLegacyInitialCurrentAnswerId(
+  tree: NodeTree,
+  questionNodeId: string,
+) {
+  const questionNode = tree.nodes[questionNodeId];
+
+  if (questionNode?.type !== 'question') {
+    return null;
+  }
+
+  const answerNodes = questionNode.childIds
+    .map((childId) => tree.nodes[childId])
+    .filter(
+      (
+        childNode,
+      ): childNode is Extract<TreeNode, { type: 'answer' }> => childNode?.type === 'answer',
+    );
+  const filledAnswerNodes = answerNodes.filter(
+    (answerNode) => answerNode.content.trim().length > 0,
+  );
+
+  return filledAnswerNodes[filledAnswerNodes.length - 1]?.id ?? null;
 }
 
 function resolveInitialModuleId(tree: NodeTree, preferredModuleId?: string | null) {
@@ -875,29 +971,21 @@ function appendSummaryCheckJudgmentToTree(
   questionNodeId: string,
   summaryNodeId: string,
   judgmentDraft: JudgmentNodeDraft,
+  sourceOptions?: {
+    sourceAnswerId?: string;
+    sourceAnswerUpdatedAt?: string;
+    sourceSummaryId?: string;
+    sourceSummaryUpdatedAt?: string;
+  },
 ) {
-  const existingSummaryCheckJudgmentId = findImmediateSummaryCheckJudgmentId(
+  return appendLearningNodeDraftToTree(
     tree,
     questionNodeId,
-    summaryNodeId,
-  );
-  let baseTree = tree;
-  let insertIndex = getSummaryCheckJudgmentInsertIndex(tree, questionNodeId, summaryNodeId);
-
-  if (existingSummaryCheckJudgmentId) {
-    baseTree = deleteNode(baseTree, existingSummaryCheckJudgmentId);
-    insertIndex = getSummaryCheckJudgmentInsertIndex(
-      baseTree,
-      questionNodeId,
-      summaryNodeId,
-    );
-  }
-
-  return appendLearningNodeDraftToTree(
-    baseTree,
-    questionNodeId,
-    judgmentDraft,
-    insertIndex,
+    {
+      ...judgmentDraft,
+      ...sourceOptions,
+    },
+    getSummaryCheckJudgmentInsertIndex(tree, questionNodeId, summaryNodeId),
   );
 }
 

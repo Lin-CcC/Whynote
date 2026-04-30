@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+﻿import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
 
 import type {
@@ -32,6 +32,37 @@ afterEach(async () => {
     }
   }
 });
+
+function getAnswerEvaluationCallout() {
+  return screen.getByTestId('answer-evaluation-callout');
+}
+
+function getAnswerEvaluationButton() {
+  return within(getAnswerEvaluationCallout()).getByRole('button', {
+    name: '重新评估当前回答',
+  });
+}
+
+function revealHistoryAnswer(nodeTestId: string) {
+  const expandPreviousAnswersButton = screen.queryByRole('button', {
+    name: '展开早期回答',
+  });
+
+  if (expandPreviousAnswersButton) {
+    fireEvent.click(expandPreviousAnswersButton);
+  }
+
+  const answerNode = screen.getByTestId(nodeTestId);
+  const expandBodyButton = within(answerNode).queryByRole('button', {
+    name: '展开正文',
+  });
+
+  if (expandBodyButton) {
+    fireEvent.click(expandBodyButton);
+  }
+
+  return answerNode;
+}
 
 test('evaluates an incomplete answer into judgment, summary and follow-up question with persisted citations', async () => {
   const dependencies = await createPreloadedDependencies(
@@ -68,10 +99,10 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
   await waitFor(() => {
     expect(
-      screen.getByRole('button', { name: '重新评估当前回答' }),
+      getAnswerEvaluationButton(),
     ).toBeEnabled();
   });
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('回答还不完整'),
@@ -92,9 +123,6 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
       name: '查看答案解析',
     }),
   ).toBeInTheDocument();
-  expect(
-    screen.getByText('答案解析可以对照，但主路径还是留在当前回答。'),
-  ).toBeInTheDocument();
 
   const summaryNode = screen
     .getByDisplayValue('标准理解')
@@ -109,6 +137,7 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   );
   const judgmentNode = findNodeByTitle(savedSnapshot, '判断：回答还不完整');
   const persistedSummaryNode = findNodeByTitle(savedSnapshot, '标准理解');
+  const answerNode = savedSnapshot.tree.nodes['answer-answer-closure'];
   const stepNode = savedSnapshot.tree.nodes['step-answer-closure'];
 
   expect(judgmentNode?.referenceIds).toHaveLength(1);
@@ -119,6 +148,16 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   expect(
     savedSnapshot.tree.references[persistedSummaryNode!.referenceIds[0]].targetNodeId,
   ).toBe('fragment-batching');
+  expect(judgmentNode).toMatchObject({
+    type: 'judgment',
+    sourceAnswerId: 'answer-answer-closure',
+    sourceAnswerUpdatedAt: answerNode?.updatedAt,
+  });
+  expect(persistedSummaryNode).toMatchObject({
+    type: 'summary',
+    sourceAnswerId: 'answer-answer-closure',
+    sourceAnswerUpdatedAt: answerNode?.updatedAt,
+  });
   expect(stepNode.type).toBe('plan-step');
   expect(stepNode.type === 'plan-step' ? stepNode.status : null).toBe('doing');
 
@@ -161,18 +200,18 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
   fireEvent.focus(screen.getByLabelText('回答草稿 标题'));
   await waitFor(() => {
     expect(
-      screen.getByRole('button', { name: '重新评估当前回答' }),
+      getAnswerEvaluationButton(),
     ).toBeEnabled();
   });
   expect(screen.getByTestId('answer-evaluation-callout')).toHaveTextContent(
-    '改完这版回答再重评',
+    '回答还可以直接继续修改，再决定是否重新评估。',
   );
   expect(screen.getByTestId('answer-evaluation-callout')).toHaveTextContent(
-    '先重评当前回答，把判断和答案解析补出来。',
+    '如果评估链还没闭合，优先补齐当前回答。',
   );
-  expect(screen.getByText('当前回答修订')).toBeInTheDocument();
+  expect(screen.getByTestId('answer-evaluation-callout')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('回答还不完整'),
@@ -244,14 +283,14 @@ test('directly answers a hand-authored question and keeps the answer-revision pa
     'true',
   );
   expect(observedLearningActionPrompt).toContain('学习动作：insert-answer');
-  expect(screen.getByText('当前回答修订')).toBeInTheDocument();
+  expect(screen.getByTestId('answer-evaluation-callout')).toBeInTheDocument();
 
   await waitFor(() => {
     expect(
-      screen.getByRole('button', { name: '重新评估当前回答' }),
+      getAnswerEvaluationButton(),
     ).toBeEnabled();
   });
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('AI 回答还可再补'),
@@ -282,9 +321,14 @@ test('directly answers a hand-authored question and keeps the answer-revision pa
     (snapshot) => findNodeByTitle(snapshot, 'AI 回答草稿') !== null,
   );
   const answerNode = findNodeByTitle(savedSnapshot, 'AI 回答草稿');
+  const questionNode = savedSnapshot.tree.nodes['question-manual-direct-answer'];
 
   expect(answerNode?.type).toBe('answer');
   expect(answerNode?.parentId).toBe('question-manual-direct-answer');
+  expect(questionNode).toMatchObject({
+    type: 'question',
+    currentAnswerId: answerNode?.id,
+  });
 });
 
 test('directly answers a generated question without relying on question source', async () => {
@@ -355,10 +399,10 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
   await waitFor(() => {
     expect(
-      screen.getByRole('button', { name: '重新评估当前回答' }),
+      getAnswerEvaluationButton(),
     ).toBeEnabled();
   });
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('已答到当前问题'),
@@ -391,7 +435,7 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   ).toHaveAttribute('data-node-selected', 'true');
 });
 
-test('re-evaluates only the currently selected answer when a question already has multiple answers', async () => {
+test('re-evaluates the question current answer instead of the selected old answer', async () => {
   let observedQuestionClosurePrompt = '';
   const dependencies = await createPreloadedDependencies(
     createMultiAnswerClosureSnapshot(),
@@ -404,17 +448,17 @@ test('re-evaluates only the currently selected answer when a question already ha
         return {
           isAnswerSufficient: false,
           judgment: {
-            title: '判断：第一版回答还不完整',
-            content: '这次只继续围绕当前选中的回答补缺口。',
+            title: '判断：第二版回答还不完整',
+            content: '这次只继续围绕当前回答补缺口。',
           },
           summary: {
             title: '标准理解',
-            content: '先把第一版回答缺失的因果关系补清楚，再决定是否需要继续追问。',
+            content: '先把第二版回答缺失的因果关系补清楚，再决定是否需要继续追问。',
           },
           followUpQuestions: [
             {
-              title: '追问：第一版还缺哪条因果关系？',
-              content: '继续围绕当前这版回答补关键缺口。',
+              title: '追问：第二版还缺哪条因果关系？',
+              content: '继续围绕当前回答补关键缺口。',
             },
           ],
         };
@@ -425,26 +469,28 @@ test('re-evaluates only the currently selected answer when a question already ha
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByLabelText('第一版回答 标题'));
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  const firstAnswerNode = revealHistoryAnswer('editor-node-answer-answer-closure');
+
+  fireEvent.focus(within(firstAnswerNode).getByLabelText('第一版回答 标题'));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
-    await screen.findByDisplayValue('第一版回答还不完整'),
+    await screen.findByDisplayValue('第二版回答还不完整'),
   ).toBeInTheDocument();
-  expect(observedQuestionClosurePrompt).toContain('当前回答：第一版回答');
-  expect(observedQuestionClosurePrompt).toContain('因为 React 会先把更新合并起来。');
-  expect(observedQuestionClosurePrompt).not.toContain('第二版回答');
-  expect(observedQuestionClosurePrompt).not.toContain(
+  expect(observedQuestionClosurePrompt).toContain('当前回答：第二版回答');
+  expect(observedQuestionClosurePrompt).toContain(
     '因为同一轮事件里的更新会统一提交，所以能减少重复渲染。',
   );
+  expect(observedQuestionClosurePrompt).not.toContain('当前回答：第一版回答');
+  expect(observedQuestionClosurePrompt).not.toContain('因为 React 会先把更新合并起来。');
   expect(
     screen
-      .getByDisplayValue('第一版回答')
+      .getByDisplayValue('第二版回答')
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
 });
 
-test('scopes learning-action drafts to the currently selected answer instead of aggregating sibling answers', async () => {
+test('scopes learning-action drafts to the question current answer instead of the selected old answer', async () => {
   let observedLearningActionPrompt = '';
   const dependencies = await createPreloadedDependencies(
     createMultiAnswerClosureSnapshot(),
@@ -455,8 +501,8 @@ test('scopes learning-action drafts to the currently selected answer instead of 
         observedLearningActionPrompt = userMessage?.content ?? '';
 
         return {
-          title: '总结：只围绕第一版回答',
-          content: '只围绕第一版回答补上缺失的因果关系。',
+          title: '总结：只围绕第二版回答',
+          content: '只围绕第二版回答补上缺失的因果关系。',
         };
       },
     }),
@@ -465,25 +511,31 @@ test('scopes learning-action drafts to the currently selected answer instead of 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByLabelText('第一版回答 标题'));
-  await waitFor(() => {
-    expect(screen.getByRole('button', { name: '插入总结' })).toBeEnabled();
-  });
-  fireEvent.click(screen.getByRole('button', { name: '插入总结' }));
+  const firstAnswerNode = revealHistoryAnswer('editor-node-answer-answer-closure');
 
-  expect(
-    await screen.findByDisplayValue('只围绕第一版回答'),
-  ).toBeInTheDocument();
+  fireEvent.focus(within(firstAnswerNode).getByLabelText('第一版回答 标题'));
+  const blockActions = await screen.findByTestId(
+    'question-block-actions-question-answer-closure',
+  );
+
+  await waitFor(() => {
+    expect(
+      within(blockActions).getByRole('button', { name: '插入总结' }),
+    ).toBeEnabled();
+  });
+  fireEvent.click(within(blockActions).getByRole('button', { name: '插入总结' }));
+  await waitFor(() => {
+    expect(observedLearningActionPrompt).toContain('现有回答');
+  });
   expect(observedLearningActionPrompt).toContain('现有回答');
-  expect(observedLearningActionPrompt).toContain('第一版回答');
-  expect(observedLearningActionPrompt).toContain('因为 React 会先把更新合并起来。');
-  expect(observedLearningActionPrompt).not.toContain('第二版回答');
-  expect(observedLearningActionPrompt).not.toContain(
+  expect(observedLearningActionPrompt).toContain('第二版回答');
+  expect(observedLearningActionPrompt).toContain(
     '因为同一轮事件里的更新会统一提交，所以能减少重复渲染。',
   );
+  expect(observedLearningActionPrompt).not.toContain('现有回答：当前回答：第一版回答');
 });
 
-test('views the explanation that belongs to the currently selected answer round', async () => {
+test('views the explanation that belongs to the question current answer round', async () => {
   const dependencies = await createPreloadedDependencies(
     createMultiRoundClosureSnapshot(),
   );
@@ -491,23 +543,33 @@ test('views the explanation that belongs to the currently selected answer round'
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByLabelText('第一版回答 标题'));
+  const firstAnswerNode = revealHistoryAnswer('editor-node-answer-answer-closure');
+
+  fireEvent.focus(within(firstAnswerNode).getByLabelText('第一版回答 标题'));
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: '查看答案解析' })).toBeEnabled();
+    expect(
+      within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
+        name: '查看答案解析',
+      }),
+    ).toBeEnabled();
   });
-  fireEvent.click(screen.getByRole('button', { name: '查看答案解析' }));
+  fireEvent.click(
+    within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
+      name: '查看答案解析',
+    }),
+  );
 
   expect(
-    await screen.findByDisplayValue('标准理解：第一版回答'),
+    await screen.findByDisplayValue('标准理解：第二版回答'),
   ).toBeInTheDocument();
   expect(
     screen
-      .getByDisplayValue('标准理解：第一版回答')
+      .getByDisplayValue('标准理解：第二版回答')
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
   expect(
     screen
-      .getByDisplayValue('标准理解：第二版回答')
+      .getByDisplayValue('标准理解：第一版回答')
       .closest('[data-testid^="editor-node-"]'),
   ).not.toHaveAttribute('data-node-selected', 'true');
 });
@@ -520,6 +582,7 @@ test('keeps judgment nodes actionable within the current answer revision path', 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
+  revealHistoryAnswer('editor-node-answer-answer-closure');
   fireEvent.click(screen.getByRole('button', { name: /第一版回答还不完整/ }));
 
   const inlineActions = await screen.findByTestId(
@@ -535,13 +598,8 @@ test('keeps judgment nodes actionable within the current answer revision path', 
     within(inlineActions).getByRole('button', { name: '回到当前回答继续修改' }),
   ).toBeInTheDocument();
   expect(
-    screen.queryByRole('button', { name: '重新评估当前回答' }),
+    screen.queryByTestId('answer-evaluation-callout'),
   ).not.toBeInTheDocument();
-  expect(
-    screen.getByText(
-      '当前 judgment 的主动作已经收口到正文卡片，左侧不再重复抢这条路径。',
-    ),
-  ).toBeInTheDocument();
 
   fireEvent.click(
     within(inlineActions).getByRole('button', { name: '回到当前回答继续修改' }),
@@ -552,6 +610,7 @@ test('keeps judgment nodes actionable within the current answer revision path', 
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
 
+  revealHistoryAnswer('editor-node-answer-answer-closure');
   fireEvent.click(screen.getByRole('button', { name: /第一版回答还不完整/ }));
   fireEvent.click(
     within(
@@ -665,9 +724,7 @@ test('creates AI drafts instead of empty shells for scaffold, question, summary 
     ),
   ).toBeInTheDocument();
 
-  fireEvent.click(
-    screen.getByRole('button', { name: '插入总结' }),
-  );
+  fireEvent.click(screen.getAllByRole('button', { name: '插入总结' })[0]);
   expect(
     await screen.findByDisplayValue('先把节奏和结果分开看'),
   ).toBeInTheDocument();
@@ -730,10 +787,10 @@ test('tolerates question-closure JSON wrapped in explanation text and code fence
   fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
   await waitFor(() => {
     expect(
-      screen.getByRole('button', { name: '重新评估当前回答' }),
+      getAnswerEvaluationButton(),
     ).toBeEnabled();
   });
-  fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
+  fireEvent.click(getAnswerEvaluationButton());
 
   expect(
     await screen.findByDisplayValue('已答到当前问题'),
@@ -765,11 +822,14 @@ test('preserves a manual step status override across save and reload', async () 
   );
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(screen.getByRole('combobox', { name: '起始步骤 的步骤状态' }), {
-    target: {
-      value: 'done',
+  fireEvent.change(
+    within(screen.getByTestId('editor-node-step-manual-status')).getByRole('combobox'),
+    {
+      target: {
+        value: 'done',
+      },
     },
-  });
+  );
 
   const savedSnapshot = await waitForSavedSnapshot(
     dependencies.structuredDataStorage,
@@ -788,7 +848,9 @@ test('preserves a manual step status override across save and reload', async () 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   expect(
-    await screen.findByRole('combobox', { name: '起始步骤 的步骤状态' }),
+    within(await screen.findByTestId('editor-node-step-manual-status')).getByRole(
+      'combobox',
+    ),
   ).toHaveValue('done');
 });
 
@@ -1040,6 +1102,8 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       content: '第一版回答还没有把为什么能减少重复渲染讲清楚。',
       hint: '先把“同一轮更新如何被合并提交”与“为什么会减少重复渲染”这层关系补出来。',
       judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-answer-closure',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -1052,6 +1116,8 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       title: '标准理解：第一版回答',
       content: '先补上“合并更新如何减少重复渲染”的因果链条。',
       summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-answer-closure',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -1076,6 +1142,8 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       content: '第二版回答已经把更新节奏和减少重复渲染的关系补全了。',
       hint: '这轮已经答到位了，只需要按当前答案复述一遍完整因果链。',
       judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-answer-closure-v2',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -1088,6 +1156,8 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       title: '标准理解：第二版回答',
       content: '第二版已经覆盖了为什么统一提交能减少重复渲染。',
       summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-answer-closure-v2',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );

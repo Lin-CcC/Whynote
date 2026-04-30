@@ -29,19 +29,19 @@ type CreateNodeInput =
       updatedAt?: string;
     }
   | {
+      type: 'answer';
+      id?: string;
+      title: string;
+      content?: string;
+      createdAt?: string;
+      updatedAt?: string;
+    }
+  | {
       type: 'question';
       id?: string;
       title: string;
       content?: string;
       currentAnswerId?: string;
-      createdAt?: string;
-      updatedAt?: string;
-    }
-  | {
-      type: 'answer';
-      id?: string;
-      title: string;
-      content?: string;
       createdAt?: string;
       updatedAt?: string;
     }
@@ -141,6 +141,11 @@ export function createNode(input: CreateNodeInput): NonRootNode {
         type: 'plan-step',
         status: input.status ?? 'todo',
       };
+    case 'answer':
+      return {
+        ...baseNode,
+        type: 'answer',
+      };
     case 'question':
       return {
         ...baseNode,
@@ -148,11 +153,6 @@ export function createNode(input: CreateNodeInput): NonRootNode {
         ...(input.currentAnswerId
           ? { currentAnswerId: input.currentAnswerId }
           : {}),
-      };
-    case 'answer':
-      return {
-        ...baseNode,
-        type: 'answer',
       };
     case 'summary':
       return {

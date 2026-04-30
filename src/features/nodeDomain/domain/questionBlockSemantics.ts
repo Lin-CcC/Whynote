@@ -1,4 +1,8 @@
-import { getJudgmentNodeKind, getSummaryNodeKind } from './nodeSemantics';
+import {
+  getCurrentQuestionAnswerNodeId,
+  getJudgmentNodeKind,
+  getSummaryNodeKind,
+} from './nodeSemantics';
 import { getNodeOrThrow } from './treeDocument';
 import type {
   AnswerNode,
@@ -71,36 +75,7 @@ export function resolveQuestionCurrentAnswerNodeId(
   tree: NodeTree,
   questionNodeId: string,
 ) {
-  const questionNode = getNodeOrThrow(tree, questionNodeId);
-
-  if (questionNode.type !== 'question') {
-    return null;
-  }
-
-  const answerNodes = getQuestionChildNodes(tree, questionNode.id).filter(
-    (childNode): childNode is AnswerNode => childNode.type === 'answer',
-  );
-
-  if (answerNodes.length === 0) {
-    return null;
-  }
-
-  if (
-    questionNode.currentAnswerId &&
-    answerNodes.some((answerNode) => answerNode.id === questionNode.currentAnswerId)
-  ) {
-    return questionNode.currentAnswerId;
-  }
-
-  for (let index = answerNodes.length - 1; index >= 0; index -= 1) {
-    const answerNode = answerNodes[index];
-
-    if (answerNode && answerNode.content.trim().length > 0) {
-      return answerNode.id;
-    }
-  }
-
-  return answerNodes[answerNodes.length - 1]?.id ?? null;
+  return getCurrentQuestionAnswerNodeId(tree, questionNodeId);
 }
 
 export function buildQuestionBlockData(
