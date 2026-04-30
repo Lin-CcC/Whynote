@@ -18,7 +18,9 @@ test('keeps manual step status overrides until later content changes hand contro
     />,
   );
 
-  expect(screen.getByText(/系统判断：待开始/)).toBeInTheDocument();
+  expect(
+    screen.getByRole('combobox', { name: '起始步骤 状态' }),
+  ).toHaveValue('todo');
 
   fireEvent.change(
     screen.getByRole('combobox', { name: '起始步骤 状态' }),
@@ -29,7 +31,9 @@ test('keeps manual step status overrides until later content changes hand contro
     },
   );
 
-  expect(screen.getByText(/当前状态已手动改为 已完成/)).toBeInTheDocument();
+  expect(
+    screen.getByRole('combobox', { name: '起始步骤 状态' }),
+  ).toHaveValue('done');
 
   fireEvent.change(screen.getByLabelText('起始问题 内容'), {
     target: {
@@ -42,7 +46,6 @@ test('keeps manual step status overrides until later content changes hand contro
       screen.getByRole('combobox', { name: '起始步骤 状态' }),
     ).toHaveValue('todo');
   });
-  expect(screen.queryByText(/当前状态已手动改为 已完成/)).not.toBeInTheDocument();
 });
 
 function createPlanStepStatusSnapshot(): WorkspaceSnapshot {

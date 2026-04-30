@@ -2,6 +2,7 @@ import {
   getAllowedChildTypes,
   getDisplayNodeTitle,
   getDisplayNodeTypeLabel,
+  getJudgmentNodeKind,
   getModuleScopeId,
   getNodeOrThrow,
   isAnswerClosureSummaryNode,
@@ -183,7 +184,9 @@ export function getNodeRoleDescription(tree: NodeTree, node: TreeNode) {
     case 'summary':
       return '这里承接阶段总结';
     case 'judgment':
-      return '这里负责判断、反馈或纠偏';
+      return getJudgmentNodeKind(tree, node) === 'answer-closure'
+        ? '这里只负责当前回答的判断缺口和反馈'
+        : '这里只负责判断缺口和反馈';
     case 'resource':
       return '这里记录资料概况与来源';
     case 'resource-fragment':

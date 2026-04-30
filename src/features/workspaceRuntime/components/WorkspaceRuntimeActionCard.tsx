@@ -11,6 +11,7 @@ type WorkspaceRuntimeActionCardProps = {
   answerFollowUpCount: number;
   canDirectAnswerCurrentQuestion: boolean;
   currentModule: TreeNode | null;
+  currentQuestionAnswerNodeId: string | null;
   evaluationTarget: QuestionAnswerEvaluationTarget | null;
   hasDirectAnswerCurrentQuestion: boolean;
   isAiRunning: boolean;
@@ -30,6 +31,7 @@ type WorkspaceRuntimeActionCardProps = {
 
 type RuntimeActionStage =
   | 'question-needs-answer'
+  | 'question-has-draft'
   | 'question'
   | 'answer'
   | 'judgment'
@@ -43,6 +45,7 @@ export default function WorkspaceRuntimeActionCard({
   answerFollowUpCount,
   canDirectAnswerCurrentQuestion,
   currentModule,
+  currentQuestionAnswerNodeId,
   evaluationTarget,
   hasDirectAnswerCurrentQuestion,
   isAiRunning,
@@ -70,6 +73,7 @@ export default function WorkspaceRuntimeActionCard({
   const runtimeActionStage = resolveRuntimeActionStage(
     selectedNode,
     evaluationTarget,
+    currentQuestionAnswerNodeId,
     hasDirectAnswerCurrentQuestion,
     summaryCheckJudgmentContext,
     summaryEvaluationTarget,
@@ -79,7 +83,7 @@ export default function WorkspaceRuntimeActionCard({
     runtimeActionStage !== null &&
     runtimeActionStage !== 'answer' &&
     runtimeActionStage !== 'summary-check-result' &&
-    evaluationTarget !== null &&
+    (evaluationTarget !== null || currentQuestionAnswerNodeId !== null) &&
     !isAiRunning;
   const canReturnToSummary =
     summaryCheckJudgmentContext !== null && !isAiRunning;
@@ -149,16 +153,53 @@ export default function WorkspaceRuntimeActionCard({
                   插入回答
                 </button>
               </>
+            ) : runtimeActionStage === 'question-has-draft' ? (
+              <>
+                <button
+                  className="workspace-primaryAction"
+                  disabled={!canReturnToAnswer}
+                  onClick={() => {
+                    const answerNodeId =
+                      evaluationTarget?.answerNodeId ?? currentQuestionAnswerNodeId;
+
+                    if (!answerNodeId) {
+                      return;
+                    }
+
+                    onSelectNode(answerNodeId);
+                  }}
+                  type="button"
+                >
+                  回到当前回答继续修改
+                </button>
+                <button
+                  disabled={!canDirectAnswerCurrentQuestion}
+                  onClick={onDirectAnswerCurrentQuestion}
+                  type="button"
+                >
+                  直接回答当前问题
+                </button>
+                <button
+                  disabled={isAiRunning}
+                  onClick={onInsertAnswer}
+                  type="button"
+                >
+                  插入回答
+                </button>
+              </>
             ) : runtimeActionStage === 'summary' ? (
               <button
                 className="workspace-primaryAction"
                 disabled={!canReturnToAnswer}
                 onClick={() => {
-                  if (!evaluationTarget) {
+                  const answerNodeId =
+                    evaluationTarget?.answerNodeId ?? currentQuestionAnswerNodeId;
+
+                  if (!answerNodeId) {
                     return;
                   }
 
-                  onSelectNode(evaluationTarget.answerNodeId);
+                  onSelectNode(answerNodeId);
                 }}
                 type="button"
               >
@@ -234,6 +275,24 @@ export default function WorkspaceRuntimeActionCard({
                 查看答案解析
               </button>
             ) : null}
+            {runtimeActionStage === 'question' && canReturnToAnswer ? (
+              <button
+                disabled={!canReturnToAnswer}
+                onClick={() => {
+                  const answerNodeId =
+                    evaluationTarget?.answerNodeId ?? currentQuestionAnswerNodeId;
+
+                  if (!answerNodeId) {
+                    return;
+                  }
+
+                  onSelectNode(answerNodeId);
+                }}
+                type="button"
+              >
+                回到当前回答继续修改
+              </button>
+            ) : null}
             {runtimeActionStage === 'summary' ? (
               <button
                 disabled={!canEvaluateQuestionAnswer}
@@ -253,11 +312,14 @@ export default function WorkspaceRuntimeActionCard({
               <button
                 disabled={!canReturnToAnswer}
                 onClick={() => {
-                  if (!evaluationTarget) {
+                  const answerNodeId =
+                    evaluationTarget?.answerNodeId ?? currentQuestionAnswerNodeId;
+
+                  if (!answerNodeId) {
                     return;
                   }
 
-                  onSelectNode(evaluationTarget.answerNodeId);
+                  onSelectNode(answerNodeId);
                 }}
                 type="button"
               >
@@ -350,6 +412,7 @@ export default function WorkspaceRuntimeActionCard({
 function resolveRuntimeActionStage(
   selectedNode: TreeNode | null,
   evaluationTarget: QuestionAnswerEvaluationTarget | null,
+  currentQuestionAnswerNodeId: string | null,
   hasDirectAnswerCurrentQuestion: boolean,
   summaryCheckJudgmentContext: SummaryCheckJudgmentContext | null,
   summaryEvaluationTarget: SummaryEvaluationTarget | null,
@@ -369,6 +432,10 @@ function resolveRuntimeActionStage(
   if (selectedNode.type === 'question') {
     if (evaluationTarget) {
       return 'question';
+    }
+
+    if (currentQuestionAnswerNodeId) {
+      return 'question-has-draft';
     }
 
     return hasDirectAnswerCurrentQuestion ? 'question-needs-answer' : null;
@@ -392,6 +459,8 @@ function getOverviewTitle(runtimeActionStage: RuntimeActionStage) {
   switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '当前问题概览';
+    case 'question-has-draft':
+      return '当前回答草稿';
     case 'question':
       return '当前问题闭环概览';
     case 'answer':
@@ -413,6 +482,8 @@ function getOverviewText(runtimeActionStage: RuntimeActionStage) {
   switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '主路径已经在主视图里提供 question block 级动作，这里只补充 AI 直答建议。';
+    case 'question-has-draft':
+      return '这个问题已经有当前回答草稿。即使正文还空着，主路径也先围绕这版回答继续写。';
     case 'question':
       return '这个问题已经有回答，主视图里可以直接继续编辑、切换当前回答或展开历史。';
     case 'answer':
@@ -437,6 +508,8 @@ function getNextStepText(
   switch (runtimeActionStage) {
     case 'question-needs-answer':
       return '如果你想先让 AI 起一版回答，可以直接用下面的入口；否则回到主视图插入空白回答。';
+    case 'question-has-draft':
+      return '这道题已经有 current answer 草稿，下一步通常是先回到这版回答继续补写。';
     case 'question':
       return hasAnswerExplanation
         ? '当前问题已经有答案解析，下一步通常是继续修改当前回答或重新评估。'
@@ -466,6 +539,8 @@ function getRuntimeActionHint(
   switch (runtimeActionStage) {
     case 'question-needs-answer':
       return 'AI 直答会生成新的 answer 节点；如果你更想手写，主视图里的“插入回答”已经完整可达。';
+    case 'question-has-draft':
+      return '当前回答即使还是空草稿，也继续占住主路径；只有新建、切换或删除回答时，这个锚点才会改变。';
     case 'question':
     case 'answer':
       if (answerFollowUpCount > 0) {
@@ -493,6 +568,10 @@ function getRuntimeActionCalloutTestId(
 ) {
   if (runtimeActionStage === 'question-needs-answer') {
     return 'question-direct-answer-callout';
+  }
+
+  if (runtimeActionStage === 'question-has-draft') {
+    return 'question-current-answer-draft-callout';
   }
 
   if (runtimeActionStage === 'summary-check') {

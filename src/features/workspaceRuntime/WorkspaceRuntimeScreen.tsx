@@ -27,6 +27,7 @@ import {
   countQuestionFollowUpNodes,
   getJudgmentInlineActionContext,
   getLatestQuestionAnswerExplanationNodeId,
+  getLatestQuestionAnswerNodeId,
   resolveQuestionAnswerEvaluationTarget,
   resolveSummaryCheckJudgmentContext,
   resolveSummaryEvaluationTarget,
@@ -165,6 +166,10 @@ export default function WorkspaceRuntimeScreen({
       context,
       evaluationTarget,
     );
+    const currentQuestionAnswerNodeId =
+      context.selectedNode?.type === 'question'
+        ? getLatestQuestionAnswerNodeId(context.tree, context.selectedNode.id)
+        : null;
     const answerExplanationNodeId = evaluationTarget
       ? getLatestQuestionAnswerExplanationNodeId(
           context.tree,
@@ -184,6 +189,7 @@ export default function WorkspaceRuntimeScreen({
           directAnswerRequest !== null && !runtime.isAiRunning
         }
         currentModule={context.currentModule}
+        currentQuestionAnswerNodeId={currentQuestionAnswerNodeId}
         evaluationTarget={evaluationTarget}
         hasDirectAnswerCurrentQuestion={directAnswerRequest !== null}
         isAiRunning={runtime.isAiRunning}

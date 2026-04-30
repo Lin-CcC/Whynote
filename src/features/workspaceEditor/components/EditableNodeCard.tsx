@@ -23,6 +23,7 @@ import {
   getNodeInputPlaceholderForNode,
   getNodeRoleDescription,
 } from '../utils/treeSelectors';
+import { getNodeSemanticVisibility } from '../utils/nodeSemanticVisibility';
 import type { NodeContentPatch } from '../workspaceEditorTypes';
 
 type EditableNodeCardProps = {
@@ -72,6 +73,7 @@ export default function EditableNodeCard({
     node.type === 'plan-step'
       ? resolvePlanStepRuntimeStatus(tree, node.id)
       : null;
+  const semanticVisibility = getNodeSemanticVisibility(tree, node);
   const hasManualPlanStepStatusOverride =
     node.type === 'plan-step' &&
     planStepRuntimeStatus !== null &&
@@ -144,6 +146,15 @@ export default function EditableNodeCard({
       <div className="workspace-nodeHeader">
         <div className="workspace-nodeMeta">
           <span className="workspace-nodeType">{displayLabel}</span>
+          {semanticVisibility.badges.map((badge) => (
+            <span
+              className="workspace-semanticBadge"
+              data-badge-tone={badge.tone}
+              key={badge.key}
+            >
+              {badge.label}
+            </span>
+          ))}
           {node.type === 'plan-step' ? (
             <select
               aria-label={`${displayTitle || displayLabel} 状态`}
@@ -188,14 +199,19 @@ export default function EditableNodeCard({
             {getNodeSelectionHint(tree, node, isEditing)}
           </p>
         ) : null}
+        {semanticVisibility.notes.map((note) => (
+          <p className="workspace-nodeHint" key={note}>
+            {note}
+          </p>
+        ))}
         {node.type === 'plan-step' && planStepRuntimeStatus ? (
           <>
             <p className="workspace-nodeHint">
-              {`建议状态：${PLAN_STEP_STATUS_LABELS[planStepRuntimeStatus.suggestedStatus]}。${planStepRuntimeStatus.reasonSummary}`}
+              {`系统判断：${PLAN_STEP_STATUS_LABELS[planStepRuntimeStatus.suggestedStatus]}。依据：${planStepRuntimeStatus.reasonSummary}`}
             </p>
             {hasManualPlanStepStatusOverride ? (
               <p className="workspace-nodeHint">
-                {`当前手动状态为 ${PLAN_STEP_STATUS_LABELS[node.status]}，与建议状态不同。`}
+                {`当前状态已手动改为 ${PLAN_STEP_STATUS_LABELS[node.status]}。后续内容变化时系统会重新托管。`}
               </p>
             ) : null}
           </>

@@ -4,18 +4,18 @@
 
 ## 当前工作面
 
-- 当前工作树：`codex/question-block-order-fix`
-- 当前短期目标：修复 `question block` 主视图里 `answer / judgment / 答案解析 / 手写 summary / 总结检查结果 / follow-up question` 的链条顺序割裂，只改主视图分组与排序逻辑，不扩展到思维导图、导出、资料系统重构、AI provider、完整阅读态/编辑态系统或新节点类型。
+- 当前工作树：`codex/v11-testability-ui-audit`
+- 当前短期目标：审查 current-answer 语义测试文档在工程壳 UI 上的可见性覆盖，补 `当前回答 / 已过期 / 当前结果 / 历史结果 / 配对对象` 的最小可见表达，让主树能直接通过工程壳验证这些语义。
 
 ## 当前短期任务
 
-- 修复 question block 内 `answer / closure / follow-up` 被拆开的排序问题。
-- 收紧 `currentAnswerId` 的职责边界：只决定当前工作 answer 与视觉强调，不再驱动主视图跨组重排。
-- 把历史结果收回各自 answer / summary 组内折叠，替代全局“旧回答 / 历史结果”割裂区。
-- 补多 answer、多 closure、summary-check、follow-up 与折叠回归测试。
+- 审查手工测试文档里的 current-answer / stale / 历史结果 / 级联清理条目，区分当前壳层是可直接验证、部分可验证还是不可验证。
+- 在文本主视图与 inspector 上补最小必要状态：`当前回答`、`旧回答`、`当前结果`、`历史结果`、`已过期`、`配对回答 / 检查对象`。
+- 调整 question 语境下空 current answer 草稿的动作提示，让壳层明确继续围绕当前草稿，而不是重新退回唯一 `直接回答当前问题` 主动作。
+- 补回归测试，覆盖 direct answer / insert-answer / type-switch-to-answer 的 current-answer 标识、stale 标识、历史结果区分，以及删除 / 切型 / 跨题移动后的可见清理效果。
 
 ## 本轮明确不做
 
-- 不做思维导图、导出模式或资料系统重构
-- 不重写 `currentAnswerId`、显式 `sourceId + sourceUpdatedAt`、过期判定或 block 激活语义
-- 不引入新的学习节点类型，不重做 judgment / hint / 答案解析 入口
+- 不重写 `currentAnswerId`、显式 source 配对或级联清理的底层语义规则
+- 不做新的 question block 重布局、完整历史区折叠体系或产品化 UI redesign
+- 不扩到思维导图、资料系统重构、导出重做、provider 或新的学习链逻辑

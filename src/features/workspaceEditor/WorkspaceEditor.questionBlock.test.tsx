@@ -148,7 +148,7 @@ test('currentAnswerId only changes emphasis and does not reorder answer groups',
   });
 
   expect(
-    within(screen.getByTestId('question-block-answer-group-answer-first')).getByText(
+    within(screen.getByTestId('editor-node-answer-first')).getByText(
       '当前回答',
     ),
   ).toBeInTheDocument();

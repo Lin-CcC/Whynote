@@ -385,10 +385,14 @@ export function stripRedundantDisplayTypePrefix(
 }
 
 export function getDisplayNodeTitle(tree: NodeTree, node: TreeNode): string {
-  return stripRedundantDisplayTypePrefix(
-    node.title,
-    getDisplayNodeTypeLabel(tree, node),
-  );
+  const displayTypeLabel = getDisplayNodeTypeLabel(tree, node);
+  let displayTitle = stripRedundantDisplayTypePrefix(node.title, displayTypeLabel);
+
+  if (isSummaryCheckJudgmentNode(tree, node)) {
+    displayTitle = stripRedundantDisplayTypePrefix(displayTitle, '判断');
+  }
+
+  return displayTitle;
 }
 
 function resolveNode(

@@ -84,11 +84,7 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
               </p>
             </div>
           ) : null}
-          <EditorNodeSection
-            {...props}
-            depth={depth + 1}
-            nodeId={childNode.id}
-          />
+          <EditorNodeSection {...props} depth={depth + 1} nodeId={childNode.id} />
         </Fragment>
       ))}
     </EditableNodeCard>
