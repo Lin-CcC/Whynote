@@ -109,6 +109,7 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   );
   const judgmentNode = findNodeByTitle(savedSnapshot, '判断：回答还不完整');
   const persistedSummaryNode = findNodeByTitle(savedSnapshot, '标准理解');
+  const answerNode = savedSnapshot.tree.nodes['answer-answer-closure'];
   const stepNode = savedSnapshot.tree.nodes['step-answer-closure'];
 
   expect(judgmentNode?.referenceIds).toHaveLength(1);
@@ -119,6 +120,16 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   expect(
     savedSnapshot.tree.references[persistedSummaryNode!.referenceIds[0]].targetNodeId,
   ).toBe('fragment-batching');
+  expect(judgmentNode).toMatchObject({
+    type: 'judgment',
+    sourceAnswerId: 'answer-answer-closure',
+    sourceAnswerUpdatedAt: answerNode?.updatedAt,
+  });
+  expect(persistedSummaryNode).toMatchObject({
+    type: 'summary',
+    sourceAnswerId: 'answer-answer-closure',
+    sourceAnswerUpdatedAt: answerNode?.updatedAt,
+  });
   expect(stepNode.type).toBe('plan-step');
   expect(stepNode.type === 'plan-step' ? stepNode.status : null).toBe('doing');
 
@@ -282,9 +293,14 @@ test('directly answers a hand-authored question and keeps the answer-revision pa
     (snapshot) => findNodeByTitle(snapshot, 'AI 回答草稿') !== null,
   );
   const answerNode = findNodeByTitle(savedSnapshot, 'AI 回答草稿');
+  const questionNode = savedSnapshot.tree.nodes['question-manual-direct-answer'];
 
   expect(answerNode?.type).toBe('answer');
   expect(answerNode?.parentId).toBe('question-manual-direct-answer');
+  expect(questionNode).toMatchObject({
+    type: 'question',
+    currentAnswerId: answerNode?.id,
+  });
 });
 
 test('directly answers a generated question without relying on question source', async () => {
@@ -391,7 +407,7 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   ).toHaveAttribute('data-node-selected', 'true');
 });
 
-test('re-evaluates only the currently selected answer when a question already has multiple answers', async () => {
+test('re-evaluates the question current answer instead of the selected old answer', async () => {
   let observedQuestionClosurePrompt = '';
   const dependencies = await createPreloadedDependencies(
     createMultiAnswerClosureSnapshot(),
@@ -404,17 +420,17 @@ test('re-evaluates only the currently selected answer when a question already ha
         return {
           isAnswerSufficient: false,
           judgment: {
-            title: '判断：第一版回答还不完整',
-            content: '这次只继续围绕当前选中的回答补缺口。',
+            title: '判断：第二版回答还不完整',
+            content: '这次只继续围绕当前回答补缺口。',
           },
           summary: {
             title: '标准理解',
-            content: '先把第一版回答缺失的因果关系补清楚，再决定是否需要继续追问。',
+            content: '先把第二版回答缺失的因果关系补清楚，再决定是否需要继续追问。',
           },
           followUpQuestions: [
             {
-              title: '追问：第一版还缺哪条因果关系？',
-              content: '继续围绕当前这版回答补关键缺口。',
+              title: '追问：第二版还缺哪条因果关系？',
+              content: '继续围绕当前回答补关键缺口。',
             },
           ],
         };
@@ -429,22 +445,22 @@ test('re-evaluates only the currently selected answer when a question already ha
   fireEvent.click(screen.getByRole('button', { name: '重新评估当前回答' }));
 
   expect(
-    await screen.findByDisplayValue('第一版回答还不完整'),
+    await screen.findByDisplayValue('第二版回答还不完整'),
   ).toBeInTheDocument();
-  expect(observedQuestionClosurePrompt).toContain('当前回答：第一版回答');
-  expect(observedQuestionClosurePrompt).toContain('因为 React 会先把更新合并起来。');
-  expect(observedQuestionClosurePrompt).not.toContain('第二版回答');
-  expect(observedQuestionClosurePrompt).not.toContain(
+  expect(observedQuestionClosurePrompt).toContain('当前回答：第二版回答');
+  expect(observedQuestionClosurePrompt).toContain(
     '因为同一轮事件里的更新会统一提交，所以能减少重复渲染。',
   );
+  expect(observedQuestionClosurePrompt).not.toContain('当前回答：第一版回答');
+  expect(observedQuestionClosurePrompt).not.toContain('因为 React 会先把更新合并起来。');
   expect(
     screen
-      .getByDisplayValue('第一版回答')
+      .getByDisplayValue('第二版回答')
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
 });
 
-test('scopes learning-action drafts to the currently selected answer instead of aggregating sibling answers', async () => {
+test('scopes learning-action drafts to the question current answer instead of the selected old answer', async () => {
   let observedLearningActionPrompt = '';
   const dependencies = await createPreloadedDependencies(
     createMultiAnswerClosureSnapshot(),
@@ -455,8 +471,8 @@ test('scopes learning-action drafts to the currently selected answer instead of 
         observedLearningActionPrompt = userMessage?.content ?? '';
 
         return {
-          title: '总结：只围绕第一版回答',
-          content: '只围绕第一版回答补上缺失的因果关系。',
+          title: '总结：只围绕第二版回答',
+          content: '只围绕第二版回答补上缺失的因果关系。',
         };
       },
     }),
@@ -472,18 +488,17 @@ test('scopes learning-action drafts to the currently selected answer instead of 
   fireEvent.click(screen.getByRole('button', { name: '插入总结' }));
 
   expect(
-    await screen.findByDisplayValue('只围绕第一版回答'),
+    await screen.findByDisplayValue('只围绕第二版回答'),
   ).toBeInTheDocument();
   expect(observedLearningActionPrompt).toContain('现有回答');
-  expect(observedLearningActionPrompt).toContain('第一版回答');
-  expect(observedLearningActionPrompt).toContain('因为 React 会先把更新合并起来。');
-  expect(observedLearningActionPrompt).not.toContain('第二版回答');
-  expect(observedLearningActionPrompt).not.toContain(
+  expect(observedLearningActionPrompt).toContain('第二版回答');
+  expect(observedLearningActionPrompt).toContain(
     '因为同一轮事件里的更新会统一提交，所以能减少重复渲染。',
   );
+  expect(observedLearningActionPrompt).not.toContain('现有回答：当前回答：第一版回答');
 });
 
-test('views the explanation that belongs to the currently selected answer round', async () => {
+test('views the explanation that belongs to the question current answer round', async () => {
   const dependencies = await createPreloadedDependencies(
     createMultiRoundClosureSnapshot(),
   );
@@ -498,16 +513,16 @@ test('views the explanation that belongs to the currently selected answer round'
   fireEvent.click(screen.getByRole('button', { name: '查看答案解析' }));
 
   expect(
-    await screen.findByDisplayValue('标准理解：第一版回答'),
+    await screen.findByDisplayValue('标准理解：第二版回答'),
   ).toBeInTheDocument();
   expect(
     screen
-      .getByDisplayValue('标准理解：第一版回答')
+      .getByDisplayValue('标准理解：第二版回答')
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
   expect(
     screen
-      .getByDisplayValue('标准理解：第二版回答')
+      .getByDisplayValue('标准理解：第一版回答')
       .closest('[data-testid^="editor-node-"]'),
   ).not.toHaveAttribute('data-node-selected', 'true');
 });
@@ -1040,6 +1055,8 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       content: '第一版回答还没有把为什么能减少重复渲染讲清楚。',
       hint: '先把“同一轮更新如何被合并提交”与“为什么会减少重复渲染”这层关系补出来。',
       judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-answer-closure',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -1052,6 +1069,8 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       title: '标准理解：第一版回答',
       content: '先补上“合并更新如何减少重复渲染”的因果链条。',
       summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-answer-closure',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -1076,6 +1095,8 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       content: '第二版回答已经把更新节奏和减少重复渲染的关系补全了。',
       hint: '这轮已经答到位了，只需要按当前答案复述一遍完整因果链。',
       judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-answer-closure-v2',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -1088,6 +1109,8 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
       title: '标准理解：第二版回答',
       content: '第二版已经覆盖了为什么统一提交能减少重复渲染。',
       summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-answer-closure-v2',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );

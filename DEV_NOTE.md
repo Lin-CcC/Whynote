@@ -235,6 +235,17 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - `StructureActionBar`、`SelectedNodeInspector`、学习节点引用上下文和运行状态卡这类高频刷新块，默认使用固定文本槽位、clamp 或局部可滚动明细承接长标题 / 长路径 / 长状态文案，不改变卡片 box model。
 - inspector 已单独展示 `主题` 时，`路径` 不再重复带一遍 theme-root 标题；侧栏上下文优先展示必要信息，而不是堆重复路径。
 
+### 27. question 闭环的当前回答、显式配对与结果失效规则
+
+- `question` 的运行时默认锚点是 `currentAnswerId`，不是“最新 answer”，也不是“当前选中的 answer”。
+- `currentAnswerId` 指向的 `answer` 即使正文为空，也视为当前草稿；只有删除、移走或切成非 `answer` 时才失效。
+- 新生成的 direct answer、手动 `insert-answer` 生成的 answer，以及叶子节点切成 `answer` 的结果，都会自动晋升为 `currentAnswerId`；编辑旧 answer 不会自动升格。
+- `currentAnswerId` 失效后的回退顺序固定为：先找树顺序上更靠前且最近的 surviving answer；没有再找更靠后的第一条 surviving answer；仍没有才清空。
+- `answer-closure` 的 `summary / judgment` 必须显式记录 `sourceAnswerId + sourceAnswerUpdatedAt`；`summary-check` 的 `judgment` 必须显式记录 `sourceSummaryId + sourceSummaryUpdatedAt`，若存在明确 answer 上下文，建议同时记录 answer source。
+- runtime 在匹配旧闭环结果时，优先使用显式 `source...Id`；只有旧数据缺失这些字段时，才允许退回 legacy heuristic。
+- 当源节点当前 `updatedAt` 晚于结果节点记录的 `source...UpdatedAt` 时，该结果进入“过期但保留”状态，供 runtime / 主视图提示“建议重新评估 / 重新检查”。
+- 当 answer 被删除或切成非 `answer` 时，所有 `sourceAnswerId` 指向它的 answer-closure `summary / judgment` 一律级联删除；当手写 `summary` 被删除或切成非手写总结语义时，所有 `sourceSummaryId` 指向它的 `summary-check judgment` 一律级联删除，不保留孤儿结果节点。
+
 ## 后续需要重新评估这些决策的触发条件
 
 - 需要公开注册或公开商用

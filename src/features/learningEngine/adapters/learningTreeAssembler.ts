@@ -80,18 +80,38 @@ export function appendQuestionClosureToTree(
   tree: NodeTree,
   questionNodeId: string,
   closureResult: QuestionClosureResult,
+  options?: {
+    sourceAnswerId: string;
+    sourceAnswerUpdatedAt: string;
+  },
 ) {
   let nextTree = tree;
 
   nextTree = appendLearningNodeDraftToTree(
     nextTree,
     questionNodeId,
-    closureResult.judgment,
+    {
+      ...closureResult.judgment,
+      ...(options
+        ? {
+            sourceAnswerId: options.sourceAnswerId,
+            sourceAnswerUpdatedAt: options.sourceAnswerUpdatedAt,
+          }
+        : {}),
+    },
   );
   nextTree = appendLearningNodeDraftToTree(
     nextTree,
     questionNodeId,
-    closureResult.summary,
+    {
+      ...closureResult.summary,
+      ...(options
+        ? {
+            sourceAnswerId: options.sourceAnswerId,
+            sourceAnswerUpdatedAt: options.sourceAnswerUpdatedAt,
+          }
+        : {}),
+    },
   );
 
   for (const questionDraft of closureResult.followUpQuestions) {
@@ -133,6 +153,10 @@ export function appendLearningNodeDraftToTree(
         hint?: string;
         summaryKind?: 'manual' | 'scaffold' | 'answer-closure';
         judgmentKind?: 'manual' | 'answer-closure' | 'summary-check';
+        sourceAnswerId?: string;
+        sourceAnswerUpdatedAt?: string;
+        sourceSummaryId?: string;
+        sourceSummaryUpdatedAt?: string;
         citations: Array<{
           targetNodeId: string;
           focusText?: string;
@@ -151,9 +175,27 @@ export function appendLearningNodeDraftToTree(
     ...(draft.type === 'summary' && draft.summaryKind
       ? { summaryKind: draft.summaryKind }
       : {}),
+    ...(draft.type === 'summary' && draft.sourceAnswerId
+      ? { sourceAnswerId: draft.sourceAnswerId }
+      : {}),
+    ...(draft.type === 'summary' && draft.sourceAnswerUpdatedAt
+      ? { sourceAnswerUpdatedAt: draft.sourceAnswerUpdatedAt }
+      : {}),
     ...(draft.type === 'judgment' && draft.hint ? { hint: draft.hint } : {}),
     ...(draft.type === 'judgment' && draft.judgmentKind
       ? { judgmentKind: draft.judgmentKind }
+      : {}),
+    ...(draft.type === 'judgment' && draft.sourceAnswerId
+      ? { sourceAnswerId: draft.sourceAnswerId }
+      : {}),
+    ...(draft.type === 'judgment' && draft.sourceAnswerUpdatedAt
+      ? { sourceAnswerUpdatedAt: draft.sourceAnswerUpdatedAt }
+      : {}),
+    ...(draft.type === 'judgment' && draft.sourceSummaryId
+      ? { sourceSummaryId: draft.sourceSummaryId }
+      : {}),
+    ...(draft.type === 'judgment' && draft.sourceSummaryUpdatedAt
+      ? { sourceSummaryUpdatedAt: draft.sourceSummaryUpdatedAt }
       : {}),
   });
 

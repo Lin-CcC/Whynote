@@ -266,6 +266,70 @@ test('allows switching a newly inserted leaf node between safe types while prese
   });
 });
 
+test('does not promote an older edited answer to currentAnswerId', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-current-answer-editor"
+      initialSelectedNodeId="answer-editor-previous"
+      initialSnapshot={createCurrentAnswerEditorSnapshot()}
+      onSnapshotChange={(snapshot) => {
+        snapshots.push(snapshot);
+      }}
+    />,
+  );
+
+  fireEvent.change(screen.getByLabelText('第一版回答 内容'), {
+    target: {
+      value: '补充旧回答，但不升格为当前回答。',
+    },
+  });
+
+  const latestSnapshot = snapshots[snapshots.length - 1];
+  const questionNode = latestSnapshot.tree.nodes['question-current-answer-editor'];
+
+  expect(questionNode).toMatchObject({
+    type: 'question',
+    currentAnswerId: 'answer-editor-current',
+  });
+});
+
+test('promotes a leaf node to currentAnswerId when switching it to answer', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-current-answer-editor"
+      initialSelectedNodeId="summary-editor-draft"
+      initialSnapshot={createCurrentAnswerEditorSnapshot()}
+      onSnapshotChange={(snapshot) => {
+        snapshots.push(snapshot);
+      }}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: '切换为回答' }));
+
+  await waitFor(() => {
+    expect(screen.getByTestId('editor-node-summary-editor-draft')).toHaveAttribute(
+      'data-node-type',
+      'answer',
+    );
+  });
+
+  const latestSnapshot = snapshots[snapshots.length - 1];
+  const questionNode = latestSnapshot.tree.nodes['question-current-answer-editor'];
+
+  expect(questionNode).toMatchObject({
+    type: 'question',
+    currentAnswerId: 'summary-editor-draft',
+  });
+  expect(latestSnapshot.tree.nodes['summary-editor-draft']).toMatchObject({
+    type: 'answer',
+  });
+});
+
 test('shows scaffold teaching follow-up actions when a scaffold node is selected', () => {
   render(
     <WorkspaceEditor
@@ -1111,6 +1175,85 @@ function createTypeSwitchSnapshot(): WorkspaceSnapshot {
       id: 'question-type-switch-child',
       title: '子问题',
       content: '让父问题失去叶子节点资格。',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createCurrentAnswerEditorSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '当前回答编辑器语义',
+    workspaceId: 'workspace-current-answer-editor',
+    rootId: 'theme-current-answer-editor',
+    createdAt: '2026-04-30T00:00:00.000Z',
+    updatedAt: '2026-04-30T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-current-answer-editor',
+      title: '模块',
+      content: '',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-current-answer-editor',
+    createNode({
+      type: 'question',
+      id: 'question-current-answer-editor',
+      title: '目标问题',
+      content: '验证当前回答语义。',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-current-answer-editor',
+    createNode({
+      type: 'answer',
+      id: 'answer-editor-previous',
+      title: '第一版回答',
+      content: '旧回答内容',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-current-answer-editor',
+    createNode({
+      type: 'answer',
+      id: 'answer-editor-current',
+      title: '当前回答',
+      content: '当前回答内容',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      updatedAt: '2026-04-30T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-current-answer-editor',
+    createNode({
+      type: 'summary',
+      id: 'summary-editor-draft',
+      title: '手写总结草稿',
+      content: '可切换成 answer 的叶子节点',
+      summaryKind: 'manual',
       createdAt: '2026-04-30T00:00:00.000Z',
       updatedAt: '2026-04-30T00:00:00.000Z',
     }),
