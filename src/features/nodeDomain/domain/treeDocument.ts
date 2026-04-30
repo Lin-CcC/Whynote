@@ -1,4 +1,5 @@
 import { NodeDomainError } from './nodeErrors';
+import { getJudgmentNodeKind, getSummaryNodeKind } from './nodeSemantics';
 import {
   canNodeHaveChildren,
   canParentAcceptChild,
@@ -61,6 +62,30 @@ export function getModuleScopeId(tree: NodeTree, nodeId: string) {
   return null;
 }
 
+export function getQuestionAnchorNodeId(
+  tree: NodeTree,
+  nodeOrId: TreeNode | string | null | undefined,
+) {
+  let currentNode =
+    typeof nodeOrId === 'string'
+      ? tree.nodes[nodeOrId]
+      : nodeOrId;
+
+  while (currentNode) {
+    if (currentNode.type === 'question') {
+      return currentNode.id;
+    }
+
+    if (currentNode.parentId === null) {
+      return null;
+    }
+
+    currentNode = tree.nodes[currentNode.parentId];
+  }
+
+  return null;
+}
+
 export function isDescendantNode(
   tree: NodeTree,
   ancestorNodeId: string,
@@ -98,6 +123,7 @@ export function validateNodeTree(tree: NodeTree) {
   for (const node of Object.values(tree.nodes)) {
     validateNodeTags(tree, node);
     validateNodeReferences(tree, node);
+    validateLearningNodeSemantics(tree, node);
 
     if (!canNodeHaveChildren(node.type) && node.childIds.length > 0) {
       throw new NodeDomainError(
@@ -310,4 +336,155 @@ function validateParentNodeInvariant(node: TreeNode, parentNode: TreeNode) {
       },
     );
   }
+}
+
+function validateLearningNodeSemantics(tree: NodeTree, node: TreeNode) {
+  if (node.type === 'question' && node.currentAnswerId) {
+    const currentAnswerNode = tree.nodes[node.currentAnswerId];
+
+    if (currentAnswerNode?.type !== 'answer' || currentAnswerNode.parentId !== node.id) {
+      throw new NodeDomainError(
+        'INVALID_CHILD_TYPE',
+        `question ${node.id} 的 currentAnswerId 必须指向自己的 answer 子节点。`,
+        {
+          nodeId: node.id,
+          currentAnswerId: node.currentAnswerId,
+        },
+      );
+    }
+  }
+
+  if (node.type === 'summary' && node.sourceAnswerId) {
+    const sourceAnswerNode = tree.nodes[node.sourceAnswerId];
+
+    if (sourceAnswerNode?.type !== 'answer') {
+      throw new NodeDomainError(
+        'INVALID_CHILD_TYPE',
+        `summary ${node.id} 的 sourceAnswerId 必须指向 answer。`,
+        {
+          nodeId: node.id,
+          sourceAnswerId: node.sourceAnswerId,
+        },
+      );
+    }
+
+    if (!doNodesShareQuestionAnchor(tree, node, sourceAnswerNode)) {
+      throw new NodeDomainError(
+        'INVALID_CHILD_TYPE',
+        `summary ${node.id} 的 sourceAnswerId 必须与结果节点处于同一个 question 语境。`,
+        {
+          nodeId: node.id,
+          sourceAnswerId: node.sourceAnswerId,
+        },
+      );
+    }
+  }
+
+  if (node.type === 'judgment' && node.sourceAnswerId) {
+    const sourceAnswerNode = tree.nodes[node.sourceAnswerId];
+
+    if (sourceAnswerNode?.type !== 'answer') {
+      throw new NodeDomainError(
+        'INVALID_CHILD_TYPE',
+        `judgment ${node.id} 的 sourceAnswerId 必须指向 answer。`,
+        {
+          nodeId: node.id,
+          sourceAnswerId: node.sourceAnswerId,
+        },
+      );
+    }
+
+    if (!doNodesShareQuestionAnchor(tree, node, sourceAnswerNode)) {
+      throw new NodeDomainError(
+        'INVALID_CHILD_TYPE',
+        `judgment ${node.id} 的 sourceAnswerId 必须与结果节点处于同一个 question 语境。`,
+        {
+          nodeId: node.id,
+          sourceAnswerId: node.sourceAnswerId,
+        },
+      );
+    }
+  }
+
+  if (node.type === 'judgment' && node.sourceSummaryId) {
+    const sourceSummaryNode = tree.nodes[node.sourceSummaryId];
+
+    if (sourceSummaryNode?.type !== 'summary') {
+      throw new NodeDomainError(
+        'INVALID_CHILD_TYPE',
+        `judgment ${node.id} 的 sourceSummaryId 必须指向 summary。`,
+        {
+          nodeId: node.id,
+          sourceSummaryId: node.sourceSummaryId,
+        },
+      );
+    }
+
+    if (!doNodesShareQuestionAnchor(tree, node, sourceSummaryNode)) {
+      throw new NodeDomainError(
+        'INVALID_CHILD_TYPE',
+        `judgment ${node.id} 的 sourceSummaryId 必须与结果节点处于同一个 question 语境。`,
+        {
+          nodeId: node.id,
+          sourceSummaryId: node.sourceSummaryId,
+        },
+      );
+    }
+  }
+
+  if (
+    node.type === 'summary' &&
+    getSummaryNodeKind(tree, node) === 'answer-closure' &&
+    Boolean(node.sourceAnswerId) !== Boolean(node.sourceAnswerUpdatedAt)
+  ) {
+    throw new NodeDomainError(
+      'INVALID_CHILD_TYPE',
+      `answer-closure summary ${node.id} 的 sourceAnswerId 和 sourceAnswerUpdatedAt 必须成对出现。`,
+      {
+        nodeId: node.id,
+      },
+    );
+  }
+
+  if (
+    node.type === 'judgment' &&
+    getJudgmentNodeKind(tree, node) === 'answer-closure' &&
+    Boolean(node.sourceAnswerId) !== Boolean(node.sourceAnswerUpdatedAt)
+  ) {
+    throw new NodeDomainError(
+      'INVALID_CHILD_TYPE',
+      `answer-closure judgment ${node.id} 的 sourceAnswerId 和 sourceAnswerUpdatedAt 必须成对出现。`,
+      {
+        nodeId: node.id,
+      },
+    );
+  }
+
+  if (
+    node.type === 'judgment' &&
+    getJudgmentNodeKind(tree, node) === 'summary-check' &&
+    Boolean(node.sourceSummaryId) !== Boolean(node.sourceSummaryUpdatedAt)
+  ) {
+    throw new NodeDomainError(
+      'INVALID_CHILD_TYPE',
+      `summary-check judgment ${node.id} 的 sourceSummaryId 和 sourceSummaryUpdatedAt 必须成对出现。`,
+      {
+        nodeId: node.id,
+      },
+    );
+  }
+}
+
+function doNodesShareQuestionAnchor(
+  tree: NodeTree,
+  firstNode: TreeNode,
+  secondNode: TreeNode,
+) {
+  const firstQuestionAnchorId = getQuestionAnchorNodeId(tree, firstNode);
+  const secondQuestionAnchorId = getQuestionAnchorNodeId(tree, secondNode);
+
+  return (
+    firstQuestionAnchorId !== null &&
+    firstQuestionAnchorId === secondQuestionAnchorId
+  );
 }

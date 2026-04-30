@@ -26,6 +26,7 @@ import {
   type PlanStepNode,
   shouldConvertToModuleAtRoot,
   stripRedundantDisplayTypePrefix,
+  switchNodeType as switchNodeTypeInDomain,
   type TreeNode,
   type WorkspaceSnapshot,
 } from '../../nodeDomain';
@@ -684,7 +685,11 @@ export function useWorkspaceEditor({
 
     runStructuralOperation(
       () => {
-        const nextTree = switchNodeType(tree, selectedNodeId, nextNodeType);
+        const nextTree = switchNodeTypeInDomain(
+          tree,
+          selectedNodeId,
+          nextNodeType,
+        );
 
         return {
           nextTree,
@@ -1141,79 +1146,6 @@ function canTargetParentAcceptNode(node: TreeNode, targetParentNode: TreeNode) {
   }
 
   return canParentAcceptChild(targetParentNode.type, targetNodeType);
-}
-
-function switchNodeType(
-  tree: NodeTree,
-  nodeId: string,
-  nextNodeType: (typeof SWITCHABLE_LEAF_NODE_TYPES)[number],
-) {
-  const currentNode = getNodeOrThrow(tree, nodeId);
-
-  if (currentNode.parentId === null) {
-    throw new Error('根节点不支持切换类型。');
-  }
-
-  if (currentNode.childIds.length > 0) {
-    throw new Error('当前节点仍带有子树，只允许对叶子节点切换类型。');
-  }
-
-  if (currentNode.type === nextNodeType) {
-    return tree;
-  }
-
-  const parentNode = getNodeOrThrow(tree, currentNode.parentId);
-
-  if (!canParentAcceptChild(parentNode.type, nextNodeType)) {
-    throw new Error('目标类型不符合当前父节点约束。');
-  }
-
-  const nextTree = structuredClone(tree);
-  const nextNode = getNodeOrThrow(nextTree, nodeId);
-  const baseNode = {
-    childIds: [] as string[],
-    content: nextNode.content,
-    createdAt: nextNode.createdAt,
-    id: nextNode.id,
-    order: nextNode.order,
-    parentId: nextNode.parentId,
-    referenceIds: [...nextNode.referenceIds],
-    tagIds: [...nextNode.tagIds],
-    title: nextNode.title,
-    updatedAt: new Date().toISOString(),
-  };
-
-  switch (nextNodeType) {
-    case 'question':
-      nextTree.nodes[nodeId] = {
-        ...baseNode,
-        type: 'question',
-      };
-      break;
-    case 'answer':
-      nextTree.nodes[nodeId] = {
-        ...baseNode,
-        type: 'answer',
-      };
-      break;
-    case 'summary':
-      nextTree.nodes[nodeId] = {
-        ...baseNode,
-        type: 'summary',
-        summaryKind:
-          parentNode.type === 'plan-step' ? 'scaffold' : 'manual',
-      };
-      break;
-    case 'judgment':
-      nextTree.nodes[nodeId] = {
-        ...baseNode,
-        type: 'judgment',
-        judgmentKind: 'manual',
-      };
-      break;
-  }
-
-  return nextTree;
 }
 
 function getEffectiveTargetNodeType(

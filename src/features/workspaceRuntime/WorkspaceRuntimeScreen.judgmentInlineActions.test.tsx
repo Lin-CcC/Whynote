@@ -286,6 +286,8 @@ function createJudgmentInlineSnapshot(): WorkspaceSnapshot {
       content:
         '已答到的部分：\n- 你已经答到了“更新会先放在一起”这一层。\n\n还缺的关键点：\n1. 你还缺“为什么会减少重复渲染”这一条因果关系。\n\n为什么这些缺口关键：\n- 如果少了统一提交和重复计算之间的因果链，就还是停在现象层。',
       judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-inline-primary',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -299,6 +301,8 @@ function createJudgmentInlineSnapshot(): WorkspaceSnapshot {
       content:
         '标准理解：React 会先收集同一轮事件里的更新，再统一提交，因此可以减少重复渲染。',
       summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-inline-primary',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -412,6 +416,8 @@ function createJudgmentInlineSnapshotWithoutSummary(): WorkspaceSnapshot {
       content:
         '已答到的部分：\n- 你已经答到了“更新会先放在一起”这一层。\n\n还缺的关键点：\n1. 你还缺“为什么会减少重复渲染”这一条因果关系。\n\n为什么这些缺口关键：\n- 如果少了统一提交和重复计算之间的因果链，就还是停在现象层。',
       judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-inline-primary',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -487,6 +493,8 @@ function createMultiAnswerJudgmentSnapshot(): WorkspaceSnapshot {
       title: '判断：第一版还不完整',
       content: '第一版还没有解释为什么会减少重复渲染。',
       judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-inline-previous',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -499,6 +507,8 @@ function createMultiAnswerJudgmentSnapshot(): WorkspaceSnapshot {
       title: '第一版标准理解',
       content: '先补齐因果关系，再继续推进。',
       summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-inline-previous',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -522,6 +532,8 @@ function createMultiAnswerJudgmentSnapshot(): WorkspaceSnapshot {
       title: '判断：第二版还差最后一步',
       content: '这版只差把“统一提交为什么会减少重复渲染”说透。',
       judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-inline-current',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );
@@ -534,6 +546,8 @@ function createMultiAnswerJudgmentSnapshot(): WorkspaceSnapshot {
       title: '第二版标准理解',
       content: '同一轮里的更新会被统一提交，所以界面不需要为每次更新都单独重跑渲染。',
       summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-inline-current',
+      sourceAnswerUpdatedAt: '2026-04-28T00:00:00.000Z',
       createdAt: '2026-04-28T00:00:00.000Z',
     }),
   );

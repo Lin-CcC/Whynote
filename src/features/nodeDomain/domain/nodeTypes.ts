@@ -90,6 +90,7 @@ export interface PlanStepNode extends BaseNode {
 
 export interface QuestionNode extends BaseNode {
   type: 'question';
+  currentAnswerId?: string;
 }
 
 export interface AnswerNode extends BaseNode {
@@ -99,12 +100,18 @@ export interface AnswerNode extends BaseNode {
 export interface SummaryNode extends BaseNode {
   type: 'summary';
   summaryKind?: SummaryNodeKind;
+  sourceAnswerId?: string;
+  sourceAnswerUpdatedAt?: string;
 }
 
 export interface JudgmentNode extends BaseNode {
   type: 'judgment';
   hint?: string;
   judgmentKind?: JudgmentNodeKind;
+  sourceAnswerId?: string;
+  sourceAnswerUpdatedAt?: string;
+  sourceSummaryId?: string;
+  sourceSummaryUpdatedAt?: string;
 }
 
 export interface ResourceNode extends BaseNode {
