@@ -28,8 +28,15 @@ type TextMainViewProps = {
   onDirectAnswerQuestion?: (questionNodeId: string) => void;
   onEvaluateAnswer?: (questionNodeId: string, answerNodeId: string) => void;
   onEvaluateSummary?: (summaryNodeId: string) => void;
+  onGenerateFollowUpQuestion?: (sourceNodeId: string) => void;
+  onGenerateSummary?: (sourceNodeId: string) => void;
   onInsertAnswerForQuestion: (questionNodeId: string) => void;
-  onInsertFollowUpQuestion: (questionNodeId: string) => void;
+  onInsertFollowUpQuestion: (
+    questionNodeId: string,
+    options?: {
+      sourceNodeId?: string | null;
+    },
+  ) => void;
   onInsertSummaryForQuestion: (questionNodeId: string) => void;
   onSelectNode: (nodeId: string) => void;
   onSetCurrentAnswer: (questionNodeId: string, answerNodeId: string) => void;
@@ -52,6 +59,8 @@ export default function TextMainView({
   onDirectAnswerQuestion,
   onEvaluateAnswer,
   onEvaluateSummary,
+  onGenerateFollowUpQuestion,
+  onGenerateSummary,
   onInsertAnswerForQuestion,
   onInsertFollowUpQuestion,
   onInsertSummaryForQuestion,
@@ -166,6 +175,8 @@ export default function TextMainView({
         onDirectAnswerQuestion={onDirectAnswerQuestion}
         onEvaluateAnswer={onEvaluateAnswer}
         onEvaluateSummary={onEvaluateSummary}
+        onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
+        onGenerateSummary={onGenerateSummary}
         onInsertAnswerForQuestion={onInsertAnswerForQuestion}
         onInsertFollowUpQuestion={onInsertFollowUpQuestion}
         onInsertSummaryForQuestion={onInsertSummaryForQuestion}

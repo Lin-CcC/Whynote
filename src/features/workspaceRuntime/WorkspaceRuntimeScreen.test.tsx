@@ -330,7 +330,13 @@ test('keeps the left runtime action card auxiliary while the main question block
     within(blockActions).getByRole('button', { name: '插入回答' }),
   ).toBeInTheDocument();
   expect(
+    within(blockActions).getByRole('button', { name: '生成追问' }),
+  ).toBeInTheDocument();
+  expect(
     within(blockActions).getByRole('button', { name: '插入追问' }),
+  ).toBeInTheDocument();
+  expect(
+    within(blockActions).getByRole('button', { name: '生成总结' }),
   ).toBeInTheDocument();
   expect(
     within(blockActions).getByRole('button', { name: '插入总结' }),

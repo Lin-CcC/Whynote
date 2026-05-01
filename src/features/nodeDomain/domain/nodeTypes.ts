@@ -59,6 +59,14 @@ export type SummaryNodeKind = (typeof SUMMARY_NODE_KINDS)[number];
 export type JudgmentNodeKind = (typeof JUDGMENT_NODE_KINDS)[number];
 export type PlanStepStatus = 'todo' | 'doing' | 'done';
 
+export interface QuestionSourceContext {
+  content: string;
+  nodeId?: string;
+  nodeType: 'question' | 'answer' | 'summary' | 'judgment';
+  title: string;
+  updatedAt?: string;
+}
+
 export interface BaseNode {
   id: string;
   type: NodeType;
@@ -91,6 +99,7 @@ export interface PlanStepNode extends BaseNode {
 export interface QuestionNode extends BaseNode {
   type: 'question';
   currentAnswerId?: string;
+  sourceContext?: QuestionSourceContext;
 }
 
 export interface AnswerNode extends BaseNode {

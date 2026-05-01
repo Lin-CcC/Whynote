@@ -20,6 +20,7 @@ test.each([
   'question-main',
   'answer-first',
   'judgment-first-latest',
+  'summary-first-latest',
   'summary-manual',
   'judgment-summary-latest',
 ])('activates the same question block when selecting %s', (selectedNodeId) => {
@@ -52,7 +53,13 @@ test('shows question block actions only on the active block', () => {
     within(mainBlockActions).getByRole('button', { name: '插入回答' }),
   ).toBeInTheDocument();
   expect(
+    within(mainBlockActions).getByRole('button', { name: '生成追问' }),
+  ).toBeInTheDocument();
+  expect(
     within(mainBlockActions).getByRole('button', { name: '插入追问' }),
+  ).toBeInTheDocument();
+  expect(
+    within(mainBlockActions).getByRole('button', { name: '生成总结' }),
   ).toBeInTheDocument();
   expect(
     within(mainBlockActions).getByRole('button', { name: '插入总结' }),
@@ -75,6 +82,93 @@ test('shows question block actions only on the active block', () => {
     screen.getByTestId('question-block-actions-question-secondary'),
   ).toBeInTheDocument();
 });
+
+test.each([
+  'answer-first',
+  'judgment-first-latest',
+  'summary-first-latest',
+  'summary-manual',
+  'judgment-summary-latest',
+])(
+  'keeps the full active-block action surface reachable from %s',
+  (selectedNodeId) => {
+    renderQuestionBlockEditor({
+      initialSelectedNodeId: selectedNodeId,
+    });
+
+    const mainBlockActions = screen.getByTestId(
+      'question-block-actions-question-main',
+    );
+
+    expect(
+      within(mainBlockActions).getByRole('button', { name: '插入回答' }),
+    ).toBeInTheDocument();
+    expect(
+      within(mainBlockActions).getByRole('button', { name: '生成追问' }),
+    ).toBeInTheDocument();
+    expect(
+      within(mainBlockActions).getByRole('button', { name: '插入追问' }),
+    ).toBeInTheDocument();
+    expect(
+      within(mainBlockActions).getByRole('button', { name: '生成总结' }),
+    ).toBeInTheDocument();
+    expect(
+      within(mainBlockActions).getByRole('button', { name: '插入总结' }),
+    ).toBeInTheDocument();
+  },
+);
+
+test.each([
+  'answer-first',
+  'summary-first-latest',
+  'summary-manual',
+])(
+  'routes AI follow-up generation through the selected content node %s',
+  (selectedNodeId) => {
+    const onGenerateFollowUpQuestion = vi.fn();
+
+    renderQuestionBlockEditor({
+      initialSelectedNodeId: selectedNodeId,
+      onGenerateFollowUpQuestion,
+    });
+
+    const mainBlockActions = screen.getByTestId(
+      'question-block-actions-question-main',
+    );
+
+    fireEvent.click(
+      within(mainBlockActions).getByRole('button', { name: '生成追问' }),
+    );
+
+    expect(onGenerateFollowUpQuestion).toHaveBeenCalledWith(selectedNodeId);
+  },
+);
+
+test.each([
+  'answer-first',
+  'summary-first-latest',
+  'summary-manual',
+])(
+  'routes AI summary generation through the selected content node %s',
+  (selectedNodeId) => {
+    const onGenerateSummary = vi.fn();
+
+    renderQuestionBlockEditor({
+      initialSelectedNodeId: selectedNodeId,
+      onGenerateSummary,
+    });
+
+    const mainBlockActions = screen.getByTestId(
+      'question-block-actions-question-main',
+    );
+
+    fireEvent.click(
+      within(mainBlockActions).getByRole('button', { name: '生成总结' }),
+    );
+
+    expect(onGenerateSummary).toHaveBeenCalledWith(selectedNodeId);
+  },
+);
 
 test('keeps each answer adjacent to its own latest closure nodes in reading-chain order', () => {
   renderQuestionBlockEditor({
@@ -418,6 +512,9 @@ function renderQuestionBlockEditor(
   const onDirectAnswerQuestion = options?.onDirectAnswerQuestion ?? vi.fn();
   const onEvaluateAnswer = options?.onEvaluateAnswer ?? vi.fn();
   const onEvaluateSummary = options?.onEvaluateSummary ?? vi.fn();
+  const onGenerateFollowUpQuestion =
+    options?.onGenerateFollowUpQuestion ?? vi.fn();
+  const onGenerateSummary = options?.onGenerateSummary ?? vi.fn();
 
   function Wrapper() {
     const [workspaceViewState, setWorkspaceViewState] = useState(
@@ -434,6 +531,8 @@ function renderQuestionBlockEditor(
         onDirectAnswerQuestion={onDirectAnswerQuestion}
         onEvaluateAnswer={onEvaluateAnswer}
         onEvaluateSummary={onEvaluateSummary}
+        onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
+        onGenerateSummary={onGenerateSummary}
         onWorkspaceViewStateChange={(state) => {
           setWorkspaceViewState(state);
           options?.onViewStateChange?.(state);

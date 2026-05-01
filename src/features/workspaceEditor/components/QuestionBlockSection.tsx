@@ -27,6 +27,8 @@ export default function QuestionBlockSection({
   onDirectAnswerQuestion,
   onEvaluateAnswer,
   onEvaluateSummary,
+  onGenerateFollowUpQuestion,
+  onGenerateSummary,
   onInsertAnswerForQuestion,
   onInsertFollowUpQuestion,
   onInsertSummaryForQuestion,
@@ -48,6 +50,11 @@ export default function QuestionBlockSection({
     workspaceViewState.collapsedQuestionBlockIds.includes(question.id);
   const firstFollowUpEntryIndex = questionBlock.entries.findIndex(
     (entry) => entry.type === 'node' && entry.node.type === 'question',
+  );
+  const actionSourceNodeId = resolveQuestionBlockActionSourceNodeId(
+    tree,
+    question.id,
+    selectedNodeId,
   );
 
   function updateViewState(
@@ -382,14 +389,38 @@ export default function QuestionBlockSection({
               >
                 插入回答
               </button>
+              {onGenerateFollowUpQuestion ? (
+                <button
+                  className="workspace-nodeActionButton"
+                  disabled={isInteractionLocked}
+                  onClick={() => onGenerateFollowUpQuestion(actionSourceNodeId)}
+                  type="button"
+                >
+                  生成追问
+                </button>
+              ) : null}
               <button
                 className="workspace-nodeActionButton"
                 disabled={isInteractionLocked}
-                onClick={() => onInsertFollowUpQuestion(question.id)}
+                onClick={() =>
+                  onInsertFollowUpQuestion(question.id, {
+                    sourceNodeId: actionSourceNodeId,
+                  })
+                }
                 type="button"
               >
                 插入追问
               </button>
+              {onGenerateSummary ? (
+                <button
+                  className="workspace-nodeActionButton"
+                  disabled={isInteractionLocked}
+                  onClick={() => onGenerateSummary(actionSourceNodeId)}
+                  type="button"
+                >
+                  生成总结
+                </button>
+              ) : null}
               <button
                 className="workspace-nodeActionButton"
                 disabled={isInteractionLocked}
@@ -464,4 +495,26 @@ function getQuestionBlockEntryKey(entry: QuestionBlockEntry) {
   }
 
   return entry.node.id;
+}
+
+function resolveQuestionBlockActionSourceNodeId(
+  tree: { nodes: Record<string, TreeNode> },
+  questionNodeId: string,
+  selectedNodeId: string | null,
+) {
+  if (!selectedNodeId) {
+    return questionNodeId;
+  }
+
+  const selectedNode = tree.nodes[selectedNodeId];
+
+  if (!selectedNode) {
+    return questionNodeId;
+  }
+
+  if (selectedNode.type === 'question') {
+    return selectedNode.id === questionNodeId ? selectedNode.id : questionNodeId;
+  }
+
+  return selectedNode.parentId === questionNodeId ? selectedNode.id : questionNodeId;
 }

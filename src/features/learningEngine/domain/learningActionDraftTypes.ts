@@ -26,6 +26,11 @@ export type LearningActionDraft =
 export interface LearningActionDraftInput {
   actionId: LearningActionDraftActionId;
   topic: string;
+  focusContext?: {
+    type: 'question' | 'answer' | 'summary' | 'judgment';
+    title: string;
+    content?: string;
+  };
   moduleTitle?: string;
   planStepTitle?: string;
   planStepSummary?: string;

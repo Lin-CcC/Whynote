@@ -120,6 +120,8 @@ export interface WorkspaceEditorProps {
   initialSnapshot?: WorkspaceSnapshot;
   initialModuleId?: string;
   initialSelectedNodeId?: string;
+  onGenerateFollowUpQuestion?: (sourceNodeId: string) => void;
+  onGenerateSummary?: (sourceNodeId: string) => void;
   interactionLockReason?: string | null;
   isInteractionLocked?: boolean;
   onDirectAnswerQuestion?: (questionNodeId: string) => void;

@@ -149,6 +149,27 @@ export function useWorkspaceEditor({
   const selectedNodeTypeSwitchOptions = getSwitchableNodeTypes(tree, selectedNodeId);
 
   useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Delete' || isInteractionLocked || !selectedNodeId) {
+        return;
+      }
+
+      if (isEditableKeyboardTarget(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+      deleteSelection();
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [currentModuleId, isInteractionLocked, selectedNodeId, tree]);
+
+  useEffect(() => {
     setSelectedChildInsertType((previousType) =>
       resolveInsertTypeSelection(
         previousType,
@@ -598,7 +619,12 @@ export function useWorkspaceEditor({
     );
   }
 
-  function insertFollowUpQuestion(questionNodeId: string) {
+  function insertFollowUpQuestion(
+    questionNodeId: string,
+    options?: {
+      sourceNodeId?: string | null;
+    },
+  ) {
     if (isInteractionLocked || !tree.nodes[questionNodeId]) {
       return;
     }
@@ -609,7 +635,13 @@ export function useWorkspaceEditor({
       return;
     }
 
-    const nextNode = createEditorNode('question', questionNodeId);
+    const nextNode = createEditorNode('question', questionNodeId, {
+      sourceContext: buildQuestionSourceContext(
+        tree,
+        questionNodeId,
+        options?.sourceNodeId ?? questionNodeId,
+      ),
+    });
 
     runStructuralOperation(
       () => {
@@ -632,16 +664,6 @@ export function useWorkspaceEditor({
 
   function insertSummaryForQuestion(questionNodeId: string) {
     if (isInteractionLocked) {
-      return;
-    }
-
-    const isHandledByExternalRuntime = requestExternalLearningAction(
-      'insert-summary',
-      questionNodeId,
-    );
-
-    if (isHandledByExternalRuntime) {
-      setOperationError(null);
       return;
     }
 
@@ -890,6 +912,7 @@ function createEditorNode(
   options?: {
     content?: string;
     judgmentKind?: 'manual';
+    sourceContext?: Extract<TreeNode, { type: 'question' }>['sourceContext'];
     summaryKind?: 'answer-closure' | 'manual' | 'scaffold';
     title?: string;
   },
@@ -929,6 +952,9 @@ function createEditorNode(
     type: nodeType,
     title: nodeTitle,
     content: nodeContent,
+    ...(nodeType === 'question' && options?.sourceContext
+      ? { sourceContext: options.sourceContext }
+      : {}),
   });
 }
 
@@ -1406,4 +1432,53 @@ function resolveLearningActionSummaryKind(actionId: LearningActionId) {
     default:
       return undefined;
   }
+}
+
+function buildQuestionSourceContext(
+  tree: NodeTree,
+  questionNodeId: string,
+  sourceNodeId: string,
+) {
+  const sourceNode = tree.nodes[sourceNodeId];
+
+  if (
+    !sourceNode ||
+    (sourceNode.type !== 'question' &&
+      sourceNode.type !== 'answer' &&
+      sourceNode.type !== 'summary' &&
+      sourceNode.type !== 'judgment')
+  ) {
+    return undefined;
+  }
+
+  if (sourceNode.type === 'question') {
+    if (sourceNode.id !== questionNodeId) {
+      return undefined;
+    }
+  } else if (sourceNode.parentId !== questionNodeId) {
+    return undefined;
+  }
+
+  return {
+    content: sourceNode.content,
+    nodeId: sourceNode.id,
+    nodeType: sourceNode.type,
+    title: sourceNode.title,
+    updatedAt: sourceNode.updatedAt,
+  } satisfies NonNullable<Extract<TreeNode, { type: 'question' }>['sourceContext']>;
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+
+  return (
+    tagName === 'input' ||
+    tagName === 'textarea' ||
+    tagName === 'select' ||
+    target.isContentEditable
+  );
 }

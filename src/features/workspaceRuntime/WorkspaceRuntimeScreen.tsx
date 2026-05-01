@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import AppLayout from '../../ui/AppLayout';
 import SectionCard from '../../ui/SectionCard';
-import { getModuleScopeId } from '../nodeDomain';
+import { findNearestQuestionNodeId, getModuleScopeId, getNodeOrThrow } from '../nodeDomain';
 import ResourcesSearchExportPanel from '../resourcesSearchExport/ResourcesSearchExportPanel';
 import WorkspaceEditor from '../workspaceEditor/WorkspaceEditor';
 import { resolveLearningActionPlacement } from '../workspaceEditor/utils/learningActions';
@@ -131,6 +131,8 @@ export default function WorkspaceRuntimeScreen({
       onEvaluateSummary={(summaryNodeId) => {
         void runtime.runSummaryEvaluation(summaryNodeId);
       }}
+      onGenerateFollowUpQuestion={handleGenerateFollowUpQuestion}
+      onGenerateSummary={handleGenerateSummary}
       onLearningActionRequest={(request) => {
         if (!canRunAiLearningAction(request.actionId)) {
           return false;
@@ -367,6 +369,42 @@ export default function WorkspaceRuntimeScreen({
     void runtime.runQuestionDirectAnswer(directAnswerRequest);
   }
 
+  function handleGenerateFollowUpQuestion(sourceNodeId: string) {
+    if (runtime.isAiRunning) {
+      return;
+    }
+
+    const request = resolveFollowUpQuestionDraftRequest(
+      runtime.snapshot?.tree ?? null,
+      runtime.initialModuleId,
+      sourceNodeId,
+    );
+
+    if (!request) {
+      return;
+    }
+
+    void runtime.runLearningAction(request);
+  }
+
+  function handleGenerateSummary(sourceNodeId: string) {
+    if (runtime.isAiRunning) {
+      return;
+    }
+
+    const request = resolveQuestionBlockSummaryDraftRequest(
+      runtime.snapshot?.tree ?? null,
+      runtime.initialModuleId,
+      sourceNodeId,
+    );
+
+    if (!request) {
+      return;
+    }
+
+    void runtime.runLearningAction(request);
+  }
+
   async function handleJudgmentHintToggle(
     judgmentNodeId: string,
     hasPersistedHint: boolean,
@@ -396,8 +434,6 @@ function canRunAiLearningAction(actionId: LearningActionId) {
     case 'rephrase-scaffold':
     case 'simplify-scaffold':
     case 'add-example':
-    case 'insert-question':
-    case 'insert-summary':
     case 'insert-judgment':
       return true;
     default:
@@ -444,6 +480,65 @@ function resolveDirectAnswerRequestForQuestion(
     currentModuleId: getModuleScopeId(tree, questionNodeId) ?? currentModuleId,
     placement,
     selectedNodeId: questionNodeId,
+    tree,
+  };
+}
+
+function resolveFollowUpQuestionDraftRequest(
+  tree: WorkspaceEditorRenderContext['tree'] | null,
+  currentModuleId: string | null,
+  sourceNodeId: string | null,
+): WorkspaceEditorLearningActionRequest | null {
+  if (!tree || !sourceNodeId || !tree.nodes[sourceNodeId]) {
+    return null;
+  }
+
+  const questionNodeId = findNearestQuestionNodeId(tree, sourceNodeId);
+
+  if (!questionNodeId) {
+    return null;
+  }
+
+  const questionNode = getNodeOrThrow(tree, questionNodeId);
+
+  if (questionNode.type !== 'question') {
+    return null;
+  }
+
+  return {
+    actionId: 'insert-question',
+    currentModuleId: getModuleScopeId(tree, sourceNodeId) ?? currentModuleId,
+    placement: {
+      insertIndex: questionNode.childIds.length,
+      nodeType: 'question',
+      parentNodeId: questionNode.id,
+      title: '新追问',
+    },
+    selectedNodeId: sourceNodeId,
+    tree,
+  };
+}
+
+function resolveQuestionBlockSummaryDraftRequest(
+  tree: WorkspaceEditorRenderContext['tree'] | null,
+  currentModuleId: string | null,
+  sourceNodeId: string | null,
+): WorkspaceEditorLearningActionRequest | null {
+  if (!tree || !sourceNodeId || !tree.nodes[sourceNodeId]) {
+    return null;
+  }
+
+  const placement = resolveLearningActionPlacement(tree, sourceNodeId, 'insert-summary');
+
+  if (!placement) {
+    return null;
+  }
+
+  return {
+    actionId: 'insert-summary',
+    currentModuleId: getModuleScopeId(tree, sourceNodeId) ?? currentModuleId,
+    placement,
+    selectedNodeId: sourceNodeId,
     tree,
   };
 }
