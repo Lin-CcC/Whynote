@@ -1,11 +1,17 @@
 import { Fragment } from 'react';
 
 import { getNodeOrThrow, isScaffoldSummaryNode, type TreeNode } from '../../nodeDomain';
-import { getChildNodes } from '../utils/treeSelectors';
+import { getChildNodes, getDisplayTitleForNode } from '../utils/treeSelectors';
 import EditableNodeCard from './EditableNodeCard';
 import LearningActionPanel from './LearningActionPanel';
 import type { MainViewNodeProps } from './mainViewTypes';
 import QuestionBlockSection from './QuestionBlockSection';
+
+const PLAN_STEP_STATUS_LABELS = {
+  todo: '待处理',
+  doing: '进行中',
+  done: '已完成',
+} as const;
 
 export default function EditorNodeSection(props: MainViewNodeProps) {
   const { depth, nodeId, tree } = props;
@@ -45,6 +51,10 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
     planStepCollapsed ||
     (supportsNodeBodyCollapse(node) &&
       props.workspaceViewState.collapsedNodeBodyIds.includes(node.id));
+  const compactPlanStepSummary =
+    node.type === 'plan-step' && planStepCollapsed
+      ? buildCollapsedPlanStepSummary()
+      : undefined;
 
   function toggleNodeBodyCollapsed() {
     props.onWorkspaceViewStateChange({
@@ -72,16 +82,12 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
 
   return (
     <EditableNodeCard
-      actions={selectedNodeActions ?? inlineActions}
+      actions={compactPlanStepSummary ? null : selectedNodeActions ?? inlineActions}
       bodyCollapsed={bodyCollapsed}
-      bodyCollapsedHint={
-        planStepCollapsed
-          ? '步骤已折叠，展开后继续查看正文和子内容。'
-          : undefined
-      }
+      collapsedSummary={compactPlanStepSummary}
       depth={depth}
       headerControls={
-        node.type === 'plan-step' ? (
+        node.type === 'plan-step' && !planStepCollapsed ? (
           <button
             className="workspace-nodeBodyToggle"
             disabled={props.isInteractionLocked}
@@ -215,6 +221,44 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
         ]}
         testId={`node-actions-${node.id}`}
       />
+    );
+  }
+
+  function buildCollapsedPlanStepSummary() {
+    if (node.type !== 'plan-step') {
+      return null;
+    }
+
+    const displayTitle = getDisplayTitleForNode(tree, node).trim();
+    const collapsedTitle = displayTitle.length > 0 ? displayTitle : '未命名步骤';
+
+    return (
+      <div className="workspace-planStepCollapsedSummary">
+        <div className="workspace-planStepCollapsedInfo">
+          <div className="workspace-planStepCollapsedMeta">
+            <span className="workspace-nodeType">步骤</span>
+            <span
+              className="workspace-planStepStatusBadge"
+              data-status={node.status}
+            >
+              {PLAN_STEP_STATUS_LABELS[node.status]}
+            </span>
+          </div>
+          <h3 className="workspace-planStepCollapsedTitle">{collapsedTitle}</h3>
+          <p className="workspace-planStepCollapsedHint">当前步骤已折叠</p>
+        </div>
+        <button
+          className="workspace-nodeBodyToggle"
+          disabled={props.isInteractionLocked}
+          onClick={(event) => {
+            event.stopPropagation();
+            togglePlanStepCollapsed();
+          }}
+          type="button"
+        >
+          展开步骤
+        </button>
+      </div>
     );
   }
 }

@@ -31,6 +31,7 @@ type EditableNodeCardProps = {
   bodyCollapsed?: boolean;
   bodyCollapsedHint?: string;
   children?: ReactNode;
+  collapsedSummary?: ReactNode;
   depth: number;
   headerControls?: ReactNode;
   isInteractionLocked: boolean;
@@ -54,6 +55,7 @@ export default function EditableNodeCard({
   bodyCollapsed = false,
   bodyCollapsedHint = '正文已折叠，展开后继续查看或编辑。',
   children,
+  collapsedSummary,
   depth,
   headerControls,
   isInteractionLocked,
@@ -83,6 +85,7 @@ export default function EditableNodeCard({
     planStepRuntimeStatus !== null &&
     node.status !== planStepRuntimeStatus.suggestedStatus;
   const bodyToggleLabel = `${bodyCollapsed ? '展开' : '收起'}正文`;
+  const hasCollapsedSummary = collapsedSummary !== undefined && collapsedSummary !== null;
 
   function handleEditableFocus(event: FocusEvent<HTMLElement>) {
     if (
@@ -137,6 +140,7 @@ export default function EditableNodeCard({
     <section
       aria-selected={isSelected}
       className="workspace-node"
+      data-node-collapsed-summary={hasCollapsedSummary}
       data-node-emphasis={getNodeEmphasis(node)}
       data-node-editing={isEditing}
       data-node-selected={isSelected}
@@ -147,114 +151,120 @@ export default function EditableNodeCard({
       style={{ '--node-depth': depth } as CSSProperties}
       tabIndex={-1}
     >
-      <div className="workspace-nodeHeader">
-        <div className="workspace-nodeMeta">
-          <span className="workspace-nodeType">{displayLabel}</span>
-          {semanticVisibility.badges.map((badge) => (
-            <span
-              className="workspace-semanticBadge"
-              data-badge-tone={badge.tone}
-              key={badge.key}
-            >
-              {badge.label}
-            </span>
-          ))}
-          {node.type === 'plan-step' ? (
-            <select
-              aria-label={`${displayTitle || displayLabel} 状态`}
-              className="workspace-statusSelect"
-              disabled={isInteractionLocked}
-              onBlur={handleEditableBlur}
-              onChange={handleStatusChange}
-              onClick={(event) => event.stopPropagation()}
-              onFocus={handleEditableFocus}
-              ref={statusSelectRef}
-              value={node.status}
-            >
-              {Object.entries(PLAN_STEP_STATUS_LABELS).map(([status, label]) => (
-                <option key={status} value={status}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          {onToggleBodyCollapsed ? (
-            <button
-              className="workspace-nodeBodyToggle"
-              disabled={isInteractionLocked}
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggleBodyCollapsed();
-              }}
-              type="button"
-            >
-              {bodyToggleLabel}
-            </button>
-          ) : null}
-          {headerControls}
-          {isSelected ? (
-            <span className="workspace-selectedBadge">已选中</span>
-          ) : null}
-          {isEditing ? (
-            <span className="workspace-editingBadge">编辑中</span>
-          ) : null}
-        </div>
-        {isSelected ? (
-          <p className="workspace-nodeSelectionHint">
-            {getNodeSelectionHint(tree, node, isEditing)}
-          </p>
-        ) : null}
-        {semanticVisibility.notes.map((note) => (
-          <p className="workspace-nodeHint" key={note}>
-            {note}
-          </p>
-        ))}
-        {node.type === 'plan-step' && planStepRuntimeStatus ? (
-          <>
-            <p className="workspace-nodeHint">
-              {`系统判断：${PLAN_STEP_STATUS_LABELS[planStepRuntimeStatus.suggestedStatus]}。依据：${planStepRuntimeStatus.reasonSummary}`}
-            </p>
-            {hasManualPlanStepStatusOverride ? (
-              <p className="workspace-nodeHint">
-                {`当前状态已手动改为 ${PLAN_STEP_STATUS_LABELS[node.status]}。后续内容变化时系统会重新托管。`}
-              </p>
-            ) : null}
-          </>
-        ) : null}
-      </div>
-      {actions ? <div className="workspace-nodeInlineActions">{actions}</div> : null}
-      {bodyCollapsed ? (
-        <p className="workspace-nodeHint">{bodyCollapsedHint}</p>
+      {hasCollapsedSummary ? (
+        <div className="workspace-nodeCompactSummary">{collapsedSummary}</div>
       ) : (
         <>
-          <input
-            aria-label={`${displayTitle || displayLabel} 标题`}
-            className="workspace-nodeTitleInput"
-            disabled={isInteractionLocked}
-            onBlur={handleEditableBlur}
-            onChange={handleTitleChange}
-            onClick={(event) => event.stopPropagation()}
-            onFocus={handleEditableFocus}
-            placeholder={getNodeInputPlaceholderForNode(tree, node, 'title')}
-            ref={titleInputRef}
-            value={displayTitle}
-          />
-          <textarea
-            aria-label={`${displayTitle || displayLabel} 内容`}
-            className="workspace-nodeContentInput"
-            disabled={isInteractionLocked}
-            onBlur={handleEditableBlur}
-            onChange={handleContentChange}
-            onClick={(event) => event.stopPropagation()}
-            onFocus={handleEditableFocus}
-            placeholder={getNodeInputPlaceholderForNode(tree, node, 'content')}
-            ref={contentInputRef}
-            rows={node.type === 'plan-step' ? 3 : 4}
-            value={node.content}
-          />
+          <div className="workspace-nodeHeader">
+            <div className="workspace-nodeMeta">
+              <span className="workspace-nodeType">{displayLabel}</span>
+              {semanticVisibility.badges.map((badge) => (
+                <span
+                  className="workspace-semanticBadge"
+                  data-badge-tone={badge.tone}
+                  key={badge.key}
+                >
+                  {badge.label}
+                </span>
+              ))}
+              {node.type === 'plan-step' ? (
+                <select
+                  aria-label={`${displayTitle || displayLabel} 状态`}
+                  className="workspace-statusSelect"
+                  disabled={isInteractionLocked}
+                  onBlur={handleEditableBlur}
+                  onChange={handleStatusChange}
+                  onClick={(event) => event.stopPropagation()}
+                  onFocus={handleEditableFocus}
+                  ref={statusSelectRef}
+                  value={node.status}
+                >
+                  {Object.entries(PLAN_STEP_STATUS_LABELS).map(([status, label]) => (
+                    <option key={status} value={status}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              {onToggleBodyCollapsed ? (
+                <button
+                  className="workspace-nodeBodyToggle"
+                  disabled={isInteractionLocked}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleBodyCollapsed();
+                  }}
+                  type="button"
+                >
+                  {bodyToggleLabel}
+                </button>
+              ) : null}
+              {headerControls}
+              {isSelected ? (
+                <span className="workspace-selectedBadge">已选中</span>
+              ) : null}
+              {isEditing ? (
+                <span className="workspace-editingBadge">编辑中</span>
+              ) : null}
+            </div>
+            {isSelected ? (
+              <p className="workspace-nodeSelectionHint">
+                {getNodeSelectionHint(tree, node, isEditing)}
+              </p>
+            ) : null}
+            {semanticVisibility.notes.map((note) => (
+              <p className="workspace-nodeHint" key={note}>
+                {note}
+              </p>
+            ))}
+            {node.type === 'plan-step' && planStepRuntimeStatus ? (
+              <>
+                <p className="workspace-nodeHint">
+                  {`系统判断：${PLAN_STEP_STATUS_LABELS[planStepRuntimeStatus.suggestedStatus]}。依据：${planStepRuntimeStatus.reasonSummary}`}
+                </p>
+                {hasManualPlanStepStatusOverride ? (
+                  <p className="workspace-nodeHint">
+                    {`当前状态已手动改为 ${PLAN_STEP_STATUS_LABELS[node.status]}。后续内容变化时系统会重新托管。`}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+          {actions ? <div className="workspace-nodeInlineActions">{actions}</div> : null}
+          {bodyCollapsed ? (
+            <p className="workspace-nodeHint">{bodyCollapsedHint}</p>
+          ) : (
+            <>
+              <input
+                aria-label={`${displayTitle || displayLabel} 标题`}
+                className="workspace-nodeTitleInput"
+                disabled={isInteractionLocked}
+                onBlur={handleEditableBlur}
+                onChange={handleTitleChange}
+                onClick={(event) => event.stopPropagation()}
+                onFocus={handleEditableFocus}
+                placeholder={getNodeInputPlaceholderForNode(tree, node, 'title')}
+                ref={titleInputRef}
+                value={displayTitle}
+              />
+              <textarea
+                aria-label={`${displayTitle || displayLabel} 内容`}
+                className="workspace-nodeContentInput"
+                disabled={isInteractionLocked}
+                onBlur={handleEditableBlur}
+                onChange={handleContentChange}
+                onClick={(event) => event.stopPropagation()}
+                onFocus={handleEditableFocus}
+                placeholder={getNodeInputPlaceholderForNode(tree, node, 'content')}
+                ref={contentInputRef}
+                rows={node.type === 'plan-step' ? 3 : 4}
+                value={node.content}
+              />
+            </>
+          )}
+          {children ? <div className="workspace-nodeChildren">{children}</div> : null}
         </>
       )}
-      {children ? <div className="workspace-nodeChildren">{children}</div> : null}
     </section>
   );
 }

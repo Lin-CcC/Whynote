@@ -505,11 +505,41 @@ test('collapses and expands a plan-step while keeping its header visible', async
 
   expect(viewStateChanges.at(-1)?.collapsedPlanStepIds).toContain('step-question-block');
   expect(
-    within(screen.getByTestId('editor-node-step-question-block')).getByRole(
+    within(screen.getByTestId('editor-node-step-question-block')).getByText('步骤'),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).getByText('问题块步骤'),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).getByText('进行中'),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).getByText(
+      '当前步骤已折叠',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).queryByRole(
       'combobox',
       { name: '问题块步骤 状态' },
     ),
-  ).toBeInTheDocument();
+  ).not.toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).queryByText(
+      /这里承接当前学习步骤/,
+    ),
+  ).not.toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).queryByText(
+      /系统判断：/,
+    ),
+  ).not.toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).queryByText(
+      '步骤已折叠，展开后继续查看正文和子内容。',
+    ),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('问题块步骤 标题')).not.toBeInTheDocument();
   expect(screen.queryByLabelText('问题块步骤 内容')).not.toBeInTheDocument();
   expect(screen.queryByTestId('question-block-question-main')).not.toBeInTheDocument();
 
@@ -661,6 +691,44 @@ test('does not auto-reopen a plan-step after the user manually collapses it', as
     within(screen.getByTestId('editor-node-step-question-block')).getByRole(
       'button',
       { name: '展开步骤' },
+    ),
+  ).toBeInTheDocument();
+});
+
+test('shows 未命名步骤 in the compact collapsed summary when the plan-step title is empty', async () => {
+  const snapshot = createQuestionBlockSnapshot();
+  const planStepNode = snapshot.tree.nodes['step-question-block'];
+
+  if (planStepNode?.type !== 'plan-step') {
+    throw new Error('Expected step-question-block to be a plan-step node.');
+  }
+
+  planStepNode.title = '  ';
+
+  renderQuestionBlockEditor({
+    initialSnapshot: snapshot,
+    initialSelectedNodeId: 'step-question-block',
+  });
+
+  fireEvent.click(
+    within(screen.getByTestId('editor-node-step-question-block')).getByRole(
+      'button',
+      { name: '收起步骤' },
+    ),
+  );
+
+  await waitFor(() => {
+    expect(
+      within(screen.getByTestId('editor-node-step-question-block')).getByRole(
+        'button',
+        { name: '展开步骤' },
+      ),
+    ).toBeInTheDocument();
+  });
+
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).getByText(
+      '未命名步骤',
     ),
   ).toBeInTheDocument();
 });
