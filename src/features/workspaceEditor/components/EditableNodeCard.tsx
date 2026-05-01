@@ -9,7 +9,6 @@ import {
   useState,
 } from 'react';
 
-import { resolvePlanStepRuntimeStatus } from '../../learningEngine';
 import {
   getNodeOrThrow,
   type NodeTree,
@@ -75,17 +74,13 @@ export default function EditableNodeCard({
   const isSelected = node.id === selectedNodeId;
   const displayLabel = getDisplayLabelForNode(tree, node);
   const displayTitle = getDisplayTitleForNode(tree, node);
-  const planStepRuntimeStatus =
-    node.type === 'plan-step'
-      ? resolvePlanStepRuntimeStatus(tree, node.id)
-      : null;
   const semanticVisibility = getNodeSemanticVisibility(tree, node);
-  const hasManualPlanStepStatusOverride =
-    node.type === 'plan-step' &&
-    planStepRuntimeStatus !== null &&
-    node.status !== planStepRuntimeStatus.suggestedStatus;
   const bodyToggleLabel = `${bodyCollapsed ? '展开' : '收起'}正文`;
   const hasCollapsedSummary = collapsedSummary !== undefined && collapsedSummary !== null;
+  const nodeShell = getNodeShellKind(node);
+  const frameVisible = isSelected || isEditing;
+  const shouldRenderSelectionHint =
+    node.type !== 'module' && node.type !== 'plan-step';
 
   function handleEditableFocus(event: FocusEvent<HTMLElement>) {
     if (
@@ -143,7 +138,9 @@ export default function EditableNodeCard({
       data-node-collapsed-summary={hasCollapsedSummary}
       data-node-emphasis={getNodeEmphasis(node)}
       data-node-editing={isEditing}
+      data-node-frame-visible={frameVisible}
       data-node-selected={isSelected}
+      data-node-shell={nodeShell}
       data-node-type={node.type}
       data-testid={`editor-node-${node.id}`}
       onClick={handleNodeClick}
@@ -207,7 +204,7 @@ export default function EditableNodeCard({
                 <span className="workspace-editingBadge">编辑中</span>
               ) : null}
             </div>
-            {isSelected ? (
+            {isSelected && shouldRenderSelectionHint ? (
               <p className="workspace-nodeSelectionHint">
                 {getNodeSelectionHint(tree, node, isEditing)}
               </p>
@@ -217,18 +214,6 @@ export default function EditableNodeCard({
                 {note}
               </p>
             ))}
-            {node.type === 'plan-step' && planStepRuntimeStatus ? (
-              <>
-                <p className="workspace-nodeHint">
-                  {`系统判断：${PLAN_STEP_STATUS_LABELS[planStepRuntimeStatus.suggestedStatus]}。依据：${planStepRuntimeStatus.reasonSummary}`}
-                </p>
-                {hasManualPlanStepStatusOverride ? (
-                  <p className="workspace-nodeHint">
-                    {`当前状态已手动改为 ${PLAN_STEP_STATUS_LABELS[node.status]}。后续内容变化时系统会重新托管。`}
-                  </p>
-                ) : null}
-              </>
-            ) : null}
           </div>
           {actions ? <div className="workspace-nodeInlineActions">{actions}</div> : null}
           {bodyCollapsed ? (
@@ -279,6 +264,17 @@ function getNodeSelectionHint(
   return isEditing
     ? `${roleDescription}。现在可以直接修改标题或正文。`
     : `${roleDescription}。点击输入框后会进入正文编辑。`;
+}
+
+function getNodeShellKind(node: TreeNode) {
+  switch (node.type) {
+    case 'module':
+      return 'document-root';
+    case 'plan-step':
+      return 'section-divider';
+    default:
+      return 'document-node';
+  }
 }
 
 function isOwnedEditableTarget(
