@@ -24,6 +24,9 @@ export function readCompleteWorkspaceViewStateForExport(
   const collapsedQuestionBlockIds = readRequiredStringArray(
     workspaceViewValue.collapsedQuestionBlockIds,
   );
+  const collapsedPlanStepIds = readRequiredStringArray(
+    workspaceViewValue.collapsedPlanStepIds,
+  );
   const collapsedNodeBodyIds = readRequiredStringArray(
     workspaceViewValue.collapsedNodeBodyIds,
   );
@@ -32,6 +35,7 @@ export function readCompleteWorkspaceViewStateForExport(
   );
 
   if (
+    !collapsedPlanStepIds ||
     !collapsedQuestionBlockIds ||
     !collapsedNodeBodyIds ||
     !expandedHistorySectionIds
@@ -40,6 +44,7 @@ export function readCompleteWorkspaceViewStateForExport(
   }
 
   return {
+    collapsedPlanStepIds,
     collapsedNodeBodyIds,
     collapsedQuestionBlockIds,
     expandedHistorySectionIds,

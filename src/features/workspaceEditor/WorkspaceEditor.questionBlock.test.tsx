@@ -472,10 +472,132 @@ test('tracks block, body, and group-local history collapse in workspace view sta
   ).not.toBeInTheDocument();
 });
 
+test('collapses and expands a plan-step while keeping its header visible', async () => {
+  const viewStateChanges: WorkspaceViewState[] = [];
+
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'step-question-block',
+    onViewStateChange: (state) => {
+      viewStateChanges.push(state);
+    },
+  });
+
+  const planStepNode = screen.getByTestId('editor-node-step-question-block');
+
+  expect(
+    within(planStepNode).getByRole('button', { name: '收起步骤' }),
+  ).toBeInTheDocument();
+  expect(
+    within(planStepNode).getByRole('combobox', { name: '问题块步骤 状态' }),
+  ).toBeInTheDocument();
+  expect(screen.getByTestId('question-block-question-main')).toBeInTheDocument();
+
+  fireEvent.click(within(planStepNode).getByRole('button', { name: '收起步骤' }));
+
+  await waitFor(() => {
+    expect(
+      within(screen.getByTestId('editor-node-step-question-block')).getByRole(
+        'button',
+        { name: '展开步骤' },
+      ),
+    ).toBeInTheDocument();
+  });
+
+  expect(viewStateChanges.at(-1)?.collapsedPlanStepIds).toContain('step-question-block');
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).getByRole(
+      'combobox',
+      { name: '问题块步骤 状态' },
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText('问题块步骤 内容')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('question-block-question-main')).not.toBeInTheDocument();
+
+  fireEvent.click(
+    within(screen.getByTestId('editor-node-step-question-block')).getByRole(
+      'button',
+      { name: '展开步骤' },
+    ),
+  );
+
+  await waitFor(() => {
+    expect(screen.getByLabelText('问题块步骤 内容')).toBeInTheDocument();
+  });
+
+  expect(
+    viewStateChanges.at(-1)?.collapsedPlanStepIds.includes('step-question-block'),
+  ).toBe(false);
+  expect(screen.getByTestId('question-block-question-main')).toBeInTheDocument();
+});
+
+test('restores inner question block, body, and history state after collapsing and reopening a plan-step', async () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'step-question-block',
+    initialWorkspaceViewState: {
+      collapsedPlanStepIds: [],
+      collapsedQuestionBlockIds: ['question-main'],
+      collapsedNodeBodyIds: ['answer-first'],
+      expandedHistorySectionIds: [getAnswerHistorySectionId('answer-first')],
+    },
+  });
+
+  const planStepNode = screen.getByTestId('editor-node-step-question-block');
+
+  fireEvent.click(within(planStepNode).getByRole('button', { name: '收起步骤' }));
+
+  await waitFor(() => {
+    expect(screen.queryByTestId('question-block-question-main')).not.toBeInTheDocument();
+  });
+
+  fireEvent.click(
+    within(screen.getByTestId('editor-node-step-question-block')).getByRole(
+      'button',
+      { name: '展开步骤' },
+    ),
+  );
+
+  await waitFor(() => {
+    expect(screen.getByTestId('question-block-question-main')).toBeInTheDocument();
+  });
+
+  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+    'data-collapsed',
+    'true',
+  );
+
+  fireEvent.click(
+    within(screen.getByTestId('question-block-question-main')).getByRole('button', {
+      name: '展开 block',
+    }),
+  );
+
+  await waitFor(() => {
+    expect(
+      screen.getByTestId('question-block-answer-group-answer-first'),
+    ).toBeInTheDocument();
+  });
+
+  expect(screen.queryByLabelText('第一版回答 内容')).not.toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-answer-first')).getByRole('button', {
+      name: '展开正文',
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(
+      screen.getByTestId('question-block-answer-group-answer-first'),
+    ).getByRole('button', {
+      name: '收起历史评估与旧解析',
+    }),
+  ).toBeInTheDocument();
+  expect(screen.getByTestId('editor-node-judgment-first-history')).toBeInTheDocument();
+});
+
 test('does not auto-reopen a group history section after the user collapses it', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'judgment-first-history',
     initialWorkspaceViewState: {
+      collapsedPlanStepIds: [],
       collapsedQuestionBlockIds: [],
       collapsedNodeBodyIds: [],
       expandedHistorySectionIds: [getAnswerHistorySectionId('answer-first')],
@@ -509,19 +631,52 @@ test('does not auto-reopen a group history section after the user collapses it',
   ).not.toBeInTheDocument();
 });
 
-test('auto-expands a collapsed block and its hidden history when selecting a historical node from the structure tree', async () => {
+test('does not auto-reopen a plan-step after the user manually collapses it', async () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: {
+      collapsedPlanStepIds: ['step-question-block'],
+      collapsedQuestionBlockIds: [],
+      collapsedNodeBodyIds: [],
+      expandedHistorySectionIds: [],
+    },
+  });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('question-block-question-main')).toBeInTheDocument();
+  });
+
+  fireEvent.click(
+    within(screen.getByTestId('editor-node-step-question-block')).getByRole(
+      'button',
+      { name: '收起步骤' },
+    ),
+  );
+
+  await waitFor(() => {
+    expect(screen.queryByTestId('question-block-question-main')).not.toBeInTheDocument();
+  });
+
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).getByRole(
+      'button',
+      { name: '展开步骤' },
+    ),
+  ).toBeInTheDocument();
+});
+
+test('auto-expands a collapsed plan-step, block, and hidden history when selecting a historical node from the structure tree', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'step-question-block',
     initialWorkspaceViewState: {
+      collapsedPlanStepIds: ['step-question-block'],
       collapsedQuestionBlockIds: ['question-main'],
       collapsedNodeBodyIds: ['judgment-first-history'],
       expandedHistorySectionIds: [],
     },
   });
 
-  expect(
-    screen.getByTestId('question-block-question-main'),
-  ).toHaveAttribute('data-collapsed', 'true');
+  expect(screen.queryByTestId('question-block-question-main')).not.toBeInTheDocument();
 
   fireEvent.click(
     within(screen.getByRole('tree', { name: '当前模块结构' })).getByRole(
@@ -536,6 +691,12 @@ test('auto-expands a collapsed block and its hidden history when selecting a his
     ).toHaveAttribute('data-collapsed', 'false');
   });
 
+  expect(
+    within(screen.getByTestId('editor-node-step-question-block')).getByRole(
+      'button',
+      { name: '收起步骤' },
+    ),
+  ).toBeInTheDocument();
   expect(
     screen.getByTestId('editor-node-judgment-first-history'),
   ).toBeInTheDocument();

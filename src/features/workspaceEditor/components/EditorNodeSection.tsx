@@ -40,9 +40,11 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
     tree,
   });
   const selectedNodeActions = buildSelectedNodeActions();
+  const planStepCollapsed = isPlanStepCollapsed(node, props.workspaceViewState);
   const bodyCollapsed =
-    supportsNodeBodyCollapse(node) &&
-    props.workspaceViewState.collapsedNodeBodyIds.includes(node.id);
+    planStepCollapsed ||
+    (supportsNodeBodyCollapse(node) &&
+      props.workspaceViewState.collapsedNodeBodyIds.includes(node.id));
 
   function toggleNodeBodyCollapsed() {
     props.onWorkspaceViewStateChange({
@@ -54,11 +56,45 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
     });
   }
 
+  function togglePlanStepCollapsed() {
+    if (node.type !== 'plan-step') {
+      return;
+    }
+
+    props.onWorkspaceViewStateChange({
+      ...props.workspaceViewState,
+      collapsedPlanStepIds: toggleId(
+        props.workspaceViewState.collapsedPlanStepIds,
+        node.id,
+      ),
+    });
+  }
+
   return (
     <EditableNodeCard
       actions={selectedNodeActions ?? inlineActions}
       bodyCollapsed={bodyCollapsed}
+      bodyCollapsedHint={
+        planStepCollapsed
+          ? '步骤已折叠，展开后继续查看正文和子内容。'
+          : undefined
+      }
       depth={depth}
+      headerControls={
+        node.type === 'plan-step' ? (
+          <button
+            className="workspace-nodeBodyToggle"
+            disabled={props.isInteractionLocked}
+            onClick={(event) => {
+              event.stopPropagation();
+              togglePlanStepCollapsed();
+            }}
+            type="button"
+          >
+            {planStepCollapsed ? '展开步骤' : '收起步骤'}
+          </button>
+        ) : undefined
+      }
       isInteractionLocked={props.isInteractionLocked}
       nodeId={node.id}
       onSelectNode={props.onSelectNode}
@@ -70,25 +106,27 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
       selectedNodeId={props.selectedNodeId}
       tree={tree}
     >
-      {childNodes.map((childNode) => (
-        <Fragment key={childNode.id}>
-          {childNode.id === firstChildQuestionNodeId && questionChildCount > 0 ? (
-            <div className="workspace-splitHint">
-              <div className="workspace-splitHeader">
-                <div>
-                  <p className="workspace-kicker">问题分区</p>
-                  <h3 className="workspace-splitTitle">下面进入 question block 主视图</h3>
+      {planStepCollapsed
+        ? null
+        : childNodes.map((childNode) => (
+            <Fragment key={childNode.id}>
+              {childNode.id === firstChildQuestionNodeId && questionChildCount > 0 ? (
+                <div className="workspace-splitHint">
+                  <div className="workspace-splitHeader">
+                    <div>
+                      <p className="workspace-kicker">问题分区</p>
+                      <h3 className="workspace-splitTitle">下面进入 question block 主视图</h3>
+                    </div>
+                    <span className="workspace-counter">{questionChildCount} 个问题块</span>
+                  </div>
+                  <p className="workspace-helpText">
+                    question block 会把回答、对应结果和追问按链条重新组织显示，但底层树顺序保持不变。
+                  </p>
                 </div>
-                <span className="workspace-counter">{questionChildCount} 个问题块</span>
-              </div>
-              <p className="workspace-helpText">
-                question block 会把回答、对应结果和追问按链条重新组织显示，但底层树顺序保持不变。
-              </p>
-            </div>
-          ) : null}
-          <EditorNodeSection {...props} depth={depth + 1} nodeId={childNode.id} />
-        </Fragment>
-      ))}
+              ) : null}
+              <EditorNodeSection {...props} depth={depth + 1} nodeId={childNode.id} />
+            </Fragment>
+          ))}
     </EditableNodeCard>
   );
 
@@ -186,6 +224,16 @@ function supportsNodeBodyCollapse(node: TreeNode) {
     node.type === 'answer' ||
     node.type === 'judgment' ||
     node.type === 'summary'
+  );
+}
+
+function isPlanStepCollapsed(
+  node: TreeNode,
+  workspaceViewState: MainViewNodeProps['workspaceViewState'],
+) {
+  return (
+    node.type === 'plan-step' &&
+    workspaceViewState.collapsedPlanStepIds.includes(node.id)
   );
 }
 

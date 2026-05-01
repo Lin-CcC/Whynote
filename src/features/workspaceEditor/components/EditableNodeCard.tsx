@@ -29,8 +29,10 @@ import type { NodeContentPatch } from '../workspaceEditorTypes';
 type EditableNodeCardProps = {
   actions?: ReactNode;
   bodyCollapsed?: boolean;
+  bodyCollapsedHint?: string;
   children?: ReactNode;
   depth: number;
+  headerControls?: ReactNode;
   isInteractionLocked: boolean;
   nodeId: string;
   onSelectNode: (nodeId: string) => void;
@@ -50,8 +52,10 @@ const PLAN_STEP_STATUS_LABELS: Record<PlanStepStatus, string> = {
 export default function EditableNodeCard({
   actions,
   bodyCollapsed = false,
+  bodyCollapsedHint = '正文已折叠，展开后继续查看或编辑。',
   children,
   depth,
+  headerControls,
   isInteractionLocked,
   nodeId,
   onSelectNode,
@@ -187,6 +191,7 @@ export default function EditableNodeCard({
               {bodyToggleLabel}
             </button>
           ) : null}
+          {headerControls}
           {isSelected ? (
             <span className="workspace-selectedBadge">已选中</span>
           ) : null}
@@ -219,7 +224,7 @@ export default function EditableNodeCard({
       </div>
       {actions ? <div className="workspace-nodeInlineActions">{actions}</div> : null}
       {bodyCollapsed ? (
-        <p className="workspace-nodeHint">正文已折叠，展开后继续查看或编辑。</p>
+        <p className="workspace-nodeHint">{bodyCollapsedHint}</p>
       ) : (
         <>
           <input

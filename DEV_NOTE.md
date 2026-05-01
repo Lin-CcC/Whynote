@@ -258,11 +258,12 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 
 ### 29. question block 折叠状态属于 workspace 级本地视图状态
 
-- `question block` 整体折叠、`answer / judgment / summary` 正文折叠、组内历史区折叠，统一存入 workspace 级本地视图状态。
+- `plan-step` 步骤级折叠、`question block` 整体折叠、`answer / judgment / summary` 正文折叠、组内历史区折叠，统一存入 workspace 级本地视图状态。
 - 这类折叠状态只属于当前 workspace 的本地视图偏好，不写入 snapshot，不参与结构树持久化，也不能复用 `StructureTree.expandedNodeIds`。
+- 步骤折叠是最外层容器折叠，只负责收起步骤正文与整段子内容；`question block / body / history` 继续维持各自独立状态，步骤重新展开后必须按原状态恢复。
 - 默认语义要区分“默认展开”和“默认收起”：block 与正文用 `collapsed...Ids` 表达，历史区用 `expandedHistorySectionIds` 表达，避免把默认收起的历史区误持久化成“已折叠”。
 - 历史折叠必须收回各自 answer / summary 组内；不要再维护一个把旧回答本体和旧 closure 结果拆开的全局历史区。
-- 来自结构树、搜索或 runtime 入口的外部选中必须反向驱动主视图自动展开：如果目标节点位于折叠 block、折叠正文或折叠历史区内，主视图需要自动把对应区域展开到可见，而不是要求用户先手工找回入口。
+- 来自结构树、搜索或 runtime 入口的外部选中必须反向驱动主视图自动展开：如果目标节点位于折叠步骤、折叠 block、折叠正文或折叠历史区内，主视图需要自动把对应区域展开到可见，而不是要求用户先手工找回入口。
 
 ### 30. 工程壳手工验收必须显式展示关键 runtime 语义
 
@@ -282,8 +283,9 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - 现有导出默认继续是 `全部内容`，不能因为主视图折叠状态改变默认导出语义。
 - `仅当前展开内容` 必须是显式模式，第一轮只作用于 `current-module / theme`；`filtered` 导出继续固定为完整语义。
 - 折叠感知导出只读取 `UiPreferences.values.workspaceViews[workspaceId]`，不读取 `RecentWorkspaceState`。
-- 只有拿到完整的 workspace view state（`collapsedQuestionBlockIds / collapsedNodeBodyIds / expandedHistorySectionIds` 三项都有效）时，才允许按折叠规则裁剪；缺失、损坏或不完整时必须安全回退到完整导出。
+- 只有拿到完整的 workspace view state（`collapsedPlanStepIds / collapsedQuestionBlockIds / collapsedNodeBodyIds / expandedHistorySectionIds` 四项都有效）时，才允许按折叠规则裁剪；缺失、损坏或不完整时必须安全回退到完整导出。
 - 第一轮裁剪规则固定为：
+  - 整个折叠的 `plan-step` 不导出其步骤正文与子内容
   - 整个折叠的 `question block` 不导出
   - 折叠正文的 `answer / judgment / summary` 只导出标题与类型，不导正文、标签或附属引用内容
   - 未展开的 `历史评估 / 历史检查结果` 不导出

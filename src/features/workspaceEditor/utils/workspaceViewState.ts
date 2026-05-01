@@ -2,9 +2,10 @@ import type { PreferenceValue, UiPreferences } from '../../nodeDomain';
 import type { WorkspaceViewState } from '../workspaceEditorTypes';
 
 export const DEFAULT_WORKSPACE_VIEW_STATE: WorkspaceViewState = {
-  expandedHistorySectionIds: [],
-  collapsedNodeBodyIds: [],
+  collapsedPlanStepIds: [],
   collapsedQuestionBlockIds: [],
+  collapsedNodeBodyIds: [],
+  expandedHistorySectionIds: [],
 };
 
 export function readWorkspaceViewState(
@@ -34,12 +35,13 @@ export function normalizeWorkspaceViewState(value: unknown): WorkspaceViewState 
   const source = value as Record<string, unknown>;
 
   return {
-    expandedHistorySectionIds: normalizeStringArray(
-      source.expandedHistorySectionIds,
-    ),
-    collapsedNodeBodyIds: normalizeStringArray(source.collapsedNodeBodyIds),
+    collapsedPlanStepIds: normalizeStringArray(source.collapsedPlanStepIds),
     collapsedQuestionBlockIds: normalizeStringArray(
       source.collapsedQuestionBlockIds,
+    ),
+    collapsedNodeBodyIds: normalizeStringArray(source.collapsedNodeBodyIds),
+    expandedHistorySectionIds: normalizeStringArray(
+      source.expandedHistorySectionIds,
     ),
   };
 }
