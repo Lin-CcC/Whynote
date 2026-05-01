@@ -236,8 +236,8 @@ test('inserts an answer under the selected follow-up question instead of the pre
     />,
   );
 
-  fireEvent.focus(
-    screen.getByLabelText('追问：补充问题 1 内容'),
+  fireEvent.click(
+    screen.getByTestId('editor-node-content-display-question-follow-up'),
   );
   expect(screen.getByTestId('editor-node-question-follow-up')).toHaveAttribute(
     'data-node-selected',
@@ -745,20 +745,41 @@ test('removes redundant type prefixes from titles when the UI already shows node
 
   expect(await screen.findByDisplayValue('先建立概念地图')).toBeInTheDocument();
   expect(screen.queryByDisplayValue('铺垫：先建立概念地图')).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('从参数到学习：AI 的物理基础')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('问题：从参数到学习：AI 的物理基础')).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('第一版理解')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('回答：第一版理解')).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('还差关键因果')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('判断：还差关键因果')).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('标准理解')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('答案解析：标准理解')).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('只围绕当前问题')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('总结：只围绕当前问题')).not.toBeInTheDocument();
+  expect(
+    screen.getByTestId('editor-node-title-display-question-prefixed'),
+  ).toHaveTextContent('从参数到学习：AI 的物理基础');
+  expect(
+    screen.getByTestId('editor-node-title-display-question-prefixed'),
+  ).not.toHaveTextContent('问题：从参数到学习：AI 的物理基础');
+  expect(
+    screen.getByTestId('editor-node-title-display-answer-prefixed'),
+  ).toHaveTextContent('第一版理解');
+  expect(
+    screen.getByTestId('editor-node-title-display-answer-prefixed'),
+  ).not.toHaveTextContent('回答：第一版理解');
+  expect(
+    screen.getByTestId('editor-node-title-display-judgment-prefixed'),
+  ).toHaveTextContent('还差关键因果');
+  expect(
+    screen.getByTestId('editor-node-title-display-judgment-prefixed'),
+  ).not.toHaveTextContent('判断：还差关键因果');
+  expect(
+    screen.getByTestId('editor-node-title-display-summary-answer-explanation-prefixed'),
+  ).toHaveTextContent('标准理解');
+  expect(
+    screen.getByTestId('editor-node-title-display-summary-answer-explanation-prefixed'),
+  ).not.toHaveTextContent('答案解析：标准理解');
+  expect(
+    screen.getByTestId('editor-node-title-display-summary-generic-prefixed'),
+  ).toHaveTextContent('只围绕当前问题');
+  expect(
+    screen.getByTestId('editor-node-title-display-summary-generic-prefixed'),
+  ).not.toHaveTextContent('总结：只围绕当前问题');
   expect(
     screen.getByRole('button', { name: /问题.*从参数到学习：AI 的物理基础/u }),
   ).toBeInTheDocument();
 
+  fireEvent.click(screen.getByTestId('editor-node-title-display-judgment-prefixed'));
   fireEvent.change(screen.getByDisplayValue('还差关键因果'), {
     target: {
       value: '判断：补上最后一步',
@@ -968,7 +989,7 @@ test('keeps text main view in the same order as the underlying question children
 
   const parentNode = screen.getByTestId('question-block-question-parent');
   const renderedNodeIds = Array.from(
-    parentNode.querySelectorAll('[data-testid^="editor-node-"]'),
+    parentNode.querySelectorAll('section[data-testid^="editor-node-"]'),
   )
     .map((element) => element.getAttribute('data-testid'))
     .filter((testId) => testId !== 'editor-node-question-parent');

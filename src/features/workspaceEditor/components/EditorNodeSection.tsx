@@ -5,7 +5,7 @@ import CollapsedLearningNodeSummary, {
   buildCollapsedLearningNodeSummaryModel,
 } from './CollapsedLearningNodeSummary';
 import { getChildNodes, getDisplayTitleForNode } from '../utils/treeSelectors';
-import EditableNodeCard from './EditableNodeCard';
+import DocumentNodeSection from './DocumentNodeSection';
 import LearningActionPanel from './LearningActionPanel';
 import type { MainViewNodeProps } from './mainViewTypes';
 import QuestionBlockSection from './QuestionBlockSection';
@@ -89,7 +89,7 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
   }
 
   return (
-    <EditableNodeCard
+    <DocumentNodeSection
       actions={planStepCollapsed ? null : selectedNodeActions ?? inlineActions}
       bodyCollapsed={bodyCollapsed}
       collapsedSummary={collapsedSummary}
@@ -141,7 +141,7 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
               <EditorNodeSection {...props} depth={depth + 1} nodeId={childNode.id} />
             </Fragment>
           ))}
-    </EditableNodeCard>
+    </DocumentNodeSection>
   );
 
   function buildSelectedNodeActions() {

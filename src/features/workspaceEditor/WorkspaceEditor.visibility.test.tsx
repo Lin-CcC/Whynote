@@ -58,7 +58,12 @@ test('keeps the current answer badge on the existing current answer when an olde
     within(screen.getByTestId('editor-node-answer-editor-previous')).getByText('旧回答'),
   ).toBeInTheDocument();
   expect(
-    within(screen.getByTestId('editor-node-answer-editor-current')).getByText('当前回答'),
+    within(screen.getByTestId('editor-node-answer-editor-current')).getByText(
+      '当前回答',
+      {
+        selector: '.workspace-semanticBadge',
+      },
+    ),
   ).toBeInTheDocument();
 });
 
