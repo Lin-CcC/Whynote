@@ -90,56 +90,74 @@ test.each([
   'summary-manual',
   'judgment-summary-latest',
 ])(
-  'keeps the active question-block action surface reachable from %s',
+  'moves progression actions onto the selected content node %s and hides the parent question action bar',
   (selectedNodeId) => {
     renderQuestionBlockEditor({
       initialSelectedNodeId: selectedNodeId,
     });
 
-    const mainBlockActions = screen.getByTestId(
-      'question-block-actions-question-main',
-    );
+    expect(
+      screen.queryByTestId('question-block-actions-question-main'),
+    ).not.toBeInTheDocument();
 
     expect(
-      within(mainBlockActions).getByRole('button', { name: '生成追问' }),
+      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
+        'button',
+        { name: '生成追问' },
+      ),
     ).toBeInTheDocument();
     expect(
-      within(mainBlockActions).getByRole('button', { name: '插入追问' }),
+      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
+        'button',
+        { name: '插入追问' },
+      ),
     ).toBeInTheDocument();
     expect(
-      within(mainBlockActions).getByRole('button', { name: '生成总结' }),
+      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
+        'button',
+        { name: '生成总结' },
+      ),
     ).toBeInTheDocument();
     expect(
-      within(mainBlockActions).getByRole('button', { name: '插入总结' }),
+      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
+        'button',
+        { name: '插入总结' },
+      ),
     ).toBeInTheDocument();
     expect(
-      within(mainBlockActions).queryByRole('button', { name: '直接回答当前问题' }),
+      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).queryByRole(
+        'button',
+        { name: '直接回答当前问题' },
+      ),
     ).not.toBeInTheDocument();
     expect(
-      within(mainBlockActions).getByRole('button', { name: '插入回答' }),
-    ).toBeInTheDocument();
+      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).queryByRole(
+        'button',
+        { name: '插入回答' },
+      ),
+    ).not.toBeInTheDocument();
   },
 );
 
 test.each([
   {
     actionPanelTestId: 'node-actions-answer-first',
-    expectedButtons: ['继续修改', '删除', '设为当前回答'],
+    expectedButtons: ['生成追问', '插入追问', '生成总结', '插入总结', '继续修改', '删除', '设为当前回答'],
     selectedNodeId: 'answer-first',
   },
   {
     actionPanelTestId: 'node-actions-judgment-first-latest',
-    expectedButtons: ['继续修改', '删除'],
+    expectedButtons: ['生成追问', '插入追问', '生成总结', '插入总结', '继续修改', '删除'],
     selectedNodeId: 'judgment-first-latest',
   },
   {
     actionPanelTestId: 'node-actions-summary-first-latest',
-    expectedButtons: ['继续修改', '删除', '回到当前回答继续修改'],
+    expectedButtons: ['生成追问', '插入追问', '生成总结', '插入总结', '继续修改', '删除', '回到当前回答继续修改'],
     selectedNodeId: 'summary-first-latest',
   },
   {
     actionPanelTestId: 'node-actions-summary-manual',
-    expectedButtons: ['继续修改', '删除', '检查这个总结'],
+    expectedButtons: ['生成追问', '插入追问', '生成总结', '插入总结', '继续修改', '删除', '检查这个总结'],
     selectedNodeId: 'summary-manual',
   },
 ])(
@@ -166,6 +184,15 @@ test('keeps the current answer reevaluation action on the selected current answe
 
   const actionPanel = screen.getByTestId('node-actions-answer-second');
 
+  expect(
+    screen.queryByTestId('question-block-actions-question-main'),
+  ).not.toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '生成追问' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '插入总结' }),
+  ).toBeInTheDocument();
   expect(
     within(actionPanel).getByRole('button', { name: '继续修改' }),
   ).toBeInTheDocument();
@@ -325,8 +352,6 @@ test('continues editing from a collapsed answer node by expanding the body first
     initialSelectedNodeId: 'answer-first',
   });
 
-  const actionPanel = screen.getByTestId('node-actions-answer-first');
-
   fireEvent.click(
     within(screen.getByTestId('editor-node-answer-first')).getByRole('button', {
       name: '收起正文',
@@ -340,12 +365,10 @@ test('continues editing from a collapsed answer node by expanding the body first
   ).toBeInTheDocument();
   expect(screen.queryByLabelText('第一版回答 内容')).not.toBeInTheDocument();
   expect(
-    within(actionPanel).getByRole('button', { name: '设为当前回答' }),
-  ).toBeInTheDocument();
+    screen.queryByTestId('node-actions-answer-first'),
+  ).not.toBeInTheDocument();
 
-  fireEvent.click(
-    within(actionPanel).getByRole('button', { name: '继续修改' }),
-  );
+  fireEvent.click(within(collapsedNode).getByRole('button', { name: '展开正文' }));
 
   await waitFor(() => {
     expect(screen.getByLabelText('第一版回答 内容')).toBeInTheDocument();
@@ -365,6 +388,7 @@ test('continues editing from a collapsed answer node by expanding the body first
 
 test.each([
   'answer-first',
+  'judgment-first-latest',
   'summary-first-latest',
   'summary-manual',
 ])(
@@ -377,12 +401,11 @@ test.each([
       onGenerateFollowUpQuestion,
     });
 
-    const mainBlockActions = screen.getByTestId(
-      'question-block-actions-question-main',
-    );
-
     fireEvent.click(
-      within(mainBlockActions).getByRole('button', { name: '生成追问' }),
+      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
+        'button',
+        { name: '生成追问' },
+      ),
     );
 
     expect(onGenerateFollowUpQuestion).toHaveBeenCalledWith(selectedNodeId);
@@ -391,6 +414,7 @@ test.each([
 
 test.each([
   'answer-first',
+  'judgment-first-latest',
   'summary-first-latest',
   'summary-manual',
 ])(
@@ -403,12 +427,11 @@ test.each([
       onGenerateSummary,
     });
 
-    const mainBlockActions = screen.getByTestId(
-      'question-block-actions-question-main',
-    );
-
     fireEvent.click(
-      within(mainBlockActions).getByRole('button', { name: '生成总结' }),
+      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
+        'button',
+        { name: '生成总结' },
+      ),
     );
 
     expect(onGenerateSummary).toHaveBeenCalledWith(selectedNodeId);

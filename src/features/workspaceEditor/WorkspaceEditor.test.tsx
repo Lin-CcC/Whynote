@@ -209,33 +209,19 @@ test('keeps newly inserted answers in the current question answer block before f
   expect(insertChildSpy.mock.calls[0]?.[3]).toBe(1);
 });
 
-test('keeps insert answer reachable from a selected answer inside the active question block', () => {
-  const operations = createOperationSpies();
-
+test('hides the parent question action bar when a child answer is selected inside the question block', () => {
   render(
     <WorkspaceEditor
       initialModuleId="module-order"
       initialSelectedNodeId="answer-first"
       initialSnapshot={createQuestionOrderSnapshot()}
-      operations={operations}
     />,
   );
 
-  fireEvent.click(
-    within(screen.getByTestId('question-block-actions-question-parent')).getByRole(
-      'button',
-      {
-        name: '插入回答',
-      },
-    ),
-  );
-
-  const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
-
-  expect(insertChildSpy).toHaveBeenCalledTimes(1);
-  expect(insertChildSpy.mock.calls[0]?.[1]).toBe('question-parent');
-  expect(insertChildSpy.mock.calls[0]?.[2].type).toBe('answer');
-  expect(insertChildSpy.mock.calls[0]?.[3]).toBe(1);
+  expect(
+    screen.queryByTestId('question-block-actions-question-parent'),
+  ).not.toBeInTheDocument();
+  expect(screen.getByTestId('node-actions-answer-first')).toBeInTheDocument();
 });
 
 test('inserts an answer under the selected follow-up question instead of the previous question', () => {
@@ -316,9 +302,7 @@ test.each([
     );
 
     fireEvent.click(
-      within(
-        screen.getByTestId('question-block-actions-question-action-source'),
-      ).getByRole('button', {
+      within(screen.getByTestId(`node-actions-${sourceNodeId}`)).getByRole('button', {
         name: '插入追问',
       }),
     );
@@ -370,9 +354,7 @@ test('inserts an empty manual summary from the question block instead of delegat
   );
 
   fireEvent.click(
-    within(
-      screen.getByTestId('question-block-actions-question-action-source'),
-    ).getByRole('button', {
+    within(screen.getByTestId('node-actions-summary-action-closure')).getByRole('button', {
       name: '插入总结',
     }),
   );
@@ -619,14 +601,12 @@ test('shows common progression actions and retained scaffold-specific actions wh
   expect(onGenerateSummary).toHaveBeenCalledWith('summary-scaffold-selected');
 });
 
-test('renders scaffold summaries in the unified compact collapsed summary and keeps scaffold actions reachable', async () => {
+test('renders scaffold summaries in the unified compact collapsed summary and restores scaffold actions after expanding', async () => {
   renderWorkspaceEditorWithViewState({
     initialModuleId: 'module-scaffold-actions',
     initialSelectedNodeId: 'summary-scaffold-selected',
     initialSnapshot: createScaffoldActionSnapshot(),
   });
-
-  const actionPanel = screen.getByTestId('node-actions-summary-scaffold-selected');
 
   fireEvent.click(
     within(
@@ -646,11 +626,11 @@ test('renders scaffold summaries in the unified compact collapsed summary and ke
   ).toBeInTheDocument();
   expect(screen.queryByLabelText('先建立概念地图 内容')).not.toBeInTheDocument();
   expect(
-    within(actionPanel).getByRole('button', { name: '换个说法' }),
-  ).toBeInTheDocument();
+    screen.queryByTestId('node-actions-summary-scaffold-selected'),
+  ).not.toBeInTheDocument();
 
   fireEvent.click(
-    within(actionPanel).getByRole('button', { name: '继续修改' }),
+    within(collapsedNode).getByRole('button', { name: '展开正文' }),
   );
 
   await waitFor(() => {

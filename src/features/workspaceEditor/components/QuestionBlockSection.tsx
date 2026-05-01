@@ -151,6 +151,44 @@ export default function QuestionBlockSection({
     };
   }
 
+  function buildCommonProgressionActionSection(
+    actionSourceNodeId: string,
+  ): LearningActionSection {
+    return {
+      buttons: [
+        ...(onGenerateFollowUpQuestion
+          ? [
+              {
+                disabled: isInteractionLocked,
+                label: '生成追问',
+                onClick: () => onGenerateFollowUpQuestion(actionSourceNodeId),
+              },
+            ]
+          : []),
+        {
+          disabled: isInteractionLocked,
+          label: '插入追问',
+          onClick: () => onInsertFollowUpQuestion(actionSourceNodeId),
+        },
+        ...(onGenerateSummary
+          ? [
+              {
+                disabled: isInteractionLocked,
+                label: '生成总结',
+                onClick: () => onGenerateSummary(actionSourceNodeId),
+              },
+            ]
+          : []),
+        {
+          disabled: isInteractionLocked,
+          label: '插入总结',
+          onClick: () => onInsertSummaryForNode(actionSourceNodeId),
+        },
+      ],
+      title: '通用推进动作',
+    };
+  }
+
   function renderSupportNode(node: TreeNode, nodeDepth: number) {
     const inlineActions = renderNodeInlineActions?.({
       isSelected: node.id === selectedNodeId,
@@ -190,7 +228,10 @@ export default function QuestionBlockSection({
     node: TreeNode,
     inlineActions: ReactNode,
   ) {
-    const sections: LearningActionSection[] = [buildCommonNodeActionSection(node.id)];
+    const sections: LearningActionSection[] = [
+      buildCommonProgressionActionSection(node.id),
+      buildCommonNodeActionSection(node.id),
+    ];
 
     if (
       node.type === 'summary' &&
@@ -239,6 +280,7 @@ export default function QuestionBlockSection({
       answerGroup.answer.id === selectedNodeId ? (
         <LearningActionPanel
           sections={[
+            buildCommonProgressionActionSection(answerGroup.answer.id),
             buildCommonNodeActionSection(answerGroup.answer.id),
             {
               buttons: [
@@ -345,6 +387,7 @@ export default function QuestionBlockSection({
       summaryGroup.summary.id === selectedNodeId ? (
         <LearningActionPanel
           sections={[
+            buildCommonProgressionActionSection(summaryGroup.summary.id),
             buildCommonNodeActionSection(summaryGroup.summary.id),
             {
               buttons: onEvaluateSummary
@@ -457,47 +500,14 @@ export default function QuestionBlockSection({
             selectedNodeId={selectedNodeId}
             tree={tree}
           />
-          {isActive ? (
+          {questionIsSelected ? (
             <div
               className="workspace-questionBlockActions"
               data-testid={`question-block-actions-${question.id}`}
             >
               <LearningActionPanel
                 sections={[
-                  {
-                    buttons: [
-                      ...(onGenerateFollowUpQuestion
-                        ? [
-                            {
-                              disabled: isInteractionLocked,
-                              label: '生成追问',
-                              onClick: () =>
-                                onGenerateFollowUpQuestion(actionSourceNodeId),
-                            },
-                          ]
-                        : []),
-                      {
-                        disabled: isInteractionLocked,
-                        label: '插入追问',
-                        onClick: () => onInsertFollowUpQuestion(actionSourceNodeId),
-                      },
-                      ...(onGenerateSummary
-                        ? [
-                            {
-                              disabled: isInteractionLocked,
-                              label: '生成总结',
-                              onClick: () => onGenerateSummary(actionSourceNodeId),
-                            },
-                          ]
-                        : []),
-                      {
-                        disabled: isInteractionLocked,
-                        label: '插入总结',
-                        onClick: () => onInsertSummaryForNode(actionSourceNodeId),
-                      },
-                    ],
-                    title: '通用推进动作',
-                  },
+                  buildCommonProgressionActionSection(actionSourceNodeId),
                   {
                     buttons: [
                       ...(questionIsSelected && onDirectAnswerQuestion
