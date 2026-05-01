@@ -46,10 +46,11 @@ export function buildDocumentNodePresentation(
       : null;
   const semanticVisibility = getNodeSemanticVisibility(tree, node);
   const isContentNode = isDocumentContentNode(node);
+  const sectionKind = getDocumentSectionKind(node);
 
   return {
     alwaysShowTitle: doesNodeAlwaysShowDocumentTitle(node),
-    bodyRows: node.type === 'plan-step' ? 3 : 4,
+    bodyRows: sectionKind === 'plan-step' ? 2 : 1,
     contentPlaceholder: getNodeInputPlaceholderForNode(tree, node, 'content'),
     displayLabel,
     displayTitle,
@@ -60,7 +61,7 @@ export function buildDocumentNodePresentation(
       node.status !== planStepRuntimeStatus.suggestedStatus,
     isContentNode,
     planStepRuntimeStatus,
-    sectionKind: getDocumentSectionKind(node),
+    sectionKind,
     semanticVisibility,
     titlePlaceholder: getNodeInputPlaceholderForNode(tree, node, 'title'),
     titleTone: isContentNode ? 'light' : 'default',

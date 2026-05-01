@@ -197,6 +197,7 @@ test('reveals the light toolbar only on hover, focus, or active', () => {
   const answerNode = screen.getByTestId('editor-node-answer-first');
   const answerToolbar = screen.getByTestId('node-actions-answer-first');
 
+  expect(answerNode).toHaveAttribute('data-node-shell', 'document-inline');
   expect(answerToolbar).toHaveAttribute('data-visible', 'false');
 
   fireEvent.mouseEnter(answerNode);
@@ -377,6 +378,85 @@ test('keeps non-active document nodes frame-free until selection moves to them',
     'true',
   );
 });
+
+test('marks the question block and inline learning nodes as document surfaces without rails', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+  });
+
+  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+    'data-block-chrome',
+    'document',
+  );
+  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+    'data-question-rail',
+    'none',
+  );
+
+  for (const nodeId of [
+    'question-main',
+    'answer-first',
+    'judgment-first-latest',
+    'summary-first-latest',
+    'summary-manual',
+    'judgment-summary-latest',
+  ] as const) {
+    expect(screen.getByTestId(`editor-node-${nodeId}`)).toHaveAttribute(
+      'data-node-shell',
+      'document-inline',
+    );
+    expect(screen.getByTestId(`editor-node-${nodeId}`)).toHaveAttribute(
+      'data-node-chrome',
+      'document',
+    );
+    expect(screen.getByTestId(`editor-node-${nodeId}`)).toHaveAttribute(
+      'data-node-rail',
+      'none',
+    );
+  }
+});
+
+test('keeps the selected question in inline document flow while editing', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+  });
+
+  const questionNode = screen.getByTestId('editor-node-question-main');
+
+  expect(questionNode).toHaveAttribute('data-node-shell', 'document-inline');
+  expect(questionNode).toHaveAttribute('data-node-chrome', 'document');
+  expect(questionNode).toHaveAttribute('data-node-rail', 'none');
+  expect(screen.getByLabelText('主问题 标题')).toBeInTheDocument();
+  expect(screen.getByLabelText('主问题 内容')).toBeInTheDocument();
+});
+
+test.each([
+  ['answer-first', '第一版回答'],
+  ['judgment-first-latest', '第一版最新评估'],
+  ['summary-first-latest', '第一版最新解析'],
+  ['summary-manual', '我的总结'],
+  ['judgment-summary-latest', '最新总结检查结果'],
+] as const)(
+  'keeps %s in inline document flow after clicking into body editing',
+  async (nodeId, displayTitle) => {
+    renderQuestionBlockEditor({
+      initialSelectedNodeId: 'question-main',
+    });
+
+    const node = screen.getByTestId(`editor-node-${nodeId}`);
+
+    fireEvent.click(screen.getByTestId(`editor-node-content-display-${nodeId}`));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(`${displayTitle} 内容`)).toBeInTheDocument();
+    });
+
+    expect(node).toHaveAttribute('data-node-shell', 'document-inline');
+    expect(node).toHaveAttribute('data-node-chrome', 'document');
+    expect(node).toHaveAttribute('data-node-rail', 'none');
+    expect(screen.getByLabelText(`${displayTitle} 标题`)).toBeInTheDocument();
+  },
+);
 
 test.each([
   {
@@ -898,6 +978,10 @@ test('keeps the expanded plan-step rendered as a lightweight section divider she
   expect(screen.getByTestId('editor-node-step-question-block')).toHaveAttribute(
     'data-node-shell',
     'section-divider',
+  );
+  expect(screen.getByTestId('editor-node-step-question-block')).toHaveAttribute(
+    'data-node-rail',
+    'separator',
   );
 });
 

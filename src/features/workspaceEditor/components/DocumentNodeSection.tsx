@@ -76,6 +76,8 @@ export default function DocumentNodeSection({
   const node = getNodeOrThrow(tree, nodeId);
   const presentation = buildDocumentNodePresentation(tree, node);
   const isSelected = node.id === selectedNodeId;
+  const isInlineDocumentSurface =
+    presentation.sectionKind === 'question' || presentation.isContentNode;
   const bodyToggleLabel = `${bodyCollapsed ? '展开' : '收起'}正文`;
   const hasCollapsedSummary =
     collapsedSummary !== undefined && collapsedSummary !== null;
@@ -101,7 +103,9 @@ export default function DocumentNodeSection({
       ? 'document-root'
       : presentation.sectionKind === 'plan-step'
         ? 'section-divider'
-        : 'document-node';
+        : isInlineDocumentSurface
+          ? 'document-inline'
+          : 'document-node';
   const frameVisible = isSelected || isEditing;
   const titleControlVisible =
     isSelected || isEditing || hasFocusWithin || isHovered;
@@ -144,6 +148,14 @@ export default function DocumentNodeSection({
       window.cancelAnimationFrame(frameId);
     };
   }, [isSelected, pendingFocusField, titleInputVisible]);
+
+  useEffect(() => {
+    if (!isSelected || bodyCollapsed) {
+      return;
+    }
+
+    syncContentInputHeight(contentInputRef.current);
+  }, [bodyCollapsed, isSelected, node.content]);
 
   function handleEditableFocus(event: FocusEvent<HTMLElement>) {
     if (
@@ -191,6 +203,7 @@ export default function DocumentNodeSection({
   }
 
   function handleContentChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    syncContentInputHeight(event.currentTarget);
     onUpdateNode(node.id, { content: event.target.value });
   }
 
@@ -244,6 +257,8 @@ export default function DocumentNodeSection({
       data-node-editing={isEditing}
       data-node-emphasis={presentation.emphasis}
       data-node-frame-visible={frameVisible}
+      data-node-chrome={isInlineDocumentSurface ? 'document' : 'section'}
+      data-node-rail={presentation.sectionKind === 'plan-step' ? 'separator' : 'none'}
       data-node-section-kind={presentation.sectionKind}
       data-node-selected={isSelected}
       data-node-shell={legacyShell}
@@ -490,4 +505,13 @@ function renderActions(actions: ReactNode, isVisible: boolean) {
   return cloneElement(actions, {
     isVisible: (actions.props.isVisible ?? true) && isVisible,
   } as never);
+}
+
+function syncContentInputHeight(textarea: HTMLTextAreaElement | null) {
+  if (!textarea) {
+    return;
+  }
+
+  textarea.style.height = '0px';
+  textarea.style.height = `${textarea.scrollHeight}px`;
 }
