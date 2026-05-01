@@ -38,7 +38,9 @@ test('switches modules and keeps structure and text view in sync', () => {
   fireEvent.click(screen.getByRole('button', { name: /副作用与数据流/i }));
 
   expect(
-    screen.getByRole('heading', { name: '副作用与数据流' }),
+    within(screen.getByTestId('workspace-document-header')).getByRole('heading', {
+      name: '副作用与数据流',
+    }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole('button', { name: /^问题什么时候应该使用 useEffect？$/i }),
@@ -64,6 +66,20 @@ test('selects a node from structure view and focuses the text card', async () =>
   await waitFor(() => {
     expect(focusedNode).toHaveFocus();
   });
+});
+
+test('renders the main view inside a single-column document shell with a tightened module header', () => {
+  render(<WorkspaceEditor />);
+
+  const documentShell = screen.getByTestId('workspace-document-shell');
+  const documentHeader = screen.getByTestId('workspace-document-header');
+
+  expect(documentShell).toHaveAttribute('data-layout', 'single-column');
+  expect(within(documentHeader).getByText('当前模块')).toBeInTheDocument();
+  expect(within(documentHeader).getByText('状态与渲染')).toBeInTheDocument();
+  expect(screen.queryByText('当前选中')).not.toBeInTheDocument();
+  expect(screen.queryByText('当前 block')).not.toBeInTheDocument();
+  expect(screen.queryByText('主视图规则')).not.toBeInTheDocument();
 });
 
 test('collapses and expands the structure tree', () => {
@@ -193,12 +209,14 @@ test('keeps newly inserted answers in the current question answer block before f
   );
 
   fireEvent.click(
-    within(screen.getByTestId('question-block-actions-question-parent')).getByRole(
-      'button',
-      {
-        name: '插入回答',
-      },
-    ),
+    within(
+      openToolbarMenu(
+        screen.getByTestId('question-block-actions-question-parent'),
+        '回答',
+      ),
+    ).getByRole('button', {
+      name: '插入回答',
+    }),
   );
 
   const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
@@ -236,8 +254,8 @@ test('inserts an answer under the selected follow-up question instead of the pre
     />,
   );
 
-  fireEvent.focus(
-    screen.getByLabelText('追问：补充问题 1 内容'),
+  fireEvent.click(
+    screen.getByTestId('editor-node-content-display-question-follow-up'),
   );
   expect(screen.getByTestId('editor-node-question-follow-up')).toHaveAttribute(
     'data-node-selected',
@@ -246,7 +264,10 @@ test('inserts an answer under the selected follow-up question instead of the pre
 
   fireEvent.click(
     within(
-      screen.getByTestId('question-block-actions-question-follow-up'),
+      openToolbarMenu(
+        screen.getByTestId('question-block-actions-question-follow-up'),
+        '回答',
+      ),
     ).getByRole('button', {
       name: '插入回答',
     }),
@@ -302,7 +323,9 @@ test.each([
     );
 
     fireEvent.click(
-      within(screen.getByTestId(`node-actions-${sourceNodeId}`)).getByRole('button', {
+      within(
+        openToolbarMenu(screen.getByTestId(`node-actions-${sourceNodeId}`), '追问'),
+      ).getByRole('button', {
         name: '插入追问',
       }),
     );
@@ -354,7 +377,12 @@ test('inserts an empty manual summary from the question block instead of delegat
   );
 
   fireEvent.click(
-    within(screen.getByTestId('node-actions-summary-action-closure')).getByRole('button', {
+    within(
+      openToolbarMenu(
+        screen.getByTestId('node-actions-summary-action-closure'),
+        '总结',
+      ),
+    ).getByRole('button', {
       name: '插入总结',
     }),
   );
@@ -401,7 +429,10 @@ test('inserts an empty scaffold summary from the selected scaffold node instead 
 
   fireEvent.click(
     within(
-      screen.getByTestId('node-actions-summary-scaffold-selected'),
+      openToolbarMenu(
+        screen.getByTestId('node-actions-summary-scaffold-selected'),
+        '总结',
+      ),
     ).getByRole('button', {
       name: '插入总结',
     }),
@@ -560,39 +591,35 @@ test('shows common progression actions and retained scaffold-specific actions wh
 
   const actionPanel = screen.getByTestId('node-actions-summary-scaffold-selected');
 
+  expectToolbarVerbs(actionPanel, ['追问', '总结', '⋯']);
+  expectToolbarMenuActions(actionPanel, '追问', ['生成追问', '插入追问']);
+  expectToolbarMenuActions(actionPanel, '总结', ['生成总结', '插入总结']);
   expect(
-    within(actionPanel).getByRole('button', { name: '生成追问' }),
+    within(actionPanel).queryByRole('button', { name: '继续修改' }),
+  ).not.toBeInTheDocument();
+
+  const overflowMenu = openOverflowMenu(actionPanel);
+
+  expect(within(overflowMenu).getByRole('button', { name: '删除' })).toBeInTheDocument();
+  expect(
+    within(overflowMenu).getByRole('button', { name: '换个说法' }),
   ).toBeInTheDocument();
   expect(
-    within(actionPanel).getByRole('button', { name: '插入追问' }),
+    within(overflowMenu).getByRole('button', { name: '更基础一点' }),
   ).toBeInTheDocument();
   expect(
-    within(actionPanel).getByRole('button', { name: '生成总结' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '插入总结' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '继续修改' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '删除' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '换个说法' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '更基础一点' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '举个例子' }),
+    within(overflowMenu).getByRole('button', { name: '举个例子' }),
   ).toBeInTheDocument();
 
   fireEvent.click(
-    within(actionPanel).getByRole('button', { name: '生成追问' }),
+    within(openToolbarMenu(actionPanel, '追问')).getByRole('button', {
+      name: '生成追问',
+    }),
   );
   fireEvent.click(
-    within(actionPanel).getByRole('button', { name: '生成总结' }),
+    within(openToolbarMenu(actionPanel, '总结')).getByRole('button', {
+      name: '生成总结',
+    }),
   );
 
   expect(onGenerateFollowUpQuestion).toHaveBeenCalledWith(
@@ -638,10 +665,11 @@ test('renders scaffold summaries in the unified compact collapsed summary and re
   });
 
   expect(
-    within(screen.getByTestId('node-actions-summary-scaffold-selected')).getByRole(
-      'button',
-      { name: '举个例子' },
-    ),
+    within(
+      openOverflowMenu(screen.getByTestId('node-actions-summary-scaffold-selected')),
+    ).getByRole('button', {
+      name: '举个例子',
+    }),
   ).toBeInTheDocument();
 });
 
@@ -683,7 +711,7 @@ test('deletes the selected scaffold node from the common node action panel', asy
 
   fireEvent.click(
     within(
-      screen.getByTestId('node-actions-summary-scaffold-selected'),
+      openOverflowMenu(screen.getByTestId('node-actions-summary-scaffold-selected')),
     ).getByRole('button', {
       name: '删除',
     }),
@@ -745,20 +773,41 @@ test('removes redundant type prefixes from titles when the UI already shows node
 
   expect(await screen.findByDisplayValue('先建立概念地图')).toBeInTheDocument();
   expect(screen.queryByDisplayValue('铺垫：先建立概念地图')).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('从参数到学习：AI 的物理基础')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('问题：从参数到学习：AI 的物理基础')).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('第一版理解')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('回答：第一版理解')).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('还差关键因果')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('判断：还差关键因果')).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('标准理解')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('答案解析：标准理解')).not.toBeInTheDocument();
-  expect(screen.getByDisplayValue('只围绕当前问题')).toBeInTheDocument();
-  expect(screen.queryByDisplayValue('总结：只围绕当前问题')).not.toBeInTheDocument();
+  expect(
+    screen.getByTestId('editor-node-title-display-question-prefixed'),
+  ).toHaveTextContent('从参数到学习：AI 的物理基础');
+  expect(
+    screen.getByTestId('editor-node-title-display-question-prefixed'),
+  ).not.toHaveTextContent('问题：从参数到学习：AI 的物理基础');
+  expect(
+    screen.getByTestId('editor-node-title-display-answer-prefixed'),
+  ).toHaveTextContent('第一版理解');
+  expect(
+    screen.getByTestId('editor-node-title-display-answer-prefixed'),
+  ).not.toHaveTextContent('回答：第一版理解');
+  expect(
+    screen.getByTestId('editor-node-title-display-judgment-prefixed'),
+  ).toHaveTextContent('还差关键因果');
+  expect(
+    screen.getByTestId('editor-node-title-display-judgment-prefixed'),
+  ).not.toHaveTextContent('判断：还差关键因果');
+  expect(
+    screen.getByTestId('editor-node-title-display-summary-answer-explanation-prefixed'),
+  ).toHaveTextContent('标准理解');
+  expect(
+    screen.getByTestId('editor-node-title-display-summary-answer-explanation-prefixed'),
+  ).not.toHaveTextContent('答案解析：标准理解');
+  expect(
+    screen.getByTestId('editor-node-title-display-summary-generic-prefixed'),
+  ).toHaveTextContent('只围绕当前问题');
+  expect(
+    screen.getByTestId('editor-node-title-display-summary-generic-prefixed'),
+  ).not.toHaveTextContent('总结：只围绕当前问题');
   expect(
     screen.getByRole('button', { name: /问题.*从参数到学习：AI 的物理基础/u }),
   ).toBeInTheDocument();
 
+  fireEvent.click(screen.getByTestId('editor-node-title-display-judgment-prefixed'));
   fireEvent.change(screen.getByDisplayValue('还差关键因果'), {
     target: {
       value: '判断：补上最后一步',
@@ -862,9 +911,7 @@ test('renders plan-step with weaker emphasis than learning nodes', () => {
     'primary',
   );
   expect(
-    screen.getByRole('combobox', {
-      name: /梳理 state \/ props \/ render 的关系.*状态/i,
-    }),
+    screen.getByTestId('plan-step-status-trigger-step-state-basics'),
   ).toBeInTheDocument();
 });
 
@@ -935,13 +982,17 @@ test('recovers with a new module after deleting the last module', () => {
   ).toBeInTheDocument();
 
   fireEvent.click(
-    within(getSectionByHeading('还没有可编辑的模块')).getByRole('button', {
+    within(screen.getByTestId('workspace-document-shell')).getByRole('button', {
       name: '新建模块',
     }),
   );
 
   expect(screen.getByDisplayValue('新模块')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '新模块' })).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('workspace-document-header')).getByRole('heading', {
+      name: '新模块',
+    }),
+  ).toBeInTheDocument();
   expect(
     within(getSectionByHeading('当前学习模块')).getByRole('button', {
       name: /新模块/i,
@@ -968,7 +1019,7 @@ test('keeps text main view in the same order as the underlying question children
 
   const parentNode = screen.getByTestId('question-block-question-parent');
   const renderedNodeIds = Array.from(
-    parentNode.querySelectorAll('[data-testid^="editor-node-"]'),
+    parentNode.querySelectorAll('section[data-testid^="editor-node-"]'),
   )
     .map((element) => element.getAttribute('data-testid'))
     .filter((testId) => testId !== 'editor-node-question-parent');
@@ -1794,6 +1845,47 @@ function createSingleModuleSnapshot(): WorkspaceSnapshot {
     ...snapshot,
     tree,
   };
+}
+
+function expectToolbarVerbs(
+  toolbar: HTMLElement,
+  expectedLabels: string[],
+) {
+  expect(
+    within(toolbar)
+      .getAllByRole('button')
+      .map((button) =>
+        (button.textContent?.replace('▾', '').trim() ?? ''),
+      ),
+  ).toEqual(expectedLabels);
+}
+
+function expectToolbarMenuActions(
+  toolbar: HTMLElement,
+  menuLabel: string,
+  expectedActionLabels: string[],
+) {
+  const menu = openToolbarMenu(toolbar, menuLabel);
+
+  for (const actionLabel of expectedActionLabels) {
+    expect(
+      within(menu).getByRole('button', { name: actionLabel }),
+    ).toBeInTheDocument();
+  }
+}
+
+function openToolbarMenu(toolbar: HTMLElement, menuLabel: string) {
+  fireEvent.click(
+    within(toolbar).getByRole('button', {
+      name: menuLabel,
+    }),
+  );
+
+  return within(toolbar).getByRole('menu');
+}
+
+function openOverflowMenu(toolbar: HTMLElement) {
+  return openToolbarMenu(toolbar, '⋯');
 }
 
 function renderWorkspaceEditorWithViewState(

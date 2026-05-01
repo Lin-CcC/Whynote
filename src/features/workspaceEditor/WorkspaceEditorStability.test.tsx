@@ -97,7 +97,7 @@ test('selects a node by clicking its card without requiring textarea focus first
     expect(node).toHaveFocus();
   });
   expect(textarea).not.toHaveFocus();
-  expect(node).toHaveTextContent('这里承接要回答的问题。点击输入框后会进入正文编辑。');
+  expect(node).toHaveTextContent('点击标题或正文即可继续修改');
   expect(node).not.toHaveTextContent('编辑中');
 });
 
@@ -174,7 +174,18 @@ test('renders disabled builtin tag controls when there is no selected node', () 
 
 function getNodeContentInput(nodeId: string) {
   const container = screen.getByTestId(`editor-node-${nodeId}`);
-  const textarea = container.querySelector('textarea');
+  let textarea = container.querySelector('textarea');
+
+  if (!(textarea instanceof HTMLTextAreaElement)) {
+    const contentDisplay = container.querySelector(
+      `[data-testid="editor-node-content-display-${nodeId}"]`,
+    );
+
+    if (contentDisplay instanceof HTMLButtonElement) {
+      fireEvent.click(contentDisplay);
+      textarea = container.querySelector('textarea');
+    }
+  }
 
   if (!(textarea instanceof HTMLTextAreaElement)) {
     throw new Error(`Unable to find textarea for node ${nodeId}.`);
@@ -185,7 +196,18 @@ function getNodeContentInput(nodeId: string) {
 
 function getNodeTitleInput(nodeId: string) {
   const container = screen.getByTestId(`editor-node-${nodeId}`);
-  const input = container.querySelector('input');
+  let input = container.querySelector('input');
+
+  if (!(input instanceof HTMLInputElement)) {
+    const titleEntry =
+      container.querySelector(`[data-testid="editor-node-title-display-${nodeId}"]`) ??
+      container.querySelector(`[data-testid="editor-node-add-title-${nodeId}"]`);
+
+    if (titleEntry instanceof HTMLButtonElement) {
+      fireEvent.click(titleEntry);
+      input = container.querySelector('input');
+    }
+  }
 
   if (!(input instanceof HTMLInputElement)) {
     throw new Error(`Unable to find title input for node ${nodeId}.`);

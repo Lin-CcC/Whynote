@@ -23,6 +23,7 @@ import {
   type WorkspaceSnapshot,
 } from '../nodeDomain';
 import WorkspaceRuntimeScreen from './WorkspaceRuntimeScreen';
+import { getTitleInput } from './workspaceRuntimeTestUtils';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 
 const openedStorages: StructuredDataStorage[] = [];
@@ -48,7 +49,7 @@ test('creates a minimal real workspace when IndexedDB is empty', async () => {
   expect(
     await screen.findByRole('heading', { name: '当前学习模块' }),
   ).toBeInTheDocument();
-  expect(screen.getByDisplayValue('默认模块')).toBeInTheDocument();
+  expect(screen.getByLabelText('默认模块 标题')).toBeInTheDocument();
 
   const workspaces = await dependencies.structuredDataStorage.listWorkspaces();
   const snapshot = await dependencies.structuredDataStorage.loadWorkspace(
@@ -72,7 +73,7 @@ test('persists workspace edits and restores them on the next mount', async () =>
 
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(screen.getByDisplayValue('默认模块'), {
+  fireEvent.change(getTitleInput('默认模块'), {
     target: {
       value: '已持久化模块',
     },
@@ -85,7 +86,7 @@ test('persists workspace edits and restores them on the next mount', async () =>
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
-  expect(await screen.findByDisplayValue('已持久化模块')).toBeInTheDocument();
+  expect(await screen.findByLabelText('已持久化模块 标题')).toBeInTheDocument();
 });
 
 test('keeps the active editor input mounted and focused while autosave status changes', async () => {
@@ -94,7 +95,7 @@ test('keeps the active editor input mounted and focused while autosave status ch
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  const moduleTitleInput = screen.getByDisplayValue('默认模块');
+  const moduleTitleInput = getTitleInput('默认模块');
 
   moduleTitleInput.focus();
   expect(moduleTitleInput).toHaveFocus();
@@ -114,7 +115,7 @@ test('keeps the active editor input mounted and focused while autosave status ch
     },
   );
 
-  expect(screen.getByDisplayValue('输入期间不应重挂载')).toBe(moduleTitleInput);
+  expect(getTitleInput('输入期间不应重挂载')).toBe(moduleTitleInput);
   expect(moduleTitleInput).toHaveFocus();
 
   await waitFor(
@@ -126,7 +127,7 @@ test('keeps the active editor input mounted and focused while autosave status ch
     },
   );
 
-  expect(screen.getByDisplayValue('输入期间不应重挂载')).toBe(moduleTitleInput);
+  expect(getTitleInput('输入期间不应重挂载')).toBe(moduleTitleInput);
   expect(moduleTitleInput).toHaveFocus();
 });
 
@@ -138,7 +139,7 @@ test('keeps sidebar context synchronized while editing a long module title', asy
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  const moduleTitleInput = screen.getByDisplayValue('默认模块');
+  const moduleTitleInput = getTitleInput('默认模块');
 
   moduleTitleInput.focus();
   expect(moduleTitleInput).toHaveFocus();
@@ -183,7 +184,7 @@ test('does not trigger a cross-component render update warning while editing wor
     render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
     await screen.findByRole('heading', { name: '当前学习模块' });
 
-    fireEvent.change(screen.getByDisplayValue('默认模块'), {
+    fireEvent.change(getTitleInput('默认模块'), {
       target: {
         value: 'render warning fixed',
       },
@@ -191,7 +192,7 @@ test('does not trigger a cross-component render update warning while editing wor
 
     await waitFor(() => {
       expect(
-        screen.getByDisplayValue('render warning fixed'),
+        getTitleInput('render warning fixed'),
       ).toBeInTheDocument();
     });
 
@@ -222,7 +223,7 @@ test('guides recovery from the AI action card when no module exists', async () =
   ).toBeInTheDocument();
   fireEvent.click(screen.getAllByRole('button', { name: '新建模块' })[0]);
 
-  expect(await screen.findByDisplayValue('新模块')).toBeInTheDocument();
+  expect(await screen.findByLabelText('新模块 标题')).toBeInTheDocument();
   expect(
     screen.getByRole('button', { name: '为当前模块规划学习路径' }),
   ).toBeInTheDocument();
@@ -329,24 +330,13 @@ test('keeps the left runtime action card auxiliary while the main question block
     'question-block-actions-question-runtime-open',
   );
 
-  expect(
-    within(blockActions).getByRole('button', { name: '直接回答当前问题' }),
-  ).toBeInTheDocument();
-  expect(
-    within(blockActions).getByRole('button', { name: '插入回答' }),
-  ).toBeInTheDocument();
-  expect(
-    within(blockActions).getByRole('button', { name: '生成追问' }),
-  ).toBeInTheDocument();
-  expect(
-    within(blockActions).getByRole('button', { name: '插入追问' }),
-  ).toBeInTheDocument();
-  expect(
-    within(blockActions).getByRole('button', { name: '生成总结' }),
-  ).toBeInTheDocument();
-  expect(
-    within(blockActions).getByRole('button', { name: '插入总结' }),
-  ).toBeInTheDocument();
+  expectToolbarVerbs(blockActions, ['回答', '追问', '总结', '⋯']);
+  expectToolbarMenuActions(blockActions, '回答', [
+    '直接回答当前问题',
+    '插入回答',
+  ]);
+  expectToolbarMenuActions(blockActions, '追问', ['生成追问', '插入追问']);
+  expectToolbarMenuActions(blockActions, '总结', ['生成总结', '插入总结']);
   expect(
     screen.getByText(/主编辑流已经收口到中间的 question block/),
   ).toBeInTheDocument();
@@ -399,12 +389,12 @@ test('runs learning-engine plan-step generation from UI and materializes the res
   fireEvent.click(screen.getByRole('button', { name: '保存当前配置' }));
   fireEvent.click(screen.getByRole('button', { name: '为当前模块规划学习路径' }));
 
-  expect(await screen.findByDisplayValue('建立最小概念框架')).toBeInTheDocument();
+  expect(await screen.findByLabelText('建立最小概念框架 标题')).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('先建立进入问题的基础图景'),
+    await screen.findByLabelText('先建立进入问题的基础图景 标题'),
   ).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('并发渲染到底改变了什么？'),
+    await screen.findByLabelText('并发渲染到底改变了什么？ 标题'),
   ).toBeInTheDocument();
 });
 
@@ -417,9 +407,9 @@ test('locks editor mutations while an AI action is running and keeps manual edit
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(screen.getByRole('button', { name: '为当前模块规划学习路径' }));
+  const moduleTitleInput = getTitleInput('默认模块');
 
-  const moduleTitleInput = await screen.findByDisplayValue('默认模块');
+  fireEvent.click(screen.getByRole('button', { name: '为当前模块规划学习路径' }));
 
   expect(moduleTitleInput).toBeDisabled();
   expect(screen.getByRole('button', { name: '插入子节点' })).toBeDisabled();
@@ -453,8 +443,8 @@ test('locks editor mutations while an AI action is running and keeps manual edit
     ],
   });
 
-  expect(await screen.findByDisplayValue('AI 生成步骤')).toBeInTheDocument();
-  expect(screen.getByDisplayValue('默认模块')).toBeInTheDocument();
+  expect(await screen.findByLabelText('AI 生成步骤 标题')).toBeInTheDocument();
+  expect(moduleTitleInput).toHaveValue('默认模块');
 });
 
 test('shows a visible error when workspace autosave fails', async () => {
@@ -468,7 +458,7 @@ test('shows a visible error when workspace autosave fails', async () => {
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(screen.getByDisplayValue('默认模块'), {
+  fireEvent.change(getTitleInput('默认模块'), {
     target: {
       value: '触发保存失败',
     },
@@ -1238,6 +1228,43 @@ function createAiCustomPreset(name: string) {
     },
   });
   fireEvent.click(screen.getByRole('button', { name: '保存为新预设' }));
+}
+
+function expectToolbarVerbs(
+  toolbar: HTMLElement,
+  expectedLabels: string[],
+) {
+  expect(
+    within(toolbar)
+      .getAllByRole('button')
+      .map((button) =>
+        (button.textContent?.replace('▾', '').trim() ?? ''),
+      ),
+  ).toEqual(expectedLabels);
+}
+
+function expectToolbarMenuActions(
+  toolbar: HTMLElement,
+  menuLabel: string,
+  expectedActionLabels: string[],
+) {
+  const menu = openToolbarMenu(toolbar, menuLabel);
+
+  for (const actionLabel of expectedActionLabels) {
+    expect(
+      within(menu).getByRole('button', { name: actionLabel }),
+    ).toBeInTheDocument();
+  }
+}
+
+function openToolbarMenu(toolbar: HTMLElement, menuLabel: string) {
+  fireEvent.click(
+    within(toolbar).getByRole('button', {
+      name: menuLabel,
+    }),
+  );
+
+  return within(toolbar).getByRole('menu');
 }
 
 function findOptionValueByText(

@@ -9,6 +9,14 @@
 - `pnpm run build`
 - `pnpm run test:e2e`（已安装 Playwright / Chromium 时）
 
+## 最新自动化基线
+
+### 2026-05-01 · V1.2 文档式主视图 integration
+
+- `pnpm test`：52 个测试文件、334 个测试全绿
+- `pnpm run typecheck`：通过
+- `pnpm run build`：通过
+
 ## 当前手工回归重点
 
 ### 1. 工作区启动与持久化
@@ -141,6 +149,13 @@
 - 在 `judgment / 答案解析 / 手写总结 / scaffold summary` 上分别点击 `生成追问` 与 `插入追问`，再对新追问执行 `直接回答当前问题`，确认 prompt 与主视图提示都还能恢复这条来源节点，而不是退化成没有来源的空泛问题。
 - 验证 AI / 手动分工：`生成追问` 会起一条 AI follow-up draft，`插入追问` 只插空 question；`生成总结` 会起一条 AI summary draft，`插入总结` 只插空 summary。`answer-closure summary` 不应与“用户主动要求 AI 总结”混成同一语义。
 - 分别在 `answer / judgment / 答案解析 / 手写总结 / scaffold summary` 上确认 `删除` 按钮可达；点击按钮删除与按 `Delete` 快捷键删除都应复用同一套现有逻辑。
+
+### 14. V1.2 文档式主视图三树联调
+
+- 主栏宽度、无框默认态、标题显示策略和轻工具栏显隐要保持一致：未选中内容节点默认是展示态按钮，选中后可直接连续编辑，轻工具栏不会被布局吞掉或挤坏。
+- follow-up `question` 必须以缩进子章节显示，同时 active block 仍保持唯一；选中子 follow-up 时，父问题 block 动作面要静默。
+- 折叠摘要态、连续正文编辑、正文 / block / history 折叠和 `plan-step` 折叠要能同时成立，刷新后继续按本地 view state 恢复。
+- 旧的 `question block / plan-step / node body / history` 回归测试必须继续通过；runtime 与 inspector 也要继续对接当前文档式主视图，而不是退回旧卡片流。
 
 ## 自动化覆盖基线
 

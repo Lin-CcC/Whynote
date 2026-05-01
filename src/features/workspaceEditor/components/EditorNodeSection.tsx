@@ -1,11 +1,18 @@
 import { Fragment } from 'react';
 
-import { getNodeOrThrow, isScaffoldSummaryNode, type TreeNode } from '../../nodeDomain';
+import {
+  getNodeOrThrow,
+  isScaffoldSummaryNode,
+  type TreeNode,
+} from '../../nodeDomain';
+import {
+  getChildNodes,
+  getDisplayTitleForNode,
+} from '../utils/treeSelectors';
 import CollapsedLearningNodeSummary, {
   buildCollapsedLearningNodeSummaryModel,
 } from './CollapsedLearningNodeSummary';
-import { getChildNodes, getDisplayTitleForNode } from '../utils/treeSelectors';
-import EditableNodeCard from './EditableNodeCard';
+import DocumentNodeSection from './DocumentNodeSection';
 import LearningActionPanel from './LearningActionPanel';
 import type { MainViewNodeProps } from './mainViewTypes';
 import QuestionBlockSection from './QuestionBlockSection';
@@ -48,7 +55,7 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
     selectNode: props.onSelectNode,
     tree,
   });
-  const selectedNodeActions = buildSelectedNodeActions();
+  const nodeToolbar = buildNodeToolbar();
   const planStepCollapsed = isPlanStepCollapsed(node, props.workspaceViewState);
   const bodyCollapsed =
     planStepCollapsed ||
@@ -89,8 +96,8 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
   }
 
   return (
-    <EditableNodeCard
-      actions={planStepCollapsed ? null : selectedNodeActions ?? inlineActions}
+    <DocumentNodeSection
+      actions={planStepCollapsed ? null : nodeToolbar}
       bodyCollapsed={bodyCollapsed}
       collapsedSummary={collapsedSummary}
       depth={depth}
@@ -118,39 +125,46 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
       onUpdateNode={props.onUpdateNode}
       registerNodeElement={props.registerNodeElement}
       selectedNodeId={props.selectedNodeId}
+      supplementalActions={planStepCollapsed ? null : inlineActions}
       tree={tree}
     >
       {planStepCollapsed
         ? null
         : childNodes.map((childNode) => (
             <Fragment key={childNode.id}>
-              {childNode.id === firstChildQuestionNodeId && questionChildCount > 0 ? (
+              {childNode.id === firstChildQuestionNodeId &&
+              questionChildCount > 0 ? (
                 <div className="workspace-splitHint">
                   <div className="workspace-splitHeader">
                     <div>
-                      <p className="workspace-kicker">问题分区</p>
-                      <h3 className="workspace-splitTitle">下面进入 question block 主视图</h3>
+                      <p className="workspace-kicker">问题章节</p>
+                      <h3 className="workspace-splitTitle">
+                        下面进入当前模块的问题正文
+                      </h3>
                     </div>
-                    <span className="workspace-counter">{questionChildCount} 个问题块</span>
+                    <span className="workspace-counter">
+                      {questionChildCount} 个问题
+                    </span>
                   </div>
                   <p className="workspace-helpText">
-                    question block 会把回答、对应结果和追问按链条重新组织显示，但底层树顺序保持不变。
+                    回答、对应结果和追问会按阅读顺序就近展开，底层树顺序保持不变。
                   </p>
                 </div>
               ) : null}
               <EditorNodeSection {...props} depth={depth + 1} nodeId={childNode.id} />
             </Fragment>
           ))}
-    </EditableNodeCard>
+    </DocumentNodeSection>
   );
 
-  function buildSelectedNodeActions() {
-    if (node.id !== props.selectedNodeId || !isScaffoldSummaryNode(tree, node)) {
+  function buildNodeToolbar() {
+    if (!isScaffoldSummaryNode(tree, node)) {
       return null;
     }
 
     return (
       <LearningActionPanel
+        isVisible={true}
         sections={[
           {
             buttons: [
@@ -189,19 +203,8 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
             buttons: [
               {
                 disabled: props.isInteractionLocked,
-                label: '继续修改',
-                onClick: () => {
-                  if (bodyCollapsed) {
-                    toggleNodeBodyCollapsed();
-                  }
-
-                  props.onSelectNode(node.id);
-                },
-              },
-              {
-                disabled: props.isInteractionLocked,
                 label: '删除',
-                onClick: props.onDeleteNode,
+                onClick: () => props.onDeleteNodeById(node.id),
               },
             ],
             title: '通用节点动作',
@@ -211,22 +214,26 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
               {
                 disabled: props.isInteractionLocked,
                 label: '换个说法',
-                onClick: () => props.onRunLearningAction('rephrase-scaffold'),
+                onClick: () =>
+                  props.onRunLearningActionForNode(node.id, 'rephrase-scaffold'),
               },
               {
                 disabled: props.isInteractionLocked,
                 label: '更基础一点',
-                onClick: () => props.onRunLearningAction('simplify-scaffold'),
+                onClick: () =>
+                  props.onRunLearningActionForNode(node.id, 'simplify-scaffold'),
               },
               {
                 disabled: props.isInteractionLocked,
                 label: '举个例子',
-                onClick: () => props.onRunLearningAction('add-example'),
+                onClick: () =>
+                  props.onRunLearningActionForNode(node.id, 'add-example'),
               },
             ],
             title: '节点专属动作',
           },
         ]}
+        surface="content"
         testId={`node-actions-${node.id}`}
       />
     );

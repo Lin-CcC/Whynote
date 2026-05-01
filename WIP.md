@@ -4,19 +4,18 @@
 
 ## 当前工作面
 
-- 当前工作树：`codex/unified-node-collapsed-summary`
-- 当前短期目标：统一所有支持正文折叠的内容型学习节点折叠摘要态，让回答 / 判断 / 答案解析 / 总结 / 铺垫在收起正文后都进入同一种紧凑展示
+- 当前工作树：`codex/v12-document-integration`
+- 当前短期目标：完成 V1.2 文档式主视图三棵主树合并后的联调、冲突收口、全量回归与最终文档更新
 
 ## 当前短期任务
 
-- 为所有已接入 `collapsedNodeBodyIds` 的内容节点建立统一紧凑摘要态：类型标签、标题、必要 badge、短提示、关系提示和 `展开正文`
-- 收起正文后隐藏 textarea、长说明、重卡片式留白和编辑态说明，避免不同节点继续各走一套重结构
-- 保持 `collapsedNodeBodyIds`、节点动作链、语义 badge 可见性、结构树 / 搜索 / runtime 自动展开逻辑不变
-- 补回归测试，覆盖统一折叠摘要、空标题回退、展开恢复、关系提示与 runtime remount 后表现
+- 合并 `v12-document-shell`、`v12-document-editing`、`v12-document-toolbar`，并统一主视图结构、标题策略、轻工具栏入口与 follow-up 缩进表现
+- 收口 `workspaceEditor/components/*`、`workspaceEditor.css` 与 runtime 对接测试里的契约漂移，确保文档流、连续编辑、轻工具栏能同时成立
+- 完成最终自动化基线：`pnpm test`、`pnpm run typecheck`、`pnpm run build`
+- 当前代码面已收口完成；若继续推进，只跟进主树合并后的 review feedback，不再额外扩 scope
 
 ## 本轮明确不做
 
-- 不扩展到思维导图、资料系统重构、导出系统重做、provider、完整文档式编辑器重构或新的学习链逻辑
-- 不改 `plan-step` 折叠语义、本地 view state 结构或外部导航链路；`plan-step` 和 `question block` 继续保留各自层级折叠
-- 不重写已有 question block / body / history 折叠系统，只统一内容节点自己的正文折叠态
-- 不做新的阅读态或额外的大型交互 redesign，不把这轮扩展到完整文档式编辑器改造
+- 不扩展新的产品功能，不新增 runtime 路径，不再改资料系统、导出系统、provider 或思维导图
+- 不改既有学习树数据结构，不新增节点类型；V1.2 只处理主视图显示层、编辑层和工具栏层的整合
+- 不重写 question block / body / history / plan-step 折叠模型，只保证它们在文档式主视图下不回归

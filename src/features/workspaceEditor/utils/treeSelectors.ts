@@ -176,6 +176,18 @@ export function getNodeEmphasis(node: TreeNode) {
   return 'primary';
 }
 
+export function isDocumentContentNode(node: TreeNode) {
+  return (
+    node.type === 'answer' ||
+    node.type === 'judgment' ||
+    node.type === 'summary'
+  );
+}
+
+export function doesNodeAlwaysShowDocumentTitle(node: TreeNode) {
+  return !isDocumentContentNode(node);
+}
+
 export function getNodeRoleDescription(tree: NodeTree, node: TreeNode) {
   if (isScaffoldSummaryNode(tree, node)) {
     return '这里负责铺垫或前置讲解';

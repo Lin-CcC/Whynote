@@ -1,6 +1,5 @@
 import { type ReactNode, useEffect, useRef } from 'react';
 
-import SectionCard from '../../../ui/SectionCard';
 import {
   buildQuestionBlockData,
   findNearestQuestionNodeId,
@@ -14,7 +13,6 @@ import type {
   WorkspaceEditorNodeRenderContext,
   WorkspaceViewState,
 } from '../workspaceEditorTypes';
-import { getDisplayLabelForNode, getDisplayTitleForNode } from '../utils/treeSelectors';
 import {
   getAnswerHistorySectionId,
   getSummaryHistorySectionId,
@@ -26,6 +24,7 @@ type TextMainViewProps = {
   interactionLockReason: string | null;
   isInteractionLocked: boolean;
   onCreateModule: () => void;
+  onDeleteNodeById: (nodeId: string) => void;
   onDirectAnswerQuestion?: (questionNodeId: string) => void;
   onEvaluateAnswer?: (questionNodeId: string, answerNodeId: string) => void;
   onEvaluateSummary?: (summaryNodeId: string) => void;
@@ -36,6 +35,10 @@ type TextMainViewProps = {
   onInsertSummaryForNode: (sourceNodeId: string) => void;
   onDeleteNode: () => void;
   onRunLearningAction: (actionId: LearningActionId) => void;
+  onRunLearningActionForNode: (
+    nodeId: string,
+    actionId: LearningActionId,
+  ) => void;
   onSelectNode: (nodeId: string) => void;
   onSetCurrentAnswer: (questionNodeId: string, answerNodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
@@ -54,6 +57,7 @@ export default function TextMainView({
   interactionLockReason,
   isInteractionLocked,
   onCreateModule,
+  onDeleteNodeById,
   onDirectAnswerQuestion,
   onEvaluateAnswer,
   onEvaluateSummary,
@@ -64,6 +68,7 @@ export default function TextMainView({
   onInsertFollowUpQuestion,
   onInsertSummaryForNode,
   onRunLearningAction,
+  onRunLearningActionForNode,
   onSelectNode,
   onSetCurrentAnswer,
   onUpdateNode,
@@ -97,101 +102,90 @@ export default function TextMainView({
 
   if (!currentModuleId || !tree.nodes[currentModuleId]) {
     return (
-      <SectionCard>
-        <p className="workspace-kicker">主视图</p>
-        <h2 className="workspace-sectionTitle">还没有可编辑的模块</h2>
-        <div className="workspace-emptyState">
-          <p className="workspace-helpText">
-            先创建一个模块，主视图才会进入 question block 编辑表面。
-          </p>
-          <button
-            className="workspace-inlineAction"
-            disabled={isInteractionLocked}
-            onClick={onCreateModule}
-            type="button"
+      <div className="workspace-mainPanel">
+        <div
+          className="workspace-documentShell workspace-documentShell-empty"
+          data-layout="single-column"
+          data-testid="workspace-document-shell"
+        >
+          <header
+            className="workspace-documentHeader"
+            data-testid="workspace-document-header"
           >
-            新建模块
-          </button>
+            <p className="workspace-kicker">主视图</p>
+            <h2 className="workspace-documentTitle">还没有可编辑的模块</h2>
+          </header>
+          <div className="workspace-emptyState">
+            <p className="workspace-helpText">
+              先创建一个模块，主视图才会进入 question block 编辑表面。
+            </p>
+            <button
+              className="workspace-inlineAction"
+              disabled={isInteractionLocked}
+              onClick={onCreateModule}
+              type="button"
+            >
+              新建模块
+            </button>
+          </div>
         </div>
-      </SectionCard>
+      </div>
     );
   }
 
   const currentModule = getNodeOrThrow(tree, currentModuleId);
-  const selectedNode =
-    selectedNodeId && tree.nodes[selectedNodeId]
-      ? getNodeOrThrow(tree, selectedNodeId)
-      : null;
 
   return (
     <div className="workspace-mainPanel">
-      <SectionCard>
-        <div className="workspace-sectionHeader">
-          <div>
-            <p className="workspace-kicker">Question Block Editor</p>
-            <h2 className="workspace-sectionTitle">主视图编辑流</h2>
-            <p className="workspace-moduleTitle">{currentModule.title}</p>
+      <div
+        className="workspace-documentShell"
+        data-layout="single-column"
+        data-testid="workspace-document-shell"
+      >
+        <header
+          className="workspace-documentHeader"
+          data-testid="workspace-document-header"
+        >
+          <div className="workspace-documentHeaderMain">
+            <p className="workspace-kicker">当前模块</p>
+            <h2 className="workspace-documentTitle">{currentModule.title}</h2>
           </div>
-          <span className="workspace-counter">
-            {currentModule.childIds.length} 个直属节点
-          </span>
+          {isInteractionLocked && interactionLockReason ? (
+            <p className="workspace-lockText" role="status">
+              {interactionLockReason}
+            </p>
+          ) : null}
+        </header>
+        <div className="workspace-documentBody">
+          <EditorNodeSection
+            activeQuestionBlockId={activeQuestionBlockId}
+            depth={0}
+            isInteractionLocked={isInteractionLocked}
+            nodeId={currentModule.id}
+            onDeleteNode={onDeleteNode}
+            onDeleteNodeById={onDeleteNodeById}
+            onDirectAnswerQuestion={onDirectAnswerQuestion}
+            onEvaluateAnswer={onEvaluateAnswer}
+            onEvaluateSummary={onEvaluateSummary}
+            onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
+            onGenerateSummary={onGenerateSummary}
+            onInsertAnswerForQuestion={onInsertAnswerForQuestion}
+            onInsertFollowUpQuestion={onInsertFollowUpQuestion}
+            onInsertSummaryForNode={onInsertSummaryForNode}
+            onRunLearningAction={onRunLearningAction}
+            onRunLearningActionForNode={onRunLearningActionForNode}
+            onSelectNode={onSelectNode}
+            onSetCurrentAnswer={onSetCurrentAnswer}
+            onUpdateNode={onUpdateNode}
+            onWorkspaceViewStateChange={onWorkspaceViewStateChange}
+            registerNodeElement={registerNodeElement}
+            renderNodeInlineActions={renderNodeInlineActions}
+            selectedNodeId={selectedNodeId}
+            tree={tree}
+            workspaceViewState={workspaceViewState}
+          />
         </div>
-        <dl className="workspace-summaryList">
-          <div>
-            <dt>当前选中</dt>
-            <dd>
-              {selectedNode
-                ? `${getDisplayLabelForNode(tree, selectedNode)} · ${getDisplayTitleForNode(tree, selectedNode)}`
-                : '尚未选中节点'}
-            </dd>
-          </div>
-          <div>
-            <dt>当前 block</dt>
-            <dd>
-              {activeQuestionBlockId && tree.nodes[activeQuestionBlockId]
-                ? getDisplayTitleForNode(
-                    tree,
-                    getNodeOrThrow(tree, activeQuestionBlockId),
-                  )
-                : '当前选中不在问题块内'}
-            </dd>
-          </div>
-          <div>
-            <dt>主视图规则</dt>
-            <dd>question block 在这里重组显示，结构树仍保持真实树顺序。</dd>
-          </div>
-        </dl>
-        {isInteractionLocked && interactionLockReason ? (
-          <p className="workspace-lockText" role="status">
-            {interactionLockReason}
-          </p>
-        ) : null}
-      </SectionCard>
-      <EditorNodeSection
-        activeQuestionBlockId={activeQuestionBlockId}
-        depth={0}
-        isInteractionLocked={isInteractionLocked}
-        nodeId={currentModule.id}
-        onDirectAnswerQuestion={onDirectAnswerQuestion}
-        onEvaluateAnswer={onEvaluateAnswer}
-        onEvaluateSummary={onEvaluateSummary}
-        onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
-        onGenerateSummary={onGenerateSummary}
-        onDeleteNode={onDeleteNode}
-        onInsertAnswerForQuestion={onInsertAnswerForQuestion}
-        onInsertFollowUpQuestion={onInsertFollowUpQuestion}
-        onInsertSummaryForNode={onInsertSummaryForNode}
-        onRunLearningAction={onRunLearningAction}
-        onSelectNode={onSelectNode}
-        onSetCurrentAnswer={onSetCurrentAnswer}
-        onUpdateNode={onUpdateNode}
-        onWorkspaceViewStateChange={onWorkspaceViewStateChange}
-        registerNodeElement={registerNodeElement}
-        renderNodeInlineActions={renderNodeInlineActions}
-        selectedNodeId={selectedNodeId}
-        tree={tree}
-        workspaceViewState={workspaceViewState}
-      />
+      </div>
     </div>
   );
 }
