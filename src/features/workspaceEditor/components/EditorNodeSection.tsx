@@ -128,13 +128,13 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
                 <div className="workspace-splitHint">
                   <div className="workspace-splitHeader">
                     <div>
-                      <p className="workspace-kicker">问题分区</p>
-                      <h3 className="workspace-splitTitle">下面进入 question block 主视图</h3>
+                      <p className="workspace-kicker">问题章节</p>
+                      <h3 className="workspace-splitTitle">下面进入当前模块的问题正文</h3>
                     </div>
-                    <span className="workspace-counter">{questionChildCount} 个问题块</span>
+                    <span className="workspace-counter">{questionChildCount} 个问题</span>
                   </div>
                   <p className="workspace-helpText">
-                    question block 会把回答、对应结果和追问按链条重新组织显示，但底层树顺序保持不变。
+                    回答、对应结果和追问会按阅读顺序就近展开，底层树顺序保持不变。
                   </p>
                 </div>
               ) : null}

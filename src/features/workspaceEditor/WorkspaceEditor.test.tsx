@@ -38,7 +38,9 @@ test('switches modules and keeps structure and text view in sync', () => {
   fireEvent.click(screen.getByRole('button', { name: /副作用与数据流/i }));
 
   expect(
-    screen.getByRole('heading', { name: '副作用与数据流' }),
+    within(screen.getByTestId('workspace-document-header')).getByRole('heading', {
+      name: '副作用与数据流',
+    }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole('button', { name: /^问题什么时候应该使用 useEffect？$/i }),
@@ -64,6 +66,20 @@ test('selects a node from structure view and focuses the text card', async () =>
   await waitFor(() => {
     expect(focusedNode).toHaveFocus();
   });
+});
+
+test('renders the main view inside a single-column document shell with a tightened module header', () => {
+  render(<WorkspaceEditor />);
+
+  const documentShell = screen.getByTestId('workspace-document-shell');
+  const documentHeader = screen.getByTestId('workspace-document-header');
+
+  expect(documentShell).toHaveAttribute('data-layout', 'single-column');
+  expect(within(documentHeader).getByText('当前模块')).toBeInTheDocument();
+  expect(within(documentHeader).getByText('状态与渲染')).toBeInTheDocument();
+  expect(screen.queryByText('当前选中')).not.toBeInTheDocument();
+  expect(screen.queryByText('当前 block')).not.toBeInTheDocument();
+  expect(screen.queryByText('主视图规则')).not.toBeInTheDocument();
 });
 
 test('collapses and expands the structure tree', () => {
@@ -956,13 +972,17 @@ test('recovers with a new module after deleting the last module', () => {
   ).toBeInTheDocument();
 
   fireEvent.click(
-    within(getSectionByHeading('还没有可编辑的模块')).getByRole('button', {
+    within(screen.getByTestId('workspace-document-shell')).getByRole('button', {
       name: '新建模块',
     }),
   );
 
   expect(screen.getByDisplayValue('新模块')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '新模块' })).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('workspace-document-header')).getByRole('heading', {
+      name: '新模块',
+    }),
+  ).toBeInTheDocument();
   expect(
     within(getSectionByHeading('当前学习模块')).getByRole('button', {
       name: /新模块/i,

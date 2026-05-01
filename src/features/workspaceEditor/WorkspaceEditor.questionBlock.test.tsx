@@ -294,6 +294,32 @@ test('keeps the current answer reevaluation action on the selected current answe
   ).not.toBeInTheDocument();
 });
 
+test('keeps non-active document nodes frame-free until selection moves to them', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+  });
+
+  expect(screen.getByTestId('editor-node-question-main')).toHaveAttribute(
+    'data-node-frame-visible',
+    'true',
+  );
+  expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
+    'data-node-frame-visible',
+    'false',
+  );
+
+  fireEvent.click(screen.getByTestId('editor-node-answer-first'));
+
+  expect(screen.getByTestId('editor-node-question-main')).toHaveAttribute(
+    'data-node-frame-visible',
+    'false',
+  );
+  expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
+    'data-node-frame-visible',
+    'true',
+  );
+});
+
 test.each([
   {
     badges: ['旧回答'],
@@ -693,6 +719,39 @@ test('keeps follow-up questions after the answer closure chain instead of under 
   ).toBe(Node.DOCUMENT_POSITION_PRECEDING);
 });
 
+test('renders follow-up questions as indented subsections and lets the child block become the active shell', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-follow-up',
+  });
+
+  expect(
+    screen.getByTestId('follow-up-section-question-follow-up'),
+  ).toBeInTheDocument();
+  expect(screen.getByTestId('question-block-question-follow-up')).toHaveAttribute(
+    'data-question-level',
+    'follow-up',
+  );
+  expect(screen.getByTestId('question-block-question-follow-up')).toHaveAttribute(
+    'data-active',
+    'true',
+  );
+  expect(screen.getByTestId('question-block-question-follow-up')).toHaveAttribute(
+    'data-question-selected',
+    'true',
+  );
+  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+    'data-active',
+    'false',
+  );
+  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+    'data-question-selected',
+    'false',
+  );
+  expect(
+    screen.queryByTestId('question-block-actions-question-main'),
+  ).not.toBeInTheDocument();
+});
+
 test('tracks block, body, and group-local history collapse in workspace view state', () => {
   const viewStateChanges: WorkspaceViewState[] = [];
 
@@ -851,6 +910,17 @@ test('collapses and expands a plan-step while keeping its header visible', async
     viewStateChanges.at(-1)?.collapsedPlanStepIds.includes('step-question-block'),
   ).toBe(false);
   expect(screen.getByTestId('question-block-question-main')).toBeInTheDocument();
+});
+
+test('keeps the expanded plan-step rendered as a lightweight section divider shell', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'step-question-block',
+  });
+
+  expect(screen.getByTestId('editor-node-step-question-block')).toHaveAttribute(
+    'data-node-shell',
+    'section-divider',
+  );
 });
 
 test('restores inner question block, body, and history state after collapsing and reopening a plan-step', async () => {

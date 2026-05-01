@@ -64,6 +64,8 @@ export default function QuestionBlockSection({
     selectedNodeId,
   );
   const questionIsSelected = selectedNodeId === question.id;
+  const isFollowUpQuestion =
+    question.parentId !== null && tree.nodes[question.parentId]?.type === 'question';
 
   function updateViewState(
     updater: (state: typeof workspaceViewState) => typeof workspaceViewState,
@@ -465,19 +467,18 @@ export default function QuestionBlockSection({
       className="workspace-questionBlock"
       data-active={isActive}
       data-collapsed={isCollapsed}
+      data-question-level={isFollowUpQuestion ? 'follow-up' : 'root'}
+      data-question-selected={questionIsSelected}
       data-testid={`question-block-${question.id}`}
     >
       <div className="workspace-questionBlockHeader">
         <div>
-          <p className="workspace-kicker">Question Block</p>
+          <p className="workspace-kicker">问题</p>
           <h3 className="workspace-questionBlockTitle">
             {getDisplayTitleForNode(tree, question)}
           </h3>
         </div>
         <div className="workspace-questionBlockHeaderActions">
-          <span className="workspace-counter">
-            {questionBlock.currentAnswerNodeId ? '已有当前回答' : '还没有当前回答'}
-          </span>
           <button
             className="workspace-historyToggle"
             disabled={isInteractionLocked}
@@ -564,13 +565,13 @@ export default function QuestionBlockSection({
                   <div className="workspace-splitHint">
                     <div className="workspace-splitHeader">
                       <div>
-                        <p className="workspace-kicker">追问区</p>
-                        <h3 className="workspace-splitTitle">下面进入 follow-up question</h3>
+                        <p className="workspace-kicker">追问章节</p>
+                        <h3 className="workspace-splitTitle">下面进入缩进子问题</h3>
                       </div>
-                      <span className="workspace-counter">按真实链条继续展开</span>
+                      <span className="workspace-counter">延续当前阅读链条</span>
                     </div>
                     <p className="workspace-helpText">
-                      追问仍然是原始子节点，只是在主视图里紧接所属回答闭环之后显示。
+                      追问仍然是原始子节点，只是在主视图里作为子章节紧接所属回答闭环之后显示。
                     </p>
                   </div>
                 ) : null}
@@ -594,7 +595,16 @@ export default function QuestionBlockSection({
       return renderSummaryGroup(entry.group);
     }
 
-    return renderChildNode(entry.node.id, depth + 1);
+    return entry.node.type === 'question' ? (
+      <div
+        className="workspace-followUpSection"
+        data-testid={`follow-up-section-${entry.node.id}`}
+      >
+        {renderChildNode(entry.node.id, depth + 1)}
+      </div>
+    ) : (
+      renderChildNode(entry.node.id, depth + 1)
+    );
   }
 }
 
