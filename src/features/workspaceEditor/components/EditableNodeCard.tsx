@@ -152,10 +152,7 @@ export default function EditableNodeCard({
       tabIndex={-1}
     >
       {hasCollapsedSummary ? (
-        <>
-          <div className="workspace-nodeCompactSummary">{collapsedSummary}</div>
-          {actions ? <div className="workspace-nodeInlineActions">{actions}</div> : null}
-        </>
+        <div className="workspace-nodeCompactSummary">{collapsedSummary}</div>
       ) : (
         <>
           <div className="workspace-nodeHeader">
