@@ -277,13 +277,24 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
   - 源内容已改但结果仍保留时，必须额外显示 `已过期`。
 - 显式配对语义如果要支持删除 / 切型 / 跨题移动后的手工验收，主视图至少要能看见轻量关系提示，例如 `配对回答：...` 或 `检查对象：...`；否则主树无法确认被清理的到底是哪一组结果。
 
-### 31. active question block 的 block 级动作不依赖重新选中 question 本体
+### 31. 导出默认保持完整语义，折叠感知只作为显式裁剪模式
+
+- 现有导出默认继续是 `全部内容`，不能因为主视图折叠状态改变默认导出语义。
+- `仅当前展开内容` 必须是显式模式，第一轮只作用于 `current-module / theme`；`filtered` 导出继续固定为完整语义。
+- 折叠感知导出只读取 `UiPreferences.values.workspaceViews[workspaceId]`，不读取 `RecentWorkspaceState`。
+- 只有拿到完整的 workspace view state（`collapsedQuestionBlockIds / collapsedNodeBodyIds / expandedHistorySectionIds` 三项都有效）时，才允许按折叠规则裁剪；缺失、损坏或不完整时必须安全回退到完整导出。
+- 第一轮裁剪规则固定为：
+  - 整个折叠的 `question block` 不导出
+  - 折叠正文的 `answer / judgment / summary` 只导出标题与类型，不导正文、标签或附属引用内容
+  - 未展开的 `历史评估 / 历史检查结果` 不导出
+  - root 级资料树不因学习链条折叠而额外裁剪
+### 32. active question block 的 block 级动作不依赖重新选中 question 本体
 
 - active question block 继续按“当前选中节点向上追溯到最近的 `question`”确定；既然 active block 已经这么算，block 级动作面也必须跟着这个 active block 工作。
 - 只要当前选中节点仍属于同一个 active question block，`插入回答 / 生成追问 / 插入追问 / 生成总结 / 插入总结` 等 block 级动作就不能消失，不允许要求用户重新点回 question 本体才能继续主编辑流。
 - 对 `answer / judgment / 答案解析 / 手写总结 / 总结检查结果` 这类 question block 内的真实内容节点，主视图动作优先收口到同一套 block 级动作面；节点卡片只保留各自语义独有的继续编辑、评估、检查、设为当前回答等局部动作。
 
-### 32. `生成追问 / 生成总结` 与 `插入追问 / 插入总结` 的语义分工
+### 33. `生成追问 / 生成总结` 与 `插入追问 / 插入总结` 的语义分工
 
 - `生成追问` / `生成总结` 明确属于 AI 动作：前者让 AI 基于当前上下文起一条新的 follow-up question，后者让 AI 围绕当前内容生成一条阶段性总结草稿。
 - `插入追问` / `插入总结` 明确属于手动插入动作：只插入空节点，由用户自己写，不再隐含 AI 起草语义。
@@ -291,7 +302,7 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - 当用户是从某条具体内容节点上发起 `生成追问` 或 `插入追问` 时，系统要保留最小必要的来源上下文，保证后续 `直接回答当前问题` 时还能接住这条具体来源，而不是把追问当成脱离上文的新题。
 - `生成总结` 作用在 question block 内的具体内容节点时，默认语义是“对当前这条内容做阶段性总结”，不是自动退回整棵 question tree，也不是默认等同于 answer-closure。
 
-### 33. Delete 快捷键的安全触发条件
+### 34. Delete 快捷键的安全触发条件
 
 - 工程壳允许用 `Delete` 作为最低摩擦的删节点快捷键，但只能在“当前有选中节点卡片，且焦点不在 `input / textarea / select / contenteditable` 里”时触发。
 - 如果焦点在文本编辑控件内，`Delete` 必须继续只处理文本删除，不得提升成结构删除动作。

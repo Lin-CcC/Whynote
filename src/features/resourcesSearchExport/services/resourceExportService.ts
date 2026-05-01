@@ -1,10 +1,17 @@
 import {
+  buildQuestionBlockData,
   getDisplayNodeTypeLabel,
   getNodeOrThrow,
+  type UiPreferences,
   type NodeTree,
   type TreeNode,
 } from '../../nodeDomain';
+import {
+  getAnswerHistorySectionId,
+  getSummaryHistorySectionId,
+} from '../../workspaceEditor/utils/workspaceViewState';
 import type {
+  ExportContentMode,
   ExportFileDescriptor,
   ExportFormat,
   ExportTarget,
@@ -17,8 +24,10 @@ import {
   getNodeSourceSummary,
   getNodeTagNames,
 } from '../utils/resourceTreeUtils';
+import { readCompleteWorkspaceViewStateForExport } from '../utils/exportWorkspaceViewState';
 
 interface CreateWorkspaceExportOptions {
+  contentMode?: ExportContentMode;
   currentModuleId: string | null;
   filterScope?: SearchScope;
   format: ExportFormat;
@@ -26,6 +35,8 @@ interface CreateWorkspaceExportOptions {
   selectedTagIds?: string[];
   target: ExportTarget;
   tree: NodeTree;
+  uiPreferences?: UiPreferences | null;
+  workspaceId?: string | null;
   workspaceTitle: string;
 }
 
@@ -33,6 +44,12 @@ interface ExportBlock {
   kind: 'heading' | 'paragraph';
   level?: number;
   text: string;
+}
+
+interface ExpandedExportState {
+  collapsedNodeBodyIds: Set<string>;
+  collapsedQuestionBlockIds: Set<string>;
+  hiddenHistoryNodeIds: Set<string>;
 }
 
 const PLAN_STEP_STATUS_LABELS = {
@@ -59,12 +76,14 @@ function buildExportBlocks(
   options: CreateWorkspaceExportOptions,
   selectedTagIds: string[],
 ) {
+  const expandedExportState = resolveExpandedExportState(options);
+
   if (options.target === 'current-module') {
-    return buildCurrentModuleBlocks(options, null);
+    return buildCurrentModuleBlocks(options, null, expandedExportState);
   }
 
   if (options.target === 'theme') {
-    return buildThemeBlocks(options, null);
+    return buildThemeBlocks(options, null, expandedExportState);
   }
 
   const filterScope = options.filterScope ?? 'current-module';
@@ -98,11 +117,11 @@ function buildExportBlocks(
     ? buildThemeBlocks(options, {
         filterNote,
         includedNodeIds,
-      })
+      }, null)
     : buildCurrentModuleBlocks(options, {
         filterNote,
         includedNodeIds,
-      });
+      }, null);
 }
 
 function buildThemeBlocks(
@@ -111,6 +130,7 @@ function buildThemeBlocks(
     filterNote: string;
     includedNodeIds: Set<string>;
   } | null,
+  expandedExportState: ExpandedExportState | null,
 ) {
   const rootNode = getNodeOrThrow(options.tree, options.tree.rootId);
   const includedNodeIds =
@@ -145,6 +165,7 @@ function buildThemeBlocks(
 
     blocks.push(
       ...renderNodeBlocks(options.tree, childId, {
+        expandedExportState,
         includePlanSteps: options.includePlanSteps,
         includedNodeIds,
         level: 2,
@@ -161,6 +182,7 @@ function buildCurrentModuleBlocks(
     filterNote: string;
     includedNodeIds: Set<string>;
   } | null,
+  expandedExportState: ExpandedExportState | null,
 ) {
   if (!options.currentModuleId || options.tree.nodes[options.currentModuleId]?.type !== 'module') {
     throw new Error('当前没有可导出的模块。');
@@ -199,6 +221,7 @@ function buildCurrentModuleBlocks(
 
     blocks.push(
       ...renderNodeBlocks(options.tree, childId, {
+        expandedExportState,
         includePlanSteps: options.includePlanSteps,
         includedNodeIds,
         level: 2,
@@ -213,6 +236,7 @@ function renderNodeBlocks(
   tree: NodeTree,
   nodeId: string,
   options: {
+    expandedExportState: ExpandedExportState | null;
     includePlanSteps: boolean;
     includedNodeIds: Set<string>;
     level: number;
@@ -222,9 +246,28 @@ function renderNodeBlocks(
     return [];
   }
 
+  if (options.expandedExportState?.hiddenHistoryNodeIds.has(nodeId)) {
+    return [];
+  }
+
   const node = getNodeOrThrow(tree, nodeId);
-  const childIds = node.childIds.filter((childId) => options.includedNodeIds.has(childId));
+
+  if (
+    node.type === 'question' &&
+    options.expandedExportState?.collapsedQuestionBlockIds.has(node.id)
+  ) {
+    return [];
+  }
+
+  const childIds = node.childIds.filter(
+    (childId) =>
+      options.includedNodeIds.has(childId) &&
+      !options.expandedExportState?.hiddenHistoryNodeIds.has(childId),
+  );
   const blocks: ExportBlock[] = [];
+  const shouldOmitBody =
+    supportsExpandedContentBodyOmission(node) &&
+    options.expandedExportState?.collapsedNodeBodyIds.has(node.id);
 
   switch (node.type) {
     case 'plan-step':
@@ -316,14 +359,14 @@ function renderNodeBlocks(
         text: `${getExportLabel(tree, node)}：${node.title}`,
       });
 
-      if (node.content.trim()) {
+      if (!shouldOmitBody && node.content.trim()) {
         blocks.push({
           kind: 'paragraph',
           text: node.content.trim(),
         });
       }
 
-      if (node.tagIds.length > 0) {
+      if (!shouldOmitBody && node.tagIds.length > 0) {
         blocks.push({
           kind: 'paragraph',
           text: `标签：${getNodeTagNames(tree, node).join('、')}`,
@@ -408,4 +451,78 @@ function getExportLabel(tree: NodeTree, node: TreeNode) {
     default:
       return node.type;
   }
+}
+
+function resolveExpandedExportState(
+  options: CreateWorkspaceExportOptions,
+): ExpandedExportState | null {
+  if (options.contentMode !== 'expanded-view' || options.target === 'filtered') {
+    return null;
+  }
+
+  const workspaceViewState = readCompleteWorkspaceViewStateForExport(
+    options.uiPreferences,
+    options.workspaceId,
+  );
+
+  if (!workspaceViewState) {
+    return null;
+  }
+
+  const hiddenHistoryNodeIds = new Set<string>();
+  const expandedHistorySectionIds = new Set(
+    workspaceViewState.expandedHistorySectionIds,
+  );
+
+  for (const node of Object.values(options.tree.nodes)) {
+    if (node.type !== 'question') {
+      continue;
+    }
+
+    const questionBlock = buildQuestionBlockData(options.tree, node.id);
+
+    for (const answerGroup of questionBlock.answerGroups) {
+      if (
+        expandedHistorySectionIds.has(
+          getAnswerHistorySectionId(answerGroup.answer.id),
+        )
+      ) {
+        continue;
+      }
+
+      for (const historyNode of answerGroup.historicalClosureNodes) {
+        hiddenHistoryNodeIds.add(historyNode.id);
+      }
+    }
+
+    for (const summaryGroup of questionBlock.summaryGroups) {
+      if (
+        expandedHistorySectionIds.has(
+          getSummaryHistorySectionId(summaryGroup.summary.id),
+        )
+      ) {
+        continue;
+      }
+
+      for (const historyNode of summaryGroup.historicalCheckNodes) {
+        hiddenHistoryNodeIds.add(historyNode.id);
+      }
+    }
+  }
+
+  return {
+    collapsedNodeBodyIds: new Set(workspaceViewState.collapsedNodeBodyIds),
+    collapsedQuestionBlockIds: new Set(
+      workspaceViewState.collapsedQuestionBlockIds,
+    ),
+    hiddenHistoryNodeIds,
+  };
+}
+
+function supportsExpandedContentBodyOmission(node: TreeNode) {
+  return (
+    node.type === 'answer' ||
+    node.type === 'judgment' ||
+    node.type === 'summary'
+  );
 }

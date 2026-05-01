@@ -4,6 +4,18 @@
 
 ## 当前工作面
 
+- 当前工作树：`codex/v11-export-expanded-view`
+- 当前短期目标：已完成 V1.1 第一轮“折叠感知导出”，给现有导出链补上 `仅当前展开内容`，并把作用范围收敛在 `current-module / theme`。
+
+## 当前短期任务
+
+- 本轮执行项已清空，等待后续合并与主线回归。
+
+## 本轮明确不做
+
+- 不做主视图折叠 UI 本身，只消费 `UiPreferences.values.workspaceViews[workspaceId]`
+- 不重写 `currentAnswerId` / `source*` 契约
+- 不扩到思维导图、资料系统重构、导出系统重做或新的学习链逻辑
 - 当前工作树：`codex/node-action-completeness`
 - 当前短期目标：审查主视图节点动作覆盖面，拆开 AI / 手动追问与总结动作，让 active question block 内的完整动作在子节点选中时仍保持可达，并为工程壳补上可靠的 Delete 删除快捷键。
 

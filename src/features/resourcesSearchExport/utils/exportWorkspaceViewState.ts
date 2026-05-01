@@ -1,0 +1,59 @@
+import type { UiPreferences } from '../../nodeDomain';
+import type { WorkspaceViewState } from '../../workspaceEditor/workspaceEditorTypes';
+
+export function readCompleteWorkspaceViewStateForExport(
+  preferences: UiPreferences | null | undefined,
+  workspaceId: string | null | undefined,
+): WorkspaceViewState | null {
+  if (!workspaceId) {
+    return null;
+  }
+
+  const workspaceViews = preferences?.values.workspaceViews;
+
+  if (!isRecord(workspaceViews)) {
+    return null;
+  }
+
+  const workspaceViewValue = workspaceViews[workspaceId];
+
+  if (!isRecord(workspaceViewValue)) {
+    return null;
+  }
+
+  const collapsedQuestionBlockIds = readRequiredStringArray(
+    workspaceViewValue.collapsedQuestionBlockIds,
+  );
+  const collapsedNodeBodyIds = readRequiredStringArray(
+    workspaceViewValue.collapsedNodeBodyIds,
+  );
+  const expandedHistorySectionIds = readRequiredStringArray(
+    workspaceViewValue.expandedHistorySectionIds,
+  );
+
+  if (
+    !collapsedQuestionBlockIds ||
+    !collapsedNodeBodyIds ||
+    !expandedHistorySectionIds
+  ) {
+    return null;
+  }
+
+  return {
+    collapsedNodeBodyIds,
+    collapsedQuestionBlockIds,
+    expandedHistorySectionIds,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readRequiredStringArray(value: unknown) {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    return null;
+  }
+
+  return [...new Set(value)];
+}
