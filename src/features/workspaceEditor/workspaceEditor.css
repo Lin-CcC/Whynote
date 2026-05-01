@@ -483,7 +483,6 @@
   background: transparent;
   cursor: pointer;
   outline: none;
-  transition: background-color 140ms ease;
 }
 
 .workspace-documentNode:hover,
@@ -594,21 +593,20 @@
 .workspace-nodeTitleToolbar {
   display: flex;
   align-items: flex-start;
-  transition:
-    opacity 140ms ease,
-    transform 140ms ease;
 }
 
 .workspace-nodeTitleToolbar[data-visible='false'] {
-  opacity: 0;
+  display: none;
   pointer-events: none;
-  transform: translateY(-2px);
 }
 
 .workspace-nodeTitleToolbar[data-visible='true'] {
-  opacity: 1;
+  display: flex;
   pointer-events: auto;
-  transform: translateY(0);
+}
+
+.workspace-nodeHeaderControls {
+  display: flex;
 }
 
 .workspace-nodeType,
@@ -953,21 +951,16 @@
 
 .workspace-nodeActionToolbar {
   position: relative;
-  transition:
-    opacity 140ms ease,
-    transform 140ms ease;
 }
 
 .workspace-nodeActionToolbar[data-visible='false'] {
-  opacity: 0;
+  display: none;
   pointer-events: none;
-  transform: translateY(-2px);
 }
 
 .workspace-nodeActionToolbar[data-visible='true'] {
-  opacity: 1;
+  display: block;
   pointer-events: auto;
-  transform: translateY(0);
 }
 
 .workspace-nodeInlineActions {
@@ -1132,21 +1125,6 @@
   padding-left: 0;
 }
 
-.workspace-questionBlockHeader,
-.workspace-questionBlockSectionHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.workspace-questionBlockTitle {
-  margin: 0;
-  color: #0f172a;
-  font-size: 1.05rem;
-}
-
-.workspace-questionBlockHeaderActions,
 .workspace-questionBlockActions {
   display: flex;
   flex-wrap: wrap;
@@ -1154,7 +1132,6 @@
   gap: 0.6rem;
 }
 
-.workspace-questionBlockStack,
 .workspace-questionBlockPrimary,
 .workspace-questionBlockGroup {
   display: grid;

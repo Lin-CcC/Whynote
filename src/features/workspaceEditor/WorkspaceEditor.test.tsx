@@ -469,6 +469,21 @@ test('inserts an empty scaffold summary from the selected scaffold node instead 
   });
 });
 
+test('keeps scaffold summaries in a single-shell document node without an extra nested header', () => {
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-scaffold-actions"
+      initialSelectedNodeId="question-scaffold-actions"
+      initialSnapshot={createScaffoldActionSnapshot()}
+    />,
+  );
+
+  const scaffoldNode = screen.getByTestId('editor-node-summary-scaffold-selected');
+
+  expect(scaffoldNode.querySelectorAll('.workspace-nodeTitleRow')).toHaveLength(1);
+  expect(within(scaffoldNode).getAllByText('先建立概念地图')).toHaveLength(1);
+});
+
 test('allows switching a newly inserted leaf node between safe types while preserving content', async () => {
   const snapshots: WorkspaceSnapshot[] = [];
 

@@ -33,6 +33,7 @@ export type DocumentNodeSectionProps = {
   depth: number;
   headerControls?: ReactNode;
   isInteractionLocked: boolean;
+  keepHeaderVisibleWhenBodyCollapsed?: boolean;
   nodeId: string;
   onSelectNode: (nodeId: string) => void;
   onToggleBodyCollapsed?: () => void;
@@ -54,6 +55,7 @@ export default function DocumentNodeSection({
   depth,
   headerControls,
   isInteractionLocked,
+  keepHeaderVisibleWhenBodyCollapsed = false,
   nodeId,
   onSelectNode,
   onToggleBodyCollapsed,
@@ -80,6 +82,8 @@ export default function DocumentNodeSection({
   const bodyToggleLabel = `${bodyCollapsed ? '展开' : '收起'}正文`;
   const hasCollapsedSummary =
     collapsedSummary !== undefined && collapsedSummary !== null;
+  const canShowTitleWhileCollapsed =
+    !bodyCollapsed || keepHeaderVisibleWhenBodyCollapsed;
   const contentInputVisible =
     !bodyCollapsed &&
     (pendingFocusField === 'content' || activeField === 'content');
@@ -92,7 +96,7 @@ export default function DocumentNodeSection({
       presentation.trimmedDisplayTitle.length > 0 ||
       isTitleInputExpanded);
   const titleDisplayVisible =
-    !bodyCollapsed &&
+    canShowTitleWhileCollapsed &&
     !titleInputVisible &&
     (presentation.alwaysShowTitle ||
       presentation.trimmedDisplayTitle.length > 0);
@@ -125,6 +129,8 @@ export default function DocumentNodeSection({
     onToggleBodyCollapsed !== undefined ||
     Boolean(headerControls) ||
     Boolean(actions);
+  const showPlanStepRuntimeStatusHints =
+    node.type === 'plan-step' && (isSelected || hasFocusWithin || isEditing);
   const renderedActions = renderActions(actions, titleControlVisible);
 
   useEffect(() => {
@@ -261,6 +267,11 @@ export default function DocumentNodeSection({
       return;
     }
 
+    if (bodyCollapsed) {
+      onSelectNode(node.id);
+      return;
+    }
+
     if (field === 'title') {
       setIsTitleInputExpanded(true);
     }
@@ -358,7 +369,14 @@ export default function DocumentNodeSection({
                       {bodyToggleLabel}
                     </button>
                   ) : null}
-                  {headerControls}
+                  {headerControls ? (
+                    <div
+                      className="workspace-nodeHeaderControls"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {headerControls}
+                    </div>
+                  ) : null}
                   {renderedActions ? (
                     <div
                       className="workspace-nodeTitleToolbar"
@@ -370,8 +388,7 @@ export default function DocumentNodeSection({
                 </div>
               ) : null}
             </div>
-            {node.type === 'plan-step' &&
-            titleControlVisible &&
+            {showPlanStepRuntimeStatusHints &&
             presentation.planStepRuntimeStatus ? (
               <>
                 <p className="workspace-nodeHint">
