@@ -71,6 +71,22 @@ test('falls back to the latest filled answer when legacy questions do not have c
   );
 });
 
+test('does not synthesize a current answer when legacy questions only contain empty answers', () => {
+  const tree = createLegacyEmptyAnswerOnlySnapshot().tree;
+
+  expect(getCurrentQuestionAnswerNodeId(tree, 'question-legacy-empty-answer-only')).toBe(
+    null,
+  );
+});
+
+test('keeps current answer empty when legacy questions have no answers at all', () => {
+  const tree = createLegacyNoAnswerSnapshot().tree;
+
+  expect(getCurrentQuestionAnswerNodeId(tree, 'question-legacy-no-answer')).toBe(
+    null,
+  );
+});
+
 test('falls back to legacy sibling heuristics when explicit source fields are missing', () => {
   const tree = createLegacyClosurePairSnapshot().tree;
 
@@ -579,6 +595,122 @@ function createLegacyClosurePairSnapshot() {
       updatedAt: '2026-04-30T10:30:00.000Z',
     }),
   );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createLegacyEmptyAnswerOnlySnapshot() {
+  const snapshot = createWorkspaceSnapshot({
+    title: 'legacy empty answer only',
+    workspaceId: 'workspace-legacy-empty-answer-only',
+    rootId: 'theme-legacy-empty-answer-only',
+    createdAt: '2026-04-30T10:15:00.000Z',
+    updatedAt: '2026-04-30T10:15:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-legacy-empty-answer-only',
+      title: 'module',
+      createdAt: '2026-04-30T10:15:00.000Z',
+      updatedAt: '2026-04-30T10:15:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-legacy-empty-answer-only',
+    createNode({
+      type: 'question',
+      id: 'question-legacy-empty-answer-only',
+      title: 'legacy empty question',
+      createdAt: '2026-04-30T10:15:00.000Z',
+      updatedAt: '2026-04-30T10:15:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-legacy-empty-answer-only',
+    createNode({
+      type: 'answer',
+      id: 'answer-legacy-empty-answer-only-v1',
+      title: 'answer v1 draft',
+      content: '   ',
+      createdAt: '2026-04-30T10:15:00.000Z',
+      updatedAt: '2026-04-30T10:15:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-legacy-empty-answer-only',
+    createNode({
+      type: 'answer',
+      id: 'answer-legacy-empty-answer-only-v2',
+      title: 'answer v2 draft',
+      content: '',
+      createdAt: '2026-04-30T10:15:00.000Z',
+      updatedAt: '2026-04-30T10:15:00.000Z',
+    }),
+  );
+
+  const questionNode = tree.nodes['question-legacy-empty-answer-only'];
+
+  if (questionNode?.type === 'question') {
+    delete questionNode.currentAnswerId;
+  }
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createLegacyNoAnswerSnapshot() {
+  const snapshot = createWorkspaceSnapshot({
+    title: 'legacy no answer',
+    workspaceId: 'workspace-legacy-no-answer',
+    rootId: 'theme-legacy-no-answer',
+    createdAt: '2026-04-30T10:20:00.000Z',
+    updatedAt: '2026-04-30T10:20:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-legacy-no-answer',
+      title: 'module',
+      createdAt: '2026-04-30T10:20:00.000Z',
+      updatedAt: '2026-04-30T10:20:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-legacy-no-answer',
+    createNode({
+      type: 'question',
+      id: 'question-legacy-no-answer',
+      title: 'legacy question without answers',
+      createdAt: '2026-04-30T10:20:00.000Z',
+      updatedAt: '2026-04-30T10:20:00.000Z',
+    }),
+  );
+
+  const questionNode = tree.nodes['question-legacy-no-answer'];
+
+  if (questionNode?.type === 'question') {
+    delete questionNode.currentAnswerId;
+  }
 
   return {
     ...snapshot,

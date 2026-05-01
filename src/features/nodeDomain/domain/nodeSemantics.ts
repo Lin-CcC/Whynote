@@ -130,9 +130,7 @@ export function getLegacyCurrentQuestionAnswerNodeId(
     return filledAnswerNodes[filledAnswerNodes.length - 1]?.id ?? null;
   }
 
-  const answerNodes = collectQuestionAnswerNodes(tree, questionNode.id);
-
-  return answerNodes[answerNodes.length - 1]?.id ?? null;
+  return null;
 }
 
 export function getCurrentQuestionAnswerNodeId(
