@@ -127,7 +127,7 @@ export function resolveQuestionCurrentAnswerNodeId(
     }
   }
 
-  return answerNodes[answerNodes.length - 1]?.id ?? null;
+  return null;
 }
 
 export function buildQuestionBlockData(
