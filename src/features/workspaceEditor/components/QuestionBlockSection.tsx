@@ -18,7 +18,7 @@ import CollapsedLearningNodeSummary, {
   buildCollapsedLearningNodeSummaryModel,
 } from './CollapsedLearningNodeSummary';
 import type { MainViewNodeProps } from './mainViewTypes';
-import EditableNodeCard from './EditableNodeCard';
+import DocumentNodeSection from './DocumentNodeSection';
 import LearningActionPanel, { type LearningActionSection } from './LearningActionPanel';
 
 type QuestionBlockSectionProps = MainViewNodeProps & {
@@ -202,7 +202,7 @@ export default function QuestionBlockSection({
         : inlineActions;
 
     return (
-      <EditableNodeCard
+      <DocumentNodeSection
         actions={supportNodeActions}
         bodyCollapsed={isNodeBodyCollapsed(node.id)}
         collapsedSummary={
@@ -326,7 +326,7 @@ export default function QuestionBlockSection({
             <p className="workspace-kicker">当前回答</p>
           </div>
         ) : null}
-        <EditableNodeCard
+        <DocumentNodeSection
           actions={answerActions}
           bodyCollapsed={isNodeBodyCollapsed(answerGroup.answer.id)}
           collapsedSummary={
@@ -414,7 +414,7 @@ export default function QuestionBlockSection({
         data-testid={`question-block-summary-group-${summaryGroup.summary.id}`}
         key={summaryGroup.summary.id}
       >
-        <EditableNodeCard
+        <DocumentNodeSection
           actions={summaryActions}
           bodyCollapsed={isNodeBodyCollapsed(summaryGroup.summary.id)}
           collapsedSummary={
@@ -490,7 +490,7 @@ export default function QuestionBlockSection({
       </div>
       {isCollapsed ? null : (
         <div className="workspace-questionBlockStack">
-          <EditableNodeCard
+          <DocumentNodeSection
             depth={depth}
             isInteractionLocked={isInteractionLocked}
             nodeId={question.id}

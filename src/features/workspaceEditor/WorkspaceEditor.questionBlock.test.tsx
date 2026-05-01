@@ -37,6 +37,93 @@ test.each([
   ).toHaveAttribute('data-active', 'false');
 });
 
+test('clicking an unselected content body enters editing without an explicit preselect and keeps node actions', async () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+  });
+
+  expect(screen.queryByLabelText('第一版回答 内容')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId('editor-node-content-display-answer-first'));
+
+  await waitFor(() => {
+    expect(screen.getByLabelText('第一版回答 内容')).toBeInTheDocument();
+  });
+
+  expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+  expect(screen.getByTestId('node-actions-answer-first')).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('node-actions-answer-first')).getByRole('button', {
+      name: '生成追问',
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('node-actions-answer-first')).getByRole('button', {
+      name: '设为当前回答',
+    }),
+  ).toBeInTheDocument();
+});
+
+test('keeps question and plan-step titles visible while untitled content nodes reveal 添加标题 only when active', async () => {
+  const snapshot = createQuestionBlockSnapshot();
+  const questionNode = snapshot.tree.nodes['question-main'];
+  const planStepNode = snapshot.tree.nodes['step-question-block'];
+  const answerNode = snapshot.tree.nodes['answer-first'];
+
+  if (
+    questionNode?.type !== 'question' ||
+    planStepNode?.type !== 'plan-step' ||
+    answerNode?.type !== 'answer'
+  ) {
+    throw new Error(
+      'Expected question-main, step-question-block, and answer-first to exist.',
+    );
+  }
+
+  questionNode.title = ' ';
+  planStepNode.title = ' ';
+  answerNode.title = ' ';
+
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+    initialSnapshot: snapshot,
+  });
+
+  expect(screen.getByLabelText('问题 标题')).toBeInTheDocument();
+  expect(screen.getByText('填写步骤标题')).toBeInTheDocument();
+  expect(
+    screen.getByTestId('editor-node-title-display-judgment-first-latest'),
+  ).toHaveTextContent('第一版最新评估');
+
+  const answerCard = screen.getByTestId('editor-node-answer-first');
+
+  expect(
+    within(answerCard).queryByTestId('editor-node-title-display-answer-first'),
+  ).not.toBeInTheDocument();
+  expect(
+    within(answerCard).queryByTestId('editor-node-add-title-answer-first'),
+  ).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId('editor-node-content-display-answer-first'));
+
+  await waitFor(() => {
+    expect(
+      within(answerCard).getByTestId('editor-node-add-title-answer-first'),
+    ).toBeInTheDocument();
+  });
+
+  fireEvent.click(
+    within(answerCard).getByTestId('editor-node-add-title-answer-first'),
+  );
+
+  await waitFor(() => {
+    expect(screen.getByLabelText('回答 标题')).toBeInTheDocument();
+  });
+});
+
 test('shows question block actions only on the active block', () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
@@ -1373,7 +1460,7 @@ function getRenderedNodeIds(questionNodeId: string) {
   return Array.from(
     screen
       .getByTestId(`question-block-${questionNodeId}`)
-      .querySelectorAll('[data-testid^="editor-node-"]'),
+      .querySelectorAll('section[data-testid^="editor-node-"]'),
   )
     .map((element) => element.getAttribute('data-testid') ?? '')
     .filter((testId) => testId !== `editor-node-${questionNodeId}`)
