@@ -600,6 +600,23 @@
   gap: 0.75rem;
 }
 
+.workspace-nodeActionStack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.workspace-nodeActionSection {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.workspace-nodeActionSectionTitle {
+  margin: 0;
+  color: #0f766e;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .workspace-nodeInlineActions {
   padding: 0.95rem 1rem;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -735,6 +752,12 @@
   border: 1px solid rgba(13, 148, 136, 0.16);
   border-radius: 1rem;
   background: rgba(240, 253, 250, 0.92);
+}
+
+.workspace-questionBlockActions .workspace-nodeActionSection + .workspace-nodeActionSection,
+.workspace-nodeInlineActions .workspace-nodeActionSection + .workspace-nodeActionSection {
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
 }
 
 .workspace-questionBlockPrimary {

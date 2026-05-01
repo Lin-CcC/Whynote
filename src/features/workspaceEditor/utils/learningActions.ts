@@ -95,7 +95,7 @@ function getCandidateActionIds(
             'simplify-scaffold',
             'add-example',
             'insert-question',
-            'insert-scaffold',
+            'insert-summary',
           ]
         : ['insert-answer', 'insert-summary', 'insert-judgment'];
     case 'judgment':
@@ -225,6 +225,19 @@ function resolveSummaryPlacement(
   tree: NodeTree,
   selectedNode: TreeNode,
 ): LearningActionPlacement | null {
+  if (selectedNode.type === 'summary' && isScaffoldSummaryNode(tree, selectedNode)) {
+    if (selectedNode.parentId === null) {
+      return null;
+    }
+
+    return {
+      insertIndex: selectedNode.order + 1,
+      nodeType: 'summary',
+      parentNodeId: selectedNode.parentId,
+      title: '新总结',
+    };
+  }
+
   const questionNode = getQuestionContextNode(tree, selectedNode);
 
   if (!questionNode) {
@@ -364,7 +377,7 @@ function getLearningActionLabel(actionId: LearningActionId) {
     case 'insert-scaffold':
       return '插入铺垫 / 讲解';
     case 'rephrase-scaffold':
-      return '换个说法解释';
+      return '换个说法';
     case 'simplify-scaffold':
       return '更基础一点';
     case 'add-example':
@@ -417,6 +430,10 @@ function buildLearningActionHint(
         ? '默认接在当前回答后方。'
         : '默认回到当前问题的回答区。';
     case 'insert-summary':
+      if (selectedNode.type === 'summary' && isScaffoldSummaryNode(tree, selectedNode)) {
+        return '默认接在当前铺垫后方，作为这一段讲解的继续收束。';
+      }
+
       return selectedNode.type === 'summary'
         ? '默认接到当前问题链条尾部，不再插回中间。'
         : '默认接到当前问题链条尾部，作为这一段的收束。';

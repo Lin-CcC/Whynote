@@ -90,7 +90,7 @@ test.each([
   'summary-manual',
   'judgment-summary-latest',
 ])(
-  'keeps the full active-block action surface reachable from %s',
+  'keeps the active question-block action surface reachable from %s',
   (selectedNodeId) => {
     renderQuestionBlockEditor({
       initialSelectedNodeId: selectedNodeId,
@@ -100,9 +100,6 @@ test.each([
       'question-block-actions-question-main',
     );
 
-    expect(
-      within(mainBlockActions).getByRole('button', { name: '插入回答' }),
-    ).toBeInTheDocument();
     expect(
       within(mainBlockActions).getByRole('button', { name: '生成追问' }),
     ).toBeInTheDocument();
@@ -115,8 +112,73 @@ test.each([
     expect(
       within(mainBlockActions).getByRole('button', { name: '插入总结' }),
     ).toBeInTheDocument();
+    expect(
+      within(mainBlockActions).queryByRole('button', { name: '直接回答当前问题' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(mainBlockActions).getByRole('button', { name: '插入回答' }),
+    ).toBeInTheDocument();
   },
 );
+
+test.each([
+  {
+    actionPanelTestId: 'node-actions-answer-first',
+    expectedButtons: ['继续修改', '删除', '设为当前回答'],
+    selectedNodeId: 'answer-first',
+  },
+  {
+    actionPanelTestId: 'node-actions-judgment-first-latest',
+    expectedButtons: ['继续修改', '删除'],
+    selectedNodeId: 'judgment-first-latest',
+  },
+  {
+    actionPanelTestId: 'node-actions-summary-first-latest',
+    expectedButtons: ['继续修改', '删除', '回到当前回答继续修改'],
+    selectedNodeId: 'summary-first-latest',
+  },
+  {
+    actionPanelTestId: 'node-actions-summary-manual',
+    expectedButtons: ['继续修改', '删除', '检查这个总结'],
+    selectedNodeId: 'summary-manual',
+  },
+])(
+  'shows common node actions and retained node-specific actions on $selectedNodeId',
+  ({ actionPanelTestId, expectedButtons, selectedNodeId }) => {
+    renderQuestionBlockEditor({
+      initialSelectedNodeId: selectedNodeId,
+    });
+
+    const actionPanel = screen.getByTestId(actionPanelTestId);
+
+    for (const buttonLabel of expectedButtons) {
+      expect(
+        within(actionPanel).getByRole('button', { name: buttonLabel }),
+      ).toBeInTheDocument();
+    }
+  },
+);
+
+test('keeps the current answer reevaluation action on the selected current answer', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'answer-second',
+  });
+
+  const actionPanel = screen.getByTestId('node-actions-answer-second');
+
+  expect(
+    within(actionPanel).getByRole('button', { name: '继续修改' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '删除' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '重新评估当前回答' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).queryByRole('button', { name: '设为当前回答' }),
+  ).not.toBeInTheDocument();
+});
 
 test.each([
   'answer-first',
@@ -227,9 +289,10 @@ test('currentAnswerId only changes emphasis and does not reorder answer groups',
     screen.getByTestId('question-block-answer-group-answer-second'),
   ).toHaveAttribute('data-current-answer', 'true');
 
+  fireEvent.click(screen.getByTestId('editor-node-answer-first'));
   fireEvent.click(
     within(
-      screen.getByTestId('question-block-answer-group-answer-first'),
+      screen.getByTestId('node-actions-answer-first'),
     ).getByRole('button', {
       name: '设为当前回答',
     }),

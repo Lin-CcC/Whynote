@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import type { NodeTree } from '../../nodeDomain';
 import type {
+  LearningActionId,
   NodeContentPatch,
   WorkspaceEditorNodeRenderContext,
   WorkspaceViewState,
@@ -18,13 +19,10 @@ export interface MainViewNodeProps {
   onGenerateFollowUpQuestion?: (sourceNodeId: string) => void;
   onGenerateSummary?: (sourceNodeId: string) => void;
   onInsertAnswerForQuestion: (questionNodeId: string) => void;
-  onInsertFollowUpQuestion: (
-    questionNodeId: string,
-    options?: {
-      sourceNodeId?: string | null;
-    },
-  ) => void;
-  onInsertSummaryForQuestion: (questionNodeId: string) => void;
+  onInsertFollowUpQuestion: (sourceNodeId: string) => void;
+  onInsertSummaryForNode: (sourceNodeId: string) => void;
+  onDeleteNode: () => void;
+  onRunLearningAction: (actionId: LearningActionId) => void;
   onSelectNode: (nodeId: string) => void;
   onSetCurrentAnswer: (questionNodeId: string, answerNodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;

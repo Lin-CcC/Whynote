@@ -437,7 +437,12 @@ export function createWorkspaceRuntimeService(
         createdNodeId,
         request,
       );
-      const nextSnapshot = createSnapshot(nextTreeWithSourceContext, snapshot);
+      const nextTreeWithSummaryKind = applySummaryKindForPlacement(
+        nextTreeWithSourceContext,
+        createdNodeId,
+        request,
+      );
+      const nextSnapshot = createSnapshot(nextTreeWithSummaryKind, snapshot);
 
       return {
         snapshot: nextSnapshot,
@@ -696,6 +701,38 @@ function applyQuestionSourceContext(
     title: sourceNode.title,
     updatedAt: sourceNode.updatedAt,
   };
+
+  return nextTree;
+}
+
+function applySummaryKindForPlacement(
+  tree: NodeTree,
+  createdNodeId: string,
+  request: WorkspaceEditorLearningActionRequest,
+) {
+  if (request.actionId !== 'insert-summary') {
+    return tree;
+  }
+
+  const createdNode = tree.nodes[createdNodeId];
+  const parentNode = tree.nodes[request.placement.parentNodeId];
+
+  if (createdNode?.type !== 'summary' || parentNode?.type !== 'plan-step') {
+    return tree;
+  }
+
+  if (createdNode.summaryKind === 'scaffold') {
+    return tree;
+  }
+
+  const nextTree = cloneNodeTree(tree);
+  const nextSummaryNode = getNodeOrThrow(nextTree, createdNodeId);
+
+  if (nextSummaryNode.type !== 'summary') {
+    return tree;
+  }
+
+  nextSummaryNode.summaryKind = 'scaffold';
 
   return nextTree;
 }

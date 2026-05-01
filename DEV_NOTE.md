@@ -308,6 +308,15 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - 如果焦点在文本编辑控件内，`Delete` 必须继续只处理文本删除，不得提升成结构删除动作。
 - 快捷键删除继续复用现有删除入口与保护逻辑；这轮只补最小删除快捷键，不额外扩展成完整快捷键系统。
 
+### 35. 学习节点通用动作模型
+
+- 只要是“有具体内容的学习节点”，默认都应具备一组统一的通用推进动作：`生成追问 / 插入追问 / 生成总结 / 插入总结 / 继续修改 / 删除`。当前至少覆盖 `question / answer / judgment / answer-closure summary / manual summary / scaffold summary`。
+- `question` 仍可保留最完整主动作，但不能再是唯一的完整动作节点；当用户选中 `answer / judgment / 答案解析 / 手写总结 / scaffold summary` 时，主路径仍然必须可继续追问、总结、修改和删除。
+- `生成追问 / 生成总结` 明确属于 AI 动作，用于起草 follow-up question 或阶段性 summary；`插入追问 / 插入总结` 明确属于手动动作，只插空节点，不再混入 AI 草稿语义。
+- `insert-summary` 的手动语义依旧只是“插入一条空 summary 节点，由用户自己写”；如果插入位置在 `plan-step` 的铺垫区，则仍落成 `summaryKind: scaffold`，以维持铺垫语义，而不是退化成 question 闭环里的手写总结。
+- 从具体内容节点发起追问时，必须把最小来源上下文写进新 question：至少保存 `nodeId / nodeType / title / content / updatedAt`；后续 runtime 组 prompt 时优先读取 live source node，节点失效时才退回快照。
+- 主视图动作展示默认分两层：question block 负责“通用推进动作”，节点卡片负责“通用节点动作 + 节点专属动作”；避免把 8 到 10 个同权重按钮平铺到同一层。
+
 ## 后续需要重新评估这些决策的触发条件
 
 - 需要公开注册或公开商用

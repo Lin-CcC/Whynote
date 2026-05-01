@@ -1,8 +1,9 @@
 import { Fragment } from 'react';
 
-import { getNodeOrThrow, type TreeNode } from '../../nodeDomain';
+import { getNodeOrThrow, isScaffoldSummaryNode, type TreeNode } from '../../nodeDomain';
 import { getChildNodes } from '../utils/treeSelectors';
 import EditableNodeCard from './EditableNodeCard';
+import LearningActionPanel from './LearningActionPanel';
 import type { MainViewNodeProps } from './mainViewTypes';
 import QuestionBlockSection from './QuestionBlockSection';
 
@@ -38,6 +39,7 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
     selectNode: props.onSelectNode,
     tree,
   });
+  const selectedNodeActions = buildSelectedNodeActions();
   const bodyCollapsed =
     supportsNodeBodyCollapse(node) &&
     props.workspaceViewState.collapsedNodeBodyIds.includes(node.id);
@@ -54,7 +56,7 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
 
   return (
     <EditableNodeCard
-      actions={inlineActions}
+      actions={selectedNodeActions ?? inlineActions}
       bodyCollapsed={bodyCollapsed}
       depth={depth}
       isInteractionLocked={props.isInteractionLocked}
@@ -89,6 +91,94 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
       ))}
     </EditableNodeCard>
   );
+
+  function buildSelectedNodeActions() {
+    if (node.id !== props.selectedNodeId || !isScaffoldSummaryNode(tree, node)) {
+      return null;
+    }
+
+    return (
+      <LearningActionPanel
+        sections={[
+          {
+            buttons: [
+              ...(props.onGenerateFollowUpQuestion
+                ? [
+                    {
+                      disabled: props.isInteractionLocked,
+                      label: '生成追问',
+                      onClick: () => props.onGenerateFollowUpQuestion?.(node.id),
+                    },
+                  ]
+                : []),
+              {
+                disabled: props.isInteractionLocked,
+                label: '插入追问',
+                onClick: () => props.onInsertFollowUpQuestion(node.id),
+              },
+              ...(props.onGenerateSummary
+                ? [
+                    {
+                      disabled: props.isInteractionLocked,
+                      label: '生成总结',
+                      onClick: () => props.onGenerateSummary?.(node.id),
+                    },
+                  ]
+                : []),
+              {
+                disabled: props.isInteractionLocked,
+                label: '插入总结',
+                onClick: () => props.onInsertSummaryForNode(node.id),
+              },
+            ],
+            title: '通用推进动作',
+          },
+          {
+            buttons: [
+              {
+                disabled: props.isInteractionLocked,
+                label: '继续修改',
+                onClick: () => {
+                  if (bodyCollapsed) {
+                    toggleNodeBodyCollapsed();
+                  }
+
+                  props.onSelectNode(node.id);
+                },
+              },
+              {
+                disabled: props.isInteractionLocked,
+                label: '删除',
+                onClick: props.onDeleteNode,
+              },
+            ],
+            title: '通用节点动作',
+          },
+          {
+            buttons: [
+              {
+                disabled: props.isInteractionLocked,
+                label: '换个说法',
+                onClick: () => props.onRunLearningAction('rephrase-scaffold'),
+              },
+              {
+                disabled: props.isInteractionLocked,
+                label: '更基础一点',
+                onClick: () => props.onRunLearningAction('simplify-scaffold'),
+              },
+              {
+                disabled: props.isInteractionLocked,
+                label: '举个例子',
+                onClick: () => props.onRunLearningAction('add-example'),
+              },
+            ],
+            title: '节点专属动作',
+          },
+        ]}
+        testId={`node-actions-${node.id}`}
+      />
+    );
+  }
 }
 
 function supportsNodeBodyCollapse(node: TreeNode) {

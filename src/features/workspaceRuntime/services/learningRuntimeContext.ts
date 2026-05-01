@@ -326,8 +326,10 @@ export function getJudgmentInlineActionContext(
     questionNode.id,
     judgmentNode.id,
   );
-  const summaryNodeId = answerNodeId
-    ? getQuestionAnswerClosureSummaryNodeId(tree, questionNode.id, answerNodeId)
+  const currentAnswerNodeId = getCurrentQuestionAnswerNodeId(tree, questionNode.id);
+  const actionAnswerNodeId = currentAnswerNodeId ?? answerNodeId;
+  const summaryNodeId = actionAnswerNodeId
+    ? getQuestionAnswerClosureSummaryNodeId(tree, questionNode.id, actionAnswerNodeId)
     : null;
   const answerNode =
     answerNodeId && tree.nodes[answerNodeId]?.type === 'answer'
@@ -335,7 +337,7 @@ export function getJudgmentInlineActionContext(
       : null;
 
   return {
-    answerNodeId,
+    answerNodeId: actionAnswerNodeId,
     hint: buildJudgmentHint(judgmentNode, questionNode, answerNode),
     questionNodeId: questionNode.id,
     summaryNodeId,

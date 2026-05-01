@@ -94,9 +94,11 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           onEvaluateSummary={props.onEvaluateSummary}
           onGenerateFollowUpQuestion={props.onGenerateFollowUpQuestion}
           onGenerateSummary={props.onGenerateSummary}
+          onDeleteNode={workspaceEditor.deleteSelection}
           onInsertAnswerForQuestion={workspaceEditor.insertAnswerForQuestion}
           onInsertFollowUpQuestion={workspaceEditor.insertFollowUpQuestion}
-          onInsertSummaryForQuestion={workspaceEditor.insertSummaryForQuestion}
+          onInsertSummaryForNode={workspaceEditor.insertSummaryForNode}
+          onRunLearningAction={workspaceEditor.runLearningAction}
           onSelectNode={workspaceEditor.selectNode}
           onSetCurrentAnswer={workspaceEditor.setCurrentAnswer}
           onUpdateNode={workspaceEditor.updateNode}

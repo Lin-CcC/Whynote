@@ -119,6 +119,15 @@
 - 先选中一个节点卡片，把焦点移到卡片外部非输入区域后按 `Delete`，确认删除动作会直接落到当前选中节点，并沿用现有删除确认 / 保护逻辑。
 - 再把焦点放进同一节点的标题输入框、正文 textarea、select 或 contenteditable 区域里按 `Delete`，确认只删除文本，不会触发结构删除。
 
+### 12. 通用学习节点动作补全
+
+- 在同一个 question block 里依次选中 `answer / judgment / 答案解析 / 手写总结`，确认 block 级动作始终保留 `生成追问 / 插入追问 / 生成总结 / 插入总结`，不需要重新点回 question 本体。
+- 选中 `question` 本体时，确认除了通用推进动作外，还能看到 `直接回答当前问题 / 插入回答`；切到 answer、judgment、答案解析、手写总结后，这两个 question 专属动作应收起，避免按钮噪音。
+- 选中 `answer` 时，节点卡片应保留 `重新评估当前回答` 或 `设为当前回答`；选中 `manual summary` 时应保留 `检查这个总结`；选中 `scaffold summary` 时应保留 `换个说法 / 更基础一点 / 举个例子`。
+- 在 `judgment / 答案解析 / 手写总结 / scaffold summary` 上分别点击 `生成追问` 与 `插入追问`，再对新追问执行 `直接回答当前问题`，确认 prompt 与主视图提示都还能恢复这条来源节点，而不是退化成没有来源的空泛问题。
+- 验证 AI / 手动分工：`生成追问` 会起一条 AI follow-up draft，`插入追问` 只插空 question；`生成总结` 会起一条 AI summary draft，`插入总结` 只插空 summary。`answer-closure summary` 不应与“用户主动要求 AI 总结”混成同一语义。
+- 分别在 `answer / judgment / 答案解析 / 手写总结 / scaffold summary` 上确认 `删除` 按钮可达；点击按钮删除与按 `Delete` 快捷键删除都应复用同一套现有逻辑。
+
 ## 自动化覆盖基线
 
 - 单元 / 集成测试：Vitest
