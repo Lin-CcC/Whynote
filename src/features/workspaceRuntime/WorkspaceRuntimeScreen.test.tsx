@@ -256,13 +256,27 @@ test('restores question block collapse state after remounting the runtime screen
       },
     ),
   );
+  fireEvent.click(screen.getByTestId('editor-node-step-runtime-question-block'));
+  await waitFor(() => {
+    expect(
+      screen.getByTestId('editor-node-step-runtime-question-block'),
+    ).toHaveAttribute('data-node-selected', 'true');
+  });
+  fireEvent.mouseEnter(screen.getByTestId('editor-node-question-runtime-main'));
   fireEvent.click(
-    within(
-      screen.getByTestId('question-block-question-runtime-main'),
-    ).getByRole('button', {
-      name: '收起 block',
-    }),
+    within(screen.getByTestId('editor-node-question-runtime-main')).getByRole(
+      'button',
+      {
+        name: '收起问题',
+      },
+    ),
   );
+
+  await waitFor(() => {
+    expect(
+      screen.getByTestId('question-block-question-runtime-main'),
+    ).toHaveAttribute('data-collapsed', 'true');
+  });
 
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
@@ -273,10 +287,14 @@ test('restores question block collapse state after remounting the runtime screen
 
   expect(questionBlock).toHaveAttribute('data-collapsed', 'true');
 
+  fireEvent.mouseEnter(screen.getByTestId('editor-node-question-runtime-main'));
   fireEvent.click(
-    within(questionBlock).getByRole('button', {
-      name: '展开 block',
-    }),
+    within(screen.getByTestId('editor-node-question-runtime-main')).getByRole(
+      'button',
+      {
+        name: '展开问题',
+      },
+    ),
   );
 
   expect(

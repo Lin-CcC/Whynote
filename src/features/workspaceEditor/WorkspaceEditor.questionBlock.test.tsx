@@ -160,7 +160,6 @@ test('renders the selected question toolbar on the question title row and keeps 
   });
 
   const mainQuestionNode = screen.getByTestId('editor-node-question-main');
-  const mainQuestionHeader = screen.getByTestId('question-block-header-question-main');
   const mainBlockActions = screen.getByTestId(
     'question-block-actions-question-main',
   );
@@ -170,7 +169,11 @@ test('renders the selected question toolbar on the question title row and keeps 
   const mainQuestionTitleRow = mainQuestionNode.querySelector('.workspace-nodeTitleRow');
 
   expect(mainQuestionTitleRow).not.toBeNull();
-  expect(mainQuestionHeader).not.toContainElement(mainBlockActions);
+  expect(
+    screen.getByTestId('question-block-question-main').querySelector(
+      '.workspace-questionBlockHeader',
+    ),
+  ).toBeNull();
   expect(mainQuestionTitleRow).toContainElement(mainBlockActions);
   expect(screen.queryByText('已有当前回答')).not.toBeInTheDocument();
   expect(screen.queryByText('还没有当前回答')).not.toBeInTheDocument();
@@ -257,7 +260,7 @@ test('clicking the question body enters the light editing state without moving t
     initialSelectedNodeId: 'question-main',
   });
 
-  const questionHeader = screen.getByTestId('question-block-header-question-main');
+  const questionNode = screen.getByTestId('editor-node-question-main');
   const questionToolbar = screen.getByTestId('question-block-actions-question-main');
 
   fireEvent.click(screen.getByLabelText('主问题 内容'));
@@ -275,7 +278,37 @@ test('clicking the question body enters the light editing state without moving t
     'true',
   );
   expect(questionToolbar).toHaveAttribute('data-visible', 'true');
-  expect(questionHeader).not.toContainElement(questionToolbar);
+  expect(questionNode.querySelector('.workspace-nodeTitleRow')).toContainElement(
+    questionToolbar,
+  );
+  expect(
+    screen.getByTestId('question-block-question-main').querySelector(
+      '.workspace-questionBlockHeader',
+    ),
+  ).toBeNull();
+});
+
+test('keeps question, answer, judgment, explanation, summary, and summary-check nodes in a single-shell structure', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-secondary',
+  });
+
+  const questionBlock = screen.getByTestId('question-block-question-main');
+
+  expect(questionBlock.querySelector('.workspace-questionBlockHeader')).toBeNull();
+  expect(
+    screen
+      .getByTestId('question-block-answer-group-answer-second')
+      .querySelector('.workspace-questionBlockSectionHeader'),
+  ).toBeNull();
+
+  expectSingleShellNode('question-main', '主问题');
+  expectSingleShellNode('answer-first', '第一版回答');
+  expectSingleShellNode('answer-second', '第二版回答');
+  expectSingleShellNode('judgment-first-latest', '第一版最新评估');
+  expectSingleShellNode('summary-first-latest', '第一版最新解析');
+  expectSingleShellNode('summary-manual', '我的总结');
+  expectSingleShellNode('judgment-summary-latest', '最新总结检查结果');
 });
 
 test.each([
@@ -949,7 +982,7 @@ test('renders follow-up questions as indented subsections and lets the child blo
   ).not.toBeInTheDocument();
 });
 
-test('tracks block, body, and group-local history collapse in workspace view state', () => {
+test('tracks block, body, and group-local history collapse in workspace view state', async () => {
   const viewStateChanges: WorkspaceViewState[] = [];
 
   renderQuestionBlockEditor({
@@ -1002,24 +1035,33 @@ test('tracks block, body, and group-local history collapse in workspace view sta
     screen.getByTestId('editor-node-judgment-summary-old'),
   ).toBeInTheDocument();
 
+  fireEvent.click(screen.getByTestId('editor-node-question-main'));
+
+  await waitFor(() => {
+    expect(
+      screen.getByTestId('question-block-question-main'),
+    ).toHaveAttribute('data-question-selected', 'true');
+  });
+
   fireEvent.click(
-    within(screen.getByTestId('question-block-question-main')).getAllByRole(
-      'button',
-      {
-        name: '收起 block',
-      },
-    )[0],
+    within(screen.getByTestId('editor-node-question-main')).getByRole('button', {
+      name: '收起问题',
+    }),
   );
 
-  expect(viewStateChanges.at(-1)?.collapsedQuestionBlockIds).toContain(
-    'question-main',
-  );
-  expect(
-    screen.getByTestId('question-block-question-main'),
-  ).toHaveAttribute('data-collapsed', 'true');
-  expect(
-    screen.queryByTestId('question-block-answer-group-answer-first'),
-  ).not.toBeInTheDocument();
+  await waitFor(() => {
+    expect(
+      viewStateChanges.some((state) =>
+        state.collapsedQuestionBlockIds.includes('question-main'),
+      ),
+    ).toBe(true);
+    expect(
+      screen.getByTestId('question-block-question-main'),
+    ).toHaveAttribute('data-collapsed', 'true');
+    expect(
+      screen.queryByTestId('question-block-answer-group-answer-first'),
+    ).not.toBeInTheDocument();
+  });
 });
 
 test('keeps the expanded plan-step rendered as a lightweight section divider shell', () => {
@@ -1027,13 +1069,27 @@ test('keeps the expanded plan-step rendered as a lightweight section divider she
     initialSelectedNodeId: 'step-question-block',
   });
 
-  expect(screen.getByTestId('editor-node-step-question-block')).toHaveAttribute(
+  const planStepNode = screen.getByTestId('editor-node-step-question-block');
+  const planStepHeader = planStepNode.querySelector('.workspace-nodeHeader');
+  const titleControls = planStepNode.querySelector('.workspace-nodeTitleControls');
+
+  expect(planStepNode).toHaveAttribute(
     'data-node-shell',
     'section-divider',
   );
-  expect(screen.getByTestId('editor-node-step-question-block')).toHaveAttribute(
+  expect(planStepNode).toHaveAttribute(
     'data-node-rail',
     'separator',
+  );
+  expect(planStepHeader).not.toBeNull();
+  expect(planStepHeader?.querySelectorAll('.workspace-nodeTitleRow')).toHaveLength(1);
+  expect(planStepNode.querySelector('.workspace-planStepCollapsedTitle')).toBeNull();
+  expect(titleControls).not.toBeNull();
+  expect(titleControls).toContainElement(
+    within(planStepNode).getByTestId('plan-step-status-trigger-step-question-block'),
+  );
+  expect(titleControls).toContainElement(
+    within(planStepNode).getByRole('button', { name: '收起步骤' }),
   );
 });
 
@@ -1159,9 +1215,10 @@ test('restores inner question block, body, and history state after collapsing an
     'true',
   );
 
+  fireEvent.mouseEnter(screen.getByTestId('editor-node-question-main'));
   fireEvent.click(
-    within(screen.getByTestId('question-block-question-main')).getByRole('button', {
-      name: '展开 block',
+    within(screen.getByTestId('editor-node-question-main')).getByRole('button', {
+      name: '展开问题',
     }),
   );
 
@@ -1761,6 +1818,13 @@ function openToolbarMenu(toolbar: HTMLElement, menuLabel: string) {
 
 function openOverflowMenu(toolbar: HTMLElement) {
   return openToolbarMenu(toolbar, '⋯');
+}
+
+function expectSingleShellNode(nodeId: string, title: string) {
+  const node = screen.getByTestId(`editor-node-${nodeId}`);
+
+  expect(node.querySelectorAll('.workspace-nodeTitleRow')).toHaveLength(1);
+  expect(within(node).getAllByText(title)).toHaveLength(1);
 }
 
 function getRenderedNodeIds(questionNodeId: string) {

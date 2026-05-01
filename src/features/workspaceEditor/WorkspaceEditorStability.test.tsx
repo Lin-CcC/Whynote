@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { createWorkspaceSnapshot, type WorkspaceSnapshot } from '../nodeDomain';
 import WorkspaceEditor from './WorkspaceEditor';
+import workspaceEditorStyles from './workspaceEditor.css?inline';
 import { DEMO_SELECTED_NODE_ID } from './utils/createDemoWorkspace';
 
 test('keeps the selected textarea focused across consecutive input updates', async () => {
@@ -102,6 +103,24 @@ test('selects a node by clicking its card without requiring textarea focus first
   expect(node.querySelector('textarea')).toBeNull();
   expect(node).toHaveAttribute('data-node-frame-visible', 'true');
   expect(node).not.toHaveTextContent('编辑中');
+});
+
+test('keeps document node visibility changes free of transition-driven shell animations', () => {
+  expect(workspaceEditorStyles).not.toMatch(
+    /\.workspace-documentNode\s*\{[^}]*transition:/,
+  );
+  expect(workspaceEditorStyles).not.toMatch(
+    /\.workspace-nodeTitleToolbar\s*\{[^}]*transition:/,
+  );
+  expect(workspaceEditorStyles).not.toMatch(
+    /\.workspace-nodeActionToolbar\s*\{[^}]*transition:/,
+  );
+  expect(workspaceEditorStyles).not.toMatch(
+    /\.workspace-nodeTitleToolbar\s*\{[^}]*animation:/,
+  );
+  expect(workspaceEditorStyles).not.toMatch(
+    /\.workspace-nodeActionToolbar\s*\{[^}]*animation:/,
+  );
 });
 
 test('keeps the title input focused while side panels reflect title edits', async () => {

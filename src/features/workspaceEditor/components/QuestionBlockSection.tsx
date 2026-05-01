@@ -9,7 +9,6 @@ import {
   type QuestionBlockSummaryGroup,
   type TreeNode,
 } from '../../nodeDomain';
-import { getDisplayTitleForNode } from '../utils/treeSelectors';
 import {
   getAnswerHistorySectionId,
   getSummaryHistorySectionId,
@@ -380,11 +379,6 @@ export default function QuestionBlockSection({
         data-testid={`question-block-answer-group-${answerGroup.answer.id}`}
         key={answerGroup.answer.id}
       >
-        {options.isCurrent ? (
-          <div className="workspace-questionBlockSectionHeader">
-            <p className="workspace-kicker">当前回答</p>
-          </div>
-        ) : null}
         <DocumentNodeSection
           actions={answerActions}
           bodyCollapsed={isNodeBodyCollapsed(answerGroup.answer.id)}
@@ -543,47 +537,37 @@ export default function QuestionBlockSection({
       data-question-selected={questionIsSelected}
       data-testid={`question-block-${question.id}`}
     >
-      <div
-        className="workspace-questionBlockHeader"
-        data-testid={`question-block-header-${question.id}`}
-      >
-        <div>
-          <p className="workspace-kicker">问题</p>
-          <h3 className="workspace-questionBlockTitle">
-            {getDisplayTitleForNode(tree, question)}
-          </h3>
-        </div>
-        <div className="workspace-questionBlockHeaderActions">
+      <DocumentNodeSection
+        actions={buildQuestionToolbar()}
+        bodyCollapsed={isCollapsed}
+        bodyCollapsedHint="当前问题已折叠，展开后继续查看正文和后续内容。"
+        depth={depth}
+        headerControls={
           <button
-            className="workspace-historyToggle"
+            className="workspace-nodeBodyToggle"
             disabled={isInteractionLocked}
             onClick={toggleQuestionBlockCollapsed}
             type="button"
           >
-            {isCollapsed ? '展开 block' : '收起 block'}
+            {isCollapsed ? '展开问题' : '收起问题'}
           </button>
-        </div>
-      </div>
-      {isCollapsed ? null : (
-        <div className="workspace-questionBlockStack">
-          <DocumentNodeSection
-            actions={buildQuestionToolbar()}
-            depth={depth}
-            isInteractionLocked={isInteractionLocked}
-            nodeId={question.id}
-            onSelectNode={onSelectNode}
-            onUpdateNode={onUpdateNode}
-            registerNodeElement={registerNodeElement}
-            selectedNodeId={selectedNodeId}
-            tree={tree}
-          />
-          {questionBlock.entries.map((entry) => (
+        }
+        isInteractionLocked={isInteractionLocked}
+        keepHeaderVisibleWhenBodyCollapsed={true}
+        nodeId={question.id}
+        onSelectNode={onSelectNode}
+        onUpdateNode={onUpdateNode}
+        registerNodeElement={registerNodeElement}
+        selectedNodeId={selectedNodeId}
+        tree={tree}
+      />
+      {isCollapsed
+        ? null
+        : questionBlock.entries.map((entry) => (
             <Fragment key={getQuestionBlockEntryKey(entry)}>
               {renderQuestionBlockEntry(entry)}
             </Fragment>
           ))}
-        </div>
-      )}
     </section>
   );
 
