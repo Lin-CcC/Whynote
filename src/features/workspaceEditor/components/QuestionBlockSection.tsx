@@ -537,10 +537,12 @@ export default function QuestionBlockSection({
 
   return (
     <section
+      data-block-chrome="document"
       className="workspace-questionBlock"
       data-active={isActive}
       data-collapsed={isCollapsed}
       data-question-level={isFollowUpQuestion ? 'follow-up' : 'root'}
+      data-question-rail="none"
       data-question-selected={questionIsSelected}
       data-testid={`question-block-${question.id}`}
     >
