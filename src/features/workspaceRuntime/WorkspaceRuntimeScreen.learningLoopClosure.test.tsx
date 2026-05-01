@@ -17,6 +17,11 @@ import {
   type WorkspaceSnapshot,
 } from '../nodeDomain';
 import WorkspaceRuntimeScreen from './WorkspaceRuntimeScreen';
+import {
+  findNodeByDisplayTitle,
+  getNodeByDisplayTitle,
+  selectNodeByTitle,
+} from './workspaceRuntimeTestUtils';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 
 const openedStorages: StructuredDataStorage[] = [];
@@ -64,6 +69,16 @@ function revealHistoryAnswer(nodeTestId: string) {
   return answerNode;
 }
 
+function openToolbarMenu(toolbar: HTMLElement, menuLabel: string) {
+  fireEvent.click(
+    within(toolbar).getByRole('button', {
+      name: menuLabel,
+    }),
+  );
+
+  return within(toolbar).getByRole('menu');
+}
+
 test('evaluates an incomplete answer into judgment, summary and follow-up question with persisted citations', async () => {
   const dependencies = await createPreloadedDependencies(
     createAnswerClosureSnapshot(),
@@ -96,7 +111,7 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   );
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
+  selectNodeByTitle('为什么状态更新会被批处理？');
   await waitFor(() => {
     expect(
       getAnswerEvaluationButton(),
@@ -105,18 +120,16 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   fireEvent.click(getAnswerEvaluationButton());
 
   expect(
-    await screen.findByDisplayValue('回答还不完整'),
+    await screen.findByLabelText('回答还不完整 标题'),
   ).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('标准理解'),
+    await screen.findByLabelText('标准理解 标题'),
   ).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('追问：还缺哪一步因果关系？'),
+    await screen.findByLabelText('追问：还缺哪一步因果关系？ 标题'),
   ).toBeInTheDocument();
   expect(
-    screen
-      .getByDisplayValue('回答草稿')
-      .closest('[data-testid^="editor-node-"]'),
+    getNodeByDisplayTitle('回答草稿'),
   ).toHaveAttribute('data-node-selected', 'true');
   expect(
     within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
@@ -124,12 +137,9 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
     }),
   ).toBeInTheDocument();
 
-  const summaryNode = screen
-    .getByDisplayValue('标准理解')
-    .closest('[data-testid^="editor-node-"]');
+  const summaryNode = getNodeByDisplayTitle('标准理解');
 
   expect(summaryNode).not.toBeNull();
-  expect(summaryNode).toHaveTextContent('答案解析');
 
   const savedSnapshot = await waitForSavedSnapshot(
     dependencies.structuredDataStorage,
@@ -165,7 +175,7 @@ test('evaluates an incomplete answer into judgment, summary and follow-up questi
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   expect(
-    await screen.findByDisplayValue('追问：还缺哪一步因果关系？'),
+    await screen.findByLabelText('追问：还缺哪一步因果关系？ 标题'),
   ).toBeInTheDocument();
 });
 
@@ -197,7 +207,7 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByLabelText('回答草稿 标题'));
+  selectNodeByTitle('回答草稿');
   await waitFor(() => {
     expect(
       getAnswerEvaluationButton(),
@@ -214,10 +224,10 @@ test('allows evaluating a leaf question while the answer node is selected', asyn
   fireEvent.click(getAnswerEvaluationButton());
 
   expect(
-    await screen.findByDisplayValue('回答还不完整'),
+    await screen.findByLabelText('回答还不完整 标题'),
   ).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('追问：还缺哪一步因果关系？'),
+    await screen.findByLabelText('追问：还缺哪一步因果关系？ 标题'),
   ).toBeInTheDocument();
   expect(
     within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
@@ -261,7 +271,7 @@ test('directly answers a hand-authored question and keeps the answer-revision pa
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByLabelText('手动问题 标题'));
+  selectNodeByTitle('手动问题');
 
   const callout = await screen.findByTestId('question-direct-answer-callout');
   const directAnswerButton = within(callout).getByRole('button', {
@@ -276,9 +286,7 @@ test('directly answers a hand-authored question and keeps the answer-revision pa
 
   fireEvent.click(directAnswerButton);
 
-  const answerTitleInput = await screen.findByDisplayValue('AI 回答草稿');
-
-  expect(answerTitleInput.closest('[data-testid^="editor-node-"]')).toHaveAttribute(
+  expect(await findNodeByDisplayTitle('AI 回答草稿')).toHaveAttribute(
     'data-node-selected',
     'true',
   );
@@ -293,9 +301,9 @@ test('directly answers a hand-authored question and keeps the answer-revision pa
   fireEvent.click(getAnswerEvaluationButton());
 
   expect(
-    await screen.findByDisplayValue('AI 回答还可再补'),
+    await screen.findByLabelText('AI 回答还可再补 标题'),
   ).toBeInTheDocument();
-  expect(await screen.findByDisplayValue('标准理解')).toBeInTheDocument();
+  expect(await screen.findByLabelText('标准理解 标题')).toBeInTheDocument();
 
   fireEvent.click(
     within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
@@ -304,9 +312,7 @@ test('directly answers a hand-authored question and keeps the answer-revision pa
   );
 
   expect(
-    screen
-      .getByDisplayValue('标准理解')
-      .closest('[data-testid^="editor-node-"]'),
+    getNodeByDisplayTitle('标准理解'),
   ).toHaveAttribute('data-node-selected', 'true');
 
   fireEvent.click(
@@ -315,9 +321,7 @@ test('directly answers a hand-authored question and keeps the answer-revision pa
     }),
   );
   expect(
-    screen
-      .getByDisplayValue('AI 回答草稿')
-      .closest('[data-testid^="editor-node-"]'),
+    getNodeByDisplayTitle('AI 回答草稿'),
   ).toHaveAttribute('data-node-selected', 'true');
 
   const savedSnapshot = await waitForSavedSnapshot(
@@ -350,7 +354,7 @@ test('directly answers a generated question without relying on question source',
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByLabelText('系统生成问题 标题'));
+  selectNodeByTitle('系统生成问题');
   fireEvent.click(
     within(await screen.findByTestId('question-direct-answer-callout')).getByRole(
       'button',
@@ -358,9 +362,7 @@ test('directly answers a generated question without relying on question source',
     ),
   );
 
-  const answerTitleInput = await screen.findByDisplayValue('系统问题 AI 回答');
-
-  expect(answerTitleInput.closest('[data-testid^="editor-node-"]')).toHaveAttribute(
+  expect(await findNodeByDisplayTitle('系统问题 AI 回答')).toHaveAttribute(
     'data-node-selected',
     'true',
   );
@@ -438,23 +440,21 @@ test.each([
     render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
     await screen.findByRole('heading', { name: '当前学习模块' });
 
-    fireEvent.focus(screen.getByLabelText(`${sourceTitle} 标题`));
+    selectNodeByTitle(sourceTitle);
     fireEvent.click(
       within(
-        screen.getByTestId('question-block-actions-question-follow-up-source'),
+        openToolbarMenu(
+          screen.getByTestId(`node-actions-${sourceNodeId}`),
+          '追问',
+        ),
       ).getByRole('button', {
         name: '生成追问',
       }),
     );
 
-    const followUpQuestionTitle = await screen.findByDisplayValue(
+    const followUpQuestionNode = await findNodeByDisplayTitle(
       '继续围绕具体内容追问',
     );
-    const followUpQuestionNode = followUpQuestionTitle.closest(
-      '[data-testid^="editor-node-"]',
-    );
-
-    expect(followUpQuestionNode).not.toBeNull();
     expect(followUpQuestionNode).toHaveTextContent(`追问围绕：来源`);
     expect(followUpQuestionNode).toHaveTextContent(sourceTitle);
 
@@ -466,7 +466,7 @@ test.each([
     );
 
     expect(
-      await screen.findByDisplayValue('追问回答草稿'),
+      await screen.findByLabelText('追问回答草稿 标题'),
     ).toBeInTheDocument();
     expect(observedLearningActionPrompt).toContain('学习动作：insert-answer');
     expect(observedLearningActionPrompt).toContain('追问来源上下文');
@@ -521,7 +521,7 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
+  selectNodeByTitle('为什么状态更新会被批处理？');
   await waitFor(() => {
     expect(
       getAnswerEvaluationButton(),
@@ -530,10 +530,10 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   fireEvent.click(getAnswerEvaluationButton());
 
   expect(
-    await screen.findByDisplayValue('已答到当前问题'),
+    await screen.findByLabelText('已答到当前问题 标题'),
   ).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('标准理解'),
+    await screen.findByLabelText('标准理解 标题'),
   ).toBeInTheDocument();
 
   const savedSnapshot = await waitForSavedSnapshot(
@@ -554,9 +554,7 @@ test('evaluates a sufficient answer into a closed question and promotes the step
     ),
   ).toBe(false);
   expect(
-    screen
-      .getByDisplayValue('标准理解')
-      .closest('[data-testid^="editor-node-"]'),
+    getNodeByDisplayTitle('标准理解'),
   ).toHaveAttribute('data-node-selected', 'true');
 });
 
@@ -609,21 +607,19 @@ test.each([
     render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
     await screen.findByRole('heading', { name: '当前学习模块' });
 
-    fireEvent.focus(screen.getByLabelText(`${sourceTitle} 标题`));
+    selectNodeByTitle(sourceTitle);
     fireEvent.click(
       within(
-        screen.getByTestId('question-block-actions-question-follow-up-source'),
+        openToolbarMenu(
+          screen.getByTestId(`node-actions-${sourceNodeId}`),
+          '追问',
+        ),
       ).getByRole('button', {
         name: '插入追问',
       }),
     );
 
-    const followUpQuestionTitle = await screen.findByDisplayValue('新追问');
-    const followUpQuestionNode = followUpQuestionTitle.closest(
-      '[data-testid^="editor-node-"]',
-    );
-
-    expect(followUpQuestionNode).not.toBeNull();
+    const followUpQuestionNode = await findNodeByDisplayTitle('新追问');
     expect(followUpQuestionNode).toHaveTextContent(`追问围绕：来源`);
     expect(followUpQuestionNode).toHaveTextContent(sourceTitle);
 
@@ -634,7 +630,7 @@ test.each([
       ),
     );
 
-    expect(await screen.findByDisplayValue('追问回答草稿')).toBeInTheDocument();
+    expect(await screen.findByLabelText('追问回答草稿 标题')).toBeInTheDocument();
     expect(observedLearningActionPrompt).toContain('学习动作：insert-answer');
     expect(observedLearningActionPrompt).toContain('追问来源上下文');
     expect(observedLearningActionPrompt).toContain(sourceType);
@@ -707,10 +703,13 @@ test.each([
     render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
     await screen.findByRole('heading', { name: '当前学习模块' });
 
-    fireEvent.focus(screen.getByLabelText('铺垫讲解 标题'));
+    selectNodeByTitle('铺垫讲解');
     fireEvent.click(
       within(
-        screen.getByTestId('node-actions-summary-follow-up-source-scaffold'),
+        openToolbarMenu(
+          screen.getByTestId('node-actions-summary-follow-up-source-scaffold'),
+          '追问',
+        ),
       ).getByRole('button', {
         name: actionLabel,
       }),
@@ -751,7 +750,7 @@ test.each([
       }),
     );
 
-    expect(await screen.findByDisplayValue('铺垫追问回答草稿')).toBeInTheDocument();
+    expect(await screen.findByLabelText('铺垫追问回答草稿 标题')).toBeInTheDocument();
     expect(observedLearningActionPrompt).toContain('学习动作：insert-answer');
     expect(observedLearningActionPrompt).toContain('追问来源上下文');
     expect(observedLearningActionPrompt).toContain('summary');
@@ -815,13 +814,12 @@ test('re-evaluates the question current answer instead of the selected old answe
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  const firstAnswerNode = revealHistoryAnswer('editor-node-answer-answer-closure');
-
-  fireEvent.focus(within(firstAnswerNode).getByLabelText('第一版回答 标题'));
+  revealHistoryAnswer('editor-node-answer-answer-closure');
+  selectNodeByTitle('第一版回答');
   fireEvent.click(getAnswerEvaluationButton());
 
   expect(
-    await screen.findByDisplayValue('第二版回答还不完整'),
+    await screen.findByLabelText('第二版回答还不完整 标题'),
   ).toBeInTheDocument();
   expect(observedQuestionClosurePrompt).toContain('当前回答：第二版回答');
   expect(observedQuestionClosurePrompt).toContain(
@@ -830,9 +828,7 @@ test('re-evaluates the question current answer instead of the selected old answe
   expect(observedQuestionClosurePrompt).not.toContain('当前回答：第一版回答');
   expect(observedQuestionClosurePrompt).not.toContain('因为 React 会先把更新合并起来。');
   expect(
-    screen
-      .getByDisplayValue('第二版回答')
-      .closest('[data-testid^="editor-node-"]'),
+    getNodeByDisplayTitle('第二版回答'),
   ).toHaveAttribute('data-node-selected', 'true');
 });
 
@@ -857,19 +853,22 @@ test('scopes generated summaries to the selected content node instead of silentl
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  const firstAnswerNode = revealHistoryAnswer('editor-node-answer-answer-closure');
-
-  fireEvent.focus(within(firstAnswerNode).getByLabelText('第一版回答 标题'));
+  revealHistoryAnswer('editor-node-answer-answer-closure');
+  selectNodeByTitle('第一版回答');
   const blockActions = await screen.findByTestId(
-    'question-block-actions-question-answer-closure',
+    'node-actions-answer-answer-closure',
   );
 
   await waitFor(() => {
     expect(
-      within(blockActions).getByRole('button', { name: '生成总结' }),
+      within(blockActions).getByRole('button', { name: '总结' }),
     ).toBeEnabled();
   });
-  fireEvent.click(within(blockActions).getByRole('button', { name: '生成总结' }));
+  fireEvent.click(
+    within(openToolbarMenu(blockActions, '总结')).getByRole('button', {
+      name: '生成总结',
+    }),
+  );
   await waitFor(() => {
     expect(observedLearningActionPrompt).toContain('现有回答');
   });
@@ -889,9 +888,8 @@ test('views the explanation that belongs to the question current answer round', 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  const firstAnswerNode = revealHistoryAnswer('editor-node-answer-answer-closure');
-
-  fireEvent.focus(within(firstAnswerNode).getByLabelText('第一版回答 标题'));
+  revealHistoryAnswer('editor-node-answer-answer-closure');
+  selectNodeByTitle('第一版回答');
   await waitFor(() => {
     expect(
       within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
@@ -906,17 +904,13 @@ test('views the explanation that belongs to the question current answer round', 
   );
 
   expect(
-    await screen.findByDisplayValue('标准理解：第二版回答'),
+    await screen.findByLabelText('标准理解：第二版回答 标题'),
   ).toBeInTheDocument();
   expect(
-    screen
-      .getByDisplayValue('标准理解：第二版回答')
-      .closest('[data-testid^="editor-node-"]'),
+    getNodeByDisplayTitle('标准理解：第二版回答'),
   ).toHaveAttribute('data-node-selected', 'true');
   expect(
-    screen
-      .getByDisplayValue('标准理解：第一版回答')
-      .closest('[data-testid^="editor-node-"]'),
+    getNodeByDisplayTitle('标准理解：第一版回答'),
   ).not.toHaveAttribute('data-node-selected', 'true');
 });
 
@@ -929,7 +923,7 @@ test('keeps judgment nodes actionable within the current answer revision path', 
   await screen.findByRole('heading', { name: '当前学习模块' });
 
   revealHistoryAnswer('editor-node-answer-answer-closure');
-  fireEvent.click(screen.getByRole('button', { name: /第一版回答还不完整/ }));
+  selectNodeByTitle('第一版回答还不完整');
 
   const inlineActions = await screen.findByTestId(
     'judgment-inline-actions-judgment-answer-closure-v1',
@@ -951,22 +945,18 @@ test('keeps judgment nodes actionable within the current answer revision path', 
     within(inlineActions).getByRole('button', { name: '回到当前回答继续修改' }),
   );
   expect(
-    screen
-      .getByDisplayValue('第二版回答')
-      .closest('[data-testid^="editor-node-"]'),
+    getNodeByDisplayTitle('第二版回答'),
   ).toHaveAttribute('data-node-selected', 'true');
 
   revealHistoryAnswer('editor-node-answer-answer-closure');
-  fireEvent.click(screen.getByRole('button', { name: /第一版回答还不完整/ }));
+  selectNodeByTitle('第一版回答还不完整');
   fireEvent.click(
     within(
       await screen.findByTestId('judgment-inline-actions-judgment-answer-closure-v1'),
     ).getByRole('button', { name: '查看答案解析' }),
   );
   expect(
-    screen
-      .getByDisplayValue('标准理解：第二版回答')
-      .closest('[data-testid^="editor-node-"]'),
+    getNodeByDisplayTitle('标准理解：第二版回答'),
   ).toHaveAttribute('data-node-selected', 'true');
 });
 
@@ -994,23 +984,25 @@ test('extends a scaffold with a simpler follow-up explanation draft', async () =
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByLabelText('先知道什么叫批处理 标题'));
+  selectNodeByTitle('先知道什么叫批处理');
   fireEvent.click(
-    within(screen.getByTestId('node-actions-intro-answer-closure')).getByRole(
-      'button',
-      { name: '更基础一点' },
-    ),
+    within(
+      openToolbarMenu(
+        screen.getByTestId('node-actions-intro-answer-closure'),
+        '⋯',
+      ),
+    ).getByRole('button', {
+      name: '更基础一点',
+    }),
   );
 
-  const titleInput = await screen.findByDisplayValue(
-    '先用排队的直觉理解批处理',
-  );
+  const scaffoldNode = await findNodeByDisplayTitle('先用排队的直觉理解批处理');
 
-  expect(titleInput).toBeInTheDocument();
-  expect(
-    await screen.findByDisplayValue(/可以先把批处理想成把同一轮里的更新先排进同一个队列/u),
-  ).toBeInTheDocument();
-  expect(titleInput.closest('[data-testid^="editor-node-"]')).toHaveAttribute(
+  expect(scaffoldNode).toBeInTheDocument();
+  expect(scaffoldNode).toHaveTextContent(
+    /可以先把批处理想成把同一轮里的更新先排进同一个队列/u,
+  );
+  expect(scaffoldNode).toHaveAttribute(
     'data-node-selected',
     'true',
   );
@@ -1058,59 +1050,65 @@ test('creates AI drafts for scaffold, generate-follow-up, generate-summary and j
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByLabelText('理解批处理为什么成立 标题'));
+  selectNodeByTitle('理解批处理为什么成立');
   fireEvent.click(
     within(screen.getByTestId('learning-action-grid')).getByRole('button', {
       name: '插入铺垫 / 讲解',
     }),
   );
   expect(
-    await screen.findByDisplayValue('先把同一轮更新放到一张图里'),
+    await screen.findByLabelText('先把同一轮更新放到一张图里 标题'),
   ).toBeInTheDocument();
   expect(
-    screen.getByDisplayValue(/先抓住一件事：批处理不是“晚一点更新”/u),
-  ).toBeInTheDocument();
+    getNodeByDisplayTitle('先把同一轮更新放到一张图里'),
+  ).toHaveTextContent(/先抓住一件事：批处理不是“晚一点更新”/u);
 
-  fireEvent.focus(screen.getByLabelText('为什么状态更新会被批处理？ 标题'));
+  selectNodeByTitle('为什么状态更新会被批处理？');
   const blockActions = await screen.findByTestId(
     'question-block-actions-question-answer-closure',
   );
 
   fireEvent.click(
-    within(blockActions).getByRole('button', { name: '生成追问' }),
+    within(openToolbarMenu(blockActions, '追问')).getByRole('button', {
+      name: '生成追问',
+    }),
   );
   expect(
-    await screen.findByDisplayValue('为什么“同一轮事件”是批处理成立的前提？'),
+    await screen.findByLabelText('为什么“同一轮事件”是批处理成立的前提？ 标题'),
   ).toBeInTheDocument();
   expect(
-    screen.getByDisplayValue(
-      '请解释如果更新不处在同一轮里，React 为什么就不能直接沿用同一套合并节奏。',
-    ),
-  ).toBeInTheDocument();
+    getNodeByDisplayTitle('为什么“同一轮事件”是批处理成立的前提？'),
+  ).toHaveTextContent(
+    '请解释如果更新不处在同一轮里，React 为什么就不能直接沿用同一套合并节奏。',
+  );
 
-  fireEvent.focus(screen.getByLabelText('为什么状态更新会被批处理？ 标题'));
+  selectNodeByTitle('为什么状态更新会被批处理？');
   fireEvent.click(
-    within(screen.getByTestId('question-block-actions-question-answer-closure')).getByRole(
-      'button',
-      { name: '生成总结' },
-    ),
+    within(
+      openToolbarMenu(
+        screen.getByTestId('question-block-actions-question-answer-closure'),
+        '总结',
+      ),
+    ).getByRole('button', {
+      name: '生成总结',
+    }),
   );
   expect(
-    await screen.findByDisplayValue('先把节奏和结果分开看'),
+    await screen.findByLabelText('先把节奏和结果分开看 标题'),
   ).toBeInTheDocument();
   expect(
-    screen.getByDisplayValue(
-      '理解批处理时，先区分“更新何时被收集”与“界面何时被提交”。前者决定能不能合并，后者决定用户会看到几次渲染结果。',
-    ),
-  ).toBeInTheDocument();
+    getNodeByDisplayTitle('先把节奏和结果分开看'),
+  ).toHaveTextContent(
+    '理解批处理时，先区分“更新何时被收集”与“界面何时被提交”。前者决定能不能合并，后者决定用户会看到几次渲染结果。',
+  );
 
   fireEvent.click(screen.getByRole('button', { name: '插入判断' }));
   expect(
-    await screen.findByDisplayValue('已经抓到批处理的主线'),
+    await screen.findByLabelText('已经抓到批处理的主线 标题'),
   ).toBeInTheDocument();
   expect(
-    screen.getByDisplayValue(/这份草稿已经抓到了“先收集再统一提交”的主线/u),
-  ).toBeInTheDocument();
+    getNodeByDisplayTitle('已经抓到批处理的主线'),
+  ).toHaveTextContent(/这份草稿已经抓到了“先收集再统一提交”的主线/u);
 });
 
 test('falls back to a local judgment draft when the AI provider is unavailable', async () => {
@@ -1124,16 +1122,18 @@ test('falls back to a local judgment draft when the AI provider is unavailable',
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByLabelText('回答草稿 标题'));
+  selectNodeByTitle('回答草稿');
   await waitFor(() => {
     expect(screen.getByRole('button', { name: '插入判断' })).toBeEnabled();
   });
   fireEvent.click(screen.getByRole('button', { name: '插入判断' }));
 
-  expect(await screen.findByDisplayValue('回答还不完整')).toBeInTheDocument();
+  expect(await screen.findByLabelText('回答还不完整 标题')).toBeInTheDocument();
   expect(
-    screen.getByDisplayValue(/这次回答还不完整，“为什么状态更新会被批处理？”里仍有关键点没有答到。/u),
-  ).toBeInTheDocument();
+    getNodeByDisplayTitle('回答还不完整'),
+  ).toHaveTextContent(
+    /这次回答还不完整，“为什么状态更新会被批处理？”里仍有关键点没有答到。/u,
+  );
   expect(screen.getByText('AI 暂时不可用，已先补上一段可编辑的本地判断草稿。')).toBeInTheDocument();
   expect(screen.queryByText(/AI 动作失败：/u)).not.toBeInTheDocument();
 });
@@ -1154,7 +1154,7 @@ test('tolerates question-closure JSON wrapped in explanation text and code fence
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByDisplayValue('为什么状态更新会被批处理？'));
+  selectNodeByTitle('为什么状态更新会被批处理？');
   await waitFor(() => {
     expect(
       getAnswerEvaluationButton(),
@@ -1163,10 +1163,10 @@ test('tolerates question-closure JSON wrapped in explanation text and code fence
   fireEvent.click(getAnswerEvaluationButton());
 
   expect(
-    await screen.findByDisplayValue('已答到当前问题'),
+    await screen.findByLabelText('已答到当前问题 标题'),
   ).toBeInTheDocument();
   expect(
-    await screen.findByDisplayValue('标准理解'),
+    await screen.findByLabelText('标准理解 标题'),
   ).toBeInTheDocument();
 
   const savedSnapshot = await waitForSavedSnapshot(
@@ -1192,13 +1192,14 @@ test('preserves a manual step status override across save and reload', async () 
   );
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(
-    within(screen.getByTestId('editor-node-step-manual-status')).getByRole('combobox'),
-    {
-      target: {
-        value: 'done',
+  fireEvent.click(screen.getByTestId('plan-step-status-trigger-step-manual-status'));
+  fireEvent.click(
+    within(screen.getByTestId('plan-step-status-menu-step-manual-status')).getByRole(
+      'button',
+      {
+        name: '已完成',
       },
-    },
+    ),
   );
 
   const savedSnapshot = await waitForSavedSnapshot(
@@ -1216,12 +1217,11 @@ test('preserves a manual step status override across save and reload', async () 
 
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
 
   expect(
-    within(await screen.findByTestId('editor-node-step-manual-status')).getByRole(
-      'combobox',
-    ),
-  ).toHaveValue('done');
+    screen.getByTestId('plan-step-status-trigger-step-manual-status'),
+  ).toHaveTextContent('已完成');
 });
 
 async function createPreloadedDependencies(

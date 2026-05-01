@@ -13,6 +13,7 @@ export interface MainViewNodeProps {
   depth: number;
   isInteractionLocked: boolean;
   nodeId: string;
+  onDeleteNodeById: (nodeId: string) => void;
   onDirectAnswerQuestion?: (questionNodeId: string) => void;
   onEvaluateAnswer?: (questionNodeId: string, answerNodeId: string) => void;
   onEvaluateSummary?: (summaryNodeId: string) => void;
@@ -23,6 +24,10 @@ export interface MainViewNodeProps {
   onInsertSummaryForNode: (sourceNodeId: string) => void;
   onDeleteNode: () => void;
   onRunLearningAction: (actionId: LearningActionId) => void;
+  onRunLearningActionForNode: (
+    nodeId: string,
+    actionId: LearningActionId,
+  ) => void;
   onSelectNode: (nodeId: string) => void;
   onSetCurrentAnswer: (questionNodeId: string, answerNodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;

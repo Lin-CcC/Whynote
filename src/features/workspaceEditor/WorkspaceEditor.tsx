@@ -89,6 +89,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           interactionLockReason={props.interactionLockReason ?? null}
           isInteractionLocked={props.isInteractionLocked ?? false}
           onCreateModule={workspaceEditor.createModule}
+          onDeleteNodeById={workspaceEditor.deleteNodeById}
           onDirectAnswerQuestion={props.onDirectAnswerQuestion}
           onEvaluateAnswer={props.onEvaluateAnswer}
           onEvaluateSummary={props.onEvaluateSummary}
@@ -99,6 +100,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           onInsertFollowUpQuestion={workspaceEditor.insertFollowUpQuestion}
           onInsertSummaryForNode={workspaceEditor.insertSummaryForNode}
           onRunLearningAction={workspaceEditor.runLearningAction}
+          onRunLearningActionForNode={workspaceEditor.runLearningActionForNode}
           onSelectNode={workspaceEditor.selectNode}
           onSetCurrentAnswer={workspaceEditor.setCurrentAnswer}
           onUpdateNode={workspaceEditor.updateNode}

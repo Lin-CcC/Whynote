@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
@@ -54,14 +54,14 @@ test('clicking an unselected content body enters editing without an explicit pre
     'data-node-selected',
     'true',
   );
-  expect(screen.getByTestId('node-actions-answer-first')).toBeInTheDocument();
+
+  const actionPanel = screen.getByTestId('node-actions-answer-first');
+
+  expect(actionPanel).toHaveAttribute('data-visible', 'true');
+  expectToolbarVerbs(actionPanel, ['评估', '追问', '总结', '⋯']);
+  expectToolbarMenuActions(actionPanel, '追问', ['生成追问', '插入追问']);
   expect(
-    within(screen.getByTestId('node-actions-answer-first')).getByRole('button', {
-      name: '生成追问',
-    }),
-  ).toBeInTheDocument();
-  expect(
-    within(screen.getByTestId('node-actions-answer-first')).getByRole('button', {
+    within(openOverflowMenu(actionPanel)).getByRole('button', {
       name: '设为当前回答',
     }),
   ).toBeInTheDocument();
@@ -124,36 +124,37 @@ test('keeps question and plan-step titles visible while untitled content nodes r
   });
 });
 
-test('shows question block actions only on the active block', () => {
+test('renders the selected question toolbar on the question title row and keeps shell actions quiet', () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
   });
 
+  const mainQuestionNode = screen.getByTestId('editor-node-question-main');
+  const mainQuestionHeader = screen.getByTestId('question-block-header-question-main');
   const mainBlockActions = screen.getByTestId(
     'question-block-actions-question-main',
   );
+  const secondaryBlockActions = screen.getByTestId(
+    'question-block-actions-question-secondary',
+  );
+  const mainQuestionTitleRow = mainQuestionNode.querySelector('.workspace-nodeTitleRow');
 
-  expect(
-    within(mainBlockActions).getByRole('button', { name: '直接回答当前问题' }),
-  ).toBeInTheDocument();
-  expect(
-    within(mainBlockActions).getByRole('button', { name: '插入回答' }),
-  ).toBeInTheDocument();
-  expect(
-    within(mainBlockActions).getByRole('button', { name: '生成追问' }),
-  ).toBeInTheDocument();
-  expect(
-    within(mainBlockActions).getByRole('button', { name: '插入追问' }),
-  ).toBeInTheDocument();
-  expect(
-    within(mainBlockActions).getByRole('button', { name: '生成总结' }),
-  ).toBeInTheDocument();
-  expect(
-    within(mainBlockActions).getByRole('button', { name: '插入总结' }),
-  ).toBeInTheDocument();
-  expect(
-    screen.queryByTestId('question-block-actions-question-secondary'),
-  ).not.toBeInTheDocument();
+  expect(mainQuestionTitleRow).not.toBeNull();
+  expect(mainQuestionHeader).not.toContainElement(mainBlockActions);
+  expect(mainQuestionTitleRow).toContainElement(mainBlockActions);
+  expect(screen.queryByText('已有当前回答')).not.toBeInTheDocument();
+  expect(screen.queryByText('还没有当前回答')).not.toBeInTheDocument();
+
+  expect(mainBlockActions).toHaveAttribute('data-visible', 'true');
+  expectToolbarVerbs(mainBlockActions, ['回答', '追问', '总结', '⋯']);
+  expect(secondaryBlockActions).toHaveAttribute('data-visible', 'false');
+
+  expectToolbarMenuActions(mainBlockActions, '回答', [
+    '直接回答当前问题',
+    '插入回答',
+  ]);
+  expectToolbarMenuActions(mainBlockActions, '追问', ['生成追问', '插入追问']);
+  expectToolbarMenuActions(mainBlockActions, '总结', ['生成总结', '插入总结']);
 
   fireEvent.click(
     within(screen.getByRole('tree', { name: '当前模块结构' })).getByRole(
@@ -162,23 +163,79 @@ test('shows question block actions only on the active block', () => {
     ),
   );
 
+  expect(screen.getByTestId('question-block-actions-question-main')).toHaveAttribute(
+    'data-visible',
+    'false',
+  );
+  expect(
+    screen.getByTestId('question-block-actions-question-secondary'),
+  ).toHaveAttribute('data-visible', 'true');
+});
+
+test('keeps only the child question title toolbar when a follow-up question becomes active', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-follow-up',
+  });
+
+  const followUpNode = screen.getByTestId('editor-node-question-follow-up');
+  const followUpTitleRow = followUpNode.querySelector('.workspace-nodeTitleRow');
+  const followUpActions = screen.getByTestId('question-block-actions-question-follow-up');
+
+  expect(followUpTitleRow).not.toBeNull();
+  expect(followUpTitleRow).toContainElement(followUpActions);
   expect(
     screen.queryByTestId('question-block-actions-question-main'),
   ).not.toBeInTheDocument();
-  expect(
-    screen.getByTestId('question-block-actions-question-secondary'),
-  ).toBeInTheDocument();
+  expect(followUpActions).toHaveAttribute('data-visible', 'true');
+});
+
+test('reveals the light toolbar only on hover, focus, or active', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+  });
+
+  const answerNode = screen.getByTestId('editor-node-answer-first');
+  const answerToolbar = screen.getByTestId('node-actions-answer-first');
+
+  expect(answerToolbar).toHaveAttribute('data-visible', 'false');
+
+  fireEvent.mouseEnter(answerNode);
+  expect(answerToolbar).toHaveAttribute('data-visible', 'true');
+
+  fireEvent.mouseLeave(answerNode);
+  expect(answerToolbar).toHaveAttribute('data-visible', 'false');
+
+  fireEvent.focus(screen.getByLabelText('第一版回答 标题'));
+  expect(answerToolbar).toHaveAttribute('data-visible', 'true');
+});
+
+test('clicking the question body keeps editing on the node and does not move the toolbar back to the block shell', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+  });
+
+  const questionHeader = screen.getByTestId('question-block-header-question-main');
+  const questionToolbar = screen.getByTestId('question-block-actions-question-main');
+
+  fireEvent.focus(screen.getByLabelText('主问题 内容'));
+
+  expect(screen.getByTestId('editor-node-question-main')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+  expect(questionToolbar).toHaveAttribute('data-visible', 'true');
+  expect(questionHeader).not.toContainElement(questionToolbar);
 });
 
 test.each([
-  'answer-first',
-  'judgment-first-latest',
-  'summary-first-latest',
-  'summary-manual',
-  'judgment-summary-latest',
+  ['answer-first', ['评估', '追问', '总结', '⋯']],
+  ['judgment-first-latest', ['追问', '总结', '⋯']],
+  ['summary-first-latest', ['追问', '总结', '⋯']],
+  ['summary-manual', ['追问', '总结', '⋯']],
+  ['judgment-summary-latest', ['追问', '总结', '⋯']],
 ])(
   'moves progression actions onto the selected content node %s and hides the parent question action bar',
-  (selectedNodeId) => {
+  (selectedNodeId, expectedVerbs) => {
     renderQuestionBlockEditor({
       initialSelectedNodeId: selectedNodeId,
     });
@@ -187,78 +244,75 @@ test.each([
       screen.queryByTestId('question-block-actions-question-main'),
     ).not.toBeInTheDocument();
 
+    const actionPanel = screen.getByTestId(`node-actions-${selectedNodeId}`);
+
+    expect(actionPanel).toHaveAttribute('data-visible', 'true');
+    expectToolbarVerbs(actionPanel, expectedVerbs);
     expect(
-      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
-        'button',
-        { name: '生成追问' },
-      ),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
-        'button',
-        { name: '插入追问' },
-      ),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
-        'button',
-        { name: '生成总结' },
-      ),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
-        'button',
-        { name: '插入总结' },
-      ),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).queryByRole(
-        'button',
-        { name: '直接回答当前问题' },
-      ),
+      within(actionPanel).queryByRole('button', { name: '回答' }),
     ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).queryByRole(
-        'button',
-        { name: '插入回答' },
-      ),
-    ).not.toBeInTheDocument();
+  },
+);
+
+test.each([
+  'judgment-first-latest',
+  'summary-first-latest',
+  'summary-manual',
+  'judgment-summary-latest',
+])(
+  'keeps AI and manual follow-up/summary entries under the selected content node %s',
+  (selectedNodeId) => {
+    renderQuestionBlockEditor({
+      initialSelectedNodeId: selectedNodeId,
+    });
+
+    const actionPanel = screen.getByTestId(`node-actions-${selectedNodeId}`);
+
+    expectToolbarMenuActions(actionPanel, '追问', ['生成追问', '插入追问']);
+    expectToolbarMenuActions(actionPanel, '总结', ['生成总结', '插入总结']);
   },
 );
 
 test.each([
   {
     actionPanelTestId: 'node-actions-answer-first',
-    expectedButtons: ['生成追问', '插入追问', '生成总结', '插入总结', '继续修改', '删除', '设为当前回答'],
+    expectedOverflowButtons: ['删除', '查看答案解析', '设为当前回答'],
+    expectedVerbs: ['评估', '追问', '总结', '⋯'],
     selectedNodeId: 'answer-first',
   },
   {
     actionPanelTestId: 'node-actions-judgment-first-latest',
-    expectedButtons: ['生成追问', '插入追问', '生成总结', '插入总结', '继续修改', '删除'],
+    expectedOverflowButtons: ['删除', '回到当前回答继续修改'],
+    expectedVerbs: ['追问', '总结', '⋯'],
     selectedNodeId: 'judgment-first-latest',
   },
   {
     actionPanelTestId: 'node-actions-summary-first-latest',
-    expectedButtons: ['生成追问', '插入追问', '生成总结', '插入总结', '继续修改', '删除', '回到当前回答继续修改'],
+    expectedOverflowButtons: ['删除', '回到当前回答继续修改'],
+    expectedVerbs: ['追问', '总结', '⋯'],
     selectedNodeId: 'summary-first-latest',
   },
   {
     actionPanelTestId: 'node-actions-summary-manual',
-    expectedButtons: ['生成追问', '插入追问', '生成总结', '插入总结', '继续修改', '删除', '检查这个总结'],
+    expectedOverflowButtons: ['删除', '检查这个总结', '回到当前回答继续修改'],
+    expectedVerbs: ['追问', '总结', '⋯'],
     selectedNodeId: 'summary-manual',
   },
 ])(
-  'shows common node actions and retained node-specific actions on $selectedNodeId',
-  ({ actionPanelTestId, expectedButtons, selectedNodeId }) => {
+  'keeps low-frequency actions in ⋯ on $selectedNodeId',
+  ({ actionPanelTestId, expectedOverflowButtons, expectedVerbs }) => {
     renderQuestionBlockEditor({
-      initialSelectedNodeId: selectedNodeId,
+      initialSelectedNodeId: actionPanelTestId.replace('node-actions-', ''),
     });
 
     const actionPanel = screen.getByTestId(actionPanelTestId);
 
-    for (const buttonLabel of expectedButtons) {
+    expectToolbarVerbs(actionPanel, expectedVerbs);
+    const overflowMenu = openOverflowMenu(actionPanel);
+
+    for (const buttonLabel of expectedOverflowButtons) {
       expect(
-        within(actionPanel).getByRole('button', { name: buttonLabel }),
+        within(overflowMenu).getByRole('button', { name: buttonLabel }),
       ).toBeInTheDocument();
     }
   },
@@ -274,23 +328,27 @@ test('keeps the current answer reevaluation action on the selected current answe
   expect(
     screen.queryByTestId('question-block-actions-question-main'),
   ).not.toBeInTheDocument();
+  expect(actionPanel).toHaveAttribute('data-visible', 'true');
+  expectToolbarVerbs(actionPanel, ['评估', '追问', '总结', '⋯']);
   expect(
-    within(actionPanel).getByRole('button', { name: '生成追问' }),
+    within(actionPanel).getByRole('button', { name: '评估' }),
   ).toBeInTheDocument();
   expect(
-    within(actionPanel).getByRole('button', { name: '插入总结' }),
+    within(actionPanel).getByRole('button', { name: '评估' }),
+  ).toBeEnabled();
+  const overflowMenu = openOverflowMenu(actionPanel);
+  expect(
+    within(overflowMenu).getByRole('button', { name: '删除' }),
   ).toBeInTheDocument();
   expect(
-    within(actionPanel).getByRole('button', { name: '继续修改' }),
+    within(overflowMenu).getByRole('button', {
+      name: '查看答案解析',
+    }),
   ).toBeInTheDocument();
   expect(
-    within(actionPanel).getByRole('button', { name: '删除' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '重新评估当前回答' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).queryByRole('button', { name: '设为当前回答' }),
+    within(overflowMenu).queryByRole('button', {
+      name: '设为当前回答',
+    }),
   ).not.toBeInTheDocument();
 });
 
@@ -493,9 +551,12 @@ test('continues editing from a collapsed answer node by expanding the body first
     }),
   ).toBeInTheDocument();
   expect(
-    within(screen.getByTestId('node-actions-answer-first')).getByRole('button', {
-      name: '设为当前回答',
-    }),
+    within(openOverflowMenu(screen.getByTestId('node-actions-answer-first'))).getByRole(
+      'button',
+      {
+        name: '设为当前回答',
+      },
+    ),
   ).toBeInTheDocument();
 });
 
@@ -515,10 +576,11 @@ test.each([
     });
 
     fireEvent.click(
-      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
-        'button',
-        { name: '生成追问' },
-      ),
+      within(
+        openToolbarMenu(screen.getByTestId(`node-actions-${selectedNodeId}`), '追问'),
+      ).getByRole('button', {
+        name: '生成追问',
+      }),
     );
 
     expect(onGenerateFollowUpQuestion).toHaveBeenCalledWith(selectedNodeId);
@@ -541,10 +603,11 @@ test.each([
     });
 
     fireEvent.click(
-      within(screen.getByTestId(`node-actions-${selectedNodeId}`)).getByRole(
-        'button',
-        { name: '生成总结' },
-      ),
+      within(
+        openToolbarMenu(screen.getByTestId(`node-actions-${selectedNodeId}`), '总结'),
+      ).getByRole('button', {
+        name: '生成总结',
+      }),
     );
 
     expect(onGenerateSummary).toHaveBeenCalledWith(selectedNodeId);
@@ -610,11 +673,12 @@ test('currentAnswerId only changes emphasis and does not reorder answer groups',
 
   fireEvent.click(screen.getByTestId('editor-node-answer-first'));
   fireEvent.click(
-    within(
-      screen.getByTestId('node-actions-answer-first'),
-    ).getByRole('button', {
-      name: '设为当前回答',
-    }),
+    within(openOverflowMenu(screen.getByTestId('node-actions-answer-first'))).getByRole(
+      'button',
+      {
+        name: '设为当前回答',
+      },
+    ),
   );
 
   await waitFor(() => {
@@ -660,7 +724,9 @@ test('keeps manual summary and summary-check results adjacent with group-local h
     ),
   ).toBeInTheDocument();
   expect(
-    within(screen.getByTestId('editor-node-summary-manual')).getByText('总结'),
+    within(screen.getByTestId('editor-node-summary-manual')).getByText('总结', {
+      selector: '.workspace-nodeType',
+    }),
   ).toBeInTheDocument();
   expect(
     within(screen.getByTestId('editor-node-judgment-summary-latest')).getByText(
@@ -824,6 +890,17 @@ test('tracks block, body, and group-local history collapse in workspace view sta
   ).not.toBeInTheDocument();
 });
 
+test('keeps the expanded plan-step rendered as a lightweight section divider shell', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'step-question-block',
+  });
+
+  expect(screen.getByTestId('editor-node-step-question-block')).toHaveAttribute(
+    'data-node-shell',
+    'section-divider',
+  );
+});
+
 test('collapses and expands a plan-step while keeping its header visible', async () => {
   const viewStateChanges: WorkspaceViewState[] = [];
 
@@ -840,7 +917,7 @@ test('collapses and expands a plan-step while keeping its header visible', async
     within(planStepNode).getByRole('button', { name: '收起步骤' }),
   ).toBeInTheDocument();
   expect(
-    within(planStepNode).getByRole('combobox', { name: '问题块步骤 状态' }),
+    within(planStepNode).getByTestId('plan-step-status-trigger-step-question-block'),
   ).toBeInTheDocument();
   expect(screen.getByTestId('question-block-question-main')).toBeInTheDocument();
 
@@ -871,9 +948,8 @@ test('collapses and expands a plan-step while keeping its header visible', async
     ),
   ).toBeInTheDocument();
   expect(
-    within(screen.getByTestId('editor-node-step-question-block')).queryByRole(
-      'combobox',
-      { name: '问题块步骤 状态' },
+    within(screen.getByTestId('editor-node-step-question-block')).queryByTestId(
+      'plan-step-status-trigger-step-question-block',
     ),
   ).not.toBeInTheDocument();
   expect(
@@ -910,17 +986,6 @@ test('collapses and expands a plan-step while keeping its header visible', async
     viewStateChanges.at(-1)?.collapsedPlanStepIds.includes('step-question-block'),
   ).toBe(false);
   expect(screen.getByTestId('question-block-question-main')).toBeInTheDocument();
-});
-
-test('keeps the expanded plan-step rendered as a lightweight section divider shell', () => {
-  renderQuestionBlockEditor({
-    initialSelectedNodeId: 'step-question-block',
-  });
-
-  expect(screen.getByTestId('editor-node-step-question-block')).toHaveAttribute(
-    'data-node-shell',
-    'section-divider',
-  );
 });
 
 test('restores inner question block, body, and history state after collapsing and reopening a plan-step', async () => {
@@ -1524,6 +1589,47 @@ function createLegacyAnswerFallbackSnapshot(): WorkspaceSnapshot {
     ...snapshot,
     tree,
   };
+}
+
+function expectToolbarVerbs(
+  toolbar: HTMLElement,
+  expectedLabels: string[],
+) {
+  expect(
+    within(toolbar)
+      .getAllByRole('button')
+      .map((button) =>
+        (button.textContent?.replace('▾', '').trim() ?? ''),
+      ),
+  ).toEqual(expectedLabels);
+}
+
+function expectToolbarMenuActions(
+  toolbar: HTMLElement,
+  menuLabel: string,
+  expectedActionLabels: string[],
+) {
+  const menu = openToolbarMenu(toolbar, menuLabel);
+
+  for (const actionLabel of expectedActionLabels) {
+    expect(
+      within(menu).getByRole('button', { name: actionLabel }),
+    ).toBeInTheDocument();
+  }
+}
+
+function openToolbarMenu(toolbar: HTMLElement, menuLabel: string) {
+  fireEvent.click(
+    within(toolbar).getByRole('button', {
+      name: menuLabel,
+    }),
+  );
+
+  return within(toolbar).getByRole('menu');
+}
+
+function openOverflowMenu(toolbar: HTMLElement) {
+  return openToolbarMenu(toolbar, '⋯');
 }
 
 function getRenderedNodeIds(questionNodeId: string) {

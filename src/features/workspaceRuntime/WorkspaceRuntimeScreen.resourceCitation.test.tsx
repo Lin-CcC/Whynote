@@ -41,7 +41,7 @@ test('reuses an existing fragment for an answer citation, persists it after remo
     <WorkspaceRuntimeScreen dependencies={dependencies} />,
   );
 
-  expect(await screen.findByDisplayValue('资料引用模块')).toBeInTheDocument();
+  expect(await screen.findByLabelText('资料引用模块 标题')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '回答批处理答案' }));
   fireEvent.click(
@@ -77,7 +77,7 @@ test('reuses an existing fragment for an answer citation, persists it after remo
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
-  expect(await screen.findByDisplayValue('资料引用模块')).toBeInTheDocument();
+  expect(await screen.findByLabelText('资料引用模块 标题')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '回答批处理答案' }));
 
   const restoredCitationSection = await findSectionByHeading('当前学习节点引用');
@@ -101,7 +101,7 @@ test('falls back to a resource-level citation when runtime cannot resolve a stab
   );
 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
-  expect(await screen.findByDisplayValue('资料引用模块')).toBeInTheDocument();
+  expect(await screen.findByLabelText('资料引用模块 标题')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: '回答批处理答案' }));
   fireEvent.click(

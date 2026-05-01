@@ -17,6 +17,7 @@ import {
   type WorkspaceSnapshot,
 } from '../nodeDomain';
 import WorkspaceRuntimeScreen from './WorkspaceRuntimeScreen';
+import { selectNodeByTitle } from './workspaceRuntimeTestUtils';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 
 const openedStorages: StructuredDataStorage[] = [];
@@ -61,7 +62,7 @@ test('checks a manual summary through summary-evaluation instead of question clo
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.focus(screen.getByLabelText('手写总结 标题'));
+  selectNodeByTitle('手写总结');
 
   const callout = await screen.findByTestId('summary-evaluation-callout');
 
@@ -72,7 +73,7 @@ test('checks a manual summary through summary-evaluation instead of question clo
   fireEvent.click(within(callout).getByRole('button', { name: '检查这个总结' }));
 
   expect(
-    await screen.findByDisplayValue('这段总结还可再补'),
+    await screen.findByLabelText('这段总结还可再补 标题'),
   ).toBeInTheDocument();
   expect(
     await screen.findByTestId('summary-evaluation-result-callout'),

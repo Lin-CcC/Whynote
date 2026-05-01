@@ -17,6 +17,7 @@ import {
   type WorkspaceSnapshot,
 } from '../nodeDomain';
 import WorkspaceRuntimeScreen from './WorkspaceRuntimeScreen';
+import { findNodeByDisplayTitle } from './workspaceRuntimeTestUtils';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 
 const openedStorages: StructuredDataStorage[] = [];
@@ -54,20 +55,19 @@ test('creates a judgment-linked answer explanation on the first evaluation', asy
 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
-  await screen.findByDisplayValue('手动回答草稿');
+  await screen.findByLabelText('手动回答草稿 标题');
   fireEvent.click(
     within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
       name: '重新评估当前回答',
     }),
   );
 
-  await screen.findByDisplayValue('回答还不完整');
-  await screen.findByDisplayValue('标准理解');
+  await screen.findByLabelText('回答还不完整 标题');
+  await screen.findByLabelText('标准理解 标题');
 
-  const judgmentNode = findNodeByTitleInput('回答还不完整');
-  const summaryNode = findNodeByTitleInput('标准理解');
+  const judgmentNode = await findNodeByDisplayTitle('回答还不完整');
+  const summaryNode = await findNodeByDisplayTitle('标准理解');
 
-  expect(summaryNode).toHaveTextContent('答案解析');
   expect(
     within(judgmentNode).queryByText('当前还没有对应的答案解析。'),
   ).not.toBeInTheDocument();
@@ -111,16 +111,16 @@ test('evaluates a manually inserted question and answer through the same closure
 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
-  await screen.findByDisplayValue('手动回答草稿');
+  await screen.findByLabelText('手动回答草稿 标题');
   fireEvent.click(
     within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
       name: '重新评估当前回答',
     }),
   );
 
-  expect(await screen.findByDisplayValue('手动问题还差关键因果')).toBeInTheDocument();
-  expect(await screen.findByDisplayValue('标准理解')).toBeInTheDocument();
-  expect(await screen.findByDisplayValue('追问：还缺哪条因果链？')).toBeInTheDocument();
+  expect(await screen.findByLabelText('手动问题还差关键因果 标题')).toBeInTheDocument();
+  expect(await screen.findByLabelText('标准理解 标题')).toBeInTheDocument();
+  expect(await screen.findByLabelText('追问：还缺哪条因果链？ 标题')).toBeInTheDocument();
   expect(
     within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
       name: '查看答案解析',
@@ -145,7 +145,7 @@ test('keeps answer explanation available on the first evaluation even when summa
 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
-  await screen.findByDisplayValue('手动回答草稿');
+  await screen.findByLabelText('手动回答草稿 标题');
   fireEvent.click(
     within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
       name: '重新评估当前回答',
@@ -153,13 +153,11 @@ test('keeps answer explanation available on the first evaluation even when summa
   );
 
   expect(
-    await screen.findByDisplayValue('还缺最后一步'),
+    await screen.findByLabelText('还缺最后一步 标题'),
   ).toBeInTheDocument();
-  await screen.findByDisplayValue('标准理解');
-  const judgmentNode = findNodeByTitleInput('还缺最后一步');
-  const summaryNode = findNodeByTitleInput('标准理解');
-  expect(summaryNode).toHaveTextContent('答案解析');
-
+  await screen.findByLabelText('标准理解 标题');
+  const judgmentNode = await findNodeByDisplayTitle('还缺最后一步');
+  const summaryNode = await findNodeByDisplayTitle('标准理解');
   const callout = screen.getByTestId('answer-evaluation-callout');
   expect(
     within(callout).getByRole('button', { name: '查看答案解析' }),
@@ -189,8 +187,9 @@ test('keeps a manual summary before a manual judgment on the separate summary-ch
   const summaryNode = await screen.findByTestId('editor-node-manual-summary');
 
   fireEvent.click(summaryNode);
+  expect(openToolbarMenu(summaryNode, '⋯')).toBeInTheDocument();
   expect(
-    within(summaryNode).getByRole('button', { name: '检查这个总结' }),
+    within(screen.getByRole('menu')).getByRole('button', { name: '检查这个总结' }),
   ).toBeEnabled();
   expect(screen.queryByRole('button', { name: '查看答案解析' })).not.toBeInTheDocument();
   expect(summaryNode).toHaveTextContent('总结');
@@ -245,15 +244,14 @@ function createMockProviderClient(
   };
 }
 
-function findNodeByTitleInput(title: string) {
-  const input = screen.getByDisplayValue(title);
-  const node = input.closest('[data-testid^="editor-node-"]');
+function openToolbarMenu(container: HTMLElement, menuLabel: string) {
+  fireEvent.click(
+    within(container).getByRole('button', {
+      name: menuLabel,
+    }),
+  );
 
-  if (!(node instanceof HTMLElement)) {
-    throw new Error(`Unable to locate editor node for title ${title}.`);
-  }
-
-  return node;
+  return within(container).getByRole('menu');
 }
 
 function createManualQuestionAnswerSnapshot(): WorkspaceSnapshot {

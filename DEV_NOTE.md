@@ -332,6 +332,14 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - `answer`、`judgment`、`answer-closure summary`、`manual summary`、`scaffold summary` 以及后续新增的同类节点都应复用同一模型；允许保留少量语义差异，但不能重新分裂成“每种节点一个特殊折叠卡片”。
 - 折叠态不再继续显示标题输入框、正文 textarea、长系统判断、长编辑说明、大块留白、节点动作栏或“正文只是缩了一点”的重结构；这些内容只属于展开态。
 
+### 38. V1.2 文档式主视图的整合基线
+
+- 主视图继续是单栏文档流：模块作为文档根、`plan-step` 作为轻量章节分隔、`question block` 作为阅读链重组容器；这只是显示层整合，不改底层树顺序。
+- 内容型学习节点默认无框，只有选中或真实进入编辑态时才显示 frame；未选中节点通过标题展示按钮 / 正文展示按钮进入连续编辑，不再维持常驻输入框。
+- 轻工具栏统一收口到节点标题行：`answer / judgment / summary / scaffold` 的节点动作在 hover、focus 或 selection 时可见；`question block` 动作只在该 `question` 本体被选中时展开。
+- follow-up `question` 继续作为真实子节点存在，但在主视图里必须以缩进子章节紧跟所属闭环之后显示；当子 follow-up 成为当前激活 block 时，父问题的 block 动作面要静默收起，保持 active block 唯一。
+- `plan-step` 折叠、`question block` 折叠、正文折叠和组内历史折叠继续共用 workspace 级本地 view state；runtime、inspector 和主视图必须基于同一套选中 / 展开契约联动，不能各自漂移。
+
 ## 后续需要重新评估这些决策的触发条件
 
 - 需要公开注册或公开商用

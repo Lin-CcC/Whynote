@@ -9,6 +9,9 @@ test('renders the workspace editor shell', async () => {
   expect(
     await screen.findByRole('heading', { name: '当前学习模块' }),
   ).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '主视图编辑流' })).toBeInTheDocument();
+  expect(screen.getByTestId('workspace-document-shell')).toBeInTheDocument();
+  expect(
+    screen.getByTestId('workspace-document-header'),
+  ).toHaveTextContent('当前模块');
   expect(screen.getByRole('heading', { name: '当前焦点' })).toBeInTheDocument();
 });

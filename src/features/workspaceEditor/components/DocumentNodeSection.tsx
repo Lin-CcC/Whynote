@@ -1,4 +1,6 @@
 import {
+  cloneElement,
+  isValidElement,
   type CSSProperties,
   type ChangeEvent,
   type FocusEvent,
@@ -22,6 +24,7 @@ import {
   buildDocumentNodePresentation,
   PLAN_STEP_STATUS_LABELS,
 } from './documentNodePresentation';
+import PlanStepStatusMenu from './PlanStepStatusMenu';
 
 export type DocumentNodeSectionProps = {
   actions?: ReactNode;
@@ -38,6 +41,7 @@ export type DocumentNodeSectionProps = {
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
   selectedNodeId: string | null;
+  supplementalActions?: ReactNode;
   tree: NodeTree;
 };
 
@@ -58,15 +62,17 @@ export default function DocumentNodeSection({
   onUpdateNode,
   registerNodeElement,
   selectedNodeId,
+  supplementalActions,
   tree,
 }: DocumentNodeSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [hasFocusWithin, setHasFocusWithin] = useState(false);
   const [isTitleInputExpanded, setIsTitleInputExpanded] = useState(false);
   const [pendingFocusField, setPendingFocusField] =
     useState<PendingFocusField>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const contentInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const statusSelectRef = useRef<HTMLSelectElement | null>(null);
   const node = getNodeOrThrow(tree, nodeId);
   const presentation = buildDocumentNodePresentation(tree, node);
   const isSelected = node.id === selectedNodeId;
@@ -90,6 +96,16 @@ export default function DocumentNodeSection({
     presentation.isContentNode &&
     presentation.trimmedDisplayTitle.length === 0 &&
     !isTitleInputExpanded;
+  const legacyShell =
+    presentation.sectionKind === 'module'
+      ? 'document-root'
+      : presentation.sectionKind === 'plan-step'
+        ? 'section-divider'
+        : 'document-node';
+  const frameVisible = isSelected || isEditing;
+  const titleControlVisible =
+    isSelected || isEditing || hasFocusWithin || isHovered;
+  const renderedActions = renderActions(actions, titleControlVisible);
 
   useEffect(() => {
     if (isSelected) {
@@ -133,7 +149,6 @@ export default function DocumentNodeSection({
     if (
       !isOwnedEditableTarget(event.target, {
         contentInputRef,
-        statusSelectRef,
         titleInputRef,
       })
     ) {
@@ -151,7 +166,6 @@ export default function DocumentNodeSection({
     if (
       isOwnedEditableTarget(event.relatedTarget, {
         contentInputRef,
-        statusSelectRef,
         titleInputRef,
       })
     ) {
@@ -180,13 +194,28 @@ export default function DocumentNodeSection({
     onUpdateNode(node.id, { content: event.target.value });
   }
 
-  function handleStatusChange(event: ChangeEvent<HTMLSelectElement>) {
-    onUpdateNode(node.id, { status: event.target.value as PlanStepStatus });
+  function handleStatusChange(status: PlanStepStatus) {
+    onUpdateNode(node.id, { status });
   }
 
   function handleNodeClick(event: MouseEvent<HTMLElement>) {
     event.stopPropagation();
     onSelectNode(node.id);
+  }
+
+  function handleFocusCapture() {
+    setHasFocusWithin(true);
+  }
+
+  function handleBlurCapture(event: FocusEvent<HTMLElement>) {
+    if (
+      event.relatedTarget instanceof Node &&
+      event.currentTarget.contains(event.relatedTarget)
+    ) {
+      return;
+    }
+
+    setHasFocusWithin(false);
   }
 
   function startEditingField(
@@ -214,11 +243,17 @@ export default function DocumentNodeSection({
       data-node-collapsed-summary={hasCollapsedSummary}
       data-node-editing={isEditing}
       data-node-emphasis={presentation.emphasis}
+      data-node-frame-visible={frameVisible}
       data-node-section-kind={presentation.sectionKind}
       data-node-selected={isSelected}
+      data-node-shell={legacyShell}
       data-node-type={node.type}
       data-testid={`editor-node-${node.id}`}
+      onBlurCapture={handleBlurCapture}
       onClick={handleNodeClick}
+      onFocusCapture={handleFocusCapture}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       ref={(element) => registerNodeElement(node.id, element)}
       style={{ '--node-depth': depth } as CSSProperties}
       tabIndex={-1}
@@ -243,41 +278,6 @@ export default function DocumentNodeSection({
                   {badge.label}
                 </span>
               ))}
-              {node.type === 'plan-step' ? (
-                <select
-                  aria-label={`${presentation.displayTitle || presentation.displayLabel} 状态`}
-                  className="workspace-statusSelect"
-                  disabled={isInteractionLocked}
-                  onBlur={handleEditableBlur}
-                  onChange={handleStatusChange}
-                  onClick={(event) => event.stopPropagation()}
-                  onFocus={handleEditableFocus}
-                  ref={statusSelectRef}
-                  value={node.status}
-                >
-                  {Object.entries(PLAN_STEP_STATUS_LABELS).map(
-                    ([status, label]) => (
-                      <option key={status} value={status}>
-                        {label}
-                      </option>
-                    ),
-                  )}
-                </select>
-              ) : null}
-              {onToggleBodyCollapsed ? (
-                <button
-                  className="workspace-nodeBodyToggle"
-                  disabled={isInteractionLocked}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onToggleBodyCollapsed();
-                  }}
-                  type="button"
-                >
-                  {bodyToggleLabel}
-                </button>
-              ) : null}
-              {headerControls}
               {isSelected ? (
                 <span className="workspace-selectedBadge">已选中</span>
               ) : null}
@@ -285,7 +285,49 @@ export default function DocumentNodeSection({
                 <span className="workspace-editingBadge">编辑中</span>
               ) : null}
             </div>
-            {renderTitleField()}
+            <div className="workspace-nodeTitleRow">
+              {renderTitleField()}
+              <div className="workspace-nodeTitleControls">
+                {node.type === 'plan-step' ? (
+                  <PlanStepStatusMenu
+                    disabled={isInteractionLocked}
+                    displayTitle={
+                      presentation.displayTitle || presentation.displayLabel
+                    }
+                    nodeId={node.id}
+                    onOpen={() => {
+                      if (!isSelected) {
+                        onSelectNode(node.id);
+                      }
+                    }}
+                    onStatusChange={handleStatusChange}
+                    status={node.status}
+                  />
+                ) : null}
+                {onToggleBodyCollapsed ? (
+                  <button
+                    className="workspace-nodeBodyToggle"
+                    disabled={isInteractionLocked}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleBodyCollapsed();
+                    }}
+                    type="button"
+                  >
+                    {bodyToggleLabel}
+                  </button>
+                ) : null}
+                {headerControls}
+                {renderedActions ? (
+                  <div
+                    className="workspace-nodeTitleToolbar"
+                    data-visible={titleControlVisible}
+                  >
+                    {renderedActions}
+                  </div>
+                ) : null}
+              </div>
+            </div>
             {isSelected ? (
               <p className="workspace-nodeSelectionHint">
                 {getNodeSelectionHint(tree, node, isEditing)}
@@ -309,47 +351,45 @@ export default function DocumentNodeSection({
               </>
             ) : null}
           </div>
-          {actions ? (
-            <div className="workspace-nodeInlineActions">{actions}</div>
-          ) : null}
           {bodyCollapsed ? (
             <p className="workspace-nodeHint">{bodyCollapsedHint}</p>
+          ) : isSelected ? (
+            <textarea
+              aria-label={`${presentation.displayTitle || presentation.displayLabel} 内容`}
+              className="workspace-nodeContentInput"
+              disabled={isInteractionLocked}
+              onBlur={handleEditableBlur}
+              onChange={handleContentChange}
+              onClick={(event) => event.stopPropagation()}
+              onFocus={handleEditableFocus}
+              placeholder={presentation.contentPlaceholder}
+              ref={contentInputRef}
+              rows={presentation.bodyRows}
+              value={node.content}
+            />
           ) : (
-            <>
-              {isSelected ? (
-                <textarea
-                  aria-label={`${presentation.displayTitle || presentation.displayLabel} 内容`}
-                  className="workspace-nodeContentInput"
-                  disabled={isInteractionLocked}
-                  onBlur={handleEditableBlur}
-                  onChange={handleContentChange}
-                  onClick={(event) => event.stopPropagation()}
-                  onFocus={handleEditableFocus}
-                  placeholder={presentation.contentPlaceholder}
-                  ref={contentInputRef}
-                  rows={presentation.bodyRows}
-                  value={node.content}
-                />
+            <button
+              className="workspace-nodeContentDisplay"
+              data-placeholder={node.content.trim().length === 0}
+              data-testid={`editor-node-content-display-${node.id}`}
+              disabled={isInteractionLocked}
+              onClick={(event) => startEditingField('content', event)}
+              type="button"
+            >
+              {node.content.trim().length > 0 ? (
+                node.content
               ) : (
-                <button
-                  className="workspace-nodeContentDisplay"
-                  data-placeholder={node.content.trim().length === 0}
-                  data-testid={`editor-node-content-display-${node.id}`}
-                  disabled={isInteractionLocked}
-                  onClick={(event) => startEditingField('content', event)}
-                  type="button"
-                >
-                  {node.content.trim().length > 0 ? (
-                    node.content
-                  ) : (
-                    <span className="workspace-nodeContentPlaceholder">
-                      {presentation.contentPlaceholder}
-                    </span>
-                  )}
-                </button>
+                <span className="workspace-nodeContentPlaceholder">
+                  {presentation.contentPlaceholder}
+                </span>
               )}
-            </>
+            </button>
           )}
+          {supplementalActions ? (
+            <div className="workspace-nodeSupplementalActions">
+              {supplementalActions}
+            </div>
+          ) : null}
           {children ? (
             <div className="workspace-nodeChildren">{children}</div>
           ) : null}
@@ -397,6 +437,7 @@ export default function DocumentNodeSection({
 
     return (
       <button
+        aria-label={`${presentation.displayTitle || presentation.displayLabel} 标题`}
         className="workspace-nodeTitleDisplay"
         data-testid={`editor-node-title-display-${node.id}`}
         data-title-tone={presentation.titleTone}
@@ -432,13 +473,21 @@ function isOwnedEditableTarget(
   target: EventTarget | null,
   refs: {
     contentInputRef: RefObject<HTMLTextAreaElement | null>;
-    statusSelectRef: RefObject<HTMLSelectElement | null>;
     titleInputRef: RefObject<HTMLInputElement | null>;
   },
 ) {
   return (
     target === refs.titleInputRef.current ||
-    target === refs.contentInputRef.current ||
-    target === refs.statusSelectRef.current
+    target === refs.contentInputRef.current
   );
+}
+
+function renderActions(actions: ReactNode, isVisible: boolean) {
+  if (!isValidElement<{ isVisible?: boolean }>(actions)) {
+    return actions;
+  }
+
+  return cloneElement(actions, {
+    isVisible: (actions.props.isVisible ?? true) && isVisible,
+  } as never);
 }

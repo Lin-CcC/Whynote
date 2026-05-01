@@ -13,6 +13,7 @@ import {
   type StructuredDataStorage,
 } from '../nodeDomain';
 import WorkspaceRuntimeScreen from './WorkspaceRuntimeScreen';
+import { findNodeByDisplayTitle } from './workspaceRuntimeTestUtils';
 import type { WorkspaceRuntimeDependencies } from './workspaceRuntimeTypes';
 
 const openedStorages: StructuredDataStorage[] = [];
@@ -63,23 +64,18 @@ test('plans a minimal learning path that lands as plan-step plus introduction an
 
   fireEvent.click(screen.getByRole('button', { name: '为当前模块规划学习路径' }));
 
-  expect(await screen.findByDisplayValue('先搭建最小概念框架')).toBeInTheDocument();
+  expect(await screen.findByLabelText('先搭建最小概念框架 标题')).toBeInTheDocument();
+  const introductionNode = await findNodeByDisplayTitle('先知道为什么要学这个问题');
   expect(
-    await screen.findByDisplayValue('先知道为什么要学这个问题'),
+    await screen.findByLabelText('这个模块的核心问题是什么？ 标题'),
   ).toBeInTheDocument();
-  expect(
-    await screen.findByDisplayValue('这个模块的核心问题是什么？'),
-  ).toBeInTheDocument();
-  expect(
-    await screen.findByDisplayValue(/先把这个 step 的目标和前置概念讲清楚/u),
-  ).toBeInTheDocument();
-  const introductionInput = screen.getByDisplayValue(
+  expect(introductionNode).toHaveTextContent(
     /先把这个 step 的目标和前置概念讲清楚/u,
   );
-  expect((introductionInput as HTMLTextAreaElement).value).toContain(
+  expect(introductionNode).toHaveTextContent(
     '这一小步先把“先搭建最小概念框架”说清楚',
   );
-  expect((introductionInput as HTMLTextAreaElement).value).not.toMatch(
+  expect(introductionNode).not.toHaveTextContent(
     /接下来会围绕|理解地图/u,
   );
   expect(await screen.findAllByText('铺垫')).not.toHaveLength(0);
