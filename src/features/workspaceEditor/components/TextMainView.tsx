@@ -9,6 +9,7 @@ import {
   type TreeNode,
 } from '../../nodeDomain';
 import type {
+  LearningActionId,
   NodeContentPatch,
   WorkspaceEditorNodeRenderContext,
   WorkspaceViewState,
@@ -31,13 +32,10 @@ type TextMainViewProps = {
   onGenerateFollowUpQuestion?: (sourceNodeId: string) => void;
   onGenerateSummary?: (sourceNodeId: string) => void;
   onInsertAnswerForQuestion: (questionNodeId: string) => void;
-  onInsertFollowUpQuestion: (
-    questionNodeId: string,
-    options?: {
-      sourceNodeId?: string | null;
-    },
-  ) => void;
-  onInsertSummaryForQuestion: (questionNodeId: string) => void;
+  onInsertFollowUpQuestion: (sourceNodeId: string) => void;
+  onInsertSummaryForNode: (sourceNodeId: string) => void;
+  onDeleteNode: () => void;
+  onRunLearningAction: (actionId: LearningActionId) => void;
   onSelectNode: (nodeId: string) => void;
   onSetCurrentAnswer: (questionNodeId: string, answerNodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
@@ -61,9 +59,11 @@ export default function TextMainView({
   onEvaluateSummary,
   onGenerateFollowUpQuestion,
   onGenerateSummary,
+  onDeleteNode,
   onInsertAnswerForQuestion,
   onInsertFollowUpQuestion,
-  onInsertSummaryForQuestion,
+  onInsertSummaryForNode,
+  onRunLearningAction,
   onSelectNode,
   onSetCurrentAnswer,
   onUpdateNode,
@@ -177,9 +177,11 @@ export default function TextMainView({
         onEvaluateSummary={onEvaluateSummary}
         onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
         onGenerateSummary={onGenerateSummary}
+        onDeleteNode={onDeleteNode}
         onInsertAnswerForQuestion={onInsertAnswerForQuestion}
         onInsertFollowUpQuestion={onInsertFollowUpQuestion}
-        onInsertSummaryForQuestion={onInsertSummaryForQuestion}
+        onInsertSummaryForNode={onInsertSummaryForNode}
+        onRunLearningAction={onRunLearningAction}
         onSelectNode={onSelectNode}
         onSetCurrentAnswer={onSetCurrentAnswer}
         onUpdateNode={onUpdateNode}

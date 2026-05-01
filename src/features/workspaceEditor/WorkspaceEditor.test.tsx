@@ -205,6 +205,35 @@ test('keeps newly inserted answers in the current question answer block before f
   expect(insertChildSpy.mock.calls[0]?.[3]).toBe(1);
 });
 
+test('keeps insert answer reachable from a selected answer inside the active question block', () => {
+  const operations = createOperationSpies();
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-order"
+      initialSelectedNodeId="answer-first"
+      initialSnapshot={createQuestionOrderSnapshot()}
+      operations={operations}
+    />,
+  );
+
+  fireEvent.click(
+    within(screen.getByTestId('question-block-actions-question-parent')).getByRole(
+      'button',
+      {
+        name: '插入回答',
+      },
+    ),
+  );
+
+  const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
+
+  expect(insertChildSpy).toHaveBeenCalledTimes(1);
+  expect(insertChildSpy.mock.calls[0]?.[1]).toBe('question-parent');
+  expect(insertChildSpy.mock.calls[0]?.[2].type).toBe('answer');
+  expect(insertChildSpy.mock.calls[0]?.[3]).toBe(1);
+});
+
 test('inserts an answer under the selected follow-up question instead of the previous question', () => {
   const operations = createOperationSpies();
 
@@ -241,55 +270,84 @@ test('inserts an answer under the selected follow-up question instead of the pre
   expect(insertChildSpy.mock.calls[0]?.[3]).toBe(0);
 });
 
-test('inserts an empty manual follow-up question with source context from the selected answer', async () => {
-  const snapshots: WorkspaceSnapshot[] = [];
+test.each([
+  {
+    sourceContent: '这是当前回答。',
+    sourceNodeId: 'answer-action-source',
+    sourceTitle: '当前回答',
+    sourceType: 'answer',
+  },
+  {
+    sourceContent: '这里明确指出还缺最后一层因果。',
+    sourceNodeId: 'judgment-action-source',
+    sourceTitle: '当前回答判断',
+    sourceType: 'judgment',
+  },
+  {
+    sourceContent: '这是围绕当前回答的答案解析。',
+    sourceNodeId: 'summary-action-closure',
+    sourceTitle: '答案解析草稿',
+    sourceType: 'summary',
+  },
+  {
+    sourceContent: '这是用户自己写的阶段性总结。',
+    sourceNodeId: 'summary-action-manual',
+    sourceTitle: '手写总结',
+    sourceType: 'summary',
+  },
+])(
+  'inserts an empty manual follow-up question with source context from $sourceNodeId',
+  async ({ sourceContent, sourceNodeId, sourceTitle, sourceType }) => {
+    const snapshots: WorkspaceSnapshot[] = [];
 
-  render(
-    <WorkspaceEditor
-      initialModuleId="module-action-source"
-      initialSelectedNodeId="answer-action-source"
-      initialSnapshot={createBlockActionSourceSnapshot()}
-      onSnapshotChange={(snapshot) => {
-        snapshots.push(snapshot);
-      }}
-    />,
-  );
+    render(
+      <WorkspaceEditor
+        initialModuleId="module-action-source"
+        initialSelectedNodeId={sourceNodeId}
+        initialSnapshot={createBlockActionSourceSnapshot()}
+        onSnapshotChange={(snapshot) => {
+          snapshots.push(snapshot);
+        }}
+      />,
+    );
 
-  fireEvent.click(
-    within(
-      screen.getByTestId('question-block-actions-question-action-source'),
-    ).getByRole('button', {
-      name: '插入追问',
-    }),
-  );
+    fireEvent.click(
+      within(
+        screen.getByTestId('question-block-actions-question-action-source'),
+      ).getByRole('button', {
+        name: '插入追问',
+      }),
+    );
 
-  const insertedQuestionTitle = await screen.findByDisplayValue('新问题');
-  const insertedQuestionNode = insertedQuestionTitle.closest(
-    '[data-testid^="editor-node-"]',
-  );
+    const insertedQuestionTitle = await screen.findByDisplayValue('新追问');
+    const insertedQuestionNode = insertedQuestionTitle.closest(
+      '[data-testid^="editor-node-"]',
+    );
 
-  expect(insertedQuestionNode).not.toBeNull();
-  expect(insertedQuestionNode).toHaveTextContent('追问围绕：来源回答 · 当前回答：这是当前回答。');
+    expect(insertedQuestionNode).not.toBeNull();
+    expect(insertedQuestionNode).toHaveTextContent('追问围绕：来源');
+    expect(insertedQuestionNode).toHaveTextContent(sourceTitle);
 
-  const latestSnapshot = snapshots[snapshots.length - 1];
-  const insertedQuestion = Object.values(latestSnapshot.tree.nodes).find(
-    (node) =>
-      node.type === 'question' &&
-      node.parentId === 'question-action-source' &&
-      node.title === '新问题',
-  );
+    const latestSnapshot = snapshots[snapshots.length - 1];
+    const insertedQuestion = Object.values(latestSnapshot.tree.nodes).find(
+      (node) =>
+        node.type === 'question' &&
+        node.parentId === 'question-action-source' &&
+        node.title === '新追问',
+    );
 
-  expect(insertedQuestion).toMatchObject({
-    type: 'question',
-    content: '',
-    sourceContext: {
-      content: '这是当前回答。',
-      nodeId: 'answer-action-source',
-      nodeType: 'answer',
-      title: '当前回答',
-    },
-  });
-});
+    expect(insertedQuestion).toMatchObject({
+      type: 'question',
+      content: '',
+      sourceContext: {
+        content: sourceContent,
+        nodeId: sourceNodeId,
+        nodeType: sourceType,
+        title: sourceTitle,
+      },
+    });
+  },
+);
 
 test('inserts an empty manual summary from the question block instead of delegating to AI', async () => {
   const snapshots: WorkspaceSnapshot[] = [];
@@ -336,6 +394,53 @@ test('inserts an empty manual summary from the question block instead of delegat
     type: 'summary',
     content: '',
     summaryKind: 'manual',
+  });
+});
+
+test('inserts an empty scaffold summary from the selected scaffold node instead of delegating to AI', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+  const onLearningActionRequest = vi.fn(() => true);
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-scaffold-actions"
+      initialSelectedNodeId="summary-scaffold-selected"
+      initialSnapshot={createScaffoldActionSnapshot()}
+      onLearningActionRequest={onLearningActionRequest}
+      onSnapshotChange={(snapshot) => {
+        snapshots.push(snapshot);
+      }}
+    />,
+  );
+
+  fireEvent.click(
+    within(
+      screen.getByTestId('node-actions-summary-scaffold-selected'),
+    ).getByRole('button', {
+      name: '插入总结',
+    }),
+  );
+
+  const insertedSummaryTitle = await screen.findByDisplayValue('新总结');
+  const insertedSummaryNode = insertedSummaryTitle.closest(
+    '[data-testid^="editor-node-"]',
+  );
+
+  expect(onLearningActionRequest).not.toHaveBeenCalled();
+  expect(insertedSummaryNode).not.toBeNull();
+
+  const latestSnapshot = snapshots[snapshots.length - 1];
+  const insertedSummary = Object.values(latestSnapshot.tree.nodes).find(
+    (node) =>
+      node.type === 'summary' &&
+      node.parentId === 'step-scaffold-actions' &&
+      node.title === '新总结',
+  );
+
+  expect(insertedSummary).toMatchObject({
+    type: 'summary',
+    content: '',
+    summaryKind: 'scaffold',
   });
 });
 
@@ -453,7 +558,64 @@ test('promotes a leaf node to currentAnswerId when switching it to answer', asyn
   });
 });
 
-test('shows scaffold teaching follow-up actions when a scaffold node is selected', () => {
+test('shows common progression actions and retained scaffold-specific actions when a scaffold node is selected', () => {
+  const onGenerateFollowUpQuestion = vi.fn();
+  const onGenerateSummary = vi.fn();
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-scaffold-actions"
+      initialSelectedNodeId="summary-scaffold-selected"
+      initialSnapshot={createScaffoldActionSnapshot()}
+      onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
+      onGenerateSummary={onGenerateSummary}
+    />,
+  );
+
+  const actionPanel = screen.getByTestId('node-actions-summary-scaffold-selected');
+
+  expect(
+    within(actionPanel).getByRole('button', { name: '生成追问' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '插入追问' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '生成总结' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '插入总结' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '继续修改' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '删除' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '换个说法' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '更基础一点' }),
+  ).toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '举个例子' }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    within(actionPanel).getByRole('button', { name: '生成追问' }),
+  );
+  fireEvent.click(
+    within(actionPanel).getByRole('button', { name: '生成总结' }),
+  );
+
+  expect(onGenerateFollowUpQuestion).toHaveBeenCalledWith(
+    'summary-scaffold-selected',
+  );
+  expect(onGenerateSummary).toHaveBeenCalledWith('summary-scaffold-selected');
+});
+
+test('deletes the selected scaffold node from the common node action panel', async () => {
   render(
     <WorkspaceEditor
       initialModuleId="module-scaffold-actions"
@@ -462,17 +624,19 @@ test('shows scaffold teaching follow-up actions when a scaffold node is selected
     />,
   );
 
-  const learningActionGrid = screen.getByTestId('learning-action-grid');
+  fireEvent.click(
+    within(
+      screen.getByTestId('node-actions-summary-scaffold-selected'),
+    ).getByRole('button', {
+      name: '删除',
+    }),
+  );
 
-  expect(
-    within(learningActionGrid).getByRole('button', { name: '换个说法解释' }),
-  ).toBeInTheDocument();
-  expect(
-    within(learningActionGrid).getByRole('button', { name: '更基础一点' }),
-  ).toBeInTheDocument();
-  expect(
-    within(learningActionGrid).getByRole('button', { name: '举个例子' }),
-  ).toBeInTheDocument();
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('editor-node-summary-scaffold-selected'),
+    ).not.toBeInTheDocument();
+  });
 });
 
 test('deletes the selected node from the Delete shortcut when focus is outside editable fields', () => {
@@ -1324,6 +1488,21 @@ function createBlockActionSourceSnapshot(): WorkspaceSnapshot {
       content: '这是当前回答。',
       createdAt: '2026-05-01T00:01:00.000Z',
       updatedAt: '2026-05-01T00:01:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-action-source',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-action-source',
+      title: '当前回答判断',
+      content: '这里明确指出还缺最后一层因果。',
+      judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-action-source',
+      sourceAnswerUpdatedAt: '2026-05-01T00:01:00.000Z',
+      createdAt: '2026-05-01T00:01:30.000Z',
+      updatedAt: '2026-05-01T00:01:30.000Z',
     }),
   );
   tree = insertChildNode(

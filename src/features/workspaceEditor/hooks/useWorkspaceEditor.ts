@@ -389,7 +389,7 @@ export function useWorkspaceEditor({
       return;
     }
 
-    const nextNode = createLearningActionNode(actionId, placement);
+    const nextNode = createLearningActionNode(tree, actionId, placement);
 
     runStructuralOperation(
       () => {
@@ -619,37 +619,49 @@ export function useWorkspaceEditor({
     );
   }
 
-  function insertFollowUpQuestion(
-    questionNodeId: string,
-    options?: {
-      sourceNodeId?: string | null;
-    },
-  ) {
-    if (isInteractionLocked || !tree.nodes[questionNodeId]) {
+  function insertFollowUpQuestion(sourceNodeId: string) {
+    if (isInteractionLocked || !tree.nodes[sourceNodeId]) {
       return;
     }
 
-    const questionNode = getNodeOrThrow(tree, questionNodeId);
+    const questionNode = resolveQuestionContextNode(tree, sourceNodeId);
+    const insertionTarget = questionNode
+      ? {
+          insertIndex: questionNode.childIds.length,
+          parentNodeId: questionNode.id,
+          title: '新追问',
+        }
+      : (() => {
+          const placement = resolveLearningActionPlacement(
+            tree,
+            sourceNodeId,
+            'insert-question',
+          );
 
-    if (questionNode.type !== 'question') {
+          return placement
+            ? {
+                ...placement,
+                title: '新追问',
+              }
+            : null;
+        })();
+
+    if (!insertionTarget) {
       return;
     }
 
-    const nextNode = createEditorNode('question', questionNodeId, {
-      sourceContext: buildQuestionSourceContext(
-        tree,
-        questionNodeId,
-        options?.sourceNodeId ?? questionNodeId,
-      ),
+    const nextNode = createEditorNode('question', insertionTarget.parentNodeId, {
+      sourceContext: buildQuestionSourceContext(tree, sourceNodeId),
+      title: insertionTarget.title,
     });
 
     runStructuralOperation(
       () => {
         const nextTree = operations.insertChildNode(
           tree,
-          questionNodeId,
+          insertionTarget.parentNodeId,
           nextNode,
-          questionNode.childIds.length,
+          insertionTarget.insertIndex,
         );
 
         return {
@@ -658,18 +670,18 @@ export function useWorkspaceEditor({
           preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
         };
       },
-      '插入追问失败，请检查当前问题节点。',
+      '插入追问失败，请检查当前节点的上下文。',
     );
   }
 
-  function insertSummaryForQuestion(questionNodeId: string) {
-    if (isInteractionLocked) {
+  function insertSummaryForNode(sourceNodeId: string) {
+    if (isInteractionLocked || !tree.nodes[sourceNodeId]) {
       return;
     }
 
     const placement = resolveLearningActionPlacement(
       tree,
-      questionNodeId,
+      sourceNodeId,
       'insert-summary',
     );
 
@@ -677,8 +689,8 @@ export function useWorkspaceEditor({
       return;
     }
 
-    const nextNode = createEditorNode('summary', questionNodeId, {
-      summaryKind: 'manual',
+    const nextNode = createEditorNode('summary', placement.parentNodeId, {
+      summaryKind: resolveInsertedSummaryKind(tree, placement),
     });
 
     runStructuralOperation(
@@ -696,7 +708,7 @@ export function useWorkspaceEditor({
           preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
         };
       },
-      '插入总结失败，请检查当前问题节点。',
+      '插入总结失败，请检查当前节点。',
     );
   }
 
@@ -836,7 +848,7 @@ export function useWorkspaceEditor({
     expandedNodeIds,
     insertAnswerForQuestion,
     insertFollowUpQuestion,
-    insertSummaryForQuestion,
+    insertSummaryForNode,
     learningActions,
     moduleNodes,
     operationError,
@@ -959,13 +971,14 @@ function createEditorNode(
 }
 
 function createLearningActionNode(
+  tree: NodeTree,
   actionId: LearningActionId,
   placement: LearningActionPlacement,
 ) {
   return createEditorNode(placement.nodeType, placement.parentNodeId, {
     content: getLearningActionStarterContent(actionId),
     judgmentKind: actionId === 'insert-judgment' ? 'manual' : undefined,
-    summaryKind: resolveLearningActionSummaryKind(actionId),
+    summaryKind: resolveLearningActionSummaryKind(tree, actionId, placement),
     title: placement.title,
   });
 }
@@ -1420,7 +1433,11 @@ function setQuestionCurrentAnswerId(
   return nextTree;
 }
 
-function resolveLearningActionSummaryKind(actionId: LearningActionId) {
+function resolveLearningActionSummaryKind(
+  tree: NodeTree,
+  actionId: LearningActionId,
+  placement: LearningActionPlacement,
+) {
   switch (actionId) {
     case 'insert-scaffold':
     case 'rephrase-scaffold':
@@ -1428,7 +1445,7 @@ function resolveLearningActionSummaryKind(actionId: LearningActionId) {
     case 'add-example':
       return 'scaffold' as const;
     case 'insert-summary':
-      return 'manual' as const;
+      return resolveInsertedSummaryKind(tree, placement);
     default:
       return undefined;
   }
@@ -1436,7 +1453,6 @@ function resolveLearningActionSummaryKind(actionId: LearningActionId) {
 
 function buildQuestionSourceContext(
   tree: NodeTree,
-  questionNodeId: string,
   sourceNodeId: string,
 ) {
   const sourceNode = tree.nodes[sourceNodeId];
@@ -1451,14 +1467,6 @@ function buildQuestionSourceContext(
     return undefined;
   }
 
-  if (sourceNode.type === 'question') {
-    if (sourceNode.id !== questionNodeId) {
-      return undefined;
-    }
-  } else if (sourceNode.parentId !== questionNodeId) {
-    return undefined;
-  }
-
   return {
     content: sourceNode.content,
     nodeId: sourceNode.id,
@@ -1466,6 +1474,31 @@ function buildQuestionSourceContext(
     title: sourceNode.title,
     updatedAt: sourceNode.updatedAt,
   } satisfies NonNullable<Extract<TreeNode, { type: 'question' }>['sourceContext']>;
+}
+
+function resolveInsertedSummaryKind(
+  tree: NodeTree,
+  placement: LearningActionPlacement,
+) {
+  const parentNode = tree.nodes[placement.parentNodeId];
+
+  return parentNode?.type === 'plan-step' ? ('scaffold' as const) : ('manual' as const);
+}
+
+function resolveQuestionContextNode(tree: NodeTree, selectedNodeId: string) {
+  const selectedNode = getNodeOrThrow(tree, selectedNodeId);
+
+  if (selectedNode.type === 'question') {
+    return selectedNode;
+  }
+
+  if (selectedNode.parentId === null) {
+    return null;
+  }
+
+  const parentNode = tree.nodes[selectedNode.parentId];
+
+  return parentNode?.type === 'question' ? parentNode : null;
 }
 
 function isEditableKeyboardTarget(target: EventTarget | null) {

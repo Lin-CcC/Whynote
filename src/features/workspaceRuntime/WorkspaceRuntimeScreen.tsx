@@ -496,7 +496,22 @@ function resolveFollowUpQuestionDraftRequest(
   const questionNodeId = findNearestQuestionNodeId(tree, sourceNodeId);
 
   if (!questionNodeId) {
-    return null;
+    const placement = resolveLearningActionPlacement(tree, sourceNodeId, 'insert-question');
+
+    if (!placement) {
+      return null;
+    }
+
+    return {
+      actionId: 'insert-question',
+      currentModuleId: getModuleScopeId(tree, sourceNodeId) ?? currentModuleId,
+      placement: {
+        ...placement,
+        title: '新追问',
+      },
+      selectedNodeId: sourceNodeId,
+      tree,
+    };
   }
 
   const questionNode = getNodeOrThrow(tree, questionNodeId);

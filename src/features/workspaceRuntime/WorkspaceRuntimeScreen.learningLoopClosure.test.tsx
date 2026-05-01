@@ -309,7 +309,11 @@ test('directly answers a hand-authored question and keeps the answer-revision pa
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
 
-  fireEvent.click(screen.getByRole('button', { name: '回到当前回答继续修改' }));
+  fireEvent.click(
+    within(screen.getByTestId('answer-evaluation-callout')).getByRole('button', {
+      name: '回到当前回答继续修改',
+    }),
+  );
   expect(
     screen
       .getByDisplayValue('AI 回答草稿')
@@ -378,6 +382,12 @@ test.each([
     sourceNodeId: 'answer-follow-up-source',
     sourceTitle: '第一版回答',
     sourceType: 'answer',
+  },
+  {
+    sourceContent: '这里明确指出还缺最后一层因果。',
+    sourceNodeId: 'judgment-follow-up-source',
+    sourceTitle: '当前回答判断',
+    sourceType: 'judgment',
   },
   {
     sourceContent: '先补上“合并更新如何减少重复渲染”的因果链条。',
@@ -550,6 +560,227 @@ test('evaluates a sufficient answer into a closed question and promotes the step
   ).toHaveAttribute('data-node-selected', 'true');
 });
 
+test.each([
+  {
+    sourceContent: '这里明确指出还缺最后一层因果。',
+    sourceNodeId: 'judgment-follow-up-source',
+    sourceTitle: '当前回答判断',
+    sourceType: 'judgment',
+  },
+  {
+    sourceContent: '先补上“合并更新如何减少重复渲染”的因果链条。',
+    sourceNodeId: 'summary-follow-up-source-closure',
+    sourceTitle: '答案解析草稿',
+    sourceType: 'summary',
+  },
+  {
+    sourceContent: '这是用户自己写的阶段性总结。',
+    sourceNodeId: 'summary-follow-up-source-manual',
+    sourceTitle: '手写总结',
+    sourceType: 'summary',
+  },
+])(
+  'restores the $sourceNodeId source context when directly answering a manually inserted follow-up',
+  async ({ sourceContent, sourceNodeId, sourceTitle, sourceType }) => {
+    let observedLearningActionPrompt = '';
+    const dependencies = await createPreloadedDependencies(
+      createFollowUpSourceContextSnapshot(),
+      createMockProviderClient({
+        'learning-action-draft': (request: AiProviderObjectRequest<unknown>) => {
+          const actionId = extractLearningActionId(request);
+          const userMessage =
+            request.messages.find((message) => message.role === 'user')?.content ??
+            '';
+
+          if (actionId === 'insert-answer') {
+            observedLearningActionPrompt = userMessage;
+
+            return {
+              title: '追问回答草稿',
+              content: '先接住来源内容，再回答这条手动插入的追问。',
+            };
+          }
+
+          return {};
+        },
+      }),
+    );
+
+    render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+    await screen.findByRole('heading', { name: '当前学习模块' });
+
+    fireEvent.focus(screen.getByLabelText(`${sourceTitle} 标题`));
+    fireEvent.click(
+      within(
+        screen.getByTestId('question-block-actions-question-follow-up-source'),
+      ).getByRole('button', {
+        name: '插入追问',
+      }),
+    );
+
+    const followUpQuestionTitle = await screen.findByDisplayValue('新追问');
+    const followUpQuestionNode = followUpQuestionTitle.closest(
+      '[data-testid^="editor-node-"]',
+    );
+
+    expect(followUpQuestionNode).not.toBeNull();
+    expect(followUpQuestionNode).toHaveTextContent(`追问围绕：来源`);
+    expect(followUpQuestionNode).toHaveTextContent(sourceTitle);
+
+    fireEvent.click(
+      within(await screen.findByTestId('question-direct-answer-callout')).getByRole(
+        'button',
+        { name: '直接回答当前问题' },
+      ),
+    );
+
+    expect(await screen.findByDisplayValue('追问回答草稿')).toBeInTheDocument();
+    expect(observedLearningActionPrompt).toContain('学习动作：insert-answer');
+    expect(observedLearningActionPrompt).toContain('追问来源上下文');
+    expect(observedLearningActionPrompt).toContain(sourceType);
+    expect(observedLearningActionPrompt).toContain(sourceTitle);
+    expect(observedLearningActionPrompt).toContain(sourceContent);
+
+    const savedSnapshot = await waitForSavedSnapshot(
+      dependencies.structuredDataStorage,
+      (snapshot) =>
+        findNodeByTitle(snapshot, '新追问') !== null &&
+        findNodeByTitle(snapshot, '追问回答草稿') !== null,
+    );
+    const followUpQuestionNodeInSnapshot = findNodeByTitle(savedSnapshot, '新追问');
+
+    expect(followUpQuestionNodeInSnapshot).toMatchObject({
+      type: 'question',
+      sourceContext: {
+        content: sourceContent,
+        nodeId: sourceNodeId,
+        nodeType: sourceType,
+        title: sourceTitle,
+      },
+    });
+  },
+);
+
+test.each([
+  {
+    actionLabel: '生成追问',
+    expectedFollowUpTitle: '围绕铺垫继续追问',
+  },
+  {
+    actionLabel: '插入追问',
+    expectedFollowUpTitle: '新追问',
+  },
+])(
+  'restores scaffold source context when directly answering a follow-up created from scaffold summary via $actionLabel',
+  async ({ actionLabel, expectedFollowUpTitle }) => {
+    let observedLearningActionPrompt = '';
+    const dependencies = await createPreloadedDependencies(
+      createScaffoldFollowUpSourceContextSnapshot(),
+      createMockProviderClient({
+        'learning-action-draft': (request: AiProviderObjectRequest<unknown>) => {
+          const actionId = extractLearningActionId(request);
+          const userMessage =
+            request.messages.find((message) => message.role === 'user')?.content ??
+            '';
+
+          if (actionId === 'insert-question') {
+            return {
+              title: '围绕铺垫继续追问',
+              content: '请沿着这段铺垫继续追问最关键的理解检查点。',
+            };
+          }
+
+          if (actionId === 'insert-answer') {
+            observedLearningActionPrompt = userMessage;
+
+            return {
+              title: '铺垫追问回答草稿',
+              content: '先接住这段铺垫，再回答后面的追问。',
+            };
+          }
+
+          return {};
+        },
+      }),
+    );
+
+    render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+    await screen.findByRole('heading', { name: '当前学习模块' });
+
+    fireEvent.focus(screen.getByLabelText('铺垫讲解 标题'));
+    fireEvent.click(
+      within(
+        screen.getByTestId('node-actions-summary-follow-up-source-scaffold'),
+      ).getByRole('button', {
+        name: actionLabel,
+      }),
+    );
+
+    const insertedFollowUpSnapshot = await waitForSavedSnapshot(
+      dependencies.structuredDataStorage,
+      (snapshot) =>
+        Object.values(snapshot.tree.nodes).some(
+          (node) =>
+            node.type === 'question' &&
+            node.parentId === 'step-scaffold-follow-up-source-context' &&
+            node.sourceContext?.nodeId === 'summary-follow-up-source-scaffold',
+        ),
+    );
+    const insertedFollowUpNode = Object.values(insertedFollowUpSnapshot.tree.nodes).find(
+      (node) =>
+        node.type === 'question' &&
+        node.parentId === 'step-scaffold-follow-up-source-context' &&
+        node.sourceContext?.nodeId === 'summary-follow-up-source-scaffold',
+    );
+
+    expect(insertedFollowUpNode).toMatchObject({
+      title: expectedFollowUpTitle,
+    });
+
+    const followUpCallout = await screen.findByTestId('question-direct-answer-callout');
+    const followUpNode = screen.getByTestId(`editor-node-${insertedFollowUpNode?.id}`);
+
+    expect(followUpCallout).toBeInTheDocument();
+    expect(followUpNode).toHaveTextContent(
+      '追问围绕：来源总结 · 铺垫讲解：先建立概念地图，再进入后续问题。',
+    );
+
+    fireEvent.click(
+      within(followUpCallout).getByRole('button', {
+        name: '直接回答当前问题',
+      }),
+    );
+
+    expect(await screen.findByDisplayValue('铺垫追问回答草稿')).toBeInTheDocument();
+    expect(observedLearningActionPrompt).toContain('学习动作：insert-answer');
+    expect(observedLearningActionPrompt).toContain('追问来源上下文');
+    expect(observedLearningActionPrompt).toContain('summary');
+    expect(observedLearningActionPrompt).toContain('铺垫讲解');
+    expect(observedLearningActionPrompt).toContain('先建立概念地图，再进入后续问题。');
+
+    const savedSnapshot = await waitForSavedSnapshot(
+      dependencies.structuredDataStorage,
+      (snapshot) =>
+        findNodeByTitle(snapshot, expectedFollowUpTitle) !== null &&
+        findNodeByTitle(snapshot, '铺垫追问回答草稿') !== null,
+    );
+    const followUpQuestionNodeInSnapshot = findNodeByTitle(
+      savedSnapshot,
+      expectedFollowUpTitle,
+    );
+
+    expect(followUpQuestionNodeInSnapshot).toMatchObject({
+      type: 'question',
+      sourceContext: {
+        content: '先建立概念地图，再进入后续问题。',
+        nodeId: 'summary-follow-up-source-scaffold',
+        nodeType: 'summary',
+        title: '铺垫讲解',
+      },
+    });
+  },
+);
+
 test('re-evaluates the question current answer instead of the selected old answer', async () => {
   let observedQuestionClosurePrompt = '';
   const dependencies = await createPreloadedDependencies(
@@ -721,7 +952,7 @@ test('keeps judgment nodes actionable within the current answer revision path', 
   );
   expect(
     screen
-      .getByDisplayValue('第一版回答')
+      .getByDisplayValue('第二版回答')
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
 
@@ -734,7 +965,7 @@ test('keeps judgment nodes actionable within the current answer revision path', 
   );
   expect(
     screen
-      .getByDisplayValue('标准理解：第一版回答')
+      .getByDisplayValue('标准理解：第二版回答')
       .closest('[data-testid^="editor-node-"]'),
   ).toHaveAttribute('data-node-selected', 'true');
 });
@@ -763,7 +994,13 @@ test('extends a scaffold with a simpler follow-up explanation draft', async () =
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(screen.getByRole('button', { name: '更基础一点' }));
+  fireEvent.focus(screen.getByLabelText('先知道什么叫批处理 标题'));
+  fireEvent.click(
+    within(screen.getByTestId('node-actions-intro-answer-closure')).getByRole(
+      'button',
+      { name: '更基础一点' },
+    ),
+  );
 
   const titleInput = await screen.findByDisplayValue(
     '先用排队的直觉理解批处理',
@@ -821,7 +1058,12 @@ test('creates AI drafts for scaffold, generate-follow-up, generate-summary and j
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.click(screen.getByRole('button', { name: '插入铺垫 / 讲解' }));
+  fireEvent.focus(screen.getByLabelText('理解批处理为什么成立 标题'));
+  fireEvent.click(
+    within(screen.getByTestId('learning-action-grid')).getByRole('button', {
+      name: '插入铺垫 / 讲解',
+    }),
+  );
   expect(
     await screen.findByDisplayValue('先把同一轮更新放到一张图里'),
   ).toBeInTheDocument();
@@ -1421,6 +1663,20 @@ function createFollowUpSourceContextSnapshot(): WorkspaceSnapshot {
     tree,
     'question-follow-up-source',
     createNode({
+      type: 'judgment',
+      id: 'judgment-follow-up-source',
+      title: '当前回答判断',
+      content: '这里明确指出还缺最后一层因果。',
+      judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-follow-up-source',
+      sourceAnswerUpdatedAt: '2026-05-01T00:01:00.000Z',
+      createdAt: '2026-05-01T00:01:30.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-follow-up-source',
+    createNode({
       type: 'summary',
       id: 'summary-follow-up-source-closure',
       title: '答案解析草稿',
@@ -1441,6 +1697,70 @@ function createFollowUpSourceContextSnapshot(): WorkspaceSnapshot {
       content: '这是用户自己写的阶段性总结。',
       summaryKind: 'manual',
       createdAt: '2026-05-01T00:03:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createScaffoldFollowUpSourceContextSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '铺垫追问来源上下文',
+    workspaceId: 'workspace-scaffold-follow-up-source-context',
+    rootId: 'theme-scaffold-follow-up-source-context',
+    createdAt: '2026-05-01T01:00:00.000Z',
+    updatedAt: '2026-05-01T01:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-scaffold-follow-up-source-context',
+      title: '铺垫追问来源上下文模块',
+      content: '验证从铺垫节点发起追问后，direct answer 仍能恢复具体来源。',
+      createdAt: '2026-05-01T01:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-scaffold-follow-up-source-context',
+    createNode({
+      type: 'plan-step',
+      id: 'step-scaffold-follow-up-source-context',
+      title: '铺垫追问来源上下文步骤',
+      content: '先围绕铺垫发起追问，再直接回答这条新追问。',
+      status: 'doing',
+      createdAt: '2026-05-01T01:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-scaffold-follow-up-source-context',
+    createNode({
+      type: 'summary',
+      id: 'summary-follow-up-source-scaffold',
+      title: '铺垫讲解',
+      content: '先建立概念地图，再进入后续问题。',
+      summaryKind: 'scaffold',
+      createdAt: '2026-05-01T01:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-scaffold-follow-up-source-context',
+    createNode({
+      type: 'question',
+      id: 'question-after-scaffold-source',
+      title: '铺垫后的原始问题',
+      content: '这里保留一个原始问题，确保铺垫上下文仍处在真实学习步骤里。',
+      createdAt: '2026-05-01T01:01:00.000Z',
     }),
   );
 

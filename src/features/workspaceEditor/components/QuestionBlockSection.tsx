@@ -2,6 +2,8 @@ import { Fragment, type ReactNode } from 'react';
 
 import {
   buildQuestionBlockData,
+  getCurrentQuestionAnswerNodeId,
+  getSummaryNodeKind,
   type QuestionBlockAnswerGroup,
   type QuestionBlockEntry,
   type QuestionBlockSummaryGroup,
@@ -14,6 +16,7 @@ import {
 } from '../utils/workspaceViewState';
 import type { MainViewNodeProps } from './mainViewTypes';
 import EditableNodeCard from './EditableNodeCard';
+import LearningActionPanel, { type LearningActionSection } from './LearningActionPanel';
 
 type QuestionBlockSectionProps = MainViewNodeProps & {
   renderChildNode: (nodeId: string, depth: number) => ReactNode;
@@ -25,13 +28,14 @@ export default function QuestionBlockSection({
   isInteractionLocked,
   nodeId,
   onDirectAnswerQuestion,
+  onDeleteNode,
   onEvaluateAnswer,
   onEvaluateSummary,
   onGenerateFollowUpQuestion,
   onGenerateSummary,
   onInsertAnswerForQuestion,
   onInsertFollowUpQuestion,
-  onInsertSummaryForQuestion,
+  onInsertSummaryForNode,
   onSelectNode,
   onSetCurrentAnswer,
   onUpdateNode,
@@ -56,6 +60,7 @@ export default function QuestionBlockSection({
     question.id,
     selectedNodeId,
   );
+  const questionIsSelected = selectedNodeId === question.id;
 
   function updateViewState(
     updater: (state: typeof workspaceViewState) => typeof workspaceViewState,
@@ -106,6 +111,29 @@ export default function QuestionBlockSection({
     }));
   }
 
+  function selectNodeForEditing(nodeIdToSelect: string) {
+    ensureNodeBodyExpanded(nodeIdToSelect);
+    onSelectNode(nodeIdToSelect);
+  }
+
+  function buildCommonNodeActionSection(nodeIdToSelect: string): LearningActionSection {
+    return {
+      buttons: [
+        {
+          disabled: isInteractionLocked,
+          label: '继续修改',
+          onClick: () => selectNodeForEditing(nodeIdToSelect),
+        },
+        {
+          disabled: isInteractionLocked,
+          label: '删除',
+          onClick: onDeleteNode,
+        },
+      ],
+      title: '通用节点动作',
+    };
+  }
+
   function renderSupportNode(node: TreeNode, nodeDepth: number) {
     const inlineActions = renderNodeInlineActions?.({
       isSelected: node.id === selectedNodeId,
@@ -113,10 +141,14 @@ export default function QuestionBlockSection({
       selectNode: onSelectNode,
       tree,
     });
+    const supportNodeActions =
+      node.id === selectedNodeId
+        ? buildSelectedSupportNodeActions(node, inlineActions)
+        : inlineActions;
 
     return (
       <EditableNodeCard
-        actions={inlineActions}
+        actions={supportNodeActions}
         bodyCollapsed={workspaceViewState.collapsedNodeBodyIds.includes(node.id)}
         depth={nodeDepth}
         isInteractionLocked={isInteractionLocked}
@@ -132,6 +164,44 @@ export default function QuestionBlockSection({
     );
   }
 
+  function buildSelectedSupportNodeActions(
+    node: TreeNode,
+    inlineActions: ReactNode,
+  ) {
+    const sections: LearningActionSection[] = [buildCommonNodeActionSection(node.id)];
+
+    if (
+      node.type === 'summary' &&
+      node.parentId !== null &&
+      getSummaryNodeKind(tree, node) === 'answer-closure'
+    ) {
+      const currentAnswerNodeId = getCurrentQuestionAnswerNodeId(tree, node.parentId);
+
+      sections.push({
+        buttons: [
+          {
+            disabled: isInteractionLocked || currentAnswerNodeId === null,
+            label: '回到当前回答继续修改',
+            onClick: () => {
+              if (!currentAnswerNodeId) {
+                return;
+              }
+
+              selectNodeForEditing(currentAnswerNodeId);
+            },
+          },
+        ],
+        title: '节点专属动作',
+      });
+    }
+
+    return (
+      <LearningActionPanel sections={sections} testId={`node-actions-${node.id}`}>
+        {inlineActions}
+      </LearningActionPanel>
+    );
+  }
+
   function renderAnswerGroup(
     answerGroup: QuestionBlockAnswerGroup,
     options: {
@@ -143,43 +213,42 @@ export default function QuestionBlockSection({
       workspaceViewState.expandedHistorySectionIds.includes(
         answerHistorySectionId,
       );
-    const answerActions = (
-      <div className="workspace-nodeActionRow">
-        {options.isCurrent && onEvaluateAnswer ? (
-          <button
-            className="workspace-nodeActionButton"
-            disabled={
-              isInteractionLocked || answerGroup.answer.content.trim().length === 0
-            }
-            onClick={() => onEvaluateAnswer(question.id, answerGroup.answer.id)}
-            type="button"
-          >
-            重新评估当前回答
-          </button>
-        ) : null}
-        <button
-          className="workspace-nodeActionButton"
-          disabled={isInteractionLocked}
-          onClick={() => {
-            ensureNodeBodyExpanded(answerGroup.answer.id);
-            onSelectNode(answerGroup.answer.id);
-          }}
-          type="button"
-        >
-          继续修改
-        </button>
-        {!options.isCurrent ? (
-          <button
-            className="workspace-nodeActionButton"
-            disabled={isInteractionLocked}
-            onClick={() => onSetCurrentAnswer(question.id, answerGroup.answer.id)}
-            type="button"
-          >
-            设为当前回答
-          </button>
-        ) : null}
-      </div>
-    );
+    const answerActions =
+      answerGroup.answer.id === selectedNodeId ? (
+        <LearningActionPanel
+          sections={[
+            buildCommonNodeActionSection(answerGroup.answer.id),
+            {
+              buttons: [
+                ...(options.isCurrent && onEvaluateAnswer
+                  ? [
+                      {
+                        disabled:
+                          isInteractionLocked ||
+                          answerGroup.answer.content.trim().length === 0,
+                        label: '重新评估当前回答',
+                        onClick: () =>
+                          onEvaluateAnswer(question.id, answerGroup.answer.id),
+                      },
+                    ]
+                  : []),
+                ...(!options.isCurrent
+                  ? [
+                      {
+                        disabled: isInteractionLocked,
+                        label: '设为当前回答',
+                        onClick: () =>
+                          onSetCurrentAnswer(question.id, answerGroup.answer.id),
+                      },
+                    ]
+                  : []),
+              ],
+              title: '节点专属动作',
+            },
+          ]}
+          testId={`node-actions-${answerGroup.answer.id}`}
+        />
+      ) : null;
 
     return (
       <div
@@ -247,33 +316,29 @@ export default function QuestionBlockSection({
       workspaceViewState.expandedHistorySectionIds.includes(
         summaryHistorySectionId,
       );
-    const summaryActions = (
-      <div className="workspace-nodeActionRow">
-        {onEvaluateSummary ? (
-          <button
-            className="workspace-nodeActionButton"
-            disabled={
-              isInteractionLocked || summaryGroup.summary.content.trim().length === 0
-            }
-            onClick={() => onEvaluateSummary(summaryGroup.summary.id)}
-            type="button"
-          >
-            检查这个总结
-          </button>
-        ) : null}
-        <button
-          className="workspace-nodeActionButton"
-          disabled={isInteractionLocked}
-          onClick={() => {
-            ensureNodeBodyExpanded(summaryGroup.summary.id);
-            onSelectNode(summaryGroup.summary.id);
-          }}
-          type="button"
-        >
-          继续修改
-        </button>
-      </div>
-    );
+    const summaryActions =
+      summaryGroup.summary.id === selectedNodeId ? (
+        <LearningActionPanel
+          sections={[
+            buildCommonNodeActionSection(summaryGroup.summary.id),
+            {
+              buttons: onEvaluateSummary
+                ? [
+                    {
+                      disabled:
+                        isInteractionLocked ||
+                        summaryGroup.summary.content.trim().length === 0,
+                      label: '检查这个总结',
+                      onClick: () => onEvaluateSummary(summaryGroup.summary.id),
+                    },
+                  ]
+                : [],
+              title: '节点专属动作',
+            },
+          ]}
+          testId={`node-actions-${summaryGroup.summary.id}`}
+        />
+      ) : null;
 
     return (
       <div
@@ -369,66 +434,82 @@ export default function QuestionBlockSection({
               className="workspace-questionBlockActions"
               data-testid={`question-block-actions-${question.id}`}
             >
-              {onDirectAnswerQuestion ? (
-                <button
-                  className="workspace-nodeActionButton"
-                  disabled={
-                    isInteractionLocked || questionBlock.currentAnswerNodeId !== null
-                  }
-                  onClick={() => onDirectAnswerQuestion(question.id)}
-                  type="button"
-                >
-                  直接回答当前问题
-                </button>
-              ) : null}
-              <button
-                className="workspace-nodeActionButton"
-                disabled={isInteractionLocked}
-                onClick={() => onInsertAnswerForQuestion(question.id)}
-                type="button"
-              >
-                插入回答
-              </button>
-              {onGenerateFollowUpQuestion ? (
-                <button
-                  className="workspace-nodeActionButton"
-                  disabled={isInteractionLocked}
-                  onClick={() => onGenerateFollowUpQuestion(actionSourceNodeId)}
-                  type="button"
-                >
-                  生成追问
-                </button>
-              ) : null}
-              <button
-                className="workspace-nodeActionButton"
-                disabled={isInteractionLocked}
-                onClick={() =>
-                  onInsertFollowUpQuestion(question.id, {
-                    sourceNodeId: actionSourceNodeId,
-                  })
-                }
-                type="button"
-              >
-                插入追问
-              </button>
-              {onGenerateSummary ? (
-                <button
-                  className="workspace-nodeActionButton"
-                  disabled={isInteractionLocked}
-                  onClick={() => onGenerateSummary(actionSourceNodeId)}
-                  type="button"
-                >
-                  生成总结
-                </button>
-              ) : null}
-              <button
-                className="workspace-nodeActionButton"
-                disabled={isInteractionLocked}
-                onClick={() => onInsertSummaryForQuestion(question.id)}
-                type="button"
-              >
-                插入总结
-              </button>
+              <LearningActionPanel
+                sections={[
+                  {
+                    buttons: [
+                      ...(onGenerateFollowUpQuestion
+                        ? [
+                            {
+                              disabled: isInteractionLocked,
+                              label: '生成追问',
+                              onClick: () =>
+                                onGenerateFollowUpQuestion(actionSourceNodeId),
+                            },
+                          ]
+                        : []),
+                      {
+                        disabled: isInteractionLocked,
+                        label: '插入追问',
+                        onClick: () => onInsertFollowUpQuestion(actionSourceNodeId),
+                      },
+                      ...(onGenerateSummary
+                        ? [
+                            {
+                              disabled: isInteractionLocked,
+                              label: '生成总结',
+                              onClick: () => onGenerateSummary(actionSourceNodeId),
+                            },
+                          ]
+                        : []),
+                      {
+                        disabled: isInteractionLocked,
+                        label: '插入总结',
+                        onClick: () => onInsertSummaryForNode(actionSourceNodeId),
+                      },
+                    ],
+                    title: '通用推进动作',
+                  },
+                  {
+                    buttons: [
+                      ...(questionIsSelected && onDirectAnswerQuestion
+                        ? [
+                            {
+                              disabled:
+                                isInteractionLocked ||
+                                questionBlock.currentAnswerNodeId !== null,
+                              label: '直接回答当前问题',
+                              onClick: () => onDirectAnswerQuestion(question.id),
+                            },
+                          ]
+                        : []),
+                      {
+                        disabled: isInteractionLocked,
+                        label: '插入回答',
+                        onClick: () => onInsertAnswerForQuestion(question.id),
+                      },
+                    ],
+                    title: '当前问题动作',
+                  },
+                  {
+                    buttons: questionIsSelected
+                      ? [
+                          {
+                            disabled: isInteractionLocked,
+                            label: '继续修改',
+                            onClick: () => onSelectNode(question.id),
+                          },
+                          {
+                            disabled: isInteractionLocked,
+                            label: '删除',
+                            onClick: onDeleteNode,
+                          },
+                        ]
+                      : [],
+                    title: '通用节点动作',
+                  },
+                ]}
+              />
             </div>
           ) : null}
           {!questionBlock.currentAnswerNodeId && isActive ? (
