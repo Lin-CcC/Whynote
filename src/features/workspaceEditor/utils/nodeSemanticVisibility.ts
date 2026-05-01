@@ -9,7 +9,7 @@ import {
   isAnswerClosureResultNodeStale,
   isSummaryCheckJudgmentNodeStale,
 } from '../../nodeDomain';
-import { getDisplayTitleForNode } from './treeSelectors';
+import { getNodeDisplayName } from './treeSelectors';
 
 type SemanticBadgeTone = 'current' | 'history' | 'stale';
 
@@ -21,6 +21,7 @@ export type NodeSemanticBadge = {
 
 export type NodeSemanticVisibility = {
   badges: NodeSemanticBadge[];
+  compactRelationNote?: string | null;
   notes: string[];
 };
 
@@ -29,6 +30,7 @@ export function getNodeSemanticVisibility(
   node: TreeNode,
 ): NodeSemanticVisibility {
   const badges: NodeSemanticBadge[] = [];
+  let compactRelationNote: string | null = null;
   const notes: string[] = [];
 
   if (node.type === 'question') {
@@ -36,7 +38,7 @@ export function getNodeSemanticVisibility(
 
     if (currentAnswerNode) {
       notes.push(
-        `当前回答：${formatNodeDisplayName(tree, currentAnswerNode, '回答')}${currentAnswerNode.content.trim().length === 0 ? '（正文为空）' : ''}`,
+        `当前回答：${getNodeDisplayName(tree, currentAnswerNode, { fallbackLabel: '回答' })}${currentAnswerNode.content.trim().length === 0 ? '（正文为空）' : ''}`,
       );
     }
 
@@ -62,19 +64,35 @@ export function getNodeSemanticVisibility(
   }
 
   if (node.type === 'summary' && getSummaryNodeKind(tree, node) === 'answer-closure') {
-    appendAnswerClosureResultVisibility(tree, node, badges, notes);
+    compactRelationNote = appendAnswerClosureResultVisibility(
+      tree,
+      node,
+      badges,
+      notes,
+    );
   }
 
   if (node.type === 'judgment' && getJudgmentNodeKind(tree, node) === 'answer-closure') {
-    appendAnswerClosureResultVisibility(tree, node, badges, notes);
+    compactRelationNote = appendAnswerClosureResultVisibility(
+      tree,
+      node,
+      badges,
+      notes,
+    );
   }
 
   if (node.type === 'judgment' && getJudgmentNodeKind(tree, node) === 'summary-check') {
-    appendSummaryCheckResultVisibility(tree, node, badges, notes);
+    compactRelationNote = appendSummaryCheckResultVisibility(
+      tree,
+      node,
+      badges,
+      notes,
+    );
   }
 
   return {
     badges,
+    compactRelationNote,
     notes,
   };
 }
@@ -89,7 +107,7 @@ function appendAnswerClosureResultVisibility(
   const sourceAnswerNode = resolveAnswerClosureSourceAnswerNode(tree, node);
 
   if (!parentQuestionNode || !sourceAnswerNode) {
-    return;
+    return null;
   }
 
   const currentAnswerNodeId = getCurrentQuestionAnswerNodeId(tree, parentQuestionNode.id);
@@ -120,9 +138,10 @@ function appendAnswerClosureResultVisibility(
     });
   }
 
-  notes.push(
-    `配对回答：${currentAnswerNodeId === sourceAnswerNode.id ? '当前回答' : '旧回答'} · ${formatNodeDisplayName(tree, sourceAnswerNode, '回答')}`,
-  );
+  const relationNote = `配对回答：${currentAnswerNodeId === sourceAnswerNode.id ? '当前回答' : '旧回答'} · ${getNodeDisplayName(tree, sourceAnswerNode, { fallbackLabel: '回答' })}`;
+  notes.push(relationNote);
+
+  return relationNote;
 }
 
 function appendSummaryCheckResultVisibility(
@@ -135,7 +154,7 @@ function appendSummaryCheckResultVisibility(
   const sourceSummaryNode = resolveSummaryCheckSourceSummaryNode(tree, node);
 
   if (!parentQuestionNode || !sourceSummaryNode) {
-    return;
+    return null;
   }
 
   const latestResultNodeId = getQuestionSummaryCheckJudgmentNodeId(
@@ -158,7 +177,10 @@ function appendSummaryCheckResultVisibility(
     });
   }
 
-  notes.push(`检查对象：${formatNodeDisplayName(tree, sourceSummaryNode, '总结')}`);
+  const relationNote = `检查对象：${getNodeDisplayName(tree, sourceSummaryNode, { fallbackLabel: '总结' })}`;
+  notes.push(relationNote);
+
+  return relationNote;
 }
 
 function resolveCurrentQuestionAnswerNode(tree: NodeTree, questionNode: TreeNode) {
@@ -302,12 +324,3 @@ function findPreviousQuestionChildNode<TNode extends TreeNode>(
   return null;
 }
 
-function formatNodeDisplayName(
-  tree: NodeTree,
-  node: TreeNode,
-  fallbackLabel: string,
-) {
-  const displayTitle = getDisplayTitleForNode(tree, node).trim();
-
-  return displayTitle.length > 0 ? displayTitle : `未命名${fallbackLabel}`;
-}

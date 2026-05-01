@@ -14,6 +14,9 @@ import {
   getAnswerHistorySectionId,
   getSummaryHistorySectionId,
 } from '../utils/workspaceViewState';
+import CollapsedLearningNodeSummary, {
+  buildCollapsedLearningNodeSummaryModel,
+} from './CollapsedLearningNodeSummary';
 import type { MainViewNodeProps } from './mainViewTypes';
 import EditableNodeCard from './EditableNodeCard';
 import LearningActionPanel, { type LearningActionSection } from './LearningActionPanel';
@@ -88,6 +91,10 @@ export default function QuestionBlockSection({
     }));
   }
 
+  function isNodeBodyCollapsed(nodeId: string) {
+    return workspaceViewState.collapsedNodeBodyIds.includes(nodeId);
+  }
+
   function ensureNodeBodyExpanded(nodeIdToExpand: string) {
     if (!workspaceViewState.collapsedNodeBodyIds.includes(nodeIdToExpand)) {
       return;
@@ -114,6 +121,16 @@ export default function QuestionBlockSection({
   function selectNodeForEditing(nodeIdToSelect: string) {
     ensureNodeBodyExpanded(nodeIdToSelect);
     onSelectNode(nodeIdToSelect);
+  }
+
+  function buildCollapsedNodeSummary(node: TreeNode) {
+    return (
+      <CollapsedLearningNodeSummary
+        {...buildCollapsedLearningNodeSummaryModel(tree, node)}
+        isInteractionLocked={isInteractionLocked}
+        onExpand={() => toggleNodeBody(node.id)}
+      />
+    );
   }
 
   function buildCommonNodeActionSection(nodeIdToSelect: string): LearningActionSection {
@@ -149,7 +166,12 @@ export default function QuestionBlockSection({
     return (
       <EditableNodeCard
         actions={supportNodeActions}
-        bodyCollapsed={workspaceViewState.collapsedNodeBodyIds.includes(node.id)}
+        bodyCollapsed={isNodeBodyCollapsed(node.id)}
+        collapsedSummary={
+          isNodeBodyCollapsed(node.id)
+            ? buildCollapsedNodeSummary(node)
+            : undefined
+        }
         depth={nodeDepth}
         isInteractionLocked={isInteractionLocked}
         key={node.id}
@@ -264,9 +286,12 @@ export default function QuestionBlockSection({
         ) : null}
         <EditableNodeCard
           actions={answerActions}
-          bodyCollapsed={workspaceViewState.collapsedNodeBodyIds.includes(
-            answerGroup.answer.id,
-          )}
+          bodyCollapsed={isNodeBodyCollapsed(answerGroup.answer.id)}
+          collapsedSummary={
+            isNodeBodyCollapsed(answerGroup.answer.id)
+              ? buildCollapsedNodeSummary(answerGroup.answer)
+              : undefined
+          }
           depth={depth + 1}
           isInteractionLocked={isInteractionLocked}
           nodeId={answerGroup.answer.id}
@@ -348,9 +373,12 @@ export default function QuestionBlockSection({
       >
         <EditableNodeCard
           actions={summaryActions}
-          bodyCollapsed={workspaceViewState.collapsedNodeBodyIds.includes(
-            summaryGroup.summary.id,
-          )}
+          bodyCollapsed={isNodeBodyCollapsed(summaryGroup.summary.id)}
+          collapsedSummary={
+            isNodeBodyCollapsed(summaryGroup.summary.id)
+              ? buildCollapsedNodeSummary(summaryGroup.summary)
+              : undefined
+          }
           depth={depth + 1}
           isInteractionLocked={isInteractionLocked}
           nodeId={summaryGroup.summary.id}

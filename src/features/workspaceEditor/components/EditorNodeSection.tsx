@@ -1,6 +1,9 @@
 import { Fragment } from 'react';
 
 import { getNodeOrThrow, isScaffoldSummaryNode, type TreeNode } from '../../nodeDomain';
+import CollapsedLearningNodeSummary, {
+  buildCollapsedLearningNodeSummaryModel,
+} from './CollapsedLearningNodeSummary';
 import { getChildNodes, getDisplayTitleForNode } from '../utils/treeSelectors';
 import EditableNodeCard from './EditableNodeCard';
 import LearningActionPanel from './LearningActionPanel';
@@ -51,9 +54,10 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
     planStepCollapsed ||
     (supportsNodeBodyCollapse(node) &&
       props.workspaceViewState.collapsedNodeBodyIds.includes(node.id));
-  const compactPlanStepSummary =
-    node.type === 'plan-step' && planStepCollapsed
-      ? buildCollapsedPlanStepSummary()
+  const collapsedSummary = planStepCollapsed
+    ? buildCollapsedPlanStepSummary()
+    : bodyCollapsed && supportsNodeBodyCollapse(node)
+      ? buildCollapsedBodySummary()
       : undefined;
 
   function toggleNodeBodyCollapsed() {
@@ -71,6 +75,10 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
       return;
     }
 
+    if (!planStepCollapsed) {
+      props.onSelectNode(node.id);
+    }
+
     props.onWorkspaceViewStateChange({
       ...props.workspaceViewState,
       collapsedPlanStepIds: toggleId(
@@ -82,9 +90,9 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
 
   return (
     <EditableNodeCard
-      actions={compactPlanStepSummary ? null : selectedNodeActions ?? inlineActions}
+      actions={planStepCollapsed ? null : selectedNodeActions ?? inlineActions}
       bodyCollapsed={bodyCollapsed}
-      collapsedSummary={compactPlanStepSummary}
+      collapsedSummary={collapsedSummary}
       depth={depth}
       headerControls={
         node.type === 'plan-step' && !planStepCollapsed ? (
@@ -259,6 +267,16 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
           展开步骤
         </button>
       </div>
+    );
+  }
+
+  function buildCollapsedBodySummary() {
+    return (
+      <CollapsedLearningNodeSummary
+        {...buildCollapsedLearningNodeSummaryModel(tree, node)}
+        isInteractionLocked={props.isInteractionLocked}
+        onExpand={toggleNodeBodyCollapsed}
+      />
     );
   }
 }

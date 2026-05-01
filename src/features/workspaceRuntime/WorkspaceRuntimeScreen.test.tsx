@@ -293,6 +293,12 @@ test('restores question block collapse state after remounting the runtime screen
     }),
   ).toBeInTheDocument();
   expect(
+    within(screen.getByTestId('editor-node-answer-runtime-current')).getByText(
+      '当前回答已折叠',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText('当前回答 内容')).not.toBeInTheDocument();
+  expect(
     screen.getByTestId('editor-node-judgment-runtime-current-history'),
   ).toBeInTheDocument();
 });

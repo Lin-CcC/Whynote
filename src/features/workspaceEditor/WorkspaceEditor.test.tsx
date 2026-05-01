@@ -7,6 +7,7 @@
   waitFor,
   within,
 } from '@testing-library/react';
+import { useState } from 'react';
 
 import {
   createNode,
@@ -23,9 +24,12 @@ import { getActionAvailability, useWorkspaceEditor } from './hooks/useWorkspaceE
 import {
   DEMO_SELECTED_NODE_ID,
 } from './utils/createDemoWorkspace';
+import { DEFAULT_WORKSPACE_VIEW_STATE } from './utils/workspaceViewState';
 import type {
   WorkspaceEditorLearningActionRequest,
   WorkspaceEditorOperations,
+  WorkspaceEditorProps,
+  WorkspaceViewState,
 } from './workspaceEditorTypes';
 
 test('switches modules and keeps structure and text view in sync', () => {
@@ -613,6 +617,79 @@ test('shows common progression actions and retained scaffold-specific actions wh
     'summary-scaffold-selected',
   );
   expect(onGenerateSummary).toHaveBeenCalledWith('summary-scaffold-selected');
+});
+
+test('renders scaffold summaries in the unified compact collapsed summary and keeps scaffold actions reachable', async () => {
+  renderWorkspaceEditorWithViewState({
+    initialModuleId: 'module-scaffold-actions',
+    initialSelectedNodeId: 'summary-scaffold-selected',
+    initialSnapshot: createScaffoldActionSnapshot(),
+  });
+
+  const actionPanel = screen.getByTestId('node-actions-summary-scaffold-selected');
+
+  fireEvent.click(
+    within(
+      screen.getByTestId('editor-node-summary-scaffold-selected'),
+    ).getByRole('button', {
+      name: '收起正文',
+    }),
+  );
+
+  const collapsedNode = screen.getByTestId('editor-node-summary-scaffold-selected');
+
+  expect(within(collapsedNode).getByText('铺垫')).toBeInTheDocument();
+  expect(within(collapsedNode).getByText('先建立概念地图')).toBeInTheDocument();
+  expect(within(collapsedNode).getByText('铺垫已折叠')).toBeInTheDocument();
+  expect(
+    within(collapsedNode).getByRole('button', { name: '展开正文' }),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText('先建立概念地图 内容')).not.toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '换个说法' }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    within(actionPanel).getByRole('button', { name: '继续修改' }),
+  );
+
+  await waitFor(() => {
+    expect(screen.getByLabelText('先建立概念地图 内容')).toBeInTheDocument();
+  });
+
+  expect(
+    within(screen.getByTestId('node-actions-summary-scaffold-selected')).getByRole(
+      'button',
+      { name: '举个例子' },
+    ),
+  ).toBeInTheDocument();
+});
+
+test('uses 未命名铺垫 in the unified compact collapsed summary when the scaffold title is empty', () => {
+  const snapshot = createScaffoldActionSnapshot();
+  const scaffoldNode = snapshot.tree.nodes['summary-scaffold-selected'];
+
+  if (!scaffoldNode || scaffoldNode.type !== 'summary') {
+    throw new Error('Expected summary-scaffold-selected to be a summary node.');
+  }
+
+  scaffoldNode.title = '   ';
+
+  renderWorkspaceEditorWithViewState({
+    initialModuleId: 'module-scaffold-actions',
+    initialSelectedNodeId: 'step-scaffold-actions',
+    initialSnapshot: snapshot,
+    initialWorkspaceViewState: {
+      ...DEFAULT_WORKSPACE_VIEW_STATE,
+      collapsedNodeBodyIds: ['summary-scaffold-selected'],
+    },
+  });
+
+  expect(
+    within(screen.getByTestId('editor-node-summary-scaffold-selected')).getByText(
+      '未命名铺垫',
+    ),
+  ).toBeInTheDocument();
 });
 
 test('deletes the selected scaffold node from the common node action panel', async () => {
@@ -1737,6 +1814,33 @@ function createSingleModuleSnapshot(): WorkspaceSnapshot {
     ...snapshot,
     tree,
   };
+}
+
+function renderWorkspaceEditorWithViewState(
+  props: WorkspaceEditorProps & {
+    initialWorkspaceViewState?: WorkspaceViewState;
+  },
+) {
+  const {
+    initialWorkspaceViewState = DEFAULT_WORKSPACE_VIEW_STATE,
+    ...workspaceEditorProps
+  } = props;
+
+  function Wrapper() {
+    const [workspaceViewState, setWorkspaceViewState] = useState(
+      initialWorkspaceViewState,
+    );
+
+    return (
+      <WorkspaceEditor
+        {...workspaceEditorProps}
+        onWorkspaceViewStateChange={setWorkspaceViewState}
+        workspaceViewState={workspaceViewState}
+      />
+    );
+  }
+
+  return render(<Wrapper />);
 }
 
 function getSectionByHeading(name: string) {
