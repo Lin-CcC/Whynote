@@ -336,8 +336,16 @@ test.each([
     );
 
     expect(insertedQuestionNode).not.toBeNull();
-    expect(insertedQuestionNode).toHaveTextContent('追问围绕：来源');
-    expect(insertedQuestionNode).toHaveTextContent(sourceTitle);
+    expect(insertedQuestionNode).not.toHaveTextContent('追问围绕：');
+    const semanticRelationField = screen.getByText('语义关系').parentElement;
+
+    expect(semanticRelationField).not.toBeNull();
+    expect(semanticRelationField?.querySelector('dd')?.textContent).toContain(
+      '追问围绕：',
+    );
+    expect(semanticRelationField?.querySelector('dd')?.textContent).toContain(
+      sourceTitle,
+    );
 
     const latestSnapshot = snapshots[snapshots.length - 1];
     const insertedQuestion = Object.values(latestSnapshot.tree.nodes).find(
@@ -481,7 +489,8 @@ test('allows switching a newly inserted leaf node between safe types while prese
   );
 
   await screen.findByDisplayValue('新回答');
-  const contentInput = screen.getByLabelText('新回答 内容');
+  fireEvent.click(screen.getByLabelText('新回答 内容'));
+  const contentInput = screen.getByRole('textbox', { name: '新回答 内容' });
 
   fireEvent.change(contentInput, {
     target: {
@@ -1029,9 +1038,7 @@ test('keeps text main view in the same order as the underlying question children
     'editor-node-question-child',
     'editor-node-summary-third',
   ]);
-  expect(
-    screen.getByDisplayValue('父问题保留并承接子节点顺序。'),
-  ).toBeInTheDocument();
+  expect(screen.getByLabelText('父问题 内容')).toBeInTheDocument();
 });
 
 function createOperationSpies(): WorkspaceEditorOperations {

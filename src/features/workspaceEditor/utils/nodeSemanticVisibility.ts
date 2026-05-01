@@ -12,11 +12,13 @@ import {
 import { getNodeDisplayName } from './treeSelectors';
 
 type SemanticBadgeTone = 'current' | 'history' | 'stale';
+type SemanticBadgeVisibility = 'contextual' | 'persistent';
 
 export type NodeSemanticBadge = {
   key: string;
   label: string;
   tone: SemanticBadgeTone;
+  visibility: SemanticBadgeVisibility;
 };
 
 export type NodeSemanticVisibility = {
@@ -59,6 +61,7 @@ export function getNodeSemanticVisibility(
         key: currentAnswerNodeId === node.id ? 'current-answer' : 'history-answer',
         label: currentAnswerNodeId === node.id ? '当前回答' : '旧回答',
         tone: currentAnswerNodeId === node.id ? 'current' : 'history',
+        visibility: currentAnswerNodeId === node.id ? 'persistent' : 'contextual',
       });
     }
   }
@@ -128,6 +131,10 @@ function appendAnswerClosureResultVisibility(
       latestResultNodeId === node.id && currentAnswerNodeId === sourceAnswerNode.id
         ? 'current'
         : 'history',
+    visibility:
+      latestResultNodeId === node.id && currentAnswerNodeId === sourceAnswerNode.id
+        ? 'persistent'
+        : 'contextual',
   });
 
   if (isAnswerClosureResultNodeStale(tree, node)) {
@@ -135,6 +142,7 @@ function appendAnswerClosureResultVisibility(
       key: 'stale-result',
       label: '已过期',
       tone: 'stale',
+      visibility: 'persistent',
     });
   }
 
@@ -167,6 +175,7 @@ function appendSummaryCheckResultVisibility(
     key: latestResultNodeId === node.id ? 'current-result' : 'history-result',
     label: latestResultNodeId === node.id ? '当前结果' : '历史结果',
     tone: latestResultNodeId === node.id ? 'current' : 'history',
+    visibility: latestResultNodeId === node.id ? 'persistent' : 'contextual',
   });
 
   if (isSummaryCheckJudgmentNodeStale(tree, node)) {
@@ -174,6 +183,7 @@ function appendSummaryCheckResultVisibility(
       key: 'stale-result',
       label: '已过期',
       tone: 'stale',
+      visibility: 'persistent',
     });
   }
 

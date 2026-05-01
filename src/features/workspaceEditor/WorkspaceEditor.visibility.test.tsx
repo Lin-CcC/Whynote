@@ -17,7 +17,7 @@ import type {
   WorkspaceViewState,
 } from './workspaceEditorTypes';
 
-test('shows the current answer badge and legacy fallback note for older questions', () => {
+test('keeps current-answer semantics in inspector while only the current answer keeps a default badge', () => {
   render(
     <WorkspaceEditor
       initialModuleId="module-legacy-current-answer"
@@ -29,11 +29,12 @@ test('shows the current answer badge and legacy fallback note for older question
   const questionNode = screen.getByTestId('editor-node-question-legacy-current-answer');
 
   expect(
-    within(questionNode).getByText('当前回答：第二版回答'),
-  ).toBeInTheDocument();
+    within(questionNode).queryByText('当前回答：第二版回答'),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText('当前回答：第二版回答')).toBeInTheDocument();
   expect(
-    within(screen.getByTestId('editor-node-answer-legacy-v1')).getByText('旧回答'),
-  ).toBeInTheDocument();
+    within(screen.getByTestId('editor-node-answer-legacy-v1')).queryByText('旧回答'),
+  ).not.toBeInTheDocument();
   expect(
     within(screen.getByTestId('editor-node-answer-legacy-v2')).getByText('当前回答'),
   ).toBeInTheDocument();
@@ -48,7 +49,10 @@ test('keeps the current answer badge on the existing current answer when an olde
     />,
   );
 
-  fireEvent.change(screen.getByLabelText('第一版回答 内容'), {
+  fireEvent.click(
+    screen.getByTestId('editor-node-content-display-answer-editor-previous'),
+  );
+  fireEvent.change(screen.getByRole('textbox', { name: '第一版回答 内容' }), {
     target: {
       value: '补充旧回答，但不应该篡改当前回答标识。',
     },
@@ -108,7 +112,7 @@ test('promotes a leaf node to current answer visibility after switching it to an
   expect(within(promotedNode).getByText('当前回答')).toBeInTheDocument();
 });
 
-test('shows current or historical result badges, stale markers, and pairing notes for answer and summary results', async () => {
+test('keeps default result badges minimal while preserving full semantics in inspector', async () => {
   renderWorkspaceEditorWithViewState(
     <WorkspaceEditor
       initialModuleId="module-visibility-results"
@@ -128,30 +132,37 @@ test('shows current or historical result badges, stale markers, and pairing note
   );
 
   expect(
-    within(questionNode).getByText('当前回答：第二版回答'),
-  ).toBeInTheDocument();
-  expect(oldJudgmentNode).toHaveTextContent('历史结果');
+    within(questionNode).queryByText('当前回答：第二版回答'),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText('当前回答：第二版回答')).toBeInTheDocument();
+  expect(oldJudgmentNode).not.toHaveTextContent('历史结果');
   expect(
-    within(oldJudgmentNode).getByText('配对回答：旧回答 · 第一版回答'),
-  ).toBeInTheDocument();
+    within(oldJudgmentNode).queryByText('配对回答：旧回答 · 第一版回答'),
+  ).not.toBeInTheDocument();
   expect(currentSummaryNode).toHaveTextContent('当前结果');
   expect(currentSummaryNode).toHaveTextContent('已过期');
-  expect(
-    within(currentSummaryNode).getByText('配对回答：当前回答 · 第二版回答'),
-  ).toBeInTheDocument();
   expect(currentSummaryCheckNode).toHaveTextContent('总结检查结果');
   expect(currentSummaryCheckNode).toHaveTextContent('当前结果');
   expect(currentSummaryCheckNode).toHaveTextContent('已过期');
-  expect(
-    within(currentSummaryCheckNode).getByText('检查对象：手写总结'),
-  ).toBeInTheDocument();
+
+  fireEvent.click(oldJudgmentNode);
+
+  expect(oldJudgmentNode).toHaveTextContent('历史结果');
+  expect(screen.getByText('配对回答：旧回答 · 第一版回答')).toBeInTheDocument();
+
   fireEvent.click(
     within(summaryGroup).getByRole('button', { name: '展开历史检查结果' }),
   );
   const oldSummaryCheckNode = await screen.findByTestId(
     'editor-node-judgment-summary-check-old',
   );
+
+  expect(oldSummaryCheckNode).not.toHaveTextContent('历史结果');
+
+  fireEvent.click(oldSummaryCheckNode);
+
   expect(oldSummaryCheckNode).toHaveTextContent('历史结果');
+  expect(screen.getByText('检查对象：手写总结')).toBeInTheDocument();
 });
 
 test('shows readable fallback labels for unnamed current answers and summary pairing targets', () => {
@@ -170,14 +181,15 @@ test('shows readable fallback labels for unnamed current answers and summary pai
   );
 
   expect(
-    within(questionNode).getByText('当前回答：未命名回答（正文为空）'),
-  ).toBeInTheDocument();
-  expect(
-    within(answerResultNode).getByText('配对回答：当前回答 · 未命名回答'),
-  ).toBeInTheDocument();
-  expect(
-    within(summaryCheckNode).getByText('检查对象：未命名总结'),
-  ).toBeInTheDocument();
+    within(questionNode).queryByText('当前回答：未命名回答（正文为空）'),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText('当前回答：未命名回答（正文为空）')).toBeInTheDocument();
+
+  fireEvent.click(answerResultNode);
+  expect(screen.getByText('配对回答：当前回答 · 未命名回答')).toBeInTheDocument();
+
+  fireEvent.click(summaryCheckNode);
+  expect(screen.getByText('检查对象：未命名总结')).toBeInTheDocument();
 });
 
 test('keeps semantic badges and relation notes visible in compact collapsed summaries', () => {

@@ -235,23 +235,23 @@ export function getNodeInputPlaceholder(
 
   switch (nodeType) {
     case 'module':
-      return '补充这个模块的学习目标、边界或导读。';
+      return '补充模块说明';
     case 'plan-step':
-      return '记录这一步的关注点、完成标准或提示。';
+      return '补充步骤说明';
     case 'question':
-      return '在这里承接问题正文、补充条件或拆分说明。';
+      return '补充问题说明';
     case 'answer':
-      return '在这里承接回答正文。';
+      return '写下回答';
     case 'summary':
-      return '在这里承接总结正文。';
+      return '写下总结';
     case 'judgment':
-      return '在这里承接判断、评估或纠偏意见。';
+      return '写下判断';
     case 'resource':
-      return '补充资料摘要、来源备注或导入说明。';
+      return '补充资料说明';
     case 'resource-fragment':
-      return '在这里承接摘录正文。';
+      return '补充摘录';
     case 'theme-root':
-      return '在这里承接主题说明。';
+      return '补充主题说明';
   }
 }
 
@@ -265,11 +265,11 @@ export function getNodeInputPlaceholderForNode(
   }
 
   if (isScaffoldSummaryNode(tree, node)) {
-    return '在这里承接前置讲解、关键概念或答题铺垫。';
+    return '补充铺垫';
   }
 
   if (isAnswerClosureSummaryNode(tree, node)) {
-    return '在这里承接答案解析、标准理解或纠错讲解。';
+    return '补充答案解析';
   }
 
   return getNodeInputPlaceholder(node.type, field);

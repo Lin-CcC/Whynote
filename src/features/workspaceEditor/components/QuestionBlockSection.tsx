@@ -57,9 +57,6 @@ export default function QuestionBlockSection({
   const isActive = activeQuestionBlockId === question.id;
   const isCollapsed =
     workspaceViewState.collapsedQuestionBlockIds.includes(question.id);
-  const firstFollowUpEntryIndex = questionBlock.entries.findIndex(
-    (entry) => entry.type === 'node' && entry.node.type === 'question',
-  );
   const questionIsSelected = selectedNodeId === question.id;
   const isFollowUpQuestion =
     question.parentId !== null &&
@@ -580,31 +577,8 @@ export default function QuestionBlockSection({
             selectedNodeId={selectedNodeId}
             tree={tree}
           />
-          {!questionBlock.currentAnswerNodeId && isActive ? (
-            <div className="workspace-questionBlockEmpty">
-              <p className="workspace-helpText">
-                这个问题块还没有当前回答。可以直接回答，也可以先插入一个空白回答再开始写。
-              </p>
-            </div>
-          ) : null}
-          {questionBlock.entries.map((entry, entryIndex) => (
+          {questionBlock.entries.map((entry) => (
             <Fragment key={getQuestionBlockEntryKey(entry)}>
-              {entryIndex === firstFollowUpEntryIndex ? (
-                <div className="workspace-splitHint">
-                  <div className="workspace-splitHeader">
-                    <div>
-                      <p className="workspace-kicker">追问章节</p>
-                      <h3 className="workspace-splitTitle">
-                        下面进入缩进子问题
-                      </h3>
-                    </div>
-                    <span className="workspace-counter">延续当前阅读链条</span>
-                  </div>
-                  <p className="workspace-helpText">
-                    追问仍然是原始子节点，只是在主视图里作为子章节紧接所属回答闭环之后显示。
-                  </p>
-                </div>
-              ) : null}
               {renderQuestionBlockEntry(entry)}
             </Fragment>
           ))}

@@ -1,5 +1,3 @@
-import { Fragment } from 'react';
-
 import {
   getNodeOrThrow,
   isScaffoldSummaryNode,
@@ -44,11 +42,6 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
   }
 
   const childNodes = getChildNodes(tree, node.id);
-  const firstChildQuestionNodeId =
-    childNodes.find((childNode) => childNode.type === 'question')?.id ?? null;
-  const questionChildCount = childNodes.filter(
-    (childNode) => childNode.type === 'question',
-  ).length;
   const inlineActions = props.renderNodeInlineActions?.({
     isSelected: node.id === props.selectedNodeId,
     node,
@@ -131,28 +124,12 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
       {planStepCollapsed
         ? null
         : childNodes.map((childNode) => (
-            <Fragment key={childNode.id}>
-              {childNode.id === firstChildQuestionNodeId &&
-              questionChildCount > 0 ? (
-                <div className="workspace-splitHint">
-                  <div className="workspace-splitHeader">
-                    <div>
-                      <p className="workspace-kicker">问题章节</p>
-                      <h3 className="workspace-splitTitle">
-                        下面进入当前模块的问题正文
-                      </h3>
-                    </div>
-                    <span className="workspace-counter">
-                      {questionChildCount} 个问题
-                    </span>
-                  </div>
-                  <p className="workspace-helpText">
-                    回答、对应结果和追问会按阅读顺序就近展开，底层树顺序保持不变。
-                  </p>
-                </div>
-              ) : null}
-              <EditorNodeSection {...props} depth={depth + 1} nodeId={childNode.id} />
-            </Fragment>
+            <EditorNodeSection
+              {...props}
+              depth={depth + 1}
+              key={childNode.id}
+              nodeId={childNode.id}
+            />
           ))}
     </DocumentNodeSection>
   );

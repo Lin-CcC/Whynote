@@ -61,13 +61,17 @@ test('respects the real focused input when the user starts editing another node 
       'false',
     );
   });
-  expect(screen.getByTestId('editor-node-question-render-boundary')).toHaveTextContent(
-    '这里承接要回答的问题。现在可以直接修改标题或正文。',
+  expect(screen.getByTestId('editor-node-question-render-boundary')).toHaveAttribute(
+    'data-node-frame-visible',
+    'true',
   );
-  expect(screen.getByTestId('editor-node-question-render-boundary')).toHaveTextContent(
-    '编辑中',
-  );
-  expect(screen.getAllByText('编辑中')).toHaveLength(1);
+  expect(
+    screen.getByTestId('editor-node-question-render-boundary'),
+  ).not.toHaveTextContent('编辑中');
+  expect(
+    screen.getByTestId('editor-node-question-render-boundary'),
+  ).not.toHaveTextContent('点击标题或正文即可继续修改');
+  expect(screen.queryByText('编辑中')).not.toBeInTheDocument();
 
   fireEvent.change(textarea, {
     target: {
@@ -87,7 +91,6 @@ test('selects a node by clicking its card without requiring textarea focus first
   render(<WorkspaceEditor />);
 
   const node = screen.getByTestId('editor-node-question-render-boundary');
-  const textarea = getNodeContentInput('question-render-boundary');
 
   fireEvent.click(node);
 
@@ -96,8 +99,8 @@ test('selects a node by clicking its card without requiring textarea focus first
     expect(node).toHaveAttribute('data-node-editing', 'false');
     expect(node).toHaveFocus();
   });
-  expect(textarea).not.toHaveFocus();
-  expect(node).toHaveTextContent('点击标题或正文即可继续修改');
+  expect(node.querySelector('textarea')).toBeNull();
+  expect(node).toHaveAttribute('data-node-frame-visible', 'true');
   expect(node).not.toHaveTextContent('编辑中');
 });
 
