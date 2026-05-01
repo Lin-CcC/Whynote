@@ -247,6 +247,7 @@ test('restores question block collapse state after remounting the runtime screen
     }),
   );
 
+  fireEvent.mouseEnter(screen.getByTestId('editor-node-answer-runtime-current'));
   fireEvent.click(
     within(screen.getByTestId('editor-node-answer-runtime-current')).getByRole(
       'button',
@@ -534,7 +535,8 @@ test('clears completion suggestion after editing the related workspace content',
   expect(await screen.findByText('步骤可考虑完成')).toBeInTheDocument();
   expect(screen.getByText('当前步骤已满足最小学习闭环。')).toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText('理解闭环 内容'), {
+  fireEvent.click(screen.getByLabelText('理解闭环 内容'));
+  fireEvent.change(screen.getByRole('textbox', { name: '理解闭环 内容' }), {
     target: {
       value: '补充后需要重新判断建议是否仍然成立。',
     },
@@ -637,6 +639,7 @@ test('persists plan-step collapse in workspace view state across remounts', asyn
 
   await screen.findByTestId('editor-node-step-plan-step-view-state');
 
+  fireEvent.mouseEnter(screen.getByTestId('editor-node-step-plan-step-view-state'));
   fireEvent.click(
     within(screen.getByTestId('editor-node-step-plan-step-view-state')).getByRole(
       'button',

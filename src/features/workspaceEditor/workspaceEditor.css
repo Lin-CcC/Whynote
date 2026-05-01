@@ -572,7 +572,8 @@
 }
 
 .workspace-nodeTitleRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
   gap: 0.6rem;
 }
@@ -584,6 +585,10 @@
   align-items: flex-start;
   justify-content: flex-end;
   gap: 0.35rem;
+}
+
+.workspace-nodeTitleControls[data-visible='false'] {
+  display: none;
 }
 
 .workspace-nodeTitleToolbar {
@@ -607,9 +612,7 @@
 }
 
 .workspace-nodeType,
-.workspace-semanticBadge,
-.workspace-selectedBadge,
-.workspace-editingBadge {
+.workspace-semanticBadge {
   padding: 0.14rem 0.42rem;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 999px;
@@ -645,37 +648,9 @@
   color: #b91c1c;
 }
 
-.workspace-selectedBadge {
-  color: #0e7490;
-}
-
-.workspace-editingBadge {
-  background: rgba(240, 253, 250, 0.92);
-  border-color: rgba(15, 118, 110, 0.16);
-  color: #0f766e;
-}
-
-.workspace-nodeSelectionHint {
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #64748b;
-  font-size: 0.84rem;
-  line-height: 1.45;
-}
-
 .workspace-documentNode[data-node-section-kind='module'] .workspace-nodeHeader,
 .workspace-documentNode[data-node-section-kind='plan-step'] .workspace-nodeHeader {
   gap: 0.3rem;
-}
-
-.workspace-documentNode[data-node-section-kind='module'] .workspace-nodeSelectionHint,
-.workspace-documentNode[data-node-section-kind='plan-step'] .workspace-nodeSelectionHint {
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
 }
 
 .workspace-statusSelect {
@@ -907,14 +882,7 @@
 .workspace-nodeTitleDisplay:hover,
 .workspace-nodeContentDisplay:hover,
 .workspace-nodeAddTitleButton:hover {
-  background: rgba(226, 232, 240, 0.38);
-}
-
-.workspace-documentNode[data-node-chrome='document'][data-node-selected='true']
-  .workspace-nodeTitleInput,
-.workspace-documentNode[data-node-chrome='document'][data-node-selected='true']
-  .workspace-nodeContentInput {
-  background: rgba(248, 250, 252, 0.78);
+  background: rgba(241, 245, 249, 0.5);
 }
 
 .workspace-documentNode[data-node-chrome='document'][data-node-editing='true']
@@ -923,7 +891,8 @@
   .workspace-nodeContentInput,
 .workspace-nodeTitleInput:focus,
 .workspace-nodeContentInput:focus {
-  background: rgba(240, 253, 250, 0.74);
+  background: rgba(248, 250, 252, 0.88);
+  box-shadow: inset 0 -1px 0 rgba(14, 116, 144, 0.22);
 }
 
 .workspace-nodeTitleDisplay:disabled,
@@ -1388,7 +1357,7 @@
   }
 
   .workspace-nodeTitleRow {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .workspace-nodeTitleControls {

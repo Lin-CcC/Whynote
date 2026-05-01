@@ -37,17 +37,47 @@ test.each([
   ).toHaveAttribute('data-active', 'false');
 });
 
+test('does not render visible 已选中 or 编辑中 chips on the main surface', async () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+  });
+
+  expect(screen.queryByText('已选中')).not.toBeInTheDocument();
+  expect(screen.queryByText('编辑中')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId('editor-node-content-display-answer-first'));
+
+  await waitFor(() => {
+    expect(screen.getByRole('textbox', { name: '第一版回答 内容' })).toBeInTheDocument();
+  });
+
+  expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+  expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
+    'data-node-editing',
+    'true',
+  );
+  expect(screen.queryByText('已选中')).not.toBeInTheDocument();
+  expect(screen.queryByText('编辑中')).not.toBeInTheDocument();
+});
+
 test('clicking an unselected content body enters editing without an explicit preselect and keeps node actions', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
   });
 
-  expect(screen.queryByLabelText('第一版回答 内容')).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('textbox', { name: '第一版回答 内容' }),
+  ).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByTestId('editor-node-content-display-answer-first'));
 
   await waitFor(() => {
-    expect(screen.getByLabelText('第一版回答 内容')).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: '第一版回答 内容' }),
+    ).toBeInTheDocument();
   });
 
   expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
@@ -199,18 +229,30 @@ test('reveals the light toolbar only on hover, focus, or active', () => {
 
   expect(answerNode).toHaveAttribute('data-node-shell', 'document-inline');
   expect(answerToolbar).toHaveAttribute('data-visible', 'false');
+  expect(
+    within(answerNode).queryByRole('button', { name: '收起正文' }),
+  ).not.toBeInTheDocument();
 
   fireEvent.mouseEnter(answerNode);
   expect(answerToolbar).toHaveAttribute('data-visible', 'true');
+  expect(
+    within(answerNode).getByRole('button', { name: '收起正文' }),
+  ).toBeInTheDocument();
 
   fireEvent.mouseLeave(answerNode);
   expect(answerToolbar).toHaveAttribute('data-visible', 'false');
+  expect(
+    within(answerNode).queryByRole('button', { name: '收起正文' }),
+  ).not.toBeInTheDocument();
 
   fireEvent.focus(screen.getByLabelText('第一版回答 标题'));
   expect(answerToolbar).toHaveAttribute('data-visible', 'true');
+  expect(
+    within(answerNode).getByRole('button', { name: '收起正文' }),
+  ).toBeInTheDocument();
 });
 
-test('clicking the question body keeps editing on the node and does not move the toolbar back to the block shell', () => {
+test('clicking the question body enters the light editing state without moving the toolbar back to the block shell', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
   });
@@ -218,10 +260,18 @@ test('clicking the question body keeps editing on the node and does not move the
   const questionHeader = screen.getByTestId('question-block-header-question-main');
   const questionToolbar = screen.getByTestId('question-block-actions-question-main');
 
-  fireEvent.focus(screen.getByLabelText('主问题 内容'));
+  fireEvent.click(screen.getByLabelText('主问题 内容'));
+
+  await waitFor(() => {
+    expect(screen.getByRole('textbox', { name: '主问题 内容' })).toBeInTheDocument();
+  });
 
   expect(screen.getByTestId('editor-node-question-main')).toHaveAttribute(
     'data-node-selected',
+    'true',
+  );
+  expect(screen.getByTestId('editor-node-question-main')).toHaveAttribute(
+    'data-node-editing',
     'true',
   );
   expect(questionToolbar).toHaveAttribute('data-visible', 'true');
@@ -353,7 +403,7 @@ test('keeps the current answer reevaluation action on the selected current answe
   ).not.toBeInTheDocument();
 });
 
-test('keeps non-active document nodes frame-free until selection moves to them', () => {
+test('keeps document nodes frame-free until focus moves into their editable content', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
   });
@@ -367,15 +417,18 @@ test('keeps non-active document nodes frame-free until selection moves to them',
     'false',
   );
 
-  fireEvent.click(screen.getByTestId('editor-node-answer-first'));
+  fireEvent.click(screen.getByTestId('editor-node-content-display-answer-first'));
+
+  await waitFor(() => {
+    expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
+      'data-node-frame-visible',
+      'true',
+    );
+  });
 
   expect(screen.getByTestId('editor-node-question-main')).toHaveAttribute(
     'data-node-frame-visible',
     'false',
-  );
-  expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
-    'data-node-frame-visible',
-    'true',
   );
 });
 
@@ -416,7 +469,7 @@ test('marks the question block and inline learning nodes as document surfaces wi
   }
 });
 
-test('keeps the selected question in inline document flow while editing', () => {
+test('keeps the selected question in inline document flow without forcing an editor shell first', () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
   });
@@ -427,7 +480,11 @@ test('keeps the selected question in inline document flow while editing', () => 
   expect(questionNode).toHaveAttribute('data-node-chrome', 'document');
   expect(questionNode).toHaveAttribute('data-node-rail', 'none');
   expect(screen.getByLabelText('主问题 标题')).toBeInTheDocument();
-  expect(screen.getByLabelText('主问题 内容')).toBeInTheDocument();
+  expect(screen.getByLabelText('主问题 内容')).toHaveAttribute(
+    'data-testid',
+    'editor-node-content-display-question-main',
+  );
+  expect(questionNode.querySelector('textarea')).toBeNull();
 });
 
 test.each([
@@ -799,19 +856,13 @@ test('keeps manual summary and summary-check results adjacent with group-local h
   );
 
   expect(
-    within(screen.getByTestId('editor-node-summary-first-latest')).getByText(
-      '答案解析',
-    ),
+    screen.getByTestId('editor-node-summary-first-latest'),
   ).toBeInTheDocument();
   expect(
-    within(screen.getByTestId('editor-node-summary-manual')).getByText('总结', {
-      selector: '.workspace-nodeType',
-    }),
+    screen.getByTestId('editor-node-summary-manual'),
   ).toBeInTheDocument();
   expect(
-    within(screen.getByTestId('editor-node-judgment-summary-latest')).getByText(
-      '总结检查结果',
-    ),
+    screen.getByTestId('editor-node-judgment-summary-latest'),
   ).toBeInTheDocument();
   expect(
     within(summaryGroup).getByTestId('editor-node-judgment-summary-latest'),
@@ -908,6 +959,7 @@ test('tracks block, body, and group-local history collapse in workspace view sta
     },
   });
 
+  fireEvent.mouseEnter(screen.getByTestId('editor-node-answer-first'));
   fireEvent.click(
     within(screen.getByTestId('editor-node-answer-first')).getByRole('button', {
       name: '收起正文',
@@ -1188,6 +1240,7 @@ test('does not auto-reopen a plan-step after the user manually collapses it', as
     expect(screen.getByTestId('question-block-question-main')).toBeInTheDocument();
   });
 
+  fireEvent.mouseEnter(screen.getByTestId('editor-node-step-question-block'));
   fireEvent.click(
     within(screen.getByTestId('editor-node-step-question-block')).getByRole(
       'button',
@@ -1271,12 +1324,6 @@ test('auto-expands a collapsed plan-step, block, and hidden history when selecti
     ).toHaveAttribute('data-collapsed', 'false');
   });
 
-  expect(
-    within(screen.getByTestId('editor-node-step-question-block')).getByRole(
-      'button',
-      { name: '收起步骤' },
-    ),
-  ).toBeInTheDocument();
   expect(
     screen.getByTestId('editor-node-judgment-first-history'),
   ).toBeInTheDocument();

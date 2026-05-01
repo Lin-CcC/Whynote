@@ -16,9 +16,7 @@ import {
   getNodeOrThrow,
   type NodeTree,
   type PlanStepStatus,
-  type TreeNode,
 } from '../../nodeDomain';
-import { getNodeRoleDescription } from '../utils/treeSelectors';
 import type { NodeContentPatch } from '../workspaceEditorTypes';
 import {
   buildDocumentNodePresentation,
@@ -66,6 +64,7 @@ export default function DocumentNodeSection({
   tree,
 }: DocumentNodeSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [activeField, setActiveField] = useState<PendingFocusField>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
   const [isTitleInputExpanded, setIsTitleInputExpanded] = useState(false);
@@ -81,6 +80,11 @@ export default function DocumentNodeSection({
   const bodyToggleLabel = `${bodyCollapsed ? '展开' : '收起'}正文`;
   const hasCollapsedSummary =
     collapsedSummary !== undefined && collapsedSummary !== null;
+  const contentInputVisible =
+    !bodyCollapsed &&
+    (pendingFocusField === 'content' || activeField === 'content');
+  const titleControlVisible =
+    isSelected || isEditing || hasFocusWithin || isHovered;
   const titleInputVisible =
     !bodyCollapsed &&
     isSelected &&
@@ -95,9 +99,10 @@ export default function DocumentNodeSection({
   const showAddTitleEntry =
     !bodyCollapsed &&
     isSelected &&
+    titleControlVisible &&
     presentation.isContentNode &&
     presentation.trimmedDisplayTitle.length === 0 &&
-    !isTitleInputExpanded;
+    !titleInputVisible;
   const legacyShell =
     presentation.sectionKind === 'module'
       ? 'document-root'
@@ -106,9 +111,20 @@ export default function DocumentNodeSection({
         : isInlineDocumentSurface
           ? 'document-inline'
           : 'document-node';
-  const frameVisible = isSelected || isEditing;
-  const titleControlVisible =
-    isSelected || isEditing || hasFocusWithin || isHovered;
+  const visibleSemanticBadges = titleControlVisible
+    ? presentation.semanticVisibility.badges
+    : presentation.semanticVisibility.badges.filter(isPersistentSemanticBadge);
+  const showNodeTypeLabel = shouldShowNodeTypeLabel(
+    presentation.sectionKind,
+    titleControlVisible,
+  );
+  const showNodeMeta = showNodeTypeLabel || visibleSemanticBadges.length > 0;
+  const frameVisible = hasFocusWithin || isEditing || pendingFocusField !== null;
+  const hasTitleControls =
+    node.type === 'plan-step' ||
+    onToggleBodyCollapsed !== undefined ||
+    Boolean(headerControls) ||
+    Boolean(actions);
   const renderedActions = renderActions(actions, titleControlVisible);
 
   useEffect(() => {
@@ -117,6 +133,7 @@ export default function DocumentNodeSection({
     }
 
     setIsEditing(false);
+    setActiveField(null);
     setIsTitleInputExpanded(false);
     setPendingFocusField(null);
   }, [isSelected]);
@@ -140,22 +157,21 @@ export default function DocumentNodeSection({
       if (pendingFocusField === 'title') {
         target.select();
       }
+      setPendingFocusField(null);
     });
-
-    setPendingFocusField(null);
 
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [isSelected, pendingFocusField, titleInputVisible]);
+  }, [contentInputVisible, isSelected, pendingFocusField, titleInputVisible]);
 
   useEffect(() => {
-    if (!isSelected || bodyCollapsed) {
+    if (!contentInputVisible) {
       return;
     }
 
     syncContentInputHeight(contentInputRef.current);
-  }, [bodyCollapsed, isSelected, node.content]);
+  }, [contentInputVisible, node.content]);
 
   function handleEditableFocus(event: FocusEvent<HTMLElement>) {
     if (
@@ -171,6 +187,9 @@ export default function DocumentNodeSection({
       onSelectNode(node.id);
     }
 
+    setActiveField(
+      event.target === titleInputRef.current ? 'title' : 'content',
+    );
     setIsEditing(true);
   }
 
@@ -184,6 +203,7 @@ export default function DocumentNodeSection({
       return;
     }
 
+    setActiveField(null);
     setIsEditing(false);
   }
 
@@ -245,6 +265,8 @@ export default function DocumentNodeSection({
       setIsTitleInputExpanded(true);
     }
 
+    setActiveField(field);
+    setIsEditing(true);
     setPendingFocusField(field);
     onSelectNode(node.id);
   }
@@ -280,80 +302,77 @@ export default function DocumentNodeSection({
       ) : (
         <>
           <div className="workspace-nodeHeader">
-            <div className="workspace-nodeMeta">
-              <span className="workspace-nodeType">
-                {presentation.displayLabel}
-              </span>
-              {presentation.semanticVisibility.badges.map((badge) => (
-                <span
-                  className="workspace-semanticBadge"
-                  data-badge-tone={badge.tone}
-                  key={badge.key}
-                >
-                  {badge.label}
-                </span>
-              ))}
-              {isSelected ? (
-                <span className="workspace-selectedBadge">已选中</span>
-              ) : null}
-              {isEditing ? (
-                <span className="workspace-editingBadge">编辑中</span>
-              ) : null}
-            </div>
+            {showNodeMeta ? (
+              <div className="workspace-nodeMeta">
+                {showNodeTypeLabel ? (
+                  <span className="workspace-nodeType">
+                    {presentation.displayLabel}
+                  </span>
+                ) : null}
+                {visibleSemanticBadges.map((badge) => (
+                  <span
+                    className="workspace-semanticBadge"
+                    data-badge-tone={badge.tone}
+                    data-badge-visibility={badge.visibility}
+                    key={badge.key}
+                  >
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <div className="workspace-nodeTitleRow">
               {renderTitleField()}
-              <div className="workspace-nodeTitleControls">
-                {node.type === 'plan-step' ? (
-                  <PlanStepStatusMenu
-                    disabled={isInteractionLocked}
-                    displayTitle={
-                      presentation.displayTitle || presentation.displayLabel
-                    }
-                    nodeId={node.id}
-                    onOpen={() => {
-                      if (!isSelected) {
-                        onSelectNode(node.id);
+              {hasTitleControls ? (
+                <div
+                  className="workspace-nodeTitleControls"
+                  data-visible={titleControlVisible}
+                  hidden={!titleControlVisible}
+                >
+                  {node.type === 'plan-step' ? (
+                    <PlanStepStatusMenu
+                      disabled={isInteractionLocked}
+                      displayTitle={
+                        presentation.displayTitle || presentation.displayLabel
                       }
-                    }}
-                    onStatusChange={handleStatusChange}
-                    status={node.status}
-                  />
-                ) : null}
-                {onToggleBodyCollapsed ? (
-                  <button
-                    className="workspace-nodeBodyToggle"
-                    disabled={isInteractionLocked}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleBodyCollapsed();
-                    }}
-                    type="button"
-                  >
-                    {bodyToggleLabel}
-                  </button>
-                ) : null}
-                {headerControls}
-                {renderedActions ? (
-                  <div
-                    className="workspace-nodeTitleToolbar"
-                    data-visible={titleControlVisible}
-                  >
-                    {renderedActions}
-                  </div>
-                ) : null}
-              </div>
+                      nodeId={node.id}
+                      onOpen={() => {
+                        if (!isSelected) {
+                          onSelectNode(node.id);
+                        }
+                      }}
+                      onStatusChange={handleStatusChange}
+                      status={node.status}
+                    />
+                  ) : null}
+                  {onToggleBodyCollapsed ? (
+                    <button
+                      className="workspace-nodeBodyToggle"
+                      disabled={isInteractionLocked}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleBodyCollapsed();
+                      }}
+                      type="button"
+                    >
+                      {bodyToggleLabel}
+                    </button>
+                  ) : null}
+                  {headerControls}
+                  {renderedActions ? (
+                    <div
+                      className="workspace-nodeTitleToolbar"
+                      data-visible={titleControlVisible}
+                    >
+                      {renderedActions}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
-            {isSelected ? (
-              <p className="workspace-nodeSelectionHint">
-                {getNodeSelectionHint(tree, node, isEditing)}
-              </p>
-            ) : null}
-            {presentation.semanticVisibility.notes.map((note) => (
-              <p className="workspace-nodeHint" key={note}>
-                {note}
-              </p>
-            ))}
-            {node.type === 'plan-step' && presentation.planStepRuntimeStatus ? (
+            {node.type === 'plan-step' &&
+            titleControlVisible &&
+            presentation.planStepRuntimeStatus ? (
               <>
                 <p className="workspace-nodeHint">
                   {`系统判断：${PLAN_STEP_STATUS_LABELS[presentation.planStepRuntimeStatus.suggestedStatus]}。依据：${presentation.planStepRuntimeStatus.reasonSummary}`}
@@ -368,7 +387,7 @@ export default function DocumentNodeSection({
           </div>
           {bodyCollapsed ? (
             <p className="workspace-nodeHint">{bodyCollapsedHint}</p>
-          ) : isSelected ? (
+          ) : contentInputVisible ? (
             <textarea
               aria-label={`${presentation.displayTitle || presentation.displayLabel} 内容`}
               className="workspace-nodeContentInput"
@@ -384,6 +403,7 @@ export default function DocumentNodeSection({
             />
           ) : (
             <button
+              aria-label={`${presentation.displayTitle || presentation.displayLabel} 内容`}
               className="workspace-nodeContentDisplay"
               data-placeholder={node.content.trim().length === 0}
               data-testid={`editor-node-content-display-${node.id}`}
@@ -472,18 +492,6 @@ export default function DocumentNodeSection({
   }
 }
 
-function getNodeSelectionHint(
-  tree: NodeTree,
-  node: TreeNode,
-  isEditing: boolean,
-) {
-  const roleDescription = getNodeRoleDescription(tree, node);
-
-  return isEditing
-    ? `${roleDescription}。现在可以直接修改标题或正文。`
-    : `${roleDescription}。点击标题或正文即可继续修改。`;
-}
-
 function isOwnedEditableTarget(
   target: EventTarget | null,
   refs: {
@@ -514,4 +522,23 @@ function syncContentInputHeight(textarea: HTMLTextAreaElement | null) {
 
   textarea.style.height = '0px';
   textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+function isPersistentSemanticBadge(
+  badge: ReturnType<
+    typeof buildDocumentNodePresentation
+  >['semanticVisibility']['badges'][number],
+) {
+  return badge.visibility === 'persistent';
+}
+
+function shouldShowNodeTypeLabel(
+  sectionKind: ReturnType<typeof buildDocumentNodePresentation>['sectionKind'],
+  isContextVisible: boolean,
+) {
+  if (sectionKind === 'module' || sectionKind === 'plan-step') {
+    return true;
+  }
+
+  return isContextVisible;
 }
