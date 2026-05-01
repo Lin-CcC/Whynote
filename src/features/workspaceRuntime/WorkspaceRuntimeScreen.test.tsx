@@ -670,12 +670,27 @@ test('persists plan-step collapse in workspace view state across remounts', asyn
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
   await screen.findByTestId('editor-node-step-plan-step-view-state');
 
+  const collapsedPlanStepNode = screen.getByTestId('editor-node-step-plan-step-view-state');
+
   expect(
-    within(screen.getByTestId('editor-node-step-plan-step-view-state')).getByRole(
-      'button',
-      { name: '展开步骤' },
-    ),
+    within(collapsedPlanStepNode).getByRole('button', { name: '展开步骤' }),
   ).toBeInTheDocument();
+  expect(within(collapsedPlanStepNode).getByText('步骤')).toBeInTheDocument();
+  expect(
+    within(collapsedPlanStepNode).getByText('可折叠步骤'),
+  ).toBeInTheDocument();
+  expect(within(collapsedPlanStepNode).getByText('进行中')).toBeInTheDocument();
+  expect(
+    within(collapsedPlanStepNode).getByText('当前步骤已折叠'),
+  ).toBeInTheDocument();
+  expect(
+    within(collapsedPlanStepNode).queryByText(/系统判断：/),
+  ).not.toBeInTheDocument();
+  expect(
+    within(collapsedPlanStepNode).queryByText(
+      '步骤已折叠，展开后继续查看正文和子内容。',
+    ),
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByTestId('question-block-question-plan-step-view-state'),
   ).not.toBeInTheDocument();

@@ -480,11 +480,23 @@
     0 18px 30px rgba(15, 23, 42, 0.1);
 }
 
+.workspace-node[data-node-collapsed-summary='true'] {
+  gap: 0.65rem;
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+}
+
 .workspace-node + .workspace-node,
 .workspace-nodeChildren {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+}
+
+.workspace-nodeCompactSummary {
+  display: grid;
+  gap: 0.6rem;
 }
 
 .workspace-nodeHeader {
@@ -558,6 +570,67 @@
 .workspace-statusSelect {
   padding: 0.25rem 0.55rem;
   color: #0f172a;
+}
+
+.workspace-planStepCollapsedSummary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.workspace-planStepCollapsedInfo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.workspace-planStepCollapsedMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.workspace-planStepCollapsedTitle {
+  margin: 0;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.workspace-planStepCollapsedHint {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.workspace-planStepStatusBadge {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.workspace-planStepStatusBadge[data-status='todo'] {
+  background: rgba(148, 163, 184, 0.18);
+  color: #475569;
+}
+
+.workspace-planStepStatusBadge[data-status='doing'] {
+  background: rgba(14, 116, 144, 0.12);
+  color: #0e7490;
+}
+
+.workspace-planStepStatusBadge[data-status='done'] {
+  background: rgba(13, 148, 136, 0.14);
+  color: #0f766e;
 }
 
 .workspace-nodeTitleInput,
@@ -917,6 +990,10 @@
 
   .workspace-splitHeader,
   .workspace-sectionHeader {
+    flex-direction: column;
+  }
+
+  .workspace-planStepCollapsedSummary {
     flex-direction: column;
   }
 }
