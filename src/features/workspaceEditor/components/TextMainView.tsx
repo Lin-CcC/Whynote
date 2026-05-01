@@ -26,6 +26,7 @@ type TextMainViewProps = {
   interactionLockReason: string | null;
   isInteractionLocked: boolean;
   onCreateModule: () => void;
+  onDeleteNodeById: (nodeId: string) => void;
   onDirectAnswerQuestion?: (questionNodeId: string) => void;
   onEvaluateAnswer?: (questionNodeId: string, answerNodeId: string) => void;
   onEvaluateSummary?: (summaryNodeId: string) => void;
@@ -36,6 +37,10 @@ type TextMainViewProps = {
   onInsertSummaryForNode: (sourceNodeId: string) => void;
   onDeleteNode: () => void;
   onRunLearningAction: (actionId: LearningActionId) => void;
+  onRunLearningActionForNode: (
+    nodeId: string,
+    actionId: LearningActionId,
+  ) => void;
   onSelectNode: (nodeId: string) => void;
   onSetCurrentAnswer: (questionNodeId: string, answerNodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
@@ -54,6 +59,7 @@ export default function TextMainView({
   interactionLockReason,
   isInteractionLocked,
   onCreateModule,
+  onDeleteNodeById,
   onDirectAnswerQuestion,
   onEvaluateAnswer,
   onEvaluateSummary,
@@ -64,6 +70,7 @@ export default function TextMainView({
   onInsertFollowUpQuestion,
   onInsertSummaryForNode,
   onRunLearningAction,
+  onRunLearningActionForNode,
   onSelectNode,
   onSetCurrentAnswer,
   onUpdateNode,
@@ -172,6 +179,7 @@ export default function TextMainView({
         depth={0}
         isInteractionLocked={isInteractionLocked}
         nodeId={currentModule.id}
+        onDeleteNodeById={onDeleteNodeById}
         onDirectAnswerQuestion={onDirectAnswerQuestion}
         onEvaluateAnswer={onEvaluateAnswer}
         onEvaluateSummary={onEvaluateSummary}
@@ -182,6 +190,7 @@ export default function TextMainView({
         onInsertFollowUpQuestion={onInsertFollowUpQuestion}
         onInsertSummaryForNode={onInsertSummaryForNode}
         onRunLearningAction={onRunLearningAction}
+        onRunLearningActionForNode={onRunLearningActionForNode}
         onSelectNode={onSelectNode}
         onSetCurrentAnswer={onSetCurrentAnswer}
         onUpdateNode={onUpdateNode}

@@ -64,6 +64,16 @@ function revealHistoryAnswer(nodeTestId: string) {
   return answerNode;
 }
 
+function openToolbarMenu(toolbar: HTMLElement, menuLabel: string) {
+  fireEvent.click(
+    within(toolbar).getByRole('button', {
+      name: menuLabel,
+    }),
+  );
+
+  return within(toolbar).getByRole('menu');
+}
+
 test('evaluates an incomplete answer into judgment, summary and follow-up question with persisted citations', async () => {
   const dependencies = await createPreloadedDependencies(
     createAnswerClosureSnapshot(),
@@ -441,7 +451,10 @@ test.each([
     fireEvent.focus(screen.getByLabelText(`${sourceTitle} 标题`));
     fireEvent.click(
       within(
-        screen.getByTestId('question-block-actions-question-follow-up-source'),
+        openToolbarMenu(
+          screen.getByTestId(`node-actions-${sourceNodeId}`),
+          '追问',
+        ),
       ).getByRole('button', {
         name: '生成追问',
       }),
@@ -612,7 +625,10 @@ test.each([
     fireEvent.focus(screen.getByLabelText(`${sourceTitle} 标题`));
     fireEvent.click(
       within(
-        screen.getByTestId('question-block-actions-question-follow-up-source'),
+        openToolbarMenu(
+          screen.getByTestId(`node-actions-${sourceNodeId}`),
+          '追问',
+        ),
       ).getByRole('button', {
         name: '插入追问',
       }),
@@ -710,7 +726,10 @@ test.each([
     fireEvent.focus(screen.getByLabelText('铺垫讲解 标题'));
     fireEvent.click(
       within(
-        screen.getByTestId('node-actions-summary-follow-up-source-scaffold'),
+        openToolbarMenu(
+          screen.getByTestId('node-actions-summary-follow-up-source-scaffold'),
+          '追问',
+        ),
       ).getByRole('button', {
         name: actionLabel,
       }),
@@ -861,15 +880,19 @@ test('scopes generated summaries to the selected content node instead of silentl
 
   fireEvent.focus(within(firstAnswerNode).getByLabelText('第一版回答 标题'));
   const blockActions = await screen.findByTestId(
-    'question-block-actions-question-answer-closure',
+    'node-actions-answer-answer-closure',
   );
 
   await waitFor(() => {
     expect(
-      within(blockActions).getByRole('button', { name: '生成总结' }),
+      within(blockActions).getByRole('button', { name: '总结' }),
     ).toBeEnabled();
   });
-  fireEvent.click(within(blockActions).getByRole('button', { name: '生成总结' }));
+  fireEvent.click(
+    within(openToolbarMenu(blockActions, '总结')).getByRole('button', {
+      name: '生成总结',
+    }),
+  );
   await waitFor(() => {
     expect(observedLearningActionPrompt).toContain('现有回答');
   });
@@ -996,10 +1019,14 @@ test('extends a scaffold with a simpler follow-up explanation draft', async () =
 
   fireEvent.focus(screen.getByLabelText('先知道什么叫批处理 标题'));
   fireEvent.click(
-    within(screen.getByTestId('node-actions-intro-answer-closure')).getByRole(
-      'button',
-      { name: '更基础一点' },
-    ),
+    within(
+      openToolbarMenu(
+        screen.getByTestId('node-actions-intro-answer-closure'),
+        '⋯',
+      ),
+    ).getByRole('button', {
+      name: '更基础一点',
+    }),
   );
 
   const titleInput = await screen.findByDisplayValue(
@@ -1077,7 +1104,9 @@ test('creates AI drafts for scaffold, generate-follow-up, generate-summary and j
   );
 
   fireEvent.click(
-    within(blockActions).getByRole('button', { name: '生成追问' }),
+    within(openToolbarMenu(blockActions, '追问')).getByRole('button', {
+      name: '生成追问',
+    }),
   );
   expect(
     await screen.findByDisplayValue('为什么“同一轮事件”是批处理成立的前提？'),
@@ -1090,10 +1119,14 @@ test('creates AI drafts for scaffold, generate-follow-up, generate-summary and j
 
   fireEvent.focus(screen.getByLabelText('为什么状态更新会被批处理？ 标题'));
   fireEvent.click(
-    within(screen.getByTestId('question-block-actions-question-answer-closure')).getByRole(
-      'button',
-      { name: '生成总结' },
-    ),
+    within(
+      openToolbarMenu(
+        screen.getByTestId('question-block-actions-question-answer-closure'),
+        '总结',
+      ),
+    ).getByRole('button', {
+      name: '生成总结',
+    }),
   );
   expect(
     await screen.findByDisplayValue('先把节奏和结果分开看'),
@@ -1192,13 +1225,14 @@ test('preserves a manual step status override across save and reload', async () 
   );
   await screen.findByRole('heading', { name: '当前学习模块' });
 
-  fireEvent.change(
-    within(screen.getByTestId('editor-node-step-manual-status')).getByRole('combobox'),
-    {
-      target: {
-        value: 'done',
+  fireEvent.click(screen.getByTestId('plan-step-status-trigger-step-manual-status'));
+  fireEvent.click(
+    within(screen.getByTestId('plan-step-status-menu-step-manual-status')).getByRole(
+      'button',
+      {
+        name: '已完成',
       },
-    },
+    ),
   );
 
   const savedSnapshot = await waitForSavedSnapshot(
@@ -1216,12 +1250,11 @@ test('preserves a manual step status override across save and reload', async () 
 
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
 
   expect(
-    within(await screen.findByTestId('editor-node-step-manual-status')).getByRole(
-      'combobox',
-    ),
-  ).toHaveValue('done');
+    screen.getByTestId('plan-step-status-trigger-step-manual-status'),
+  ).toHaveTextContent('已完成');
 });
 
 async function createPreloadedDependencies(

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import {
@@ -19,21 +19,22 @@ test('keeps manual step status overrides until later content changes hand contro
   );
 
   expect(
-    screen.getByRole('combobox', { name: '起始步骤 状态' }),
-  ).toHaveValue('todo');
+    screen.getByTestId('plan-step-status-trigger-step-plan-status'),
+  ).toHaveTextContent('待处理');
 
-  fireEvent.change(
-    screen.getByRole('combobox', { name: '起始步骤 状态' }),
-    {
-      target: {
-        value: 'done',
+  fireEvent.click(screen.getByTestId('plan-step-status-trigger-step-plan-status'));
+  fireEvent.click(
+    within(screen.getByTestId('plan-step-status-menu-step-plan-status')).getByRole(
+      'button',
+      {
+        name: '已完成',
       },
-    },
+    ),
   );
 
   expect(
-    screen.getByRole('combobox', { name: '起始步骤 状态' }),
-  ).toHaveValue('done');
+    screen.getByTestId('plan-step-status-trigger-step-plan-status'),
+  ).toHaveTextContent('已完成');
 
   fireEvent.change(screen.getByLabelText('起始问题 内容'), {
     target: {
@@ -43,8 +44,8 @@ test('keeps manual step status overrides until later content changes hand contro
 
   await waitFor(() => {
     expect(
-      screen.getByRole('combobox', { name: '起始步骤 状态' }),
-    ).toHaveValue('todo');
+      screen.getByTestId('plan-step-status-trigger-step-plan-status'),
+    ).toHaveTextContent('待处理');
   });
 });
 

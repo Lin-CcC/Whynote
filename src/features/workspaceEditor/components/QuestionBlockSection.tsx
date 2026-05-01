@@ -30,8 +30,8 @@ export default function QuestionBlockSection({
   depth,
   isInteractionLocked,
   nodeId,
+  onDeleteNodeById,
   onDirectAnswerQuestion,
-  onDeleteNode,
   onEvaluateAnswer,
   onEvaluateSummary,
   onGenerateFollowUpQuestion,
@@ -58,12 +58,11 @@ export default function QuestionBlockSection({
   const firstFollowUpEntryIndex = questionBlock.entries.findIndex(
     (entry) => entry.type === 'node' && entry.node.type === 'question',
   );
-  const actionSourceNodeId = resolveQuestionBlockActionSourceNodeId(
-    tree,
-    question.id,
-    selectedNodeId,
-  );
-  const questionIsSelected = selectedNodeId === question.id;
+  const hasSelectedDescendant =
+    selectedNodeId !== null &&
+    selectedNodeId !== question.id &&
+    isNodeWithinSubtree(tree, selectedNodeId, question.id);
+  const canRenderQuestionToolbar = !hasSelectedDescendant;
 
   function updateViewState(
     updater: (state: typeof workspaceViewState) => typeof workspaceViewState,
@@ -138,13 +137,8 @@ export default function QuestionBlockSection({
       buttons: [
         {
           disabled: isInteractionLocked,
-          label: '继续修改',
-          onClick: () => selectNodeForEditing(nodeIdToSelect),
-        },
-        {
-          disabled: isInteractionLocked,
           label: '删除',
-          onClick: onDeleteNode,
+          onClick: () => onDeleteNodeById(nodeIdToSelect),
         },
       ],
       title: '通用节点动作',
@@ -196,14 +190,9 @@ export default function QuestionBlockSection({
       selectNode: onSelectNode,
       tree,
     });
-    const supportNodeActions =
-      node.id === selectedNodeId
-        ? buildSelectedSupportNodeActions(node, inlineActions)
-        : inlineActions;
-
     return (
       <EditableNodeCard
-        actions={supportNodeActions}
+        actions={buildSupportNodeToolbar(node)}
         bodyCollapsed={isNodeBodyCollapsed(node.id)}
         collapsedSummary={
           isNodeBodyCollapsed(node.id)
@@ -219,27 +208,21 @@ export default function QuestionBlockSection({
         onUpdateNode={onUpdateNode}
         registerNodeElement={registerNodeElement}
         selectedNodeId={selectedNodeId}
+        supplementalActions={inlineActions}
         tree={tree}
       />
     );
   }
 
-  function buildSelectedSupportNodeActions(
-    node: TreeNode,
-    inlineActions: ReactNode,
-  ) {
+  function buildSupportNodeToolbar(node: TreeNode) {
     const sections: LearningActionSection[] = [
       buildCommonProgressionActionSection(node.id),
       buildCommonNodeActionSection(node.id),
     ];
+    const currentAnswerNodeId =
+      node.parentId !== null ? getCurrentQuestionAnswerNodeId(tree, node.parentId) : null;
 
-    if (
-      node.type === 'summary' &&
-      node.parentId !== null &&
-      getSummaryNodeKind(tree, node) === 'answer-closure'
-    ) {
-      const currentAnswerNodeId = getCurrentQuestionAnswerNodeId(tree, node.parentId);
-
+    if (currentAnswerNodeId && currentAnswerNodeId !== node.id) {
       sections.push({
         buttons: [
           {
@@ -258,10 +241,69 @@ export default function QuestionBlockSection({
       });
     }
 
+    if (
+      node.type === 'summary' &&
+      getSummaryNodeKind(tree, node) === 'manual' &&
+      onEvaluateSummary
+    ) {
+      sections.push({
+        buttons: [
+          {
+            disabled: isInteractionLocked || node.content.trim().length === 0,
+            label: '检查这个总结',
+            onClick: () => onEvaluateSummary(node.id),
+          },
+        ],
+        title: '节点专属动作',
+      });
+    }
+
     return (
-      <LearningActionPanel sections={sections} testId={`node-actions-${node.id}`}>
-        {inlineActions}
-      </LearningActionPanel>
+      <LearningActionPanel
+        isVisible={false}
+        sections={sections}
+        surface="content"
+        testId={`node-actions-${node.id}`}
+      />
+    );
+  }
+
+  function buildQuestionToolbar() {
+    if (!canRenderQuestionToolbar) {
+      return undefined;
+    }
+
+    return (
+      <LearningActionPanel
+        isVisible={false}
+        sections={[
+          buildCommonProgressionActionSection(question.id),
+          {
+            buttons: [
+              ...(onDirectAnswerQuestion
+                ? [
+                    {
+                      disabled:
+                        isInteractionLocked ||
+                        questionBlock.currentAnswerNodeId !== null,
+                      label: '直接回答当前问题',
+                      onClick: () => onDirectAnswerQuestion(question.id),
+                    },
+                  ]
+                : []),
+              {
+                disabled: isInteractionLocked,
+                label: '插入回答',
+                onClick: () => onInsertAnswerForQuestion(question.id),
+              },
+            ],
+            title: '当前问题动作',
+          },
+          buildCommonNodeActionSection(question.id),
+        ]}
+        surface="question"
+        testId={`question-block-actions-${question.id}`}
+      />
     );
   }
 
@@ -276,43 +318,53 @@ export default function QuestionBlockSection({
       workspaceViewState.expandedHistorySectionIds.includes(
         answerHistorySectionId,
       );
-    const answerActions =
-      answerGroup.answer.id === selectedNodeId ? (
-        <LearningActionPanel
-          sections={[
-            buildCommonProgressionActionSection(answerGroup.answer.id),
-            buildCommonNodeActionSection(answerGroup.answer.id),
-            {
-              buttons: [
-                ...(options.isCurrent && onEvaluateAnswer
-                  ? [
-                      {
-                        disabled:
-                          isInteractionLocked ||
-                          answerGroup.answer.content.trim().length === 0,
-                        label: '重新评估当前回答',
-                        onClick: () =>
-                          onEvaluateAnswer(question.id, answerGroup.answer.id),
-                      },
-                    ]
-                  : []),
-                ...(!options.isCurrent
-                  ? [
-                      {
-                        disabled: isInteractionLocked,
-                        label: '设为当前回答',
-                        onClick: () =>
-                          onSetCurrentAnswer(question.id, answerGroup.answer.id),
-                      },
-                    ]
-                  : []),
-              ],
-              title: '节点专属动作',
-            },
-          ]}
-          testId={`node-actions-${answerGroup.answer.id}`}
-        />
-      ) : null;
+    const answerActions = (
+      <LearningActionPanel
+        isVisible={false}
+        sections={[
+          buildCommonProgressionActionSection(answerGroup.answer.id),
+          buildCommonNodeActionSection(answerGroup.answer.id),
+          {
+            buttons: [
+              ...(options.isCurrent && onEvaluateAnswer
+                ? [
+                    {
+                      disabled:
+                        isInteractionLocked ||
+                        answerGroup.answer.content.trim().length === 0,
+                      label: '重新评估当前回答',
+                      onClick: () =>
+                        onEvaluateAnswer(question.id, answerGroup.answer.id),
+                    },
+                  ]
+                : []),
+              ...(answerGroup.latestExplanationNode
+                ? [
+                    {
+                      disabled: isInteractionLocked,
+                      label: '查看答案解析',
+                      onClick: () => onSelectNode(answerGroup.latestExplanationNode!.id),
+                    },
+                  ]
+                : []),
+              ...(!options.isCurrent
+                ? [
+                    {
+                      disabled: isInteractionLocked,
+                      label: '设为当前回答',
+                      onClick: () =>
+                        onSetCurrentAnswer(question.id, answerGroup.answer.id),
+                    },
+                  ]
+                : []),
+            ],
+            title: '节点专属动作',
+          },
+        ]}
+        surface="answer"
+        testId={`node-actions-${answerGroup.answer.id}`}
+      />
+    );
 
     return (
       <div
@@ -383,14 +435,15 @@ export default function QuestionBlockSection({
       workspaceViewState.expandedHistorySectionIds.includes(
         summaryHistorySectionId,
       );
-    const summaryActions =
-      summaryGroup.summary.id === selectedNodeId ? (
-        <LearningActionPanel
-          sections={[
-            buildCommonProgressionActionSection(summaryGroup.summary.id),
-            buildCommonNodeActionSection(summaryGroup.summary.id),
-            {
-              buttons: onEvaluateSummary
+    const summaryActions = (
+      <LearningActionPanel
+        isVisible={false}
+        sections={[
+          buildCommonProgressionActionSection(summaryGroup.summary.id),
+          buildCommonNodeActionSection(summaryGroup.summary.id),
+          {
+            buttons: [
+              ...(onEvaluateSummary
                 ? [
                     {
                       disabled:
@@ -400,13 +453,25 @@ export default function QuestionBlockSection({
                       onClick: () => onEvaluateSummary(summaryGroup.summary.id),
                     },
                   ]
-                : [],
-              title: '节点专属动作',
-            },
-          ]}
-          testId={`node-actions-${summaryGroup.summary.id}`}
-        />
-      ) : null;
+                : []),
+              ...(questionBlock.currentAnswerNodeId
+                ? [
+                    {
+                      disabled: isInteractionLocked,
+                      label: '回到当前回答继续修改',
+                      onClick: () =>
+                        selectNodeForEditing(questionBlock.currentAnswerNodeId!),
+                    },
+                  ]
+                : []),
+            ],
+            title: '节点专属动作',
+          },
+        ]}
+        surface="content"
+        testId={`node-actions-${summaryGroup.summary.id}`}
+      />
+    );
 
     return (
       <div
@@ -467,7 +532,10 @@ export default function QuestionBlockSection({
       data-collapsed={isCollapsed}
       data-testid={`question-block-${question.id}`}
     >
-      <div className="workspace-questionBlockHeader">
+      <div
+        className="workspace-questionBlockHeader"
+        data-testid={`question-block-header-${question.id}`}
+      >
         <div>
           <p className="workspace-kicker">Question Block</p>
           <h3 className="workspace-questionBlockTitle">
@@ -475,9 +543,6 @@ export default function QuestionBlockSection({
           </h3>
         </div>
         <div className="workspace-questionBlockHeaderActions">
-          <span className="workspace-counter">
-            {questionBlock.currentAnswerNodeId ? '已有当前回答' : '还没有当前回答'}
-          </span>
           <button
             className="workspace-historyToggle"
             disabled={isInteractionLocked}
@@ -491,6 +556,7 @@ export default function QuestionBlockSection({
       {isCollapsed ? null : (
         <div className="workspace-questionBlockStack">
           <EditableNodeCard
+            actions={buildQuestionToolbar()}
             depth={depth}
             isInteractionLocked={isInteractionLocked}
             nodeId={question.id}
@@ -500,60 +566,10 @@ export default function QuestionBlockSection({
             selectedNodeId={selectedNodeId}
             tree={tree}
           />
-          {questionIsSelected ? (
-            <div
-              className="workspace-questionBlockActions"
-              data-testid={`question-block-actions-${question.id}`}
-            >
-              <LearningActionPanel
-                sections={[
-                  buildCommonProgressionActionSection(actionSourceNodeId),
-                  {
-                    buttons: [
-                      ...(questionIsSelected && onDirectAnswerQuestion
-                        ? [
-                            {
-                              disabled:
-                                isInteractionLocked ||
-                                questionBlock.currentAnswerNodeId !== null,
-                              label: '直接回答当前问题',
-                              onClick: () => onDirectAnswerQuestion(question.id),
-                            },
-                          ]
-                        : []),
-                      {
-                        disabled: isInteractionLocked,
-                        label: '插入回答',
-                        onClick: () => onInsertAnswerForQuestion(question.id),
-                      },
-                    ],
-                    title: '当前问题动作',
-                  },
-                  {
-                    buttons: questionIsSelected
-                      ? [
-                          {
-                            disabled: isInteractionLocked,
-                            label: '继续修改',
-                            onClick: () => onSelectNode(question.id),
-                          },
-                          {
-                            disabled: isInteractionLocked,
-                            label: '删除',
-                            onClick: onDeleteNode,
-                          },
-                        ]
-                      : [],
-                    title: '通用节点动作',
-                  },
-                ]}
-              />
-            </div>
-          ) : null}
           {!questionBlock.currentAnswerNodeId && isActive ? (
             <div className="workspace-questionBlockEmpty">
               <p className="workspace-helpText">
-                这个问题块还没有当前回答。可以直接回答，也可以先插入一个空白回答再继续修改。
+                这个问题块还没有当前回答。可以直接回答，也可以先插入一个空白回答再开始写。
               </p>
             </div>
           ) : null}
@@ -616,24 +632,21 @@ function getQuestionBlockEntryKey(entry: QuestionBlockEntry) {
   return entry.node.id;
 }
 
-function resolveQuestionBlockActionSourceNodeId(
+function isNodeWithinSubtree(
   tree: { nodes: Record<string, TreeNode> },
-  questionNodeId: string,
-  selectedNodeId: string | null,
+  nodeId: string,
+  ancestorNodeId: string,
 ) {
-  if (!selectedNodeId) {
-    return questionNodeId;
+  let currentNode: TreeNode | undefined = tree.nodes[nodeId];
+
+  while (currentNode) {
+    if (currentNode.id === ancestorNodeId) {
+      return true;
+    }
+
+    currentNode =
+      currentNode.parentId === null ? undefined : tree.nodes[currentNode.parentId];
   }
 
-  const selectedNode = tree.nodes[selectedNodeId];
-
-  if (!selectedNode) {
-    return questionNodeId;
-  }
-
-  if (selectedNode.type === 'question') {
-    return selectedNode.id === questionNodeId ? selectedNode.id : questionNodeId;
-  }
-
-  return selectedNode.parentId === questionNodeId ? selectedNode.id : questionNodeId;
+  return false;
 }

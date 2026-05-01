@@ -1,4 +1,6 @@
 import {
+  cloneElement,
+  isValidElement,
   type CSSProperties,
   type ChangeEvent,
   type FocusEvent,
@@ -25,6 +27,7 @@ import {
 } from '../utils/treeSelectors';
 import { getNodeSemanticVisibility } from '../utils/nodeSemanticVisibility';
 import type { NodeContentPatch } from '../workspaceEditorTypes';
+import PlanStepStatusMenu from './PlanStepStatusMenu';
 
 type EditableNodeCardProps = {
   actions?: ReactNode;
@@ -41,6 +44,7 @@ type EditableNodeCardProps = {
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
   selectedNodeId: string | null;
+  supplementalActions?: ReactNode;
   tree: NodeTree;
 };
 
@@ -65,12 +69,14 @@ export default function EditableNodeCard({
   onUpdateNode,
   registerNodeElement,
   selectedNodeId,
+  supplementalActions,
   tree,
 }: EditableNodeCardProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [hasFocusWithin, setHasFocusWithin] = useState(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const contentInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const statusSelectRef = useRef<HTMLSelectElement | null>(null);
   const node = getNodeOrThrow(tree, nodeId);
   const isSelected = node.id === selectedNodeId;
   const displayLabel = getDisplayLabelForNode(tree, node);
@@ -86,12 +92,17 @@ export default function EditableNodeCard({
     node.status !== planStepRuntimeStatus.suggestedStatus;
   const bodyToggleLabel = `${bodyCollapsed ? '展开' : '收起'}正文`;
   const hasCollapsedSummary = collapsedSummary !== undefined && collapsedSummary !== null;
+  const isToolbarVisible =
+    Boolean(actions) && (isSelected || isEditing || hasFocusWithin || isHovered);
+  const renderedActions =
+    actions && isValidElement(actions)
+      ? cloneElement(actions, { isVisible: isToolbarVisible } as never)
+      : actions;
 
   function handleEditableFocus(event: FocusEvent<HTMLElement>) {
     if (
       !isOwnedEditableTarget(event.target, {
         contentInputRef,
-        statusSelectRef,
         titleInputRef,
       })
     ) {
@@ -109,7 +120,6 @@ export default function EditableNodeCard({
     if (
       isOwnedEditableTarget(event.relatedTarget, {
         contentInputRef,
-        statusSelectRef,
         titleInputRef,
       })
     ) {
@@ -127,13 +137,28 @@ export default function EditableNodeCard({
     onUpdateNode(node.id, { content: event.target.value });
   }
 
-  function handleStatusChange(event: ChangeEvent<HTMLSelectElement>) {
-    onUpdateNode(node.id, { status: event.target.value as PlanStepStatus });
+  function handleStatusChange(nextStatus: PlanStepStatus) {
+    onUpdateNode(node.id, { status: nextStatus });
   }
 
   function handleNodeClick(event: MouseEvent<HTMLElement>) {
     event.stopPropagation();
     onSelectNode(node.id);
+  }
+
+  function handleFocusCapture() {
+    setHasFocusWithin(true);
+  }
+
+  function handleBlurCapture(event: FocusEvent<HTMLElement>) {
+    if (
+      event.relatedTarget instanceof Node &&
+      event.currentTarget.contains(event.relatedTarget)
+    ) {
+      return;
+    }
+
+    setHasFocusWithin(false);
   }
 
   return (
@@ -146,7 +171,11 @@ export default function EditableNodeCard({
       data-node-selected={isSelected}
       data-node-type={node.type}
       data-testid={`editor-node-${node.id}`}
+      onBlurCapture={handleBlurCapture}
       onClick={handleNodeClick}
+      onFocusCapture={handleFocusCapture}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       ref={(element) => registerNodeElement(node.id, element)}
       style={{ '--node-depth': depth } as CSSProperties}
       tabIndex={-1}
@@ -167,45 +196,64 @@ export default function EditableNodeCard({
                   {badge.label}
                 </span>
               ))}
-              {node.type === 'plan-step' ? (
-                <select
-                  aria-label={`${displayTitle || displayLabel} 状态`}
-                  className="workspace-statusSelect"
-                  disabled={isInteractionLocked}
-                  onBlur={handleEditableBlur}
-                  onChange={handleStatusChange}
-                  onClick={(event) => event.stopPropagation()}
-                  onFocus={handleEditableFocus}
-                  ref={statusSelectRef}
-                  value={node.status}
-                >
-                  {Object.entries(PLAN_STEP_STATUS_LABELS).map(([status, label]) => (
-                    <option key={status} value={status}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
-              {onToggleBodyCollapsed ? (
-                <button
-                  className="workspace-nodeBodyToggle"
-                  disabled={isInteractionLocked}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onToggleBodyCollapsed();
-                  }}
-                  type="button"
-                >
-                  {bodyToggleLabel}
-                </button>
-              ) : null}
-              {headerControls}
               {isSelected ? (
                 <span className="workspace-selectedBadge">已选中</span>
               ) : null}
               {isEditing ? (
                 <span className="workspace-editingBadge">编辑中</span>
               ) : null}
+            </div>
+            <div className="workspace-nodeTitleRow">
+              <input
+                aria-label={`${displayTitle || displayLabel} 标题`}
+                className="workspace-nodeTitleInput"
+                disabled={isInteractionLocked}
+                onBlur={handleEditableBlur}
+                onChange={handleTitleChange}
+                onClick={(event) => event.stopPropagation()}
+                onFocus={handleEditableFocus}
+                placeholder={getNodeInputPlaceholderForNode(tree, node, 'title')}
+                ref={titleInputRef}
+                value={displayTitle}
+              />
+              <div className="workspace-nodeTitleControls">
+                {node.type === 'plan-step' ? (
+                  <PlanStepStatusMenu
+                    disabled={isInteractionLocked}
+                    displayTitle={displayTitle || displayLabel}
+                    nodeId={node.id}
+                    onOpen={() => {
+                      if (!isSelected) {
+                        onSelectNode(node.id);
+                      }
+                    }}
+                    onStatusChange={handleStatusChange}
+                    status={node.status}
+                  />
+                ) : null}
+                {onToggleBodyCollapsed ? (
+                  <button
+                    className="workspace-nodeBodyToggle"
+                    disabled={isInteractionLocked}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleBodyCollapsed();
+                    }}
+                    type="button"
+                  >
+                    {bodyToggleLabel}
+                  </button>
+                ) : null}
+                {headerControls}
+                {renderedActions ? (
+                  <div
+                    className="workspace-nodeTitleToolbar"
+                    data-visible={isToolbarVisible}
+                  >
+                    {renderedActions}
+                  </div>
+                ) : null}
+              </div>
             </div>
             {isSelected ? (
               <p className="workspace-nodeSelectionHint">
@@ -230,23 +278,10 @@ export default function EditableNodeCard({
               </>
             ) : null}
           </div>
-          {actions ? <div className="workspace-nodeInlineActions">{actions}</div> : null}
           {bodyCollapsed ? (
             <p className="workspace-nodeHint">{bodyCollapsedHint}</p>
           ) : (
             <>
-              <input
-                aria-label={`${displayTitle || displayLabel} 标题`}
-                className="workspace-nodeTitleInput"
-                disabled={isInteractionLocked}
-                onBlur={handleEditableBlur}
-                onChange={handleTitleChange}
-                onClick={(event) => event.stopPropagation()}
-                onFocus={handleEditableFocus}
-                placeholder={getNodeInputPlaceholderForNode(tree, node, 'title')}
-                ref={titleInputRef}
-                value={displayTitle}
-              />
               <textarea
                 aria-label={`${displayTitle || displayLabel} 内容`}
                 className="workspace-nodeContentInput"
@@ -262,6 +297,11 @@ export default function EditableNodeCard({
               />
             </>
           )}
+          {supplementalActions ? (
+            <div className="workspace-nodeSupplementalActions">
+              {supplementalActions}
+            </div>
+          ) : null}
           {children ? <div className="workspace-nodeChildren">{children}</div> : null}
         </>
       )}
@@ -285,13 +325,11 @@ function isOwnedEditableTarget(
   target: EventTarget | null,
   refs: {
     contentInputRef: RefObject<HTMLTextAreaElement | null>;
-    statusSelectRef: RefObject<HTMLSelectElement | null>;
     titleInputRef: RefObject<HTMLInputElement | null>;
   },
 ) {
   return (
     target === refs.titleInputRef.current ||
-    target === refs.contentInputRef.current ||
-    target === refs.statusSelectRef.current
+    target === refs.contentInputRef.current
   );
 }

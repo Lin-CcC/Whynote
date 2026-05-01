@@ -329,24 +329,13 @@ test('keeps the left runtime action card auxiliary while the main question block
     'question-block-actions-question-runtime-open',
   );
 
-  expect(
-    within(blockActions).getByRole('button', { name: '直接回答当前问题' }),
-  ).toBeInTheDocument();
-  expect(
-    within(blockActions).getByRole('button', { name: '插入回答' }),
-  ).toBeInTheDocument();
-  expect(
-    within(blockActions).getByRole('button', { name: '生成追问' }),
-  ).toBeInTheDocument();
-  expect(
-    within(blockActions).getByRole('button', { name: '插入追问' }),
-  ).toBeInTheDocument();
-  expect(
-    within(blockActions).getByRole('button', { name: '生成总结' }),
-  ).toBeInTheDocument();
-  expect(
-    within(blockActions).getByRole('button', { name: '插入总结' }),
-  ).toBeInTheDocument();
+  expectToolbarVerbs(blockActions, ['回答', '追问', '总结', '⋯']);
+  expectToolbarMenuActions(blockActions, '回答', [
+    '直接回答当前问题',
+    '插入回答',
+  ]);
+  expectToolbarMenuActions(blockActions, '追问', ['生成追问', '插入追问']);
+  expectToolbarMenuActions(blockActions, '总结', ['生成总结', '插入总结']);
   expect(
     screen.getByText(/主编辑流已经收口到中间的 question block/),
   ).toBeInTheDocument();
@@ -1238,6 +1227,43 @@ function createAiCustomPreset(name: string) {
     },
   });
   fireEvent.click(screen.getByRole('button', { name: '保存为新预设' }));
+}
+
+function expectToolbarVerbs(
+  toolbar: HTMLElement,
+  expectedLabels: string[],
+) {
+  expect(
+    within(toolbar)
+      .getAllByRole('button')
+      .map((button) =>
+        (button.textContent?.replace('▾', '').trim() ?? ''),
+      ),
+  ).toEqual(expectedLabels);
+}
+
+function expectToolbarMenuActions(
+  toolbar: HTMLElement,
+  menuLabel: string,
+  expectedActionLabels: string[],
+) {
+  const menu = openToolbarMenu(toolbar, menuLabel);
+
+  for (const actionLabel of expectedActionLabels) {
+    expect(
+      within(menu).getByRole('button', { name: actionLabel }),
+    ).toBeInTheDocument();
+  }
+}
+
+function openToolbarMenu(toolbar: HTMLElement, menuLabel: string) {
+  fireEvent.click(
+    within(toolbar).getByRole('button', {
+      name: menuLabel,
+    }),
+  );
+
+  return within(toolbar).getByRole('menu');
 }
 
 function findOptionValueByText(

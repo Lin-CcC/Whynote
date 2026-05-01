@@ -193,12 +193,14 @@ test('keeps newly inserted answers in the current question answer block before f
   );
 
   fireEvent.click(
-    within(screen.getByTestId('question-block-actions-question-parent')).getByRole(
-      'button',
-      {
-        name: '插入回答',
-      },
-    ),
+    within(
+      openToolbarMenu(
+        screen.getByTestId('question-block-actions-question-parent'),
+        '回答',
+      ),
+    ).getByRole('button', {
+      name: '插入回答',
+    }),
   );
 
   const insertChildSpy = getOperationSpy(operations, 'insertChildNode');
@@ -246,7 +248,10 @@ test('inserts an answer under the selected follow-up question instead of the pre
 
   fireEvent.click(
     within(
-      screen.getByTestId('question-block-actions-question-follow-up'),
+      openToolbarMenu(
+        screen.getByTestId('question-block-actions-question-follow-up'),
+        '回答',
+      ),
     ).getByRole('button', {
       name: '插入回答',
     }),
@@ -302,7 +307,9 @@ test.each([
     );
 
     fireEvent.click(
-      within(screen.getByTestId(`node-actions-${sourceNodeId}`)).getByRole('button', {
+      within(
+        openToolbarMenu(screen.getByTestId(`node-actions-${sourceNodeId}`), '追问'),
+      ).getByRole('button', {
         name: '插入追问',
       }),
     );
@@ -354,7 +361,12 @@ test('inserts an empty manual summary from the question block instead of delegat
   );
 
   fireEvent.click(
-    within(screen.getByTestId('node-actions-summary-action-closure')).getByRole('button', {
+    within(
+      openToolbarMenu(
+        screen.getByTestId('node-actions-summary-action-closure'),
+        '总结',
+      ),
+    ).getByRole('button', {
       name: '插入总结',
     }),
   );
@@ -401,7 +413,10 @@ test('inserts an empty scaffold summary from the selected scaffold node instead 
 
   fireEvent.click(
     within(
-      screen.getByTestId('node-actions-summary-scaffold-selected'),
+      openToolbarMenu(
+        screen.getByTestId('node-actions-summary-scaffold-selected'),
+        '总结',
+      ),
     ).getByRole('button', {
       name: '插入总结',
     }),
@@ -560,39 +575,35 @@ test('shows common progression actions and retained scaffold-specific actions wh
 
   const actionPanel = screen.getByTestId('node-actions-summary-scaffold-selected');
 
+  expectToolbarVerbs(actionPanel, ['追问', '总结', '⋯']);
+  expectToolbarMenuActions(actionPanel, '追问', ['生成追问', '插入追问']);
+  expectToolbarMenuActions(actionPanel, '总结', ['生成总结', '插入总结']);
   expect(
-    within(actionPanel).getByRole('button', { name: '生成追问' }),
+    within(actionPanel).queryByRole('button', { name: '继续修改' }),
+  ).not.toBeInTheDocument();
+
+  const overflowMenu = openOverflowMenu(actionPanel);
+
+  expect(within(overflowMenu).getByRole('button', { name: '删除' })).toBeInTheDocument();
+  expect(
+    within(overflowMenu).getByRole('button', { name: '换个说法' }),
   ).toBeInTheDocument();
   expect(
-    within(actionPanel).getByRole('button', { name: '插入追问' }),
+    within(overflowMenu).getByRole('button', { name: '更基础一点' }),
   ).toBeInTheDocument();
   expect(
-    within(actionPanel).getByRole('button', { name: '生成总结' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '插入总结' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '继续修改' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '删除' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '换个说法' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '更基础一点' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actionPanel).getByRole('button', { name: '举个例子' }),
+    within(overflowMenu).getByRole('button', { name: '举个例子' }),
   ).toBeInTheDocument();
 
   fireEvent.click(
-    within(actionPanel).getByRole('button', { name: '生成追问' }),
+    within(openToolbarMenu(actionPanel, '追问')).getByRole('button', {
+      name: '生成追问',
+    }),
   );
   fireEvent.click(
-    within(actionPanel).getByRole('button', { name: '生成总结' }),
+    within(openToolbarMenu(actionPanel, '总结')).getByRole('button', {
+      name: '生成总结',
+    }),
   );
 
   expect(onGenerateFollowUpQuestion).toHaveBeenCalledWith(
@@ -638,10 +649,11 @@ test('renders scaffold summaries in the unified compact collapsed summary and re
   });
 
   expect(
-    within(screen.getByTestId('node-actions-summary-scaffold-selected')).getByRole(
-      'button',
-      { name: '举个例子' },
-    ),
+    within(
+      openOverflowMenu(screen.getByTestId('node-actions-summary-scaffold-selected')),
+    ).getByRole('button', {
+      name: '举个例子',
+    }),
   ).toBeInTheDocument();
 });
 
@@ -683,7 +695,7 @@ test('deletes the selected scaffold node from the common node action panel', asy
 
   fireEvent.click(
     within(
-      screen.getByTestId('node-actions-summary-scaffold-selected'),
+      openOverflowMenu(screen.getByTestId('node-actions-summary-scaffold-selected')),
     ).getByRole('button', {
       name: '删除',
     }),
@@ -862,9 +874,7 @@ test('renders plan-step with weaker emphasis than learning nodes', () => {
     'primary',
   );
   expect(
-    screen.getByRole('combobox', {
-      name: /梳理 state \/ props \/ render 的关系.*状态/i,
-    }),
+    screen.getByTestId('plan-step-status-trigger-step-state-basics'),
   ).toBeInTheDocument();
 });
 
@@ -1794,6 +1804,47 @@ function createSingleModuleSnapshot(): WorkspaceSnapshot {
     ...snapshot,
     tree,
   };
+}
+
+function expectToolbarVerbs(
+  toolbar: HTMLElement,
+  expectedLabels: string[],
+) {
+  expect(
+    within(toolbar)
+      .getAllByRole('button')
+      .map((button) =>
+        (button.textContent?.replace('▾', '').trim() ?? ''),
+      ),
+  ).toEqual(expectedLabels);
+}
+
+function expectToolbarMenuActions(
+  toolbar: HTMLElement,
+  menuLabel: string,
+  expectedActionLabels: string[],
+) {
+  const menu = openToolbarMenu(toolbar, menuLabel);
+
+  for (const actionLabel of expectedActionLabels) {
+    expect(
+      within(menu).getByRole('button', { name: actionLabel }),
+    ).toBeInTheDocument();
+  }
+}
+
+function openToolbarMenu(toolbar: HTMLElement, menuLabel: string) {
+  fireEvent.click(
+    within(toolbar).getByRole('button', {
+      name: menuLabel,
+    }),
+  );
+
+  return within(toolbar).getByRole('menu');
+}
+
+function openOverflowMenu(toolbar: HTMLElement) {
+  return openToolbarMenu(toolbar, '⋯');
 }
 
 function renderWorkspaceEditorWithViewState(

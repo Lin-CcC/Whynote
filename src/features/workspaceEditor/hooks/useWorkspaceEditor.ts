@@ -373,9 +373,20 @@ export function useWorkspaceEditor({
       return;
     }
 
+    runLearningActionForNode(selectedNodeId, actionId);
+  }
+
+  function runLearningActionForNode(
+    anchorNodeId: string | null,
+    actionId: LearningActionId,
+  ) {
+    if (isInteractionLocked) {
+      return;
+    }
+
     const isHandledByExternalRuntime = requestExternalLearningAction(
       actionId,
-      selectedNodeId,
+      anchorNodeId,
     );
 
     if (isHandledByExternalRuntime) {
@@ -383,7 +394,7 @@ export function useWorkspaceEditor({
       return;
     }
 
-    const placement = resolveLearningActionPlacement(tree, selectedNodeId, actionId);
+    const placement = resolveLearningActionPlacement(tree, anchorNodeId, actionId);
 
     if (!placement) {
       return;
@@ -526,6 +537,35 @@ export function useWorkspaceEditor({
           nextTree,
           nextSelectedNodeId: fallbackNodeId,
           preferredModuleId: resolveModuleId(nextTree, fallbackNodeId, currentModuleId),
+        };
+      },
+      '结构操作失败，请检查当前节点。',
+    );
+  }
+
+  function deleteNodeById(nodeId: string) {
+    if (isInteractionLocked || !tree.nodes[nodeId]) {
+      return;
+    }
+
+    const targetNode = getNodeOrThrow(tree, nodeId);
+    const nextSelectedNodeId =
+      selectedNodeId && isNodeWithinSubtree(tree, selectedNodeId, nodeId)
+        ? targetNode.parentId ?? resolveModuleId(tree, nodeId, currentModuleId)
+        : selectedNodeId;
+
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.deleteNode(tree, nodeId);
+
+        return {
+          nextTree,
+          nextSelectedNodeId,
+          preferredModuleId: resolveModuleId(
+            nextTree,
+            nextSelectedNodeId,
+            currentModuleId,
+          ),
         };
       },
       '结构操作失败，请检查当前节点。',
@@ -868,6 +908,8 @@ export function useWorkspaceEditor({
     tree,
     toggleSelectedNodeTag,
     updateNode,
+    runLearningActionForNode,
+    deleteNodeById,
     setCurrentAnswer,
     workspaceTitle: initialSnapshot.workspace.title,
     insertChildAtSelection,
@@ -1499,6 +1541,25 @@ function resolveQuestionContextNode(tree: NodeTree, selectedNodeId: string) {
   const parentNode = tree.nodes[selectedNode.parentId];
 
   return parentNode?.type === 'question' ? parentNode : null;
+}
+
+function isNodeWithinSubtree(
+  tree: NodeTree,
+  nodeId: string,
+  ancestorNodeId: string,
+) {
+  let currentNode: TreeNode | undefined = tree.nodes[nodeId];
+
+  while (currentNode) {
+    if (currentNode.id === ancestorNodeId) {
+      return true;
+    }
+
+    currentNode =
+      currentNode.parentId === null ? undefined : tree.nodes[currentNode.parentId];
+  }
+
+  return false;
 }
 
 function isEditableKeyboardTarget(target: EventTarget | null) {
