@@ -1,10 +1,11 @@
 import { useState } from 'react';
 
-import type { NodeTree } from '../../nodeDomain';
+import type { NodeTree, UiPreferences } from '../../nodeDomain';
 import { createWorkspaceExport } from '../services/resourceExportService';
 import { listResourceGroups } from '../services/resourceLibraryService';
 import { searchWorkspaceNodes } from '../services/resourceSearchService';
 import type {
+  ExportContentMode,
   ExportFormat,
   ExportTarget,
   SearchScope,
@@ -15,15 +16,21 @@ import { collectTagMatchedNodeIds } from '../utils/resourceTreeUtils';
 interface UseResourcesSearchExportOptions {
   currentModuleId: string | null;
   tree: NodeTree;
+  uiPreferences?: UiPreferences | null;
+  workspaceId?: string | null;
   workspaceTitle: string;
 }
 
 export function useResourcesSearchExport({
   currentModuleId,
   tree,
+  uiPreferences,
+  workspaceId,
   workspaceTitle,
 }: UseResourcesSearchExportOptions) {
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exportContentMode, setExportContentMode] =
+    useState<ExportContentMode>('full');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('markdown');
   const [exportTarget, setExportTarget] = useState<ExportTarget>('current-module');
   const [includePlanSteps, setIncludePlanSteps] = useState(false);
@@ -47,9 +54,12 @@ export function useResourcesSearchExport({
   ).length;
   const canExportFilteredResult =
     scope !== 'resources' && selectedTagIds.length > 0 && tagFilteredMatchCount > 0;
+  const canUseExpandedContentMode = exportTarget !== 'filtered';
 
   return {
+    canUseExpandedContentMode,
     canExportFilteredResult,
+    exportContentMode,
     exportError,
     exportFormat,
     exportTarget,
@@ -58,10 +68,11 @@ export function useResourcesSearchExport({
     resourceGroups,
     scope,
     searchState,
+    setExportContentMode,
     selectedTagIds,
     downloadCurrentExport,
     setExportFormat,
-    setExportTarget,
+    setExportTarget: handleExportTargetChange,
     setIncludePlanSteps,
     setQuery,
     setScope,
@@ -79,6 +90,7 @@ export function useResourcesSearchExport({
   function downloadCurrentExport() {
     try {
       const descriptor = createWorkspaceExport({
+        contentMode: exportContentMode,
         currentModuleId,
         filterScope,
         format: exportFormat,
@@ -86,6 +98,8 @@ export function useResourcesSearchExport({
         selectedTagIds,
         target: exportTarget,
         tree,
+        uiPreferences,
+        workspaceId,
         workspaceTitle,
       });
 
@@ -96,6 +110,14 @@ export function useResourcesSearchExport({
     } catch (error) {
       setExportError(error instanceof Error ? error.message : '导出失败，请稍后重试。');
       return null;
+    }
+  }
+
+  function handleExportTargetChange(nextTarget: ExportTarget) {
+    setExportTarget(nextTarget);
+
+    if (nextTarget === 'filtered') {
+      setExportContentMode('full');
     }
   }
 }

@@ -128,6 +128,40 @@ test('exports through the browser download flow', () => {
   expect(revokeObjectUrlSpy).toHaveBeenCalledWith('blob:resources-export');
 });
 
+test('switches expanded-view mode back to full content for filtered export', () => {
+  render(
+    <ResourcesSearchExportPanel
+      activeResourceNodeId={null}
+      currentModuleId="module-current"
+      onApplyTreeChange={() => {}}
+      onFocusResourceNode={() => {}}
+      onUpsertResourceMetadata={async () => {}}
+      onSelectEditorNode={() => {}}
+      selectedEditorNodeId={null}
+      tree={createResourcesPanelSnapshot().tree}
+      workspaceId="workspace-resources-panel"
+      workspaceTitle="React 学习主题"
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: '仅当前展开内容' }));
+  expect(
+    screen.getByRole('button', { name: '仅当前展开内容' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+
+  fireEvent.click(screen.getByRole('button', { name: /重要/i }));
+  fireEvent.click(screen.getByRole('button', { name: '标签筛选结果' }));
+
+  expect(screen.getByRole('button', { name: '仅当前展开内容' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '全部内容' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  expect(
+    screen.getByText('标签筛选结果始终按全部内容导出，不读取折叠状态。'),
+  ).toBeInTheDocument();
+});
+
 test('confirms fragment deletion impact and restores resource focus to the parent resource', () => {
   render(
     <StatefulResourcesSearchExportPanel

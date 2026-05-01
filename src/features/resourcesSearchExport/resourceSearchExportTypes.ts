@@ -7,6 +7,7 @@ import type {
 export type SearchScope = 'current-module' | 'theme' | 'resources';
 export type ExportFormat = 'markdown' | 'txt';
 export type ExportTarget = 'current-module' | 'theme' | 'filtered';
+export type ExportContentMode = 'full' | 'expanded-view';
 
 export interface TagFilterOption {
   id: string;

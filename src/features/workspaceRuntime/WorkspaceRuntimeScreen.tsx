@@ -294,6 +294,7 @@ export default function WorkspaceRuntimeScreen({
           resourceMetadataByNodeId={resourceMetadataByNodeId}
           selectedEditorNodeId={context.selectedNodeId}
           tree={context.tree}
+          uiPreferences={uiPreferences}
           workspaceId={workspaceSnapshot.workspace.id}
           workspaceTitle={context.workspaceTitle}
         />

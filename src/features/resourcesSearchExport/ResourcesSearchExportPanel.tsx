@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import type { NodeTree, ResourceMetadataRecord } from '../nodeDomain';
+import type {
+  NodeTree,
+  ResourceMetadataRecord,
+  UiPreferences,
+} from '../nodeDomain';
 import type { ResourceImportDraft } from './services/resourceIngestTypes';
 import { deleteResourceNode } from './services/resourceDeleteService';
 import ResourceEntryPanel from './components/ResourceEntryPanel';
@@ -27,6 +31,7 @@ type ResourcesSearchExportPanelProps = {
   resourceMetadataByNodeId?: Record<string, ResourceMetadataRecord>;
   selectedEditorNodeId: string | null;
   tree: NodeTree;
+  uiPreferences?: UiPreferences | null;
   workspaceId?: string;
   workspaceTitle: string;
 };
@@ -46,6 +51,7 @@ export default function ResourcesSearchExportPanel({
   resourceMetadataByNodeId = {},
   selectedEditorNodeId,
   tree,
+  uiPreferences,
   workspaceId = DEFAULT_WORKSPACE_ID,
   workspaceTitle,
 }: ResourcesSearchExportPanelProps) {
@@ -59,6 +65,8 @@ export default function ResourcesSearchExportPanel({
   const resourcesSearchExport = useResourcesSearchExport({
     currentModuleId,
     tree,
+    uiPreferences,
+    workspaceId,
     workspaceTitle,
   });
   const hasActiveSearch =
@@ -135,11 +143,16 @@ export default function ResourcesSearchExportPanel({
         tree={tree}
       />
       <ExportPanel
+        canUseExpandedContentMode={
+          resourcesSearchExport.canUseExpandedContentMode
+        }
         canExportFilteredResult={resourcesSearchExport.canExportFilteredResult}
+        exportContentMode={resourcesSearchExport.exportContentMode}
         exportError={resourcesSearchExport.exportError}
         exportFormat={resourcesSearchExport.exportFormat}
         exportTarget={resourcesSearchExport.exportTarget}
         includePlanSteps={resourcesSearchExport.includePlanSteps}
+        onExportContentModeChange={resourcesSearchExport.setExportContentMode}
         onExport={resourcesSearchExport.downloadCurrentExport}
         onExportFormatChange={resourcesSearchExport.setExportFormat}
         onExportTargetChange={resourcesSearchExport.setExportTarget}

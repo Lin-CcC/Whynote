@@ -1,16 +1,20 @@
 import SectionCard from '../../../ui/SectionCard';
 import type {
+  ExportContentMode,
   ExportFormat,
   ExportTarget,
   SearchScope,
 } from '../resourceSearchExportTypes';
 
 type ExportPanelProps = {
+  canUseExpandedContentMode: boolean;
   canExportFilteredResult: boolean;
+  exportContentMode: ExportContentMode;
   exportError: string | null;
   exportFormat: ExportFormat;
   exportTarget: ExportTarget;
   includePlanSteps: boolean;
+  onExportContentModeChange: (nextMode: ExportContentMode) => void;
   onExport: () => void;
   onExportFormatChange: (nextFormat: ExportFormat) => void;
   onExportTargetChange: (nextTarget: ExportTarget) => void;
@@ -19,11 +23,14 @@ type ExportPanelProps = {
 };
 
 export default function ExportPanel({
+  canUseExpandedContentMode,
   canExportFilteredResult,
+  exportContentMode,
   exportError,
   exportFormat,
   exportTarget,
   includePlanSteps,
+  onExportContentModeChange,
   onExport,
   onExportFormatChange,
   onExportTargetChange,
@@ -95,6 +102,30 @@ export default function ExportPanel({
             </button>
           </div>
         </div>
+        <div>
+          <span className="resources-panelFieldLabel">导出模式</span>
+          <div className="resources-chipGroup">
+            <button
+              aria-pressed={exportContentMode === 'full'}
+              className="resources-tagChip"
+              data-active={exportContentMode === 'full'}
+              onClick={() => onExportContentModeChange('full')}
+              type="button"
+            >
+              全部内容
+            </button>
+            <button
+              aria-pressed={exportContentMode === 'expanded-view'}
+              className="resources-tagChip"
+              data-active={exportContentMode === 'expanded-view'}
+              disabled={!canUseExpandedContentMode}
+              onClick={() => onExportContentModeChange('expanded-view')}
+              type="button"
+            >
+              仅当前展开内容
+            </button>
+          </div>
+        </div>
         <label className="resources-checkboxRow">
           <input
             checked={includePlanSteps}
@@ -111,6 +142,16 @@ export default function ExportPanel({
             {scope === 'resources'
               ? '资料区首版不支持按标签导出，请切回当前模块或全主题。'
               : '先在当前模块或全主题里选中标签并得到命中结果，才能导出筛选结果。'}
+          </p>
+        ) : null}
+        {exportTarget === 'filtered' ? (
+          <p className="workspace-helpText">
+            标签筛选结果始终按全部内容导出，不读取折叠状态。
+          </p>
+        ) : null}
+        {exportContentMode === 'expanded-view' && exportTarget !== 'filtered' ? (
+          <p className="workspace-helpText">
+            只裁剪学习链条里的折叠 block / 正文 / 历史区；若缺少完整 workspace 视图状态，会安全回退到完整导出。
           </p>
         ) : null}
         {exportError ? (
