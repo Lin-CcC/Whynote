@@ -42,6 +42,13 @@ type CreateNodeInput =
       title: string;
       content?: string;
       currentAnswerId?: string;
+      sourceContext?: {
+        content: string;
+        nodeId?: string;
+        nodeType: 'question' | 'answer' | 'summary' | 'judgment';
+        title: string;
+        updatedAt?: string;
+      };
       createdAt?: string;
       updatedAt?: string;
     }
@@ -153,6 +160,7 @@ export function createNode(input: CreateNodeInput): NonRootNode {
         ...(input.currentAnswerId
           ? { currentAnswerId: input.currentAnswerId }
           : {}),
+        ...(input.sourceContext ? { sourceContext: input.sourceContext } : {}),
       };
     case 'summary':
       return {

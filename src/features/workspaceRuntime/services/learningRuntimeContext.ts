@@ -71,6 +71,7 @@ export interface SummaryCheckJudgmentContext extends SummaryEvaluationTarget {
 export interface LearningActionRuntimeContext {
   currentNode: NonNullable<LearningActionDraftInput['currentNode']>;
   existingQuestionTitles: string[];
+  focusContext: LearningActionDraftInput['focusContext'];
   introductions: string[];
   learnerAnswer: string;
   moduleNode: ModuleNode | null;
@@ -599,6 +600,7 @@ export function buildLearningActionRuntimeContext(
     existingQuestionTitles: planStepNode
       ? collectDirectQuestionTitles(tree, planStepNode.id)
       : [],
+    focusContext: resolveQuestionSourceContext(tree, selectedNode),
     introductions: planStepNode ? collectPlanStepIntroductions(tree, planStepNode.id) : [],
     learnerAnswer: answerNode
       ? formatAnswerForEvaluation(answerNode)
@@ -709,6 +711,30 @@ function getQuestionContextNode(tree: NodeTree, selectedNodeId: string) {
   const parentNode = tree.nodes[selectedNode.parentId];
 
   return parentNode?.type === 'question' ? parentNode : null;
+}
+
+function resolveQuestionSourceContext(
+  tree: NodeTree,
+  selectedNode: TreeNode,
+): LearningActionDraftInput['focusContext'] {
+  if (selectedNode.type !== 'question' || !selectedNode.sourceContext) {
+    return undefined;
+  }
+
+  const liveSourceNode =
+    selectedNode.sourceContext.nodeId &&
+    tree.nodes[selectedNode.sourceContext.nodeId]?.type ===
+      selectedNode.sourceContext.nodeType
+      ? tree.nodes[selectedNode.sourceContext.nodeId]
+      : null;
+  const title = liveSourceNode?.title ?? selectedNode.sourceContext.title;
+  const content = liveSourceNode?.content ?? selectedNode.sourceContext.content;
+
+  return {
+    content,
+    title,
+    type: selectedNode.sourceContext.nodeType,
+  };
 }
 
 function resolveScopedAnswerNode(tree: NodeTree, selectedNodeId: string) {

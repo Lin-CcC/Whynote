@@ -302,6 +302,15 @@ export function buildLearningActionDraftMessages(
             : '',
         ),
         optionalLine(
+          '追问来源上下文',
+          input.focusContext
+            ? `${input.focusContext.type} · ${formatTitledContent(
+                input.focusContext.title,
+                input.focusContext.content,
+              )}`
+            : '',
+        ),
+        optionalLine(
           '当前问题路径',
           input.questionPath?.length ? formatQuestionPath(input.questionPath) : '',
         ),
@@ -440,6 +449,9 @@ function buildLearningActionInstructions(input: LearningActionDraftInput) {
       return [
         '目标节点类型：question。',
         '请补一个真正能推进当前步骤的问题草稿。',
+        input.currentNode && input.currentNode.type !== 'question'
+          ? '优先围绕当前选中节点里的这条具体内容继续追问，不要退回到泛泛重问整个父问题。'
+          : '',
         '问题尽量只检查一个主要理解点，不要使用“谈谈理解”“总结全部内容”这类空泛问法。',
         '如果当前步骤已有问题，尽量避开重复角度。',
       ];
@@ -447,6 +459,9 @@ function buildLearningActionInstructions(input: LearningActionDraftInput) {
       return [
         '目标节点类型：answer。',
         '请直接回答当前问题，生成一版可编辑的回答草稿。',
+        input.focusContext
+          ? '如果这道追问是围绕某条具体内容发起的，请先接住“追问来源上下文”里的那条内容，再回答当前问题，不要把它当成脱离上文的新题。'
+          : '',
         '先正面回答问题，再补关键机制、因果关系或判断边界；不要只给一句空结论。',
         '不要写成“我会这样回答”“可以从几个方面理解”这类元说明，也不要把 judgment / summary / 追问混进 answer。',
         '如果当前已经有铺垫讲解，只吸收对回答真正必要的信息，不要把铺垫原句整段复述进 answer。',
@@ -455,6 +470,9 @@ function buildLearningActionInstructions(input: LearningActionDraftInput) {
       return [
         '目标节点类型：summary。',
         '请补一段可编辑的总结 / 标准理解草稿。',
+        input.currentNode && input.currentNode.type !== 'question'
+          ? '优先对当前选中节点里的这条具体内容做阶段性总结，不要默认把整棵问题树重新总结一遍。'
+          : '',
         input.learnerAnswer?.trim()
           ? '如果当前已经有回答，先接住用户已经答到的部分，再补缺的机制、因果或边界，最后整理成更稳妥的标准理解。'
           : '如果当前还没有回答，就直接把当前问题或当前步骤真正想说明的对象、关系、机制和边界讲清楚。',

@@ -4,18 +4,20 @@
 
 ## 当前工作面
 
-- 当前工作树：`codex/v11-testability-ui-audit`
-- 当前短期目标：审查 current-answer 语义测试文档在工程壳 UI 上的可见性覆盖，补 `当前回答 / 已过期 / 当前结果 / 历史结果 / 配对对象` 的最小可见表达，让主树能直接通过工程壳验证这些语义。
+- 当前工作树：`codex/node-action-completeness`
+- 当前短期目标：审查主视图节点动作覆盖面，拆开 AI / 手动追问与总结动作，让 active question block 内的完整动作在子节点选中时仍保持可达，并为工程壳补上可靠的 Delete 删除快捷键。
 
 ## 当前短期任务
 
-- 审查手工测试文档里的 current-answer / stale / 历史结果 / 级联清理条目，区分当前壳层是可直接验证、部分可验证还是不可验证。
-- 在文本主视图与 inspector 上补最小必要状态：`当前回答`、`旧回答`、`当前结果`、`历史结果`、`已过期`、`配对回答 / 检查对象`。
-- 调整 question 语境下空 current answer 草稿的动作提示，让壳层明确继续围绕当前草稿，而不是重新退回唯一 `直接回答当前问题` 主动作。
-- 补回归测试，覆盖 direct answer / insert-answer / type-switch-to-answer 的 current-answer 标识、stale 标识、历史结果区分，以及删除 / 切型 / 跨题移动后的可见清理效果。
+- 审查 `question / answer / judgment / 答案解析 / 手写总结 / 总结检查结果` 等主视图可选内容节点的动作矩阵，收口“继续编辑 / 生成追问 / 插入追问 / 生成总结 / 插入总结 / 删除”的一致性。
+- 把 `生成追问 / 生成总结` 与 `插入追问 / 插入总结` 明确拆开，避免 `插入总结` 继续承担 AI 生成语义。
+- 让 active question block 内的 block 级动作不再依赖重新点回 question 本体；选中 answer、judgment、答案解析、手写总结或总结检查结果时，完整动作仍可达。
+- 补最小必要的追问来源语义，让从具体内容节点发起的 follow-up question 在后续 direct answer 时还能恢复对应上下文。
+- 为工程壳补 `Delete` 快捷键，并加上“焦点不在 input / textarea / select / contenteditable 时才触发”的安全保护。
+- 补回归测试，覆盖 active block 动作可达性、AI / 手动动作语义拆分、内容节点追问 / 总结覆盖、空 current answer draft 下动作不丢，以及 Delete 快捷键不误删文本。
 
 ## 本轮明确不做
 
-- 不重写 `currentAnswerId`、显式 source 配对或级联清理的底层语义规则
-- 不做新的 question block 重布局、完整历史区折叠体系或产品化 UI redesign
-- 不扩到思维导图、资料系统重构、导出重做、provider 或新的学习链逻辑
+- 不扩到思维导图、资料系统重构、导出系统重做、provider、完整文档式编辑器重构或新的节点类型
+- 不重写已有 `question block` / `currentAnswerId` / 显式 source 配对 / 可见性标识的整套底层系统，只补这一轮动作补全所需的最小语义
+- 不做与本轮节点动作收口无关的主视图大重排或额外产品化 redesign

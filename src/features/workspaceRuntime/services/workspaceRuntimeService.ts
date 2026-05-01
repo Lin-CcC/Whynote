@@ -410,6 +410,7 @@ export function createWorkspaceRuntimeService(
       const previousChildIds = new Set(parentNode.childIds);
       const result = await draftService.generate({
         actionId,
+        focusContext: context.focusContext,
         topic: snapshot.workspace.title,
         moduleTitle: context.moduleNode?.title,
         planStepSummary: context.planStepNode?.content,
@@ -431,7 +432,12 @@ export function createWorkspaceRuntimeService(
       const createdNodeId =
         nextParentNode.childIds.find((childId) => !previousChildIds.has(childId)) ??
         request.selectedNodeId;
-      const nextSnapshot = createSnapshot(nextTree, snapshot);
+      const nextTreeWithSourceContext = applyQuestionSourceContext(
+        nextTree,
+        createdNodeId,
+        request,
+      );
+      const nextSnapshot = createSnapshot(nextTreeWithSourceContext, snapshot);
 
       return {
         snapshot: nextSnapshot,
@@ -651,6 +657,47 @@ function createSnapshot(
     },
     tree: reconcilePlanStepStatuses(normalizedTree),
   };
+}
+
+function applyQuestionSourceContext(
+  tree: NodeTree,
+  createdNodeId: string,
+  request: WorkspaceEditorLearningActionRequest,
+) {
+  if (request.actionId !== 'insert-question') {
+    return tree;
+  }
+
+  const createdNode = tree.nodes[createdNodeId];
+  const sourceNode = tree.nodes[request.selectedNodeId];
+
+  if (
+    createdNode?.type !== 'question' ||
+    !sourceNode ||
+    (sourceNode.type !== 'question' &&
+      sourceNode.type !== 'answer' &&
+      sourceNode.type !== 'summary' &&
+      sourceNode.type !== 'judgment')
+  ) {
+    return tree;
+  }
+
+  const nextTree = cloneNodeTree(tree);
+  const nextQuestionNode = getNodeOrThrow(nextTree, createdNodeId);
+
+  if (nextQuestionNode.type !== 'question') {
+    return tree;
+  }
+
+  nextQuestionNode.sourceContext = {
+    content: sourceNode.content,
+    nodeId: sourceNode.id,
+    nodeType: sourceNode.type,
+    title: sourceNode.title,
+    updatedAt: sourceNode.updatedAt,
+  };
+
+  return nextTree;
 }
 
 function normalizeTreeForCurrentAnswerCompatibility(tree: NodeTree) {
@@ -1050,7 +1097,7 @@ function buildLearningActionDraftMessage(
       case 'add-example':
         return 'AI 暂时不可用，已先补上一个可编辑的本地例子草稿。';
       case 'insert-question':
-        return 'AI 暂时不可用，已先补上一个可编辑的本地问题草稿。';
+        return 'AI 暂时不可用，已先补上一个可编辑的本地追问草稿。';
       case 'insert-answer':
         return 'AI 暂时不可用，已先补上一版可编辑的本地回答草稿。';
       case 'insert-summary':
@@ -1070,7 +1117,7 @@ function buildLearningActionDraftMessage(
     case 'add-example':
       return '已补上一个帮助理解的例子草稿。';
     case 'insert-question':
-      return '已补上一个新的问题草稿。';
+      return '已补上一个新的追问草稿。';
     case 'insert-answer':
       return '已直接回答当前问题，并生成一版可编辑的回答草稿。';
     case 'insert-summary':

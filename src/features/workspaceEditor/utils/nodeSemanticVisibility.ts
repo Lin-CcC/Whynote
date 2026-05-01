@@ -39,6 +39,12 @@ export function getNodeSemanticVisibility(
         `当前回答：${formatNodeDisplayName(tree, currentAnswerNode, '回答')}${currentAnswerNode.content.trim().length === 0 ? '（正文为空）' : ''}`,
       );
     }
+
+    if (node.sourceContext) {
+      notes.push(
+        `追问围绕：${formatQuestionSourceContext(node.sourceContext)}`,
+      );
+    }
   }
 
   if (node.type === 'answer') {
@@ -229,6 +235,36 @@ function resolveSummaryCheckSourceSummaryNode(tree: NodeTree, node: JudgmentNode
     (candidateNode): candidateNode is SummaryNode =>
       candidateNode.type === 'summary' && getSummaryNodeKind(tree, candidateNode) === 'manual',
   );
+}
+
+function formatQuestionSourceContext(
+  sourceContext: Extract<TreeNode, { type: 'question' }>['sourceContext'],
+) {
+  if (!sourceContext) {
+    return '';
+  }
+
+  const typeLabel = getSourceContextTypeLabel(sourceContext.nodeType);
+  const normalizedContent = sourceContext.content.trim();
+
+  return normalizedContent
+    ? `${typeLabel} · ${sourceContext.title}：${normalizedContent}`
+    : `${typeLabel} · ${sourceContext.title}`;
+}
+
+function getSourceContextTypeLabel(
+  nodeType: NonNullable<Extract<TreeNode, { type: 'question' }>['sourceContext']>['nodeType'],
+) {
+  switch (nodeType) {
+    case 'question':
+      return '来源问题';
+    case 'answer':
+      return '来源回答';
+    case 'summary':
+      return '来源总结';
+    case 'judgment':
+      return '来源判断';
+  }
 }
 
 function findPreviousQuestionChildNode<TNode extends TreeNode>(

@@ -92,6 +92,8 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           onDirectAnswerQuestion={props.onDirectAnswerQuestion}
           onEvaluateAnswer={props.onEvaluateAnswer}
           onEvaluateSummary={props.onEvaluateSummary}
+          onGenerateFollowUpQuestion={props.onGenerateFollowUpQuestion}
+          onGenerateSummary={props.onGenerateSummary}
           onInsertAnswerForQuestion={workspaceEditor.insertAnswerForQuestion}
           onInsertFollowUpQuestion={workspaceEditor.insertFollowUpQuestion}
           onInsertSummaryForQuestion={workspaceEditor.insertSummaryForQuestion}

@@ -241,6 +241,104 @@ test('inserts an answer under the selected follow-up question instead of the pre
   expect(insertChildSpy.mock.calls[0]?.[3]).toBe(0);
 });
 
+test('inserts an empty manual follow-up question with source context from the selected answer', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-action-source"
+      initialSelectedNodeId="answer-action-source"
+      initialSnapshot={createBlockActionSourceSnapshot()}
+      onSnapshotChange={(snapshot) => {
+        snapshots.push(snapshot);
+      }}
+    />,
+  );
+
+  fireEvent.click(
+    within(
+      screen.getByTestId('question-block-actions-question-action-source'),
+    ).getByRole('button', {
+      name: '插入追问',
+    }),
+  );
+
+  const insertedQuestionTitle = await screen.findByDisplayValue('新问题');
+  const insertedQuestionNode = insertedQuestionTitle.closest(
+    '[data-testid^="editor-node-"]',
+  );
+
+  expect(insertedQuestionNode).not.toBeNull();
+  expect(insertedQuestionNode).toHaveTextContent('追问围绕：来源回答 · 当前回答：这是当前回答。');
+
+  const latestSnapshot = snapshots[snapshots.length - 1];
+  const insertedQuestion = Object.values(latestSnapshot.tree.nodes).find(
+    (node) =>
+      node.type === 'question' &&
+      node.parentId === 'question-action-source' &&
+      node.title === '新问题',
+  );
+
+  expect(insertedQuestion).toMatchObject({
+    type: 'question',
+    content: '',
+    sourceContext: {
+      content: '这是当前回答。',
+      nodeId: 'answer-action-source',
+      nodeType: 'answer',
+      title: '当前回答',
+    },
+  });
+});
+
+test('inserts an empty manual summary from the question block instead of delegating to AI', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+  const onLearningActionRequest = vi.fn(() => true);
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-action-source"
+      initialSelectedNodeId="summary-action-closure"
+      initialSnapshot={createBlockActionSourceSnapshot()}
+      onLearningActionRequest={onLearningActionRequest}
+      onSnapshotChange={(snapshot) => {
+        snapshots.push(snapshot);
+      }}
+    />,
+  );
+
+  fireEvent.click(
+    within(
+      screen.getByTestId('question-block-actions-question-action-source'),
+    ).getByRole('button', {
+      name: '插入总结',
+    }),
+  );
+
+  const insertedSummaryTitle = await screen.findByDisplayValue('新总结');
+  const insertedSummaryNode = insertedSummaryTitle.closest(
+    '[data-testid^="editor-node-"]',
+  );
+
+  expect(onLearningActionRequest).not.toHaveBeenCalled();
+  expect(insertedSummaryNode).not.toBeNull();
+  expect(insertedSummaryNode).toHaveTextContent('总结');
+
+  const latestSnapshot = snapshots[snapshots.length - 1];
+  const insertedSummary = Object.values(latestSnapshot.tree.nodes).find(
+    (node) =>
+      node.type === 'summary' &&
+      node.parentId === 'question-action-source' &&
+      node.title === '新总结',
+  );
+
+  expect(insertedSummary).toMatchObject({
+    type: 'summary',
+    content: '',
+    summaryKind: 'manual',
+  });
+});
+
 test('allows switching a newly inserted leaf node between safe types while preserving content', async () => {
   const snapshots: WorkspaceSnapshot[] = [];
 
@@ -375,6 +473,39 @@ test('shows scaffold teaching follow-up actions when a scaffold node is selected
   expect(
     within(learningActionGrid).getByRole('button', { name: '举个例子' }),
   ).toBeInTheDocument();
+});
+
+test('deletes the selected node from the Delete shortcut when focus is outside editable fields', () => {
+  const operations = createOperationSpies();
+
+  render(<WorkspaceEditor operations={operations} />);
+
+  fireEvent.keyDown(window, {
+    key: 'Delete',
+  });
+
+  expect(getOperationSpy(operations, 'deleteNode')).toHaveBeenCalledTimes(1);
+  expect(getOperationSpy(operations, 'deleteNode').mock.calls[0]?.[1]).toBe(
+    DEMO_SELECTED_NODE_ID,
+  );
+});
+
+test('does not trigger the Delete shortcut while editing a node field', () => {
+  const operations = createOperationSpies();
+
+  render(<WorkspaceEditor operations={operations} />);
+
+  const selectedNode = screen.getByTestId(`editor-node-${DEMO_SELECTED_NODE_ID}`);
+  const titleInput = selectedNode.querySelector('input');
+
+  expect(titleInput).not.toBeNull();
+
+  fireEvent.focus(titleInput!);
+  fireEvent.keyDown(titleInput!, {
+    key: 'Delete',
+  });
+
+  expect(getOperationSpy(operations, 'deleteNode')).not.toHaveBeenCalled();
 });
 
 test('removes redundant type prefixes from titles when the UI already shows node labels', async () => {
@@ -1125,6 +1256,102 @@ function createFollowUpAnswerPlacementSnapshot(): WorkspaceSnapshot {
       content: '为什么6000万个参数的盲目试错复杂度是指数级，而不是线性的？',
       createdAt: '2026-04-29T15:00:00.000Z',
       updatedAt: '2026-04-29T15:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createBlockActionSourceSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '动作来源语义',
+    workspaceId: 'workspace-action-source',
+    rootId: 'theme-action-source',
+    createdAt: '2026-05-01T00:00:00.000Z',
+    updatedAt: '2026-05-01T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-action-source',
+      title: '动作来源模块',
+      content: '',
+      createdAt: '2026-05-01T00:00:00.000Z',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-action-source',
+    createNode({
+      type: 'plan-step',
+      id: 'step-action-source',
+      title: '动作来源步骤',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-05-01T00:00:00.000Z',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-action-source',
+    createNode({
+      type: 'question',
+      id: 'question-action-source',
+      title: '动作来源问题',
+      content: '用于验证内容节点上的追问和总结动作来源。',
+      currentAnswerId: 'answer-action-source',
+      createdAt: '2026-05-01T00:00:00.000Z',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-action-source',
+    createNode({
+      type: 'answer',
+      id: 'answer-action-source',
+      title: '当前回答',
+      content: '这是当前回答。',
+      createdAt: '2026-05-01T00:01:00.000Z',
+      updatedAt: '2026-05-01T00:01:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-action-source',
+    createNode({
+      type: 'summary',
+      id: 'summary-action-closure',
+      title: '答案解析草稿',
+      content: '这是围绕当前回答的答案解析。',
+      summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-action-source',
+      sourceAnswerUpdatedAt: '2026-05-01T00:01:00.000Z',
+      createdAt: '2026-05-01T00:02:00.000Z',
+      updatedAt: '2026-05-01T00:02:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-action-source',
+    createNode({
+      type: 'summary',
+      id: 'summary-action-manual',
+      title: '手写总结',
+      content: '这是用户自己写的阶段性总结。',
+      summaryKind: 'manual',
+      createdAt: '2026-05-01T00:03:00.000Z',
+      updatedAt: '2026-05-01T00:03:00.000Z',
     }),
   );
 
