@@ -634,6 +634,53 @@ test('renames the selected preset immediately without changing its content', asy
   ).toBeInTheDocument();
 });
 
+test('persists plan-step collapse in workspace view state across remounts', async () => {
+  const snapshot = createPlanStepViewStateSnapshot();
+  const dependencies = await createPreloadedDependencies(snapshot);
+  const firstRender = render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  await screen.findByTestId('editor-node-step-plan-step-view-state');
+
+  fireEvent.click(
+    within(screen.getByTestId('editor-node-step-plan-step-view-state')).getByRole(
+      'button',
+      { name: '收起步骤' },
+    ),
+  );
+
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('question-block-question-plan-step-view-state'),
+    ).not.toBeInTheDocument();
+  });
+
+  expect(
+    (
+      dependencies.localPreferenceStorage.loadUiPreferences()?.values
+        .workspaceViews as Record<string, unknown>
+    )?.['workspace-plan-step-view-state'],
+  ).toEqual(
+    expect.objectContaining({
+      collapsedPlanStepIds: ['step-plan-step-view-state'],
+    }),
+  );
+
+  firstRender.unmount();
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByTestId('editor-node-step-plan-step-view-state');
+
+  expect(
+    within(screen.getByTestId('editor-node-step-plan-step-view-state')).getByRole(
+      'button',
+      { name: '展开步骤' },
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByTestId('question-block-question-plan-step-view-state'),
+  ).not.toBeInTheDocument();
+});
+
 function createTestDependencies(options?: {
   providerClient?: AiProviderClient;
   storage?: StructuredDataStorage;
@@ -669,6 +716,61 @@ async function createPreloadedDependencies(snapshot: WorkspaceSnapshot) {
   return createTestDependencies({
     storage,
   });
+}
+
+function createPlanStepViewStateSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '步骤折叠持久化',
+    workspaceId: 'workspace-plan-step-view-state',
+    rootId: 'theme-plan-step-view-state',
+    createdAt: '2026-05-01T00:00:00.000Z',
+    updatedAt: '2026-05-01T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-plan-step-view-state',
+      title: '当前学习模块',
+      content: '',
+      createdAt: '2026-05-01T00:00:00.000Z',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-plan-step-view-state',
+    createNode({
+      type: 'plan-step',
+      id: 'step-plan-step-view-state',
+      title: '可折叠步骤',
+      content: '这里验证步骤折叠会进本地视图状态。',
+      status: 'doing',
+      createdAt: '2026-05-01T00:00:00.000Z',
+      updatedAt: '2026-05-01T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-plan-step-view-state',
+    createNode({
+      type: 'question',
+      id: 'question-plan-step-view-state',
+      title: '折叠后的问题块',
+      content: '刷新后仍应保持隐藏。',
+      createdAt: '2026-05-01T00:01:00.000Z',
+      updatedAt: '2026-05-01T00:01:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
 }
 
 function createMockProviderClient(

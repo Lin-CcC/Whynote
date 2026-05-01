@@ -47,6 +47,7 @@ interface ExportBlock {
 }
 
 interface ExpandedExportState {
+  collapsedPlanStepIds: Set<string>;
   collapsedNodeBodyIds: Set<string>;
   collapsedQuestionBlockIds: Set<string>;
   hiddenHistoryNodeIds: Set<string>;
@@ -251,6 +252,13 @@ function renderNodeBlocks(
   }
 
   const node = getNodeOrThrow(tree, nodeId);
+
+  if (
+    node.type === 'plan-step' &&
+    options.expandedExportState?.collapsedPlanStepIds.has(node.id)
+  ) {
+    return [];
+  }
 
   if (
     node.type === 'question' &&
@@ -511,6 +519,7 @@ function resolveExpandedExportState(
   }
 
   return {
+    collapsedPlanStepIds: new Set(workspaceViewState.collapsedPlanStepIds),
     collapsedNodeBodyIds: new Set(workspaceViewState.collapsedNodeBodyIds),
     collapsedQuestionBlockIds: new Set(
       workspaceViewState.collapsedQuestionBlockIds,

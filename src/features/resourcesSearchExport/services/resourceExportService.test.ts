@@ -168,6 +168,7 @@ test.each([
       values: {
         workspaceViews: {
           'workspace-expanded-export': {
+            collapsedPlanStepIds: [],
             collapsedNodeBodyIds: ['answer-collapsed-body'],
             collapsedQuestionBlockIds: ['question-collapsed-block'],
           },
@@ -549,6 +550,7 @@ function createExpandedViewPreferences(workspaceId: string) {
     values: {
       workspaceViews: {
         [workspaceId]: {
+          collapsedPlanStepIds: [],
           collapsedNodeBodyIds: ['answer-collapsed-body'],
           collapsedQuestionBlockIds: ['question-collapsed-block'],
           expandedHistorySectionIds: [getAnswerHistorySectionId('answer-open')],

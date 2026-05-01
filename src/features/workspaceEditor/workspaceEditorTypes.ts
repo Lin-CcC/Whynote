@@ -71,9 +71,10 @@ export interface LearningActionOption {
 }
 
 export interface WorkspaceViewState {
-  expandedHistorySectionIds: string[];
-  collapsedNodeBodyIds: string[];
+  collapsedPlanStepIds: string[];
   collapsedQuestionBlockIds: string[];
+  collapsedNodeBodyIds: string[];
+  expandedHistorySectionIds: string[];
 }
 
 export interface WorkspaceEditorSelectionState {

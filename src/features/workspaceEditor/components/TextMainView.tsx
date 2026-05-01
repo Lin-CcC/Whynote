@@ -206,7 +206,12 @@ function expandWorkspaceViewStateForSelection(
   }
 
   let nextViewState = workspaceViewState;
+  const ancestorPlanStepIds = collectAncestorPlanStepIds(tree, selectedNodeId);
   const ancestorQuestionIds = collectAncestorQuestionIds(tree, selectedNodeId);
+
+  for (const planStepId of ancestorPlanStepIds) {
+    nextViewState = expandPlanStep(nextViewState, planStepId);
+  }
 
   for (const questionId of ancestorQuestionIds) {
     nextViewState = expandQuestionBlock(nextViewState, questionId);
@@ -252,6 +257,25 @@ function expandWorkspaceViewStateForSelection(
   return nextViewState;
 }
 
+function collectAncestorPlanStepIds(tree: NodeTree, nodeId: string) {
+  const ancestorPlanStepIds: string[] = [];
+  let currentNode: TreeNode | undefined = getNodeOrThrow(tree, nodeId);
+
+  while (currentNode.parentId !== null) {
+    currentNode = tree.nodes[currentNode.parentId];
+
+    if (!currentNode) {
+      break;
+    }
+
+    if (currentNode.type === 'plan-step') {
+      ancestorPlanStepIds.unshift(currentNode.id);
+    }
+  }
+
+  return ancestorPlanStepIds;
+}
+
 function collectAncestorQuestionIds(tree: NodeTree, nodeId: string) {
   const ancestorQuestionIds: string[] = [];
   let currentNode: TreeNode | undefined = getNodeOrThrow(tree, nodeId);
@@ -268,6 +292,22 @@ function collectAncestorQuestionIds(tree: NodeTree, nodeId: string) {
   }
 
   return ancestorQuestionIds;
+}
+
+function expandPlanStep(
+  workspaceViewState: WorkspaceViewState,
+  planStepNodeId: string,
+) {
+  if (!workspaceViewState.collapsedPlanStepIds.includes(planStepNodeId)) {
+    return workspaceViewState;
+  }
+
+  return {
+    ...workspaceViewState,
+    collapsedPlanStepIds: workspaceViewState.collapsedPlanStepIds.filter(
+      (collapsedId) => collapsedId !== planStepNodeId,
+    ),
+  };
 }
 
 function expandQuestionBlock(
