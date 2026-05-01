@@ -11,6 +11,7 @@ import type {
   LearningActionId,
   NodeContentPatch,
   WorkspaceEditorNodeRenderContext,
+  WorkspaceEditorToolbarSection,
   WorkspaceViewState,
 } from '../workspaceEditorTypes';
 import {
@@ -46,6 +47,9 @@ type TextMainViewProps = {
   renderNodeInlineActions?: (
     context: WorkspaceEditorNodeRenderContext,
   ) => ReactNode;
+  renderNodeToolbarSections?: (
+    context: WorkspaceEditorNodeRenderContext,
+  ) => WorkspaceEditorToolbarSection[] | null;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
   selectedNodeId: string | null;
   tree: NodeTree;
@@ -74,6 +78,7 @@ export default function TextMainView({
   onUpdateNode,
   onWorkspaceViewStateChange,
   renderNodeInlineActions,
+  renderNodeToolbarSections,
   registerNodeElement,
   selectedNodeId,
   tree,
@@ -180,6 +185,7 @@ export default function TextMainView({
             onWorkspaceViewStateChange={onWorkspaceViewStateChange}
             registerNodeElement={registerNodeElement}
             renderNodeInlineActions={renderNodeInlineActions}
+            renderNodeToolbarSections={renderNodeToolbarSections}
             selectedNodeId={selectedNodeId}
             tree={tree}
             workspaceViewState={workspaceViewState}

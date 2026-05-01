@@ -73,11 +73,13 @@ test('creates a judgment-linked answer explanation on the first evaluation', asy
   ).not.toBeInTheDocument();
 
   fireEvent.click(judgmentNode);
-  expect(
-    within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
-  ).toBeEnabled();
   fireEvent.click(
-    within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
+    within(
+      openToolbarMenu(
+        getNodeActionPanel(judgmentNode),
+        '⋯',
+      ),
+    ).getByRole('button', { name: '查看答案解析' }),
   );
 
   await waitFor(() => {
@@ -164,11 +166,13 @@ test('keeps answer explanation available on the first evaluation even when summa
   ).toBeEnabled();
 
   fireEvent.click(judgmentNode);
-  expect(
-    within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
-  ).toBeEnabled();
   fireEvent.click(
-    within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
+    within(
+      openToolbarMenu(
+        getNodeActionPanel(judgmentNode),
+        '⋯',
+      ),
+    ).getByRole('button', { name: '查看答案解析' }),
   );
 
   await waitFor(() => {
@@ -252,6 +256,16 @@ function openToolbarMenu(container: HTMLElement, menuLabel: string) {
   );
 
   return within(container).getByRole('menu');
+}
+
+function getNodeActionPanel(node: HTMLElement) {
+  const actionPanel = node.querySelector<HTMLElement>('[data-testid^="node-actions-"]');
+
+  if (!actionPanel) {
+    throw new Error('Expected selected node to render a title toolbar.');
+  }
+
+  return actionPanel;
 }
 
 function createManualQuestionAnswerSnapshot(): WorkspaceSnapshot {
