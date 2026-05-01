@@ -372,6 +372,121 @@ test('directly answers a generated question without relying on question source',
   expect(answerNode?.parentId).toBe('question-generated-direct-answer');
 });
 
+test.each([
+  {
+    sourceContent: '因为 React 会先把更新合并起来。',
+    sourceNodeId: 'answer-follow-up-source',
+    sourceTitle: '第一版回答',
+    sourceType: 'answer',
+  },
+  {
+    sourceContent: '先补上“合并更新如何减少重复渲染”的因果链条。',
+    sourceNodeId: 'summary-follow-up-source-closure',
+    sourceTitle: '答案解析草稿',
+    sourceType: 'summary',
+  },
+  {
+    sourceContent: '这是用户自己写的阶段性总结。',
+    sourceNodeId: 'summary-follow-up-source-manual',
+    sourceTitle: '手写总结',
+    sourceType: 'summary',
+  },
+])(
+  'restores the $sourceNodeId source context when directly answering an AI-generated follow-up',
+  async ({ sourceContent, sourceNodeId, sourceTitle, sourceType }) => {
+    let observedLearningActionPrompt = '';
+    const dependencies = await createPreloadedDependencies(
+      createFollowUpSourceContextSnapshot(),
+      createMockProviderClient({
+        'learning-action-draft': (request: AiProviderObjectRequest<unknown>) => {
+          const actionId = extractLearningActionId(request);
+          const userMessage =
+            request.messages.find((message) => message.role === 'user')?.content ??
+            '';
+
+          if (actionId === 'insert-question') {
+            return {
+              title: '继续围绕具体内容追问',
+              content: '请沿着当前这条内容继续补上最关键的一层因果关系。',
+            };
+          }
+
+          if (actionId === 'insert-answer') {
+            observedLearningActionPrompt = userMessage;
+
+            return {
+              title: '追问回答草稿',
+              content: '先接住来源内容，再回答这条追问。',
+            };
+          }
+
+          return {};
+        },
+      }),
+    );
+
+    render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+    await screen.findByRole('heading', { name: '当前学习模块' });
+
+    fireEvent.focus(screen.getByLabelText(`${sourceTitle} 标题`));
+    fireEvent.click(
+      within(
+        screen.getByTestId('question-block-actions-question-follow-up-source'),
+      ).getByRole('button', {
+        name: '生成追问',
+      }),
+    );
+
+    const followUpQuestionTitle = await screen.findByDisplayValue(
+      '继续围绕具体内容追问',
+    );
+    const followUpQuestionNode = followUpQuestionTitle.closest(
+      '[data-testid^="editor-node-"]',
+    );
+
+    expect(followUpQuestionNode).not.toBeNull();
+    expect(followUpQuestionNode).toHaveTextContent(`追问围绕：来源`);
+    expect(followUpQuestionNode).toHaveTextContent(sourceTitle);
+
+    fireEvent.click(
+      within(await screen.findByTestId('question-direct-answer-callout')).getByRole(
+        'button',
+        { name: '直接回答当前问题' },
+      ),
+    );
+
+    expect(
+      await screen.findByDisplayValue('追问回答草稿'),
+    ).toBeInTheDocument();
+    expect(observedLearningActionPrompt).toContain('学习动作：insert-answer');
+    expect(observedLearningActionPrompt).toContain('追问来源上下文');
+    expect(observedLearningActionPrompt).toContain(sourceType);
+    expect(observedLearningActionPrompt).toContain(sourceTitle);
+    expect(observedLearningActionPrompt).toContain(sourceContent);
+
+    const savedSnapshot = await waitForSavedSnapshot(
+      dependencies.structuredDataStorage,
+      (snapshot) =>
+        findNodeByTitle(snapshot, '继续围绕具体内容追问') !== null &&
+        findNodeByTitle(snapshot, '追问回答草稿') !== null,
+    );
+    const followUpQuestionNodeInSnapshot = findNodeByTitle(
+      savedSnapshot,
+      '继续围绕具体内容追问',
+    );
+
+    expect(followUpQuestionNodeInSnapshot).toMatchObject({
+      type: 'question',
+      sourceContext: {
+        content: sourceContent,
+        nodeId: sourceNodeId,
+        nodeType: sourceType,
+        title: sourceTitle,
+      },
+    });
+  },
+);
+
 test('evaluates a sufficient answer into a closed question and promotes the step to done', async () => {
   const dependencies = await createPreloadedDependencies(
     createAnswerClosureSnapshot(),
@@ -490,7 +605,7 @@ test('re-evaluates the question current answer instead of the selected old answe
   ).toHaveAttribute('data-node-selected', 'true');
 });
 
-test('scopes learning-action drafts to the question current answer instead of the selected old answer', async () => {
+test('scopes generated summaries to the selected content node instead of silently jumping back to current answer', async () => {
   let observedLearningActionPrompt = '';
   const dependencies = await createPreloadedDependencies(
     createMultiAnswerClosureSnapshot(),
@@ -520,19 +635,19 @@ test('scopes learning-action drafts to the question current answer instead of th
 
   await waitFor(() => {
     expect(
-      within(blockActions).getByRole('button', { name: '插入总结' }),
+      within(blockActions).getByRole('button', { name: '生成总结' }),
     ).toBeEnabled();
   });
-  fireEvent.click(within(blockActions).getByRole('button', { name: '插入总结' }));
+  fireEvent.click(within(blockActions).getByRole('button', { name: '生成总结' }));
   await waitFor(() => {
     expect(observedLearningActionPrompt).toContain('现有回答');
   });
   expect(observedLearningActionPrompt).toContain('现有回答');
-  expect(observedLearningActionPrompt).toContain('第二版回答');
+  expect(observedLearningActionPrompt).toContain('第一版回答');
   expect(observedLearningActionPrompt).toContain(
-    '因为同一轮事件里的更新会统一提交，所以能减少重复渲染。',
+    '因为 React 会先把更新合并起来。',
   );
-  expect(observedLearningActionPrompt).not.toContain('现有回答：当前回答：第一版回答');
+  expect(observedLearningActionPrompt).not.toContain('现有回答：当前回答：第二版回答');
 });
 
 test('views the explanation that belongs to the question current answer round', async () => {
@@ -664,7 +779,7 @@ test('extends a scaffold with a simpler follow-up explanation draft', async () =
   );
 });
 
-test('creates AI drafts instead of empty shells for scaffold, question, summary and judgment actions', async () => {
+test('creates AI drafts for scaffold, generate-follow-up, generate-summary and judgment actions', async () => {
   const dependencies = await createPreloadedDependencies(
     createAnswerClosureSnapshot(),
     createMockProviderClient({
@@ -714,7 +829,14 @@ test('creates AI drafts instead of empty shells for scaffold, question, summary 
     screen.getByDisplayValue(/先抓住一件事：批处理不是“晚一点更新”/u),
   ).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '插入问题' }));
+  fireEvent.focus(screen.getByLabelText('为什么状态更新会被批处理？ 标题'));
+  const blockActions = await screen.findByTestId(
+    'question-block-actions-question-answer-closure',
+  );
+
+  fireEvent.click(
+    within(blockActions).getByRole('button', { name: '生成追问' }),
+  );
   expect(
     await screen.findByDisplayValue('为什么“同一轮事件”是批处理成立的前提？'),
   ).toBeInTheDocument();
@@ -724,7 +846,13 @@ test('creates AI drafts instead of empty shells for scaffold, question, summary 
     ),
   ).toBeInTheDocument();
 
-  fireEvent.click(screen.getAllByRole('button', { name: '插入总结' })[0]);
+  fireEvent.focus(screen.getByLabelText('为什么状态更新会被批处理？ 标题'));
+  fireEvent.click(
+    within(screen.getByTestId('question-block-actions-question-answer-closure')).getByRole(
+      'button',
+      { name: '生成总结' },
+    ),
+  );
   expect(
     await screen.findByDisplayValue('先把节奏和结果分开看'),
   ).toBeInTheDocument();
@@ -1075,6 +1203,12 @@ function createMultiAnswerClosureSnapshot(): WorkspaceSnapshot {
     firstAnswerNode.content = '因为 React 会先把更新合并起来。';
   }
 
+  const questionNode = tree.nodes['question-answer-closure'];
+
+  if (questionNode?.type === 'question') {
+    questionNode.currentAnswerId = 'answer-answer-closure-v2';
+  }
+
   return {
     ...snapshot,
     tree,
@@ -1162,6 +1296,12 @@ function createMultiRoundClosureSnapshot(): WorkspaceSnapshot {
     }),
   );
 
+  const questionNode = tree.nodes['question-answer-closure'];
+
+  if (questionNode?.type === 'question') {
+    questionNode.currentAnswerId = 'answer-answer-closure-v2';
+  }
+
   return {
     ...snapshot,
     tree,
@@ -1211,6 +1351,96 @@ function createManualQuestionDirectAnswerSnapshot(): WorkspaceSnapshot {
       title: '手动问题',
       content: '为什么 React 会把同一轮里的更新统一提交，从而减少重复渲染？',
       createdAt: '2026-04-28T00:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createFollowUpSourceContextSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '追问来源上下文',
+    workspaceId: 'workspace-follow-up-source-context',
+    rootId: 'theme-follow-up-source-context',
+    createdAt: '2026-05-01T00:00:00.000Z',
+    updatedAt: '2026-05-01T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-follow-up-source-context',
+      title: '追问来源上下文模块',
+      content: '验证内容节点追问后的 direct answer 仍能恢复具体来源上下文。',
+      createdAt: '2026-05-01T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-follow-up-source-context',
+    createNode({
+      type: 'plan-step',
+      id: 'step-follow-up-source-context',
+      title: '追问来源上下文步骤',
+      content: '先在具体内容节点上发起追问，再直接回答这条新追问。',
+      status: 'doing',
+      createdAt: '2026-05-01T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-follow-up-source-context',
+    createNode({
+      type: 'question',
+      id: 'question-follow-up-source',
+      title: '为什么批处理会减少重复渲染？',
+      content: '围绕因果链继续补关键内容。',
+      currentAnswerId: 'answer-follow-up-source',
+      createdAt: '2026-05-01T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-follow-up-source',
+    createNode({
+      type: 'answer',
+      id: 'answer-follow-up-source',
+      title: '第一版回答',
+      content: '因为 React 会先把更新合并起来。',
+      createdAt: '2026-05-01T00:01:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-follow-up-source',
+    createNode({
+      type: 'summary',
+      id: 'summary-follow-up-source-closure',
+      title: '答案解析草稿',
+      content: '先补上“合并更新如何减少重复渲染”的因果链条。',
+      summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-follow-up-source',
+      sourceAnswerUpdatedAt: '2026-05-01T00:01:00.000Z',
+      createdAt: '2026-05-01T00:02:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-follow-up-source',
+    createNode({
+      type: 'summary',
+      id: 'summary-follow-up-source-manual',
+      title: '手写总结',
+      content: '这是用户自己写的阶段性总结。',
+      summaryKind: 'manual',
+      createdAt: '2026-05-01T00:03:00.000Z',
     }),
   );
 

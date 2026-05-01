@@ -781,9 +781,9 @@ function getLearningActionRuntimeLabel(
     case 'add-example':
       return '正在补一个例子';
     case 'insert-question':
-      return '正在补问题草稿';
+      return '正在生成追问草稿';
     case 'insert-summary':
-      return '正在补总结草稿';
+      return '正在生成总结草稿';
     case 'insert-judgment':
       return '正在补判断草稿';
     case 'insert-plan-step':

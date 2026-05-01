@@ -84,6 +84,22 @@ test('keeps an empty current answer draft on the main editing path instead of on
   expect(
     within(callout).getByRole('button', { name: '直接回答当前问题' }),
   ).toBeInTheDocument();
+  const blockActions = screen.getByTestId(
+    'question-block-actions-question-empty-current-draft',
+  );
+
+  expect(
+    within(blockActions).getByRole('button', { name: '生成追问' }),
+  ).toBeInTheDocument();
+  expect(
+    within(blockActions).getByRole('button', { name: '插入追问' }),
+  ).toBeInTheDocument();
+  expect(
+    within(blockActions).getByRole('button', { name: '生成总结' }),
+  ).toBeInTheDocument();
+  expect(
+    within(blockActions).getByRole('button', { name: '插入总结' }),
+  ).toBeInTheDocument();
 
   fireEvent.click(
     within(callout).getByRole('button', { name: '回到当前回答继续修改' }),
@@ -98,6 +114,9 @@ test('keeps an empty current answer draft on the main editing path instead of on
   expect(
     screen.getByTestId('editor-node-question-empty-current-draft'),
   ).toHaveTextContent('当前回答：新回答（正文为空）');
+  expect(
+    screen.getByTestId('question-block-actions-question-empty-current-draft'),
+  ).toBeInTheDocument();
 });
 
 async function createPreloadedDependencies(
