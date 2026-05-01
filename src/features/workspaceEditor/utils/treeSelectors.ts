@@ -145,6 +145,25 @@ export function getDisplayTitleForNode(tree: NodeTree, node: TreeNode) {
   return getDisplayNodeTitle(tree, node);
 }
 
+export function getNodeDisplayName(
+  tree: NodeTree,
+  node: TreeNode,
+  options?: {
+    fallbackLabel?: string;
+  },
+) {
+  const displayTitle = getDisplayTitleForNode(tree, node).trim();
+
+  if (displayTitle.length > 0) {
+    return displayTitle;
+  }
+
+  const fallbackLabel =
+    options?.fallbackLabel?.trim() || getDisplayLabelForNode(tree, node);
+
+  return `未命名${fallbackLabel}`;
+}
+
 export function getNodeEmphasis(node: TreeNode) {
   if (node.type === 'plan-step') {
     return 'supporting';

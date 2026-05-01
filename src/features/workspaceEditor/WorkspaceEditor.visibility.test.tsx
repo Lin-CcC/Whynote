@@ -14,6 +14,7 @@ import { DEFAULT_WORKSPACE_VIEW_STATE } from './utils/workspaceViewState';
 import type {
   WorkspaceEditorProps,
   WorkspaceEditorRenderContext,
+  WorkspaceViewState,
 } from './workspaceEditorTypes';
 
 test('shows the current answer badge and legacy fallback note for older questions', () => {
@@ -174,6 +175,70 @@ test('shows readable fallback labels for unnamed current answers and summary pai
   ).toBeInTheDocument();
 });
 
+test('keeps semantic badges and relation notes visible in compact collapsed summaries', () => {
+  renderWorkspaceEditorWithViewState(
+    <WorkspaceEditor
+      initialModuleId="module-visibility-results"
+      initialSelectedNodeId="question-visibility-results"
+      initialSnapshot={createVisibilityResultSnapshot()}
+    />,
+    {
+      initialWorkspaceViewState: {
+        ...DEFAULT_WORKSPACE_VIEW_STATE,
+        collapsedNodeBodyIds: [
+          'answer-visibility-v2',
+          'judgment-visibility-v1',
+          'summary-visibility-v2',
+          'judgment-summary-check-current',
+        ],
+      },
+    },
+  );
+
+  const currentAnswerNode = screen.getByTestId('editor-node-answer-visibility-v2');
+  const oldJudgmentNode = screen.getByTestId('editor-node-judgment-visibility-v1');
+  const currentSummaryNode = screen.getByTestId('editor-node-summary-visibility-v2');
+  const currentSummaryCheckNode = screen.getByTestId(
+    'editor-node-judgment-summary-check-current',
+  );
+
+  expect(within(currentAnswerNode).getByText('当前回答')).toBeInTheDocument();
+  expect(
+    within(currentAnswerNode).getByText('当前回答已折叠'),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText('第二版回答 内容')).not.toBeInTheDocument();
+
+  expect(within(oldJudgmentNode).getByText('历史结果')).toBeInTheDocument();
+  expect(
+    within(oldJudgmentNode).getByText('配对回答：旧回答 · 第一版回答'),
+  ).toBeInTheDocument();
+  expect(
+    within(oldJudgmentNode).getByText('历史判断已折叠'),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText('第一版回答仍有缺口 内容')).not.toBeInTheDocument();
+
+  expect(within(currentSummaryNode).getByText('当前结果')).toBeInTheDocument();
+  expect(within(currentSummaryNode).getByText('已过期')).toBeInTheDocument();
+  expect(
+    within(currentSummaryNode).getByText('配对回答：当前回答 · 第二版回答'),
+  ).toBeInTheDocument();
+  expect(
+    within(currentSummaryNode).getByText('当前答案解析已折叠'),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText('标准理解 内容')).not.toBeInTheDocument();
+
+  expect(
+    within(currentSummaryCheckNode).getByText('当前结果'),
+  ).toBeInTheDocument();
+  expect(within(currentSummaryCheckNode).getByText('已过期')).toBeInTheDocument();
+  expect(
+    within(currentSummaryCheckNode).getByText('检查对象：手写总结'),
+  ).toBeInTheDocument();
+  expect(
+    within(currentSummaryCheckNode).getByText('当前总结检查结果已折叠'),
+  ).toBeInTheDocument();
+});
+
 test('returns interpolated note strings from the semantic visibility helper', () => {
   const snapshot = createVisibilityResultSnapshot();
   const questionNotes = getNodeSemanticVisibility(
@@ -184,14 +249,24 @@ test('returns interpolated note strings from the semantic visibility helper', ()
     snapshot.tree,
     snapshot.tree.nodes['summary-visibility-v2'],
   ).notes;
+  const answerResultRelationNote = getNodeSemanticVisibility(
+    snapshot.tree,
+    snapshot.tree.nodes['summary-visibility-v2'],
+  ).compactRelationNote;
   const summaryCheckNotes = getNodeSemanticVisibility(
     snapshot.tree,
     snapshot.tree.nodes['judgment-summary-check-current'],
   ).notes;
+  const summaryCheckRelationNote = getNodeSemanticVisibility(
+    snapshot.tree,
+    snapshot.tree.nodes['judgment-summary-check-current'],
+  ).compactRelationNote;
 
   expect(questionNotes).toEqual(['当前回答：第二版回答']);
   expect(answerResultNotes).toContain('配对回答：当前回答 · 第二版回答');
+  expect(answerResultRelationNote).toBe('配对回答：当前回答 · 第二版回答');
   expect(summaryCheckNotes).toContain('检查对象：手写总结');
+  expect(summaryCheckRelationNote).toBe('检查对象：手写总结');
   expect(
     [...questionNotes, ...answerResultNotes, ...summaryCheckNotes].join(' '),
   ).not.toContain('?{');
@@ -207,14 +282,24 @@ test('returns readable fallback labels from the semantic visibility helper for u
     snapshot.tree,
     snapshot.tree.nodes['summary-unnamed-answer-result'],
   ).notes;
+  const answerResultRelationNote = getNodeSemanticVisibility(
+    snapshot.tree,
+    snapshot.tree.nodes['summary-unnamed-answer-result'],
+  ).compactRelationNote;
   const summaryCheckNotes = getNodeSemanticVisibility(
     snapshot.tree,
     snapshot.tree.nodes['judgment-unnamed-summary-result'],
   ).notes;
+  const summaryCheckRelationNote = getNodeSemanticVisibility(
+    snapshot.tree,
+    snapshot.tree.nodes['judgment-unnamed-summary-result'],
+  ).compactRelationNote;
 
   expect(questionNotes).toEqual(['当前回答：未命名回答（正文为空）']);
   expect(answerResultNotes).toContain('配对回答：当前回答 · 未命名回答');
+  expect(answerResultRelationNote).toBe('配对回答：当前回答 · 未命名回答');
   expect(summaryCheckNotes).toContain('检查对象：未命名总结');
+  expect(summaryCheckRelationNote).toBe('检查对象：未命名总结');
   expect(
     [...questionNotes, ...answerResultNotes, ...summaryCheckNotes].join(' '),
   ).not.toContain('?{');
@@ -281,10 +366,15 @@ function CrossQuestionMoveHarness() {
   );
 }
 
-function renderWorkspaceEditorWithViewState(element: ReactElement<WorkspaceEditorProps>) {
+function renderWorkspaceEditorWithViewState(
+  element: ReactElement<WorkspaceEditorProps>,
+  options?: {
+    initialWorkspaceViewState?: WorkspaceViewState;
+  },
+) {
   function Harness() {
     const [workspaceViewState, setWorkspaceViewState] = useState(
-      DEFAULT_WORKSPACE_VIEW_STATE,
+      options?.initialWorkspaceViewState ?? DEFAULT_WORKSPACE_VIEW_STATE,
     );
 
     return cloneElement(element, {

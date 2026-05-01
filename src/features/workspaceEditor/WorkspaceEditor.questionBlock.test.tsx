@@ -181,6 +181,189 @@ test('keeps the current answer reevaluation action on the selected current answe
 });
 
 test.each([
+  {
+    badges: ['旧回答'],
+    bodyLabel: '第一版回答',
+    hint: '旧回答已折叠',
+    label: '回答',
+    nodeId: 'answer-first',
+    relationNote: null,
+    title: '第一版回答',
+  },
+  {
+    badges: ['历史结果'],
+    bodyLabel: '第一版最新评估',
+    hint: '历史判断已折叠',
+    label: '判断',
+    nodeId: 'judgment-first-latest',
+    relationNote: '配对回答：旧回答 · 第一版回答',
+    title: '第一版最新评估',
+  },
+  {
+    badges: ['历史结果'],
+    bodyLabel: '第一版最新解析',
+    hint: '历史答案解析已折叠',
+    label: '答案解析',
+    nodeId: 'summary-first-latest',
+    relationNote: '配对回答：旧回答 · 第一版回答',
+    title: '第一版最新解析',
+  },
+  {
+    badges: [],
+    bodyLabel: '我的总结',
+    hint: '总结已折叠',
+    label: '总结',
+    nodeId: 'summary-manual',
+    relationNote: null,
+    title: '我的总结',
+  },
+  {
+    badges: ['当前结果'],
+    bodyLabel: '最新总结检查结果',
+    hint: '当前总结检查结果已折叠',
+    label: '总结检查结果',
+    nodeId: 'judgment-summary-latest',
+    relationNote: '检查对象：我的总结',
+    title: '最新总结检查结果',
+  },
+])(
+  'renders the unified compact collapsed summary for $nodeId',
+  ({ badges, bodyLabel, hint, label, nodeId, relationNote, title }) => {
+    renderQuestionBlockEditor({
+      initialSelectedNodeId: 'question-main',
+      initialWorkspaceViewState: {
+        ...DEFAULT_WORKSPACE_VIEW_STATE,
+        collapsedNodeBodyIds: [nodeId],
+      },
+    });
+
+    const collapsedNode = screen.getByTestId(`editor-node-${nodeId}`);
+
+    expect(within(collapsedNode).getByText(label)).toBeInTheDocument();
+    expect(within(collapsedNode).getByText(title)).toBeInTheDocument();
+
+    for (const badge of badges) {
+      expect(within(collapsedNode).getByText(badge)).toBeInTheDocument();
+    }
+
+    if (relationNote) {
+      expect(within(collapsedNode).getByText(relationNote)).toBeInTheDocument();
+    }
+
+    expect(within(collapsedNode).getByText(hint)).toBeInTheDocument();
+    expect(
+      within(collapsedNode).getByRole('button', { name: '展开正文' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(`${bodyLabel} 标题`)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(`${bodyLabel} 内容`)).not.toBeInTheDocument();
+    expect(
+      within(collapsedNode).queryByText('正文已折叠，展开后继续查看或编辑。'),
+    ).not.toBeInTheDocument();
+  },
+);
+
+test('uses fallback titles in unified compact collapsed summaries when content node titles are empty', () => {
+  const snapshot = createQuestionBlockSnapshot();
+
+  for (const nodeId of [
+    'answer-first',
+    'judgment-first-latest',
+    'summary-first-latest',
+    'summary-manual',
+  ] as const) {
+    const node = snapshot.tree.nodes[nodeId];
+
+    if (
+      !node ||
+      (node.type !== 'answer' &&
+        node.type !== 'judgment' &&
+        node.type !== 'summary')
+    ) {
+      throw new Error(`Expected ${nodeId} to be a collapsible content node.`);
+    }
+
+    node.title = '   ';
+  }
+
+  renderQuestionBlockEditor({
+    initialSnapshot: snapshot,
+    initialWorkspaceViewState: {
+      ...DEFAULT_WORKSPACE_VIEW_STATE,
+      collapsedNodeBodyIds: [
+        'answer-first',
+        'judgment-first-latest',
+        'summary-first-latest',
+        'summary-manual',
+      ],
+    },
+  });
+
+  expect(
+    within(screen.getByTestId('editor-node-answer-first')).getByText(
+      '未命名回答',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-judgment-first-latest')).getByText(
+      '未命名判断',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-summary-first-latest')).getByText(
+      '未命名答案解析',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('editor-node-summary-manual')).getByText(
+      '未命名总结',
+    ),
+  ).toBeInTheDocument();
+});
+
+test('continues editing from a collapsed answer node by expanding the body first', async () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'answer-first',
+  });
+
+  const actionPanel = screen.getByTestId('node-actions-answer-first');
+
+  fireEvent.click(
+    within(screen.getByTestId('editor-node-answer-first')).getByRole('button', {
+      name: '收起正文',
+    }),
+  );
+
+  const collapsedNode = screen.getByTestId('editor-node-answer-first');
+
+  expect(
+    within(collapsedNode).getByRole('button', { name: '展开正文' }),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText('第一版回答 内容')).not.toBeInTheDocument();
+  expect(
+    within(actionPanel).getByRole('button', { name: '设为当前回答' }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(
+    within(actionPanel).getByRole('button', { name: '继续修改' }),
+  );
+
+  await waitFor(() => {
+    expect(screen.getByLabelText('第一版回答 内容')).toBeInTheDocument();
+  });
+
+  expect(
+    within(screen.getByTestId('editor-node-answer-first')).getByRole('button', {
+      name: '收起正文',
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('node-actions-answer-first')).getByRole('button', {
+      name: '设为当前回答',
+    }),
+  ).toBeInTheDocument();
+});
+
+test.each([
   'answer-first',
   'summary-first-latest',
   'summary-manual',
