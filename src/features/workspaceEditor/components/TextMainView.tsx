@@ -246,7 +246,8 @@ function ModuleDocumentSurface({
     'title',
   );
   const introPlaceholder = '补充模块引言';
-  const titleInputVisible = isSelected;
+  const titleInputVisible =
+    pendingFocusField === 'title' || activeField === 'title';
   const introInputVisible =
     pendingFocusField === 'content' || activeField === 'content';
   const showIntro =
