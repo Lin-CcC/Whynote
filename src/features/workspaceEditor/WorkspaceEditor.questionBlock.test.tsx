@@ -1619,16 +1619,6 @@ test('renders plan-step panels as question clusters with local answers, follow-u
       'structure-map-scaffold-summary-scaffold-step',
     ),
   ).not.toBeInTheDocument();
-  expect(supportingRegion.previousElementSibling).not.toBeNull();
-  expect(supportingRegion.previousElementSibling).toHaveAttribute(
-    'data-structure-connector-role',
-    'supporting',
-  );
-  expect(supportingRegion.previousElementSibling).toHaveAttribute(
-    'data-structure-connector-segment',
-    'root',
-  );
-
   const supportingNodes = supportingRegion.querySelectorAll(
     '[data-structure-role="supporting-node"]',
   );
@@ -1642,7 +1632,13 @@ test('renders plan-step panels as question clusters with local answers, follow-u
         connector.getAttribute('data-structure-connector-segment'),
       ),
     ),
-  ).toEqual(new Set(['spine', 'leaf']));
+  ).toEqual(new Set(['root', 'spine', 'leaf']));
+  expect(
+    supportingConnectors.filter(
+      (connector) =>
+        connector.getAttribute('data-structure-connector-segment') === 'root',
+    ),
+  ).toHaveLength(1);
   expect(
     supportingConnectors.filter(
       (connector) =>
@@ -1656,10 +1652,8 @@ test('renders plan-step panels as question clusters with local answers, follow-u
     ),
   ).toHaveLength(supportingNodes.length);
   expect(
-    supportingRegion.querySelector(
-      '[data-structure-connector-role="supporting"][data-structure-connector-segment="root"]',
-    ),
-  ).toBeNull();
+    supportingRegion.firstElementChild,
+  ).toHaveAttribute('data-structure-connector-segment', 'root');
 
   const followUpBranch = within(topLevelCluster).getByTestId(
     'structure-map-branch-question-main',
@@ -1708,6 +1702,10 @@ test('renders plan-step panels as question clusters with local answers, follow-u
         connector.getAttribute('data-structure-connector-segment') === 'leaf',
     ),
   ).toHaveLength(followUpNodes.length);
+  expect(followUpBranch.firstElementChild).toHaveAttribute(
+    'data-structure-connector-segment',
+    'root',
+  );
   expect(followUpBranch.getAttribute('data-structure-connector')).not.toBe(
     supportingRegion.getAttribute('data-structure-connector'),
   );

@@ -448,30 +448,23 @@ function QuestionBlockNode({
       {node.entries.length > 0 ? (
         <div className="workspace-structureMapClusterBody">
           {supportingEntries.length > 0 ? (
-            <>
-              <StructureMapConnector
-                connector="supporting-spine"
-                role="supporting"
-                segment="root"
-              />
-              <QuestionEntryGroup
-                activeDropZoneId={activeDropZoneId}
-                clusterTone={clusterTone}
-                descriptors={supportingEntries}
-                dragState={dragState}
-                entryNodeIds={entryNodeIds}
-                groupKind="supporting"
-                isInteractionLocked={isInteractionLocked}
-                node={node}
-                onDragEnd={onDragEnd}
-                onDragStart={onDragStart}
-                onDropRequest={onDropRequest}
-                onDropZoneEnter={onDropZoneEnter}
-                onOpenDocumentNode={onOpenDocumentNode}
-                selectedItemId={selectedItemId}
-                tree={tree}
-              />
-            </>
+            <QuestionEntryGroup
+              activeDropZoneId={activeDropZoneId}
+              clusterTone={clusterTone}
+              descriptors={supportingEntries}
+              dragState={dragState}
+              entryNodeIds={entryNodeIds}
+              groupKind="supporting"
+              isInteractionLocked={isInteractionLocked}
+              node={node}
+              onDragEnd={onDragEnd}
+              onDragStart={onDragStart}
+              onDropRequest={onDropRequest}
+              onDropZoneEnter={onDropZoneEnter}
+              onOpenDocumentNode={onOpenDocumentNode}
+              selectedItemId={selectedItemId}
+              tree={tree}
+            />
           ) : null}
           {followUpEntries.length > 0 ? (
             <QuestionEntryGroup
@@ -559,13 +552,11 @@ function QuestionEntryGroup({
           : `structure-map-branch-${node.question.id}`
       }
     >
-      {groupKind === 'follow-up' ? (
-        <StructureMapConnector
-          connector={connectorKind}
-          role={connectorRole}
-          segment="root"
-        />
-      ) : null}
+      <StructureMapConnector
+        connector={connectorKind}
+        role={connectorRole}
+        segment="root"
+      />
       <div
         className={
           groupKind === 'supporting'
