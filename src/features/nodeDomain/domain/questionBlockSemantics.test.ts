@@ -125,7 +125,7 @@ test('reorders follow-up questions only within their original parent question', 
       nodeId: 'question-follow-up-structure-map',
       targetParentNodeId: 'question-structure-map-peer',
     }),
-  ).toThrow(/original parent question/i);
+  ).toThrow('追问必须保留在原始父问题下面。');
 });
 
 test('reorders answer groups within a question while keeping closure nodes paired and not stale', () => {

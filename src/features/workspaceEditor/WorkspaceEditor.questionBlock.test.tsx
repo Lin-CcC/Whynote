@@ -1804,7 +1804,7 @@ test('shows explicit invalid structure-map drop feedback instead of failing sile
 
   expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
   expect(screen.getByRole('status')).toHaveTextContent(
-    /target parent type is not allowed/i,
+    '当前落点无效：这个结构地图单元不能落到当前目标父节点下。',
   );
 });
 

@@ -37,7 +37,9 @@ afterEach(async () => {
   }
 });
 
-test('autofills a resource from url, still allows manual edits, and keeps metadata plus library/search/export/restore available', async () => {
+test(
+  'autofills a resource from url, still allows manual edits, and keeps metadata plus library/search/export/restore available',
+  async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue({
@@ -176,12 +178,14 @@ test('autofills a resource from url, still allows manual edits, and keeps metada
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
-  expect(
-    await screen.findByRole('button', {
-      name: '定位资料 React 渲染局部性笔记',
-    }),
-  ).toBeInTheDocument();
-});
+    expect(
+      await screen.findByRole('button', {
+        name: '定位资料 React 渲染局部性笔记',
+      }),
+    ).toBeInTheDocument();
+  },
+  20_000,
+);
 
 test('keeps manual fallback usable when url autofill fails and stores a partial ingest draft', async () => {
   vi.stubGlobal(

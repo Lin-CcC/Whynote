@@ -4,7 +4,7 @@
 
 ## 当前工作面
 
-- 当前工作树：`codex/v13-map-showcase`
+- 当前工作树：`codex/v13-map-integration-2`
 - 当前短期目标：完成 V1.3 结构地图真实工作流闭环验证与演示级文档收尾，不再扩 scope
 
 ## 当前短期任务
