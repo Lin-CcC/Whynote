@@ -1723,60 +1723,198 @@ test('renders plan-step panels as question clusters with local answers, follow-u
   ).toBeInTheDocument();
 });
 
-test('dragging a structure-map unit reorders the document, selects the moved anchor, and expands the target path', async () => {
-  const snapshots: WorkspaceSnapshot[] = [];
-
+test('marks draggable structure-map units with a stable affordance and promotes the active dragged item', async () => {
   renderQuestionBlockEditor({
-    initialSelectedNodeId: 'summary-manual',
+    initialSelectedNodeId: 'question-main',
     initialWorkspaceViewState: {
-      collapsedPlanStepIds: ['step-question-block'],
-      collapsedQuestionBlockIds: ['question-main'],
-      collapsedNodeBodyIds: [],
-      expandedHistorySectionIds: [],
+      ...DEFAULT_WORKSPACE_VIEW_STATE,
       mainViewMode: 'structure-map',
     },
-    onSnapshotChange: (snapshot) => {
-      snapshots.push(snapshot);
+  });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+  });
+
+  const answerGroupButton = screen.getByTestId(
+    'structure-map-item-answer-group:answer-first',
+  );
+  const dragHint = answerGroupButton.querySelector('.workspace-structureMapDragHint');
+
+  expect(answerGroupButton).toHaveAttribute('data-draggable', 'true');
+  expect(dragHint).not.toBeNull();
+  expect(dragHint).toHaveAttribute('data-drag-hint', 'ready');
+  expect(dragHint).toHaveTextContent('可拖动');
+
+  fireEvent.dragStart(answerGroupButton);
+
+  expect(answerGroupButton).toHaveAttribute('data-dragging', 'true');
+  expect(dragHint).toHaveAttribute('data-drag-hint', 'dragging');
+  expect(dragHint).toHaveTextContent('拖动中');
+});
+
+test('highlights valid structure-map dropzones and stabilizes the hovered legal target', async () => {
+  renderQuestionBlockEditor({
+    initialSnapshot: createCrossStepStructureMapSnapshot(),
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: {
+      ...DEFAULT_WORKSPACE_VIEW_STATE,
+      mainViewMode: 'structure-map',
     },
   });
 
-  fireEvent.dragStart(
-    screen.getByTestId('structure-map-item-summary-group:summary-manual'),
-  );
-  fireEvent.dragOver(
-    screen.getByTestId('structure-map-dropzone-question-main-0'),
-  );
-  fireEvent.drop(screen.getByTestId('structure-map-dropzone-question-main-0'));
-
   await waitFor(() => {
-    expect(
-      screen.queryByTestId('workspace-structure-map-shell'),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
   });
 
-  expect(screen.getByTestId('editor-node-summary-manual')).toHaveAttribute(
-    'data-node-selected',
-    'true',
+  const questionButton = screen.getByTestId(
+    'structure-map-item-question-block:question-main',
   );
-  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
-    'data-collapsed',
-    'false',
+  const validDropZone = screen.getByTestId('structure-map-dropzone-step-secondary-1');
+
+  fireEvent.dragStart(questionButton);
+
+  expect(validDropZone).toHaveAttribute('data-drop-state', 'valid');
+  expect(validDropZone).toHaveTextContent('可落点');
+
+  fireEvent.dragOver(validDropZone);
+
+  expect(validDropZone).toHaveAttribute('data-active', 'true');
+  expect(validDropZone).toHaveTextContent('松手放到这里');
+});
+
+test('shows explicit invalid structure-map drop feedback instead of failing silently', async () => {
+  renderQuestionBlockEditor({
+    initialSnapshot: createCrossStepStructureMapSnapshot(),
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: {
+      ...DEFAULT_WORKSPACE_VIEW_STATE,
+      mainViewMode: 'structure-map',
+    },
+  });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+  });
+
+  const answerGroupButton = screen.getByTestId(
+    'structure-map-item-answer-group:answer-first',
   );
-  expectVisibleNodeOrder('question-main', [
-    'summary-manual',
-    'judgment-summary-latest',
-    'answer-first',
-    'judgment-first-latest',
-    'summary-first-latest',
-    'answer-second',
-    'judgment-second-latest',
-    'summary-second-latest',
-    'question-follow-up',
-  ]);
+  const invalidDropZone = screen.getByTestId(
+    'structure-map-dropzone-module-question-block-1',
+  );
+
+  fireEvent.dragStart(answerGroupButton);
+
+  expect(invalidDropZone).toHaveAttribute('data-drop-state', 'invalid');
+
+  fireEvent.dragOver(invalidDropZone);
+
+  expect(invalidDropZone).toHaveAttribute('data-active', 'true');
+  expect(invalidDropZone).toHaveTextContent('不能放这里');
+
+  fireEvent.drop(invalidDropZone);
+  fireEvent.dragEnd(answerGroupButton);
+
+  expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent(
+    /target parent type is not allowed/i,
+  );
+});
+
+test('keeps structure-map drag item and dropzone test ids stable', async () => {
+  renderQuestionBlockEditor({
+    initialSnapshot: createCrossStepStructureMapSnapshot(),
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: {
+      ...DEFAULT_WORKSPACE_VIEW_STATE,
+      mainViewMode: 'structure-map',
+    },
+  });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+  });
 
   expect(
-    snapshots.at(-1)?.tree.nodes['question-main']?.childIds[0],
-  ).toBe('summary-manual');
+    screen.getByTestId('structure-map-item-question-block:question-main'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByTestId('structure-map-item-answer-group:answer-first'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByTestId('structure-map-dropzone-question-main-0'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByTestId('structure-map-dropzone-step-secondary-1'),
+  ).toBeInTheDocument();
+});
+
+test('dragging a structure-map unit reorders the document, selects the moved anchor, and expands the target path', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+  const scrollIntoViewSpy = vi.fn();
+
+  HTMLElement.prototype.scrollIntoView = scrollIntoViewSpy;
+
+  try {
+    renderQuestionBlockEditor({
+      initialSelectedNodeId: 'summary-manual',
+      initialWorkspaceViewState: {
+        collapsedPlanStepIds: ['step-question-block'],
+        collapsedQuestionBlockIds: ['question-main'],
+        collapsedNodeBodyIds: [],
+        expandedHistorySectionIds: [],
+        mainViewMode: 'structure-map',
+      },
+      onSnapshotChange: (snapshot) => {
+        snapshots.push(snapshot);
+      },
+    });
+
+    fireEvent.dragStart(
+      screen.getByTestId('structure-map-item-summary-group:summary-manual'),
+    );
+    fireEvent.dragOver(
+      screen.getByTestId('structure-map-dropzone-question-main-0'),
+    );
+    fireEvent.drop(screen.getByTestId('structure-map-dropzone-question-main-0'));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('workspace-structure-map-shell'),
+      ).not.toBeInTheDocument();
+    });
+
+    const selectedSummaryNode = screen.getByTestId('editor-node-summary-manual');
+
+    expect(selectedSummaryNode).toHaveAttribute('data-node-selected', 'true');
+    await waitFor(() => {
+      expect(scrollIntoViewSpy).toHaveBeenCalled();
+      expect(selectedSummaryNode).toHaveFocus();
+    });
+    expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+      'data-collapsed',
+      'false',
+    );
+    expectVisibleNodeOrder('question-main', [
+      'summary-manual',
+      'judgment-summary-latest',
+      'answer-first',
+      'judgment-first-latest',
+      'summary-first-latest',
+      'answer-second',
+      'judgment-second-latest',
+      'summary-second-latest',
+      'question-follow-up',
+    ]);
+
+    expect(
+      snapshots.at(-1)?.tree.nodes['question-main']?.childIds[0],
+    ).toBe('summary-manual');
+  } finally {
+    HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+  }
 });
 
 test('allows moving a top-level question block across plan steps from the structure map', async () => {

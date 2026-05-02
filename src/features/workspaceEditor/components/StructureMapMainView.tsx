@@ -9,6 +9,7 @@ import {
   type NodeTree,
   type StructureMapAnchor,
   type StructureMapAnswerGroupNode,
+  type StructureMapDropRejectionCode,
   type StructureMapManualSummaryGroupNode,
   type StructureMapMoveRequest,
   type StructureMapMoveValidationResult,
@@ -36,6 +37,24 @@ type DragState = {
   nodeId: string;
 };
 
+type DropFeedback = {
+  code: StructureMapDropRejectionCode;
+  message: string;
+};
+
+type StructureMapDropZoneState =
+  | {
+      state: 'idle' | 'noop';
+    }
+  | {
+      state: 'invalid';
+      validation: Extract<StructureMapMoveValidationResult, { allowed: false }>;
+    }
+  | {
+      state: 'valid';
+      validation: Extract<StructureMapMoveValidationResult, { allowed: true }>;
+    };
+
 type StructureRole =
   | 'answer-group'
   | 'plan-step'
@@ -53,6 +72,7 @@ type StructureMapRenderProps = {
   dragState: DragState | null;
   isInteractionLocked: boolean;
   onDragEnd: () => void;
+  onInvalidDrop: (feedback: DropFeedback) => void;
   onDragStart: (nodeId: string) => void;
   onDropRequest: (
     request: Omit<StructureMapMoveRequest, 'nodeId'>,
@@ -62,6 +82,9 @@ type StructureMapRenderProps = {
   onOpenDocumentNode: (nodeId: string) => void;
   selectedItemId: string | null;
   tree: NodeTree;
+  validateStructureMapMove: (
+    request: StructureMapMoveRequest,
+  ) => StructureMapMoveValidationResult;
 };
 
 export default function StructureMapMainView({
@@ -76,6 +99,7 @@ export default function StructureMapMainView({
 }: StructureMapMainViewProps) {
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [activeDropZoneId, setActiveDropZoneId] = useState<string | null>(null);
+  const [dropFeedback, setDropFeedback] = useState<DropFeedback | null>(null);
 
   if (!currentModuleId || !tree.nodes[currentModuleId]) {
     return (
@@ -118,8 +142,20 @@ export default function StructureMapMainView({
     ? getStructureMapSelectionId(selectedAnchor)
     : null;
   const sectionNodeIds = model.sections.map((section) => section.anchor.nodeId);
+  const dragStatus = dragState
+    ? {
+        text: '拖动中：蓝色提示表示可落点，红色提示表示当前落点不允许。',
+        tone: 'info' as const,
+      }
+    : dropFeedback
+      ? {
+          text: `当前落点无效：${dropFeedback.message}`,
+          tone: 'invalid' as const,
+        }
+      : null;
 
   function handleDragStart(nodeId: string) {
+    setDropFeedback(null);
     setDragState({ nodeId });
   }
 
@@ -162,7 +198,12 @@ export default function StructureMapMainView({
 
     onMoveStructureMapNode(nextRequest);
     setActiveDropZoneId(null);
+    setDropFeedback(null);
     setDragState(null);
+  }
+
+  function handleInvalidDrop(feedback: DropFeedback) {
+    setDropFeedback(feedback);
   }
 
   return (
@@ -183,22 +224,30 @@ export default function StructureMapMainView({
             这里负责按问题聚合结构、联动文档和拖动重排，正文编辑仍留在文档视图。
           </p>
         </header>
+        {dragStatus ? (
+          <div
+            className="workspace-structureMapStatus"
+            data-tone={dragStatus.tone}
+            role="status"
+          >
+            <span className="workspace-structureMapStatusText">{dragStatus.text}</span>
+          </div>
+        ) : null}
         <div className="workspace-structureMapBody">
           <StructureMapDropZone
             activeDropZoneId={activeDropZoneId}
             dragState={dragState}
+            dropRequest={{
+              index: 0,
+              targetParentNodeId: currentModule.id,
+            }}
             dropZoneId={createDropZoneId(currentModule.id, 0)}
             isInteractionLocked={isInteractionLocked}
-            onDropRequest={() =>
-              handleDropRequest(
-                {
-                  index: 0,
-                  targetParentNodeId: currentModule.id,
-                },
-                sectionNodeIds,
-              )
-            }
+            onDropRequest={handleDropRequest}
             onDropZoneEnter={setActiveDropZoneId}
+            onInvalidDrop={handleInvalidDrop}
+            siblingNodeIds={sectionNodeIds}
+            validateStructureMapMove={validateStructureMapMove}
           />
           {model.sections.map((section, index) => (
             <div
@@ -213,6 +262,7 @@ export default function StructureMapMainView({
                 dragState={dragState}
                 isInteractionLocked={isInteractionLocked}
                 onDragEnd={handleDragEnd}
+                onInvalidDrop={handleInvalidDrop}
                 onDragStart={handleDragStart}
                 onDropRequest={handleDropRequest}
                 onDropZoneEnter={setActiveDropZoneId}
@@ -220,22 +270,22 @@ export default function StructureMapMainView({
                 section={section}
                 selectedItemId={selectedItemId}
                 tree={tree}
+                validateStructureMapMove={validateStructureMapMove}
               />
               <StructureMapDropZone
                 activeDropZoneId={activeDropZoneId}
                 dragState={dragState}
+                dropRequest={{
+                  index: index + 1,
+                  targetParentNodeId: currentModule.id,
+                }}
                 dropZoneId={createDropZoneId(currentModule.id, index + 1)}
                 isInteractionLocked={isInteractionLocked}
-                onDropRequest={() =>
-                  handleDropRequest(
-                    {
-                      index: index + 1,
-                      targetParentNodeId: currentModule.id,
-                    },
-                    sectionNodeIds,
-                  )
-                }
+                onDropRequest={handleDropRequest}
                 onDropZoneEnter={setActiveDropZoneId}
+                onInvalidDrop={handleInvalidDrop}
+                siblingNodeIds={sectionNodeIds}
+                validateStructureMapMove={validateStructureMapMove}
               />
             </div>
           ))}
@@ -250,6 +300,7 @@ function SectionNode({
   dragState,
   isInteractionLocked,
   onDragEnd,
+  onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
@@ -257,6 +308,7 @@ function SectionNode({
   section,
   selectedItemId,
   tree,
+  validateStructureMapMove,
 }: StructureMapRenderProps & {
   section: StructureMapSection;
 }) {
@@ -291,18 +343,17 @@ function SectionNode({
             <StructureMapDropZone
               activeDropZoneId={activeDropZoneId}
               dragState={dragState}
+              dropRequest={{
+                index,
+                targetParentNodeId: section.planStep.id,
+              }}
               dropZoneId={createDropZoneId(section.planStep.id, index)}
               isInteractionLocked={isInteractionLocked}
-              onDropRequest={() =>
-                onDropRequest(
-                  {
-                    index,
-                    targetParentNodeId: section.planStep.id,
-                  },
-                  itemNodeIds,
-                )
-              }
+              onDropRequest={onDropRequest}
               onDropZoneEnter={onDropZoneEnter}
+              onInvalidDrop={onInvalidDrop}
+              siblingNodeIds={itemNodeIds}
+              validateStructureMapMove={validateStructureMapMove}
             />
             <SectionItemNode
               activeDropZoneId={activeDropZoneId}
@@ -310,30 +361,31 @@ function SectionNode({
               isInteractionLocked={isInteractionLocked}
               item={item}
               onDragEnd={onDragEnd}
+              onInvalidDrop={onInvalidDrop}
               onDragStart={onDragStart}
               onDropRequest={onDropRequest}
               onDropZoneEnter={onDropZoneEnter}
               onOpenDocumentNode={onOpenDocumentNode}
               selectedItemId={selectedItemId}
               tree={tree}
+              validateStructureMapMove={validateStructureMapMove}
             />
           </div>
         ))}
         <StructureMapDropZone
           activeDropZoneId={activeDropZoneId}
           dragState={dragState}
+          dropRequest={{
+            index: section.items.length,
+            targetParentNodeId: section.planStep.id,
+          }}
           dropZoneId={createDropZoneId(section.planStep.id, section.items.length)}
           isInteractionLocked={isInteractionLocked}
-          onDropRequest={() =>
-            onDropRequest(
-              {
-                index: section.items.length,
-                targetParentNodeId: section.planStep.id,
-              },
-              itemNodeIds,
-            )
-          }
+          onDropRequest={onDropRequest}
           onDropZoneEnter={onDropZoneEnter}
+          onInvalidDrop={onInvalidDrop}
+          siblingNodeIds={itemNodeIds}
+          validateStructureMapMove={validateStructureMapMove}
         />
       </div>
     </div>
@@ -381,12 +433,14 @@ function QuestionBlockNode({
   isInteractionLocked,
   node,
   onDragEnd,
+  onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
   selectedItemId,
   tree,
+  validateStructureMapMove,
 }: StructureMapRenderProps & {
   clusterTone: 'follow-up' | 'top-level';
   node: StructureMapQuestionBlockNode;
@@ -448,23 +502,32 @@ function QuestionBlockNode({
       {node.entries.length > 0 ? (
         <div className="workspace-structureMapClusterBody">
           {supportingEntries.length > 0 ? (
-            <QuestionEntryGroup
-              activeDropZoneId={activeDropZoneId}
-              clusterTone={clusterTone}
-              descriptors={supportingEntries}
-              dragState={dragState}
-              entryNodeIds={entryNodeIds}
-              groupKind="supporting"
-              isInteractionLocked={isInteractionLocked}
-              node={node}
-              onDragEnd={onDragEnd}
-              onDragStart={onDragStart}
-              onDropRequest={onDropRequest}
-              onDropZoneEnter={onDropZoneEnter}
-              onOpenDocumentNode={onOpenDocumentNode}
-              selectedItemId={selectedItemId}
-              tree={tree}
-            />
+            <>
+              <StructureMapConnector
+                connector="supporting-spine"
+                role="supporting"
+                segment="root"
+              />
+              <QuestionEntryGroup
+                activeDropZoneId={activeDropZoneId}
+                clusterTone={clusterTone}
+                descriptors={supportingEntries}
+                dragState={dragState}
+                entryNodeIds={entryNodeIds}
+                groupKind="supporting"
+                isInteractionLocked={isInteractionLocked}
+                node={node}
+                onDragEnd={onDragEnd}
+                onInvalidDrop={onInvalidDrop}
+                onDragStart={onDragStart}
+                onDropRequest={onDropRequest}
+                onDropZoneEnter={onDropZoneEnter}
+                onOpenDocumentNode={onOpenDocumentNode}
+                selectedItemId={selectedItemId}
+                tree={tree}
+                validateStructureMapMove={validateStructureMapMove}
+              />
+            </>
           ) : null}
           {followUpEntries.length > 0 ? (
             <QuestionEntryGroup
@@ -477,12 +540,14 @@ function QuestionBlockNode({
               isInteractionLocked={isInteractionLocked}
               node={node}
               onDragEnd={onDragEnd}
+              onInvalidDrop={onInvalidDrop}
               onDragStart={onDragStart}
               onDropRequest={onDropRequest}
               onDropZoneEnter={onDropZoneEnter}
               onOpenDocumentNode={onOpenDocumentNode}
               selectedItemId={selectedItemId}
               tree={tree}
+              validateStructureMapMove={validateStructureMapMove}
             />
           ) : null}
         </div>
@@ -502,12 +567,14 @@ function QuestionEntryGroup({
   isInteractionLocked,
   node,
   onDragEnd,
+  onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
   selectedItemId,
   tree,
+  validateStructureMapMove,
 }: StructureMapRenderProps & {
   clusterTone: 'follow-up' | 'top-level';
   descriptors: QuestionEntryDescriptor[];
@@ -591,18 +658,17 @@ function QuestionEntryGroup({
             <StructureMapDropZone
               activeDropZoneId={activeDropZoneId}
               dragState={dragState}
+              dropRequest={{
+                index,
+                targetParentNodeId: node.question.id,
+              }}
               dropZoneId={createDropZoneId(node.question.id, index)}
               isInteractionLocked={isInteractionLocked}
-              onDropRequest={() =>
-                onDropRequest(
-                  {
-                    index,
-                    targetParentNodeId: node.question.id,
-                  },
-                  entryNodeIds,
-                )
-              }
+              onDropRequest={onDropRequest}
               onDropZoneEnter={onDropZoneEnter}
+              onInvalidDrop={onInvalidDrop}
+              siblingNodeIds={entryNodeIds}
+              validateStructureMapMove={validateStructureMapMove}
             />
             <QuestionEntryNode
               activeDropZoneId={activeDropZoneId}
@@ -611,12 +677,14 @@ function QuestionEntryGroup({
               entry={entry}
               isInteractionLocked={isInteractionLocked}
               onDragEnd={onDragEnd}
+              onInvalidDrop={onInvalidDrop}
               onDragStart={onDragStart}
               onDropRequest={onDropRequest}
               onDropZoneEnter={onDropZoneEnter}
               onOpenDocumentNode={onOpenDocumentNode}
               selectedItemId={selectedItemId}
               tree={tree}
+              validateStructureMapMove={validateStructureMapMove}
             />
           </div>
         ))}
@@ -624,18 +692,17 @@ function QuestionEntryGroup({
           <StructureMapDropZone
             activeDropZoneId={activeDropZoneId}
             dragState={dragState}
+            dropRequest={{
+              index: node.entries.length,
+              targetParentNodeId: node.question.id,
+            }}
             dropZoneId={createDropZoneId(node.question.id, node.entries.length)}
             isInteractionLocked={isInteractionLocked}
-            onDropRequest={() =>
-              onDropRequest(
-                {
-                  index: node.entries.length,
-                  targetParentNodeId: node.question.id,
-                },
-                entryNodeIds,
-              )
-            }
+            onDropRequest={onDropRequest}
             onDropZoneEnter={onDropZoneEnter}
+            onInvalidDrop={onInvalidDrop}
+            siblingNodeIds={entryNodeIds}
+            validateStructureMapMove={validateStructureMapMove}
           />
         ) : null}
       </div>
@@ -670,12 +737,14 @@ function QuestionEntryNode({
   entry,
   isInteractionLocked,
   onDragEnd,
+  onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
   selectedItemId,
   tree,
+  validateStructureMapMove,
 }: StructureMapRenderProps & {
   clusterTone: 'follow-up' | 'top-level';
   entry: StructureMapQuestionEntry;
@@ -730,12 +799,14 @@ function QuestionEntryNode({
       isInteractionLocked={isInteractionLocked}
       node={entry.node}
       onDragEnd={onDragEnd}
+      onInvalidDrop={onInvalidDrop}
       onDragStart={onDragStart}
       onDropRequest={onDropRequest}
       onDropZoneEnter={onDropZoneEnter}
       onOpenDocumentNode={onOpenDocumentNode}
       selectedItemId={selectedItemId}
       tree={tree}
+      validateStructureMapMove={validateStructureMapMove}
     />
   );
 }
@@ -836,12 +907,14 @@ function StructureMapButton({
   title: string;
 }) {
   const itemId = getStructureMapSelectionId(anchor);
+  const isDragging = dragState?.nodeId === dragNodeId;
 
   return (
     <button
       aria-current={selectedItemId === itemId ? 'true' : undefined}
       className="workspace-structureMapButton"
-      data-dragging={dragState?.nodeId === dragNodeId}
+      data-draggable={dragPermission.canDrag}
+      data-dragging={isDragging}
       data-kind={itemId.split(':')[0]}
       data-selected={selectedItemId === itemId}
       data-structure-role={structureRole}
@@ -866,6 +939,15 @@ function StructureMapButton({
     >
       <span className="workspace-structureMapLabel">{kindLabel}</span>
       <span className="workspace-structureMapText">{title}</span>
+      {dragPermission.canDrag ? (
+        <span
+          aria-hidden="true"
+          className="workspace-structureMapDragHint"
+          data-drag-hint={isDragging ? 'dragging' : 'ready'}
+        >
+          {isDragging ? '拖动中' : '可拖动'}
+        </span>
+      ) : null}
       {isCurrentAnswer ? (
         <span className="workspace-structureMapBadge">当前回答</span>
       ) : null}
@@ -876,19 +958,40 @@ function StructureMapButton({
 function StructureMapDropZone({
   activeDropZoneId,
   dragState,
+  dropRequest,
   dropZoneId,
   isInteractionLocked,
   onDropRequest,
   onDropZoneEnter,
+  onInvalidDrop,
+  siblingNodeIds,
+  validateStructureMapMove,
 }: {
   activeDropZoneId: string | null;
   dragState: DragState | null;
+  dropRequest: Omit<StructureMapMoveRequest, 'nodeId'>;
   dropZoneId: string;
   isInteractionLocked: boolean;
-  onDropRequest: () => void;
+  onDropRequest: (
+    request: Omit<StructureMapMoveRequest, 'nodeId'>,
+    siblingNodeIds: string[],
+  ) => void;
   onDropZoneEnter: (dropZoneId: string | null) => void;
+  onInvalidDrop: (feedback: DropFeedback) => void;
+  siblingNodeIds: string[];
+  validateStructureMapMove: (
+    request: StructureMapMoveRequest,
+  ) => StructureMapMoveValidationResult;
 }) {
+  const dropZoneState = resolveStructureMapDropZoneState(
+    dragState,
+    isInteractionLocked,
+    dropRequest,
+    siblingNodeIds,
+    validateStructureMapMove,
+  );
   const isActive = dragState !== null && activeDropZoneId === dropZoneId;
+  const dropZoneLabel = getStructureMapDropZoneLabel(dropZoneState, isActive);
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
     if (isInteractionLocked || !dragState) {
@@ -897,7 +1000,8 @@ function StructureMapDropZone({
 
     event.preventDefault();
     if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'move';
+      event.dataTransfer.dropEffect =
+        dropZoneState.state === 'valid' ? 'move' : 'none';
     }
     onDropZoneEnter(dropZoneId);
   }
@@ -908,13 +1012,29 @@ function StructureMapDropZone({
     }
 
     event.preventDefault();
-    onDropRequest();
+    if (dropZoneState.state === 'invalid') {
+      onInvalidDrop({
+        code: dropZoneState.validation.code,
+        message: dropZoneState.validation.message,
+      });
+      return;
+    }
+
+    if (dropZoneState.state === 'valid') {
+      onDropRequest(dropRequest, siblingNodeIds);
+    }
   }
 
   return (
     <div
       className="workspace-structureMapDropZone"
       data-active={isActive}
+      data-drop-rejection-code={
+        dropZoneState.state === 'invalid'
+          ? dropZoneState.validation.code
+          : undefined
+      }
+      data-drop-state={dropZoneState.state}
       data-testid={dropZoneId}
       onDragLeave={() => {
         if (activeDropZoneId === dropZoneId) {
@@ -923,7 +1043,13 @@ function StructureMapDropZone({
       }}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-    />
+    >
+      {dropZoneLabel ? (
+        <span aria-hidden="true" className="workspace-structureMapDropZoneLabel">
+          {dropZoneLabel}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -985,4 +1111,61 @@ function isNoopMove(
   const effectiveIndex = targetIndex > draggedIndex ? targetIndex - 1 : targetIndex;
 
   return effectiveIndex === draggedIndex;
+}
+
+function resolveStructureMapDropZoneState(
+  dragState: DragState | null,
+  isInteractionLocked: boolean,
+  request: Omit<StructureMapMoveRequest, 'nodeId'>,
+  siblingNodeIds: string[],
+  validateStructureMapMove: (
+    request: StructureMapMoveRequest,
+  ) => StructureMapMoveValidationResult,
+): StructureMapDropZoneState {
+  if (!dragState || isInteractionLocked) {
+    return {
+      state: 'idle',
+    };
+  }
+
+  const targetIndex = request.index ?? siblingNodeIds.length;
+
+  if (isNoopMove(dragState.nodeId, targetIndex, siblingNodeIds)) {
+    return {
+      state: 'noop',
+    };
+  }
+
+  const validation = validateStructureMapMove({
+    ...request,
+    nodeId: dragState.nodeId,
+  });
+
+  if (!validation.allowed) {
+    return {
+      state: 'invalid',
+      validation,
+    };
+  }
+
+  return {
+    state: 'valid',
+    validation,
+  };
+}
+
+function getStructureMapDropZoneLabel(
+  dropZoneState: StructureMapDropZoneState,
+  isActive: boolean,
+) {
+  switch (dropZoneState.state) {
+    case 'valid':
+      return isActive ? '松手放到这里' : '可落点';
+    case 'invalid':
+      return isActive ? '不能放这里' : null;
+    case 'noop':
+      return isActive ? '当前位置' : null;
+    case 'idle':
+      return null;
+  }
 }
