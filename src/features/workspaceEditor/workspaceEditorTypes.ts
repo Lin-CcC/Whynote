@@ -5,6 +5,8 @@ import type {
   NonRootNode,
   NodeTree,
   PlanStepStatus,
+  StructureMapMoveRequest,
+  StructureMapMoveValidationResult,
   WorkspaceSnapshot,
 } from '../nodeDomain';
 
@@ -106,10 +108,14 @@ export interface WorkspaceEditorRenderContext
   ) => void;
   createModule: () => void;
   currentModule: TreeNode | null;
+  moveStructureMapNode: (request: StructureMapMoveRequest) => void;
   runLearningAction: (actionId: LearningActionId) => void;
   selectedNode: TreeNode | null;
   selectNode: (nodeId: string) => void;
   tree: NodeTree;
+  validateStructureMapMove: (
+    request: StructureMapMoveRequest,
+  ) => StructureMapMoveValidationResult;
   workspaceTitle: string;
 }
 

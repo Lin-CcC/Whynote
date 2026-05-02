@@ -6,6 +6,8 @@ import {
   createNode,
   createWorkspaceSnapshot,
   insertChildNode,
+  moveAnswerGroup,
+  moveSummaryGroup,
   type WorkspaceSnapshot,
 } from '../nodeDomain';
 import WorkspaceEditor from './WorkspaceEditor';
@@ -1593,6 +1595,53 @@ test('falls back to the latest non-empty answer when currentAnswerId is missing'
   expect(
     screen.getByTestId('question-block-answer-group-answer-legacy-empty'),
   ).toHaveAttribute('data-current-answer', 'false');
+});
+
+test('renders answer-group moves produced by the structure map helper without splitting paired results', () => {
+  const snapshot = createQuestionBlockSnapshot();
+
+  snapshot.tree = moveAnswerGroup(snapshot.tree, 'answer-first', 4);
+
+  renderQuestionBlockEditor({
+    initialSnapshot: snapshot,
+    initialSelectedNodeId: 'question-main',
+  });
+
+  expectAnswerGroupOrder('question-main', ['answer-second', 'answer-first']);
+  expectVisibleNodeOrder('question-main', [
+    'answer-second',
+    'judgment-second-latest',
+    'summary-second-latest',
+    'question-follow-up',
+    'summary-manual',
+    'judgment-summary-latest',
+    'answer-first',
+    'judgment-first-latest',
+    'summary-first-latest',
+  ]);
+});
+
+test('renders manual summary-group moves produced by the structure map helper without separating summary checks', () => {
+  const snapshot = createQuestionBlockSnapshot();
+
+  snapshot.tree = moveSummaryGroup(snapshot.tree, 'summary-manual', 0);
+
+  renderQuestionBlockEditor({
+    initialSnapshot: snapshot,
+    initialSelectedNodeId: 'question-main',
+  });
+
+  expectVisibleNodeOrder('question-main', [
+    'summary-manual',
+    'judgment-summary-latest',
+    'answer-first',
+    'judgment-first-latest',
+    'summary-first-latest',
+    'answer-second',
+    'judgment-second-latest',
+    'summary-second-latest',
+    'question-follow-up',
+  ]);
 });
 
 function renderQuestionBlockEditor(

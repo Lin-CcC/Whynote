@@ -21,11 +21,13 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
     createModule: workspaceEditor.createModule,
     currentModule: workspaceEditor.currentModule,
     currentModuleId: workspaceEditor.currentModuleId,
+    moveStructureMapNode: workspaceEditor.moveStructureMapNode,
     runLearningAction: workspaceEditor.runLearningAction,
     selectNode: workspaceEditor.selectNode,
     selectedNode: workspaceEditor.selectedNode,
     selectedNodeId: workspaceEditor.selectedNodeId,
     tree: workspaceEditor.tree,
+    validateStructureMapMove: workspaceEditor.validateStructureMapMove,
     workspaceTitle: workspaceEditor.workspaceTitle,
   };
 
@@ -106,7 +108,6 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           onUpdateNode={workspaceEditor.updateNode}
           onWorkspaceViewStateChange={handleWorkspaceViewStateChange}
           renderNodeInlineActions={props.renderNodeInlineActions}
-          renderNodeToolbarSections={props.renderNodeToolbarSections}
           registerNodeElement={workspaceEditor.registerNodeElement}
           selectedNodeId={workspaceEditor.selectedNodeId}
           tree={workspaceEditor.tree}
