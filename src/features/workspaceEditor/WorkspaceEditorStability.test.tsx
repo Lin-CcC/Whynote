@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { createWorkspaceSnapshot, type WorkspaceSnapshot } from '../nodeDomain';
 import WorkspaceEditor from './WorkspaceEditor';
-import workspaceEditorStyles from './workspaceEditor.css?inline';
+import workspaceEditorStyles from './workspaceEditor.css?raw';
 import { DEMO_SELECTED_NODE_ID } from './utils/createDemoWorkspace';
 
 test('keeps the selected textarea focused across consecutive input updates', async () => {
@@ -121,6 +121,32 @@ test('keeps document node visibility changes free of transition-driven shell ani
   expect(workspaceEditorStyles).not.toMatch(
     /\.workspace-nodeActionToolbar\s*\{[^}]*animation:/,
   );
+});
+
+test('keeps title control rails and toolbars layout-stable by avoiding display toggles', () => {
+  render(<WorkspaceEditor />);
+
+  const hiddenTitleControls = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '.workspace-nodeTitleControls[aria-hidden="true"][data-visible="false"]',
+    ),
+  );
+  const hiddenActionToolbars = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '.workspace-nodeActionToolbar[aria-hidden="true"][data-visible="false"]',
+    ),
+  );
+
+  expect(hiddenTitleControls.length).toBeGreaterThan(0);
+  expect(hiddenActionToolbars.length).toBeGreaterThan(0);
+
+  for (const controls of hiddenTitleControls) {
+    expect(controls.querySelector('button')).not.toBeNull();
+  }
+
+  for (const toolbar of hiddenActionToolbars) {
+    expect(toolbar.querySelector('button')).not.toBeNull();
+  }
 });
 
 test('keeps the title input focused while side panels reflect title edits', async () => {

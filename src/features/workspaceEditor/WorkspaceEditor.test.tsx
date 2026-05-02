@@ -484,6 +484,41 @@ test('keeps scaffold summaries in a single-shell document node without an extra 
   expect(within(scaffoldNode).getAllByText('先建立概念地图')).toHaveLength(1);
 });
 
+test('keeps scaffold summary title controls mounted while the rail is hidden', () => {
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-scaffold-actions"
+      initialSelectedNodeId="question-scaffold-actions"
+      initialSnapshot={createScaffoldActionSnapshot()}
+    />,
+  );
+
+  const scaffoldNode = screen.getByTestId('editor-node-summary-scaffold-selected');
+  const titleControls = scaffoldNode.querySelector('.workspace-nodeTitleControls');
+
+  expect(titleControls).not.toBeNull();
+  expect(titleControls).toHaveAttribute('data-visible', 'false');
+  expect(titleControls).toHaveAttribute('aria-hidden', 'true');
+  expect(
+    within(scaffoldNode).getByRole('button', {
+      hidden: true,
+      name: '追问',
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(scaffoldNode).getByRole('button', {
+      hidden: true,
+      name: '总结',
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(scaffoldNode).getByRole('button', {
+      hidden: true,
+      name: '收起正文',
+    }),
+  ).toBeInTheDocument();
+});
+
 test('allows switching a newly inserted leaf node between safe types while preserving content', async () => {
   const snapshots: WorkspaceSnapshot[] = [];
 
