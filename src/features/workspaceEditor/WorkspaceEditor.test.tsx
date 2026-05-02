@@ -174,16 +174,26 @@ test('renders a map-global status toolbar while keeping question focus controls 
       name: '聚焦当前问题簇',
     }),
   ).not.toBeInTheDocument();
+  expect(
+    within(actionsSection as HTMLElement).queryByText('收起面板'),
+  ).not.toBeInTheDocument();
 
   fireEvent.click(
     within(
-      screen.getByTestId('structure-map-item-question-block:question-structure-map-a'),
+      openStructureMapNodeMenu(
+        screen.getByTestId('structure-map-item-question-block:question-structure-map-a'),
+      ),
     ).getByRole('button', {
       name: '聚焦当前问题簇',
     }),
   );
 
-  expect(within(statusSection as HTMLElement).getByText('聚焦中')).toBeInTheDocument();
+  const focusedBadge = within(
+    screen.getByTestId('structure-map-item-question-block:question-structure-map-a'),
+  ).getByText('聚焦中');
+
+  expect(focusedBadge).toBeInTheDocument();
+  expect(focusedBadge).toHaveAttribute('data-structure-node-status', 'badge');
   expect(
     within(statusSection as HTMLElement).queryByRole('button', { name: '聚焦中' }),
   ).not.toBeInTheDocument();
@@ -271,15 +281,25 @@ test('keeps cluster actions inline in the header while preserving logic-graph co
   const collapseAction = within(clusterItem).getByRole('button', {
     name: '收起问题簇',
   });
+  const moreMenu = within(clusterItem).getByTestId(
+    'structure-map-node-menu-question-block:question-structure-map-rich',
+  );
 
   expect(collapseAction).toHaveAttribute('data-structure-cluster-action', 'collapse');
+  expect(collapseAction).toHaveAttribute('data-structure-node-action-style', 'icon');
   expect(inlineActions).not.toBeNull();
   expect(inlineActions).toContainElement(collapseAction);
+  expect(moreMenu).toHaveAttribute('data-structure-node-menu', 'more');
   expect(
     within(clusterItem).getByTestId(
       'structure-map-drag-handle-question-block:question-structure-map-rich',
     ),
   ).toHaveAttribute('data-structure-drag-handle', 'true');
+  expect(
+    within(clusterItem).getByTestId(
+      'structure-map-drag-handle-question-block:question-structure-map-rich',
+    ),
+  ).toHaveAttribute('data-structure-node-action-style', 'handle');
   expect(
     cluster.querySelector(
       ':scope > .workspace-structureMapClusterCanvas > .workspace-structureMapClusterBody > [data-structure-cluster-action="collapse"]',
@@ -2240,6 +2260,16 @@ function renderWorkspaceEditorWithViewState(
   }
 
   return render(<Wrapper />);
+}
+
+function openStructureMapNodeMenu(item: HTMLElement) {
+  fireEvent.click(
+    within(item).getByRole('button', {
+      name: /更多操作：/,
+    }),
+  );
+
+  return within(item).getByRole('menu');
 }
 
 function getSectionByHeading(name: string) {

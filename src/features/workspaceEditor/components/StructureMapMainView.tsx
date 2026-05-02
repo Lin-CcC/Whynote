@@ -109,6 +109,27 @@ type TitleEditingState = {
   originalTitle: string;
 };
 
+type StructureMapInlineAction = {
+  dataCollapsed?: boolean;
+  dataStructureClusterAction?: string;
+  icon: 'collapse' | 'document' | 'expand';
+  id: string;
+  label: string;
+  onClick: () => void;
+};
+
+type StructureMapMenuAction = {
+  id: string;
+  label: string;
+  onClick: () => void;
+};
+
+type StructureMapStatusBadge = {
+  id: string;
+  label: string;
+  tone: 'current-answer' | 'focused';
+};
+
 type StructureMapRenderProps = {
   activeDropZoneId: string | null;
   dragState: DragState | null;
@@ -671,31 +692,6 @@ function SectionNode({
   return (
     <div className="workspace-structureMapPanelBody">
       <StructureMapNodeCard
-        actionButtons={
-          <>
-            <button
-              className="workspace-structureMapNodeActionButton"
-              disabled={isInteractionLocked}
-              onClick={() =>
-                onToggleStructureMapFocusTarget({
-                  kind: 'plan-step',
-                  nodeId: section.planStep.id,
-                })
-              }
-              type="button"
-            >
-              {isFocused ? '退出步骤聚焦' : '聚焦当前步骤'}
-            </button>
-            <button
-              className="workspace-structureMapNodeActionButton"
-              disabled={isInteractionLocked}
-              onClick={() => onToggleStructureMapStepCollapsed(section.planStep.id)}
-              type="button"
-            >
-              {isCollapsed ? '展开面板' : '收起面板'}
-            </button>
-          </>
-        }
         anchor={section.anchor}
         dragNodeId={section.planStep.id}
         dragPermission={section.drag}
@@ -704,6 +700,22 @@ function SectionNode({
         isCurrentAnswer={false}
         isEditingTitle={titleEditingState?.itemId === itemId}
         isInteractionLocked={isInteractionLocked}
+        menuActions={[
+          {
+            id: 'focus-step',
+            label: isFocused ? '退出步骤聚焦' : '聚焦当前步骤',
+            onClick: () =>
+              onToggleStructureMapFocusTarget({
+                kind: 'plan-step',
+                nodeId: section.planStep.id,
+              }),
+          },
+          {
+            id: 'collapse-step',
+            label: isCollapsed ? '展开面板' : '收起面板',
+            onClick: () => onToggleStructureMapStepCollapsed(section.planStep.id),
+          },
+        ]}
         kindLabel="步骤"
         onCancelTitleEditing={onCancelTitleEditing}
         onDragEnd={onDragEnd}
@@ -715,6 +727,17 @@ function SectionNode({
         onTitleEditingDraftChange={onTitleEditingDraftChange}
         isSelectedOverride={isCollapsed && isCurrentPlanStep}
         selectedItemId={selectedItemId}
+        statusBadges={
+          isFocused
+            ? [
+                {
+                  id: 'focused',
+                  label: '聚焦中',
+                  tone: 'focused',
+                },
+              ]
+            : undefined
+        }
         structureRole="plan-step"
         title={getStructureMapNodeLabel(tree, section.planStep, 'step')}
         titleEditingDraft={
@@ -935,49 +958,41 @@ function QuestionBlockNode({
               data-structure-node="question-hub"
             >
               <StructureMapNodeCard
-                actionButtons={
-                  <>
-                    <button
-                      className="workspace-structureMapNodeActionButton"
-                      disabled={isInteractionLocked}
-                      onClick={() =>
-                        onToggleStructureMapFocusTarget({
-                          kind: 'question-cluster',
-                          nodeId: node.question.id,
-                        })
-                      }
-                      type="button"
-                    >
-                      {isFocused ? '退出问题聚焦' : '聚焦当前问题簇'}
-                    </button>
-                    <button
-                      aria-label={collapseTooltip}
-                      className="workspace-structureMapNodeActionButton"
-                      data-collapsed={isCollapsed}
-                      data-structure-cluster-action="collapse"
-                      disabled={isInteractionLocked}
-                      onClick={() =>
-                        isTopLevelCluster
-                          ? onToggleStructureMapClusterCollapsed(node.question.id)
-                          : onToggleStructureMapFollowUpCollapsed(node.question.id)
-                      }
-                      type="button"
-                    >
-                      {isCollapsed ? '展开' : '收起'}
-                    </button>
-                  </>
-                }
                 anchor={node.anchor}
                 dragNodeId={node.question.id}
                 dragPermission={node.drag}
                 dragState={dragState}
                 hasInlineClusterActions
+                inlineActions={[
+                  {
+                    dataCollapsed: isCollapsed,
+                    dataStructureClusterAction: 'collapse',
+                    icon: isCollapsed ? 'expand' : 'collapse',
+                    id: 'collapse-cluster',
+                    label: collapseTooltip,
+                    onClick: () =>
+                      isTopLevelCluster
+                        ? onToggleStructureMapClusterCollapsed(node.question.id)
+                        : onToggleStructureMapFollowUpCollapsed(node.question.id),
+                  },
+                ]}
                 isCurrentAnswer={false}
                 isEditingTitle={titleEditingState?.itemId === itemId}
                 isInteractionLocked={isInteractionLocked}
                 onCancelTitleEditing={onCancelTitleEditing}
                 isSelectedOverride={isCollapsed && isCurrentQuestionCluster}
                 kindLabel="问题"
+                menuActions={[
+                  {
+                    id: 'focus-cluster',
+                    label: isFocused ? '退出问题聚焦' : '聚焦当前问题簇',
+                    onClick: () =>
+                      onToggleStructureMapFocusTarget({
+                        kind: 'question-cluster',
+                        nodeId: node.question.id,
+                      }),
+                  },
+                ]}
                 onDragEnd={onDragEnd}
                 onDragStart={onDragStart}
                 onOpenDocumentNode={onOpenDocumentNode}
@@ -986,6 +1001,17 @@ function QuestionBlockNode({
                 onSubmitTitleEditing={onSubmitTitleEditing}
                 onTitleEditingDraftChange={onTitleEditingDraftChange}
                 selectedItemId={selectedItemId}
+                statusBadges={
+                  isFocused
+                    ? [
+                        {
+                          id: 'focused',
+                          label: '聚焦中',
+                          tone: 'focused',
+                        },
+                      ]
+                    : undefined
+                }
                 structureRole="question"
                 title={getStructureMapNodeLabel(tree, node.question, 'question')}
                 titleEditingDraft={
@@ -1586,6 +1612,417 @@ function StructureMapButton({
 void StructureMapButton;
 
 function StructureMapNodeCard({
+  anchor,
+  dragNodeId,
+  dragPermission,
+  dragState,
+  hasInlineClusterActions = false,
+  hasInlineStepActions = false,
+  inlineActions = [],
+  isCurrentAnswer,
+  isEditingTitle,
+  isInteractionLocked,
+  kindLabel,
+  menuActions = [],
+  onCancelTitleEditing,
+  onDragEnd,
+  onDragStart,
+  onOpenDocumentNode,
+  onSelectStructureMapNode,
+  onStartTitleEditing,
+  onSubmitTitleEditing,
+  onTitleEditingDraftChange,
+  isSelectedOverride = false,
+  selectedItemId,
+  statusBadges = [],
+  structureRole,
+  title,
+  titleEditingDraft,
+}: {
+  anchor: StructureMapAnchor;
+  dragNodeId: string;
+  dragPermission: StructureMapPresentationModel['drag'];
+  dragState: DragState | null;
+  hasInlineClusterActions?: boolean;
+  hasInlineStepActions?: boolean;
+  inlineActions?: StructureMapInlineAction[];
+  isCurrentAnswer: boolean;
+  isEditingTitle: boolean;
+  isInteractionLocked: boolean;
+  kindLabel: string;
+  menuActions?: StructureMapMenuAction[];
+  onCancelTitleEditing: () => void;
+  onDragEnd: () => void;
+  onDragStart: (nodeId: string) => void;
+  onOpenDocumentNode: (nodeId: string) => void;
+  onSelectStructureMapNode: (nodeId: string) => void;
+  onStartTitleEditing: (nodeId: string, itemId: string, title: string) => void;
+  onSubmitTitleEditing: () => void;
+  onTitleEditingDraftChange: (draft: string) => void;
+  isSelectedOverride?: boolean;
+  selectedItemId: string | null;
+  statusBadges?: StructureMapStatusBadge[];
+  structureRole: StructureRole;
+  title: string;
+  titleEditingDraft: string | null;
+}) {
+  const itemId = getStructureMapSelectionId(anchor);
+  const isDragging = dragState?.nodeId === dragNodeId;
+  const isSelected = isSelectedOverride || selectedItemId === itemId;
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocusWithin, setIsFocusWithin] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const actionVisibility =
+    isDragging || isEditingTitle || isFocusWithin || isMenuOpen || isSelected
+      ? 'active'
+      : isHovered
+        ? 'hover'
+        : 'default';
+  const allStatusBadges = [...statusBadges];
+
+  if (isCurrentAnswer) {
+    allStatusBadges.unshift({
+      id: 'current-answer',
+      label: '当前回答',
+      tone: 'current-answer',
+    });
+  }
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    function handleDocumentPointerDown(event: globalThis.MouseEvent) {
+      if (
+        rootRef.current &&
+        event.target instanceof Node &&
+        !rootRef.current.contains(event.target)
+      ) {
+        setIsMenuOpen(false);
+      }
+    }
+
+    function handleDocumentKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleDocumentPointerDown);
+    document.addEventListener('keydown', handleDocumentKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentPointerDown);
+      document.removeEventListener('keydown', handleDocumentKeyDown);
+    };
+  }, [isMenuOpen]);
+
+  function handleTitleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      onSubmitTitleEditing();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onCancelTitleEditing();
+    }
+  }
+
+  return (
+    <div
+      aria-current={isSelected ? 'true' : undefined}
+      className="workspace-structureMapButton"
+      data-draggable={dragPermission.canDrag}
+      data-dragging={isDragging}
+      data-kind={itemId.split(':')[0]}
+      data-selected={isSelected}
+      data-structure-node-action-visibility={actionVisibility}
+      data-structure-node-editable="title"
+      data-structure-node-editing={isEditingTitle}
+      data-structure-role={structureRole}
+      data-testid={`structure-map-item-${itemId}`}
+      onBlurCapture={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          return;
+        }
+
+        setIsFocusWithin(false);
+      }}
+      onFocusCapture={() => setIsFocusWithin(true)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      ref={rootRef}
+    >
+      <div className="workspace-structureMapButtonMain">
+        <span className="workspace-structureMapLabel">{kindLabel}</span>
+        {isEditingTitle ? (
+          <input
+            aria-label={`${title || kindLabel} 标题`}
+            autoFocus
+            className="workspace-structureMapTitleInput"
+            data-structure-node-editable="title"
+            onBlur={onSubmitTitleEditing}
+            onChange={(event) => onTitleEditingDraftChange(event.target.value)}
+            onKeyDown={handleTitleKeyDown}
+            type="text"
+            value={titleEditingDraft ?? title}
+          />
+        ) : (
+          <button
+            className="workspace-structureMapTitleButton"
+            data-structure-node-editable="title"
+            disabled={isInteractionLocked}
+            onClick={() => onSelectStructureMapNode(anchor.nodeId)}
+            onDoubleClick={() =>
+              onStartTitleEditing(dragNodeId, itemId, title)
+            }
+            type="button"
+          >
+            <span className="workspace-structureMapText">{title}</span>
+          </button>
+        )}
+        {allStatusBadges.map((badge) => (
+          <span
+            className="workspace-structureMapBadge"
+            data-structure-node-status="badge"
+            data-tone={badge.tone}
+            key={badge.id}
+          >
+            {badge.label}
+          </span>
+        ))}
+      </div>
+      <div
+        className="workspace-structureMapNodeActions"
+        data-structure-cluster-actions={hasInlineClusterActions ? 'inline' : undefined}
+        data-structure-node-action-visibility={actionVisibility}
+        data-structure-step-actions={hasInlineStepActions ? 'inline' : undefined}
+      >
+        <button
+          aria-label="在文档中查看"
+          className="workspace-structureMapNodeIconButton"
+          data-structure-node-action-style="icon"
+          data-testid={`structure-map-open-document-${itemId}`}
+          disabled={isInteractionLocked}
+          onClick={() => onOpenDocumentNode(anchor.nodeId)}
+          title="在文档中查看"
+          type="button"
+        >
+          <StructureMapActionIcon icon="document" />
+        </button>
+        {inlineActions.map((action) => (
+          <button
+            aria-label={action.label}
+            className="workspace-structureMapNodeIconButton"
+            data-collapsed={
+              action.dataCollapsed === undefined
+                ? undefined
+                : action.dataCollapsed
+                  ? 'true'
+                  : 'false'
+            }
+            data-structure-cluster-action={action.dataStructureClusterAction}
+            data-structure-node-action-style="icon"
+            data-testid={`structure-map-inline-action-${action.id}-${itemId}`}
+            disabled={isInteractionLocked}
+            key={action.id}
+            onClick={action.onClick}
+            title={action.label}
+            type="button"
+          >
+            <StructureMapActionIcon icon={action.icon} />
+          </button>
+        ))}
+        {menuActions.length > 0 ? (
+          <div
+            className="workspace-structureMapNodeMenu"
+            data-structure-node-action-style="menu"
+            data-structure-node-menu="more"
+            data-testid={`structure-map-node-menu-${itemId}`}
+          >
+            <button
+              aria-expanded={isMenuOpen}
+              aria-haspopup="menu"
+              aria-label={`更多操作：${title || kindLabel}`}
+              className="workspace-structureMapNodeIconButton"
+              data-structure-node-action-style="menu"
+              data-structure-node-menu="more"
+              disabled={isInteractionLocked}
+              onClick={(event) => {
+                event.stopPropagation();
+                setIsMenuOpen((currentIsOpen) => !currentIsOpen);
+              }}
+              title="更多操作"
+              type="button"
+            >
+              <StructureMapActionIcon icon="more" />
+            </button>
+            {isMenuOpen ? (
+              <div className="workspace-nodeActionPopover" role="menu">
+                <section className="workspace-nodeActionPopoverSection">
+                  <p className="workspace-nodeActionPopoverTitle">节点操作</p>
+                  <div className="workspace-nodeActionPopoverList">
+                    {menuActions.map((action) => (
+                      <button
+                        className="workspace-nodeActionPopoverButton"
+                        key={action.id}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setIsMenuOpen(false);
+                          action.onClick();
+                        }}
+                        type="button"
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {dragPermission.canDrag ? (
+          <button
+            aria-label={`拖动${kindLabel}`}
+            className="workspace-structureMapDragHandle"
+            data-drag-hint={isDragging ? 'dragging' : 'ready'}
+            data-structure-drag-handle="true"
+            data-structure-node-action-style="handle"
+            data-testid={`structure-map-drag-handle-${itemId}`}
+            disabled={isInteractionLocked}
+            draggable={!isInteractionLocked}
+            onDragEnd={onDragEnd}
+            onDragStart={(event) => {
+              if (!dragPermission.canDrag) {
+                event.preventDefault();
+                return;
+              }
+
+              if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', dragNodeId);
+                const transparentDragPreview = getTransparentDragPreviewImage();
+
+                if (transparentDragPreview) {
+                  event.dataTransfer.setDragImage(transparentDragPreview, 0, 0);
+                }
+              }
+
+              onDragStart(dragNodeId);
+            }}
+            title={`拖动${kindLabel}`}
+            type="button"
+          >
+            <StructureMapActionIcon icon="drag" />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function StructureMapActionIcon({
+  icon,
+}: {
+  icon: 'collapse' | 'document' | 'drag' | 'expand' | 'more';
+}) {
+  switch (icon) {
+    case 'document':
+      return (
+        <svg
+          aria-hidden="true"
+          className="workspace-structureMapActionIcon"
+          fill="none"
+          viewBox="0 0 20 20"
+        >
+          <path
+            d="M7 5.5H5.75A1.75 1.75 0 0 0 4 7.25v7A1.75 1.75 0 0 0 5.75 16h7a1.75 1.75 0 0 0 1.75-1.75V13"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.6"
+          />
+          <path
+            d="M9 11 15.25 4.75M11 4.75h4.25V9"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.6"
+          />
+        </svg>
+      );
+    case 'collapse':
+      return (
+        <svg
+          aria-hidden="true"
+          className="workspace-structureMapActionIcon"
+          fill="none"
+          viewBox="0 0 20 20"
+        >
+          <path
+            d="m5.5 11.75 4.5-4.5 4.5 4.5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.75"
+          />
+        </svg>
+      );
+    case 'expand':
+      return (
+        <svg
+          aria-hidden="true"
+          className="workspace-structureMapActionIcon"
+          fill="none"
+          viewBox="0 0 20 20"
+        >
+          <path
+            d="m5.5 8.25 4.5 4.5 4.5-4.5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.75"
+          />
+        </svg>
+      );
+    case 'more':
+      return (
+        <svg
+          aria-hidden="true"
+          className="workspace-structureMapActionIcon"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <circle cx="5" cy="10" r="1.6" />
+          <circle cx="10" cy="10" r="1.6" />
+          <circle cx="15" cy="10" r="1.6" />
+        </svg>
+      );
+    case 'drag':
+      return (
+        <svg
+          aria-hidden="true"
+          className="workspace-structureMapActionIcon"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <circle cx="7" cy="5.5" r="1.15" />
+          <circle cx="13" cy="5.5" r="1.15" />
+          <circle cx="7" cy="10" r="1.15" />
+          <circle cx="13" cy="10" r="1.15" />
+          <circle cx="7" cy="14.5" r="1.15" />
+          <circle cx="13" cy="14.5" r="1.15" />
+        </svg>
+      );
+  }
+}
+
+function StructureMapNodeCardLegacy({
   actionButtons,
   anchor,
   dragNodeId,
@@ -1749,6 +2186,8 @@ function StructureMapNodeCard({
     </div>
   );
 }
+
+void StructureMapNodeCardLegacy;
 
 function getTransparentDragPreviewImage() {
   if (typeof Image === 'undefined') {
