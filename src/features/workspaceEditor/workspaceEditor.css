@@ -245,17 +245,6 @@
   width: min(100%, 34rem);
 }
 
-.workspace-structureMapClusterRegionMain[data-has-supporting='true']::after,
-.workspace-structureMapClusterRegionMain[data-has-supporting='false'][data-has-branch='true']::after {
-  content: '';
-  position: absolute;
-  bottom: -0.75rem;
-  left: 50%;
-  width: 1px;
-  height: 0.75rem;
-  background: rgba(100, 116, 139, 0.38);
-}
-
 .workspace-structureMapSlot {
   display: grid;
   gap: 0.4rem;
@@ -275,6 +264,9 @@
 }
 
 .workspace-structureMapClusterRegionSupporting {
+  display: grid;
+  justify-items: center;
+  gap: 0;
   padding-top: 0.05rem;
 }
 
@@ -284,18 +276,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.95rem 1rem;
-  padding-top: 0.9rem;
-}
-
-.workspace-structureMapSupportingList::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: min(calc(100% - 2.5rem), 38rem);
-  height: 1px;
-  background: rgba(100, 116, 139, 0.34);
-  transform: translateX(-50%);
+  padding-top: 0.92rem;
 }
 
 .workspace-structureMapSupportingSlot {
@@ -303,18 +284,7 @@
   flex: 1 1 14rem;
   min-width: min(100%, 14rem);
   max-width: 18rem;
-  padding-top: 0.7rem;
-}
-
-.workspace-structureMapSupportingSlot::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 1px;
-  height: 0.7rem;
-  background: rgba(100, 116, 139, 0.34);
-  transform: translateX(-50%);
+  padding-top: 0.72rem;
 }
 
 .workspace-structureMapSupportingCard {
@@ -345,10 +315,12 @@
 }
 
 .workspace-structureMapClusterRegionBranch {
+  position: relative;
+  display: grid;
+  gap: 0;
   width: min(100%, 31rem);
   margin-left: auto;
-  padding-top: 0.1rem;
-  padding-left: 1.6rem;
+  padding-top: 0.05rem;
 }
 
 .workspace-structureMapClusterRegionBranch[data-structure-branch-direction='down'] {
@@ -356,45 +328,73 @@
   margin-left: 0;
 }
 
-.workspace-structureMapClusterRegionBranch::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0.5rem;
-  width: 1px;
-  height: 0.8rem;
-  background: rgba(100, 116, 139, 0.38);
-}
-
-.workspace-structureMapClusterRegionBranch::after {
-  content: '';
-  position: absolute;
-  top: 0.8rem;
-  left: 0.5rem;
-  width: 0.95rem;
-  height: 1px;
-  background: rgba(100, 116, 139, 0.38);
-}
-
 .workspace-structureMapBranchList {
   position: relative;
   display: grid;
   gap: 0.95rem;
   padding-left: 1.15rem;
-  border-left: 1px solid rgba(100, 116, 139, 0.34);
 }
 
 .workspace-structureMapBranchNode {
   position: relative;
 }
 
-.workspace-structureMapBranchNode::before {
-  content: '';
+.workspace-structureMapConnector {
+  pointer-events: none;
+}
+
+.workspace-structureMapConnector[data-structure-connector-role='supporting'][data-structure-connector-segment='root'] {
+  width: 1px;
+  height: 0.82rem;
+  background: rgba(100, 116, 139, 0.38);
+}
+
+.workspace-structureMapConnector[data-structure-connector-role='supporting'][data-structure-connector-segment='spine'] {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(calc(100% - 2.5rem), 38rem);
+  height: 1px;
+  background: rgba(100, 116, 139, 0.34);
+  transform: translateX(-50%);
+}
+
+.workspace-structureMapConnector[data-structure-connector-role='supporting'][data-structure-connector-segment='leaf'] {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1px;
+  height: 0.72rem;
+  background: rgba(100, 116, 139, 0.34);
+  transform: translateX(-50%);
+}
+
+.workspace-structureMapConnector[data-structure-connector-role='branch'][data-structure-connector-segment='root'] {
+  align-self: end;
+  width: calc(100% - 0.58rem);
+  height: 0.9rem;
+  margin-left: 0.58rem;
+  border-top: 1px solid rgba(100, 116, 139, 0.38);
+  border-left: 1px solid rgba(100, 116, 139, 0.38);
+  border-top-left-radius: 0.85rem;
+}
+
+.workspace-structureMapConnector[data-structure-connector-role='branch'][data-structure-connector-segment='trunk'] {
+  position: absolute;
+  top: 0;
+  bottom: 0.35rem;
+  left: 0;
+  width: 1px;
+  background: rgba(100, 116, 139, 0.34);
+}
+
+.workspace-structureMapConnector[data-structure-connector-role='branch'][data-structure-connector-segment='leaf'] {
   position: absolute;
   top: 1.2rem;
   left: -1.15rem;
   width: 0.8rem;
-  border-top: 1px solid rgba(100, 116, 139, 0.34);
+  height: 1px;
+  background: rgba(100, 116, 139, 0.34);
 }
 
 .workspace-structureMapButton {
@@ -1818,7 +1818,7 @@
     padding-top: 0.75rem;
   }
 
-  .workspace-structureMapSupportingList::before {
+  .workspace-structureMapConnector[data-structure-connector-role='supporting'][data-structure-connector-segment='spine'] {
     width: calc(100% - 1.5rem);
   }
 
@@ -1830,14 +1830,13 @@
   .workspace-structureMapClusterRegionBranch {
     width: 100%;
     margin-left: 0;
-    padding-left: 1.2rem;
   }
 
   .workspace-structureMapBranchList {
     padding-left: 0.75rem;
   }
 
-  .workspace-structureMapBranchNode::before {
+  .workspace-structureMapConnector[data-structure-connector-role='branch'][data-structure-connector-segment='leaf'] {
     left: -0.75rem;
     width: 0.48rem;
   }

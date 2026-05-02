@@ -523,6 +523,9 @@ function QuestionEntryGroup({
         ? 'down-right'
         : 'down'
       : undefined;
+  const connectorKind =
+    groupKind === 'supporting' ? 'supporting-spine' : 'follow-up-trunk';
+  const connectorRole = groupKind === 'supporting' ? 'supporting' : 'branch';
 
   return (
     <div
@@ -542,41 +545,91 @@ function QuestionEntryGroup({
       data-structure-role={
         groupKind === 'supporting' ? 'supporting-group' : 'follow-up-group'
       }
+      data-structure-connector={connectorKind}
       data-testid={
         groupKind === 'supporting'
           ? `structure-map-supporting-group-${node.question.id}`
           : `structure-map-branch-${node.question.id}`
       }
     >
+      <StructureMapConnector
+        connector={connectorKind}
+        role={connectorRole}
+        segment="root"
+      />
       <div
         className={
           groupKind === 'supporting'
             ? 'workspace-structureMapSupportingList'
             : 'workspace-structureMapBranchList'
         }
+        data-structure-connector={connectorKind}
       >
-      {descriptors.map(({ entry, index }) => (
-        <div
-          className={
-            groupKind === 'supporting'
-              ? 'workspace-structureMapSlot workspace-structureMapSupportingSlot'
-              : 'workspace-structureMapSlot workspace-structureMapBranchNode'
-          }
-          data-structure-branch={groupKind === 'follow-up' ? 'follow-up' : undefined}
-          data-structure-role={
-            entry.kind === 'question-block' ? 'follow-up-node' : 'supporting-node'
-          }
-          key={getQuestionEntryAnchorNodeId(entry)}
-        >
+        <StructureMapConnector
+          connector={connectorKind}
+          role={connectorRole}
+          segment={groupKind === 'supporting' ? 'spine' : 'trunk'}
+        />
+        {descriptors.map(({ entry, index }) => (
+          <div
+            className={
+              groupKind === 'supporting'
+                ? 'workspace-structureMapSlot workspace-structureMapSupportingSlot'
+                : 'workspace-structureMapSlot workspace-structureMapBranchNode'
+            }
+            data-structure-branch={groupKind === 'follow-up' ? 'follow-up' : undefined}
+            data-structure-role={
+              entry.kind === 'question-block' ? 'follow-up-node' : 'supporting-node'
+            }
+            key={getQuestionEntryAnchorNodeId(entry)}
+          >
+            <StructureMapConnector
+              connector={connectorKind}
+              role={connectorRole}
+              segment="leaf"
+            />
+            <StructureMapDropZone
+              activeDropZoneId={activeDropZoneId}
+              dragState={dragState}
+              dropZoneId={createDropZoneId(node.question.id, index)}
+              isInteractionLocked={isInteractionLocked}
+              onDropRequest={() =>
+                onDropRequest(
+                  {
+                    index,
+                    targetParentNodeId: node.question.id,
+                  },
+                  entryNodeIds,
+                )
+              }
+              onDropZoneEnter={onDropZoneEnter}
+            />
+            <QuestionEntryNode
+              activeDropZoneId={activeDropZoneId}
+              clusterTone={groupKind === 'follow-up' ? 'follow-up' : 'top-level'}
+              dragState={dragState}
+              entry={entry}
+              isInteractionLocked={isInteractionLocked}
+              onDragEnd={onDragEnd}
+              onDragStart={onDragStart}
+              onDropRequest={onDropRequest}
+              onDropZoneEnter={onDropZoneEnter}
+              onOpenDocumentNode={onOpenDocumentNode}
+              selectedItemId={selectedItemId}
+              tree={tree}
+            />
+          </div>
+        ))}
+        {shouldRenderTrailingDropZone ? (
           <StructureMapDropZone
             activeDropZoneId={activeDropZoneId}
             dragState={dragState}
-            dropZoneId={createDropZoneId(node.question.id, index)}
+            dropZoneId={createDropZoneId(node.question.id, node.entries.length)}
             isInteractionLocked={isInteractionLocked}
             onDropRequest={() =>
               onDropRequest(
                 {
-                  index,
+                  index: node.entries.length,
                   targetParentNodeId: node.question.id,
                 },
                 entryNodeIds,
@@ -584,42 +637,29 @@ function QuestionEntryGroup({
             }
             onDropZoneEnter={onDropZoneEnter}
           />
-          <QuestionEntryNode
-            activeDropZoneId={activeDropZoneId}
-            clusterTone={groupKind === 'follow-up' ? 'follow-up' : 'top-level'}
-            dragState={dragState}
-            entry={entry}
-            isInteractionLocked={isInteractionLocked}
-            onDragEnd={onDragEnd}
-            onDragStart={onDragStart}
-            onDropRequest={onDropRequest}
-            onDropZoneEnter={onDropZoneEnter}
-            onOpenDocumentNode={onOpenDocumentNode}
-            selectedItemId={selectedItemId}
-            tree={tree}
-          />
-        </div>
-      ))}
-      {shouldRenderTrailingDropZone ? (
-        <StructureMapDropZone
-          activeDropZoneId={activeDropZoneId}
-          dragState={dragState}
-          dropZoneId={createDropZoneId(node.question.id, node.entries.length)}
-          isInteractionLocked={isInteractionLocked}
-          onDropRequest={() =>
-            onDropRequest(
-              {
-                index: node.entries.length,
-                targetParentNodeId: node.question.id,
-              },
-              entryNodeIds,
-            )
-          }
-          onDropZoneEnter={onDropZoneEnter}
-        />
-      ) : null}
+        ) : null}
       </div>
     </div>
+  );
+}
+
+function StructureMapConnector({
+  connector,
+  role,
+  segment,
+}: {
+  connector: 'follow-up-trunk' | 'supporting-spine';
+  role: 'branch' | 'supporting';
+  segment: 'leaf' | 'root' | 'spine' | 'trunk';
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className="workspace-structureMapConnector"
+      data-structure-connector={connector}
+      data-structure-connector-role={role}
+      data-structure-connector-segment={segment}
+    />
   );
 }
 
