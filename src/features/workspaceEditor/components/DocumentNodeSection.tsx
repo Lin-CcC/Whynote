@@ -1,4 +1,4 @@
-import {
+﻿import {
   cloneElement,
   isValidElement,
   type CSSProperties,
@@ -133,9 +133,18 @@ export default function DocumentNodeSection({
     Boolean(headerControls) ||
     Boolean(actions);
   const titleControlsVisible = hasTitleControls && titleControlVisible;
-  const showPlanStepRuntimeStatusHints =
-    node.type === 'plan-step' && (isSelected || hasFocusWithin || isEditing);
   const renderedActions = renderActions(actions, titleControlVisible);
+  const planStepRuntimeHintLines =
+    node.type === 'plan-step' && presentation.planStepRuntimeStatus
+      ? [
+          `系统判断：${PLAN_STEP_STATUS_LABELS[presentation.planStepRuntimeStatus.suggestedStatus]}。依据：${presentation.planStepRuntimeStatus.reasonSummary}`,
+          ...(presentation.hasManualPlanStepStatusOverride
+            ? [
+                `当前状态已手动改为 ${PLAN_STEP_STATUS_LABELS[node.status]}。后续内容变化时系统会重新托管。`,
+              ]
+            : []),
+        ]
+      : [];
 
   useEffect(() => {
     if (isSelected) {
@@ -363,6 +372,7 @@ export default function DocumentNodeSection({
                         }
                       }}
                       onStatusChange={handleStatusChange}
+                      runtimeHintLines={planStepRuntimeHintLines}
                       status={node.status}
                     />
                   ) : null}
@@ -399,19 +409,6 @@ export default function DocumentNodeSection({
                 </div>
               ) : null}
             </div>
-            {showPlanStepRuntimeStatusHints &&
-            presentation.planStepRuntimeStatus ? (
-              <>
-                <p className="workspace-nodeHint">
-                  {`系统判断：${PLAN_STEP_STATUS_LABELS[presentation.planStepRuntimeStatus.suggestedStatus]}。依据：${presentation.planStepRuntimeStatus.reasonSummary}`}
-                </p>
-                {presentation.hasManualPlanStepStatusOverride ? (
-                  <p className="workspace-nodeHint">
-                    {`当前状态已手动改为 ${PLAN_STEP_STATUS_LABELS[node.status]}。后续内容变化时系统会重新托管。`}
-                  </p>
-                ) : null}
-              </>
-            ) : null}
           </div>
           {bodyCollapsed ? (
             <p className="workspace-nodeHint">{bodyCollapsedHint}</p>
@@ -570,3 +567,4 @@ function shouldShowNodeTypeLabel(
 
   return isContextVisible;
 }
+

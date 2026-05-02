@@ -14,6 +14,7 @@ type PlanStepStatusMenuProps = {
   nodeId: string;
   onOpen: () => void;
   onStatusChange: (status: PlanStepStatus) => void;
+  runtimeHintLines?: string[];
   status: PlanStepStatus;
 };
 
@@ -23,10 +24,13 @@ export default function PlanStepStatusMenu({
   nodeId,
   onOpen,
   onStatusChange,
+  runtimeHintLines = [],
   status,
 }: PlanStepStatusMenuProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [isHintVisible, setIsHintVisible] = useState(false);
+  const hasRuntimeHint = runtimeHintLines.length > 0;
 
   useEffect(() => {
     if (!isOpen) {
@@ -73,11 +77,31 @@ export default function PlanStepStatusMenu({
         data-status={status}
         data-testid={`plan-step-status-trigger-${nodeId}`}
         disabled={disabled}
+        onBlur={handleTriggerBlur}
         onClick={handleTriggerClick}
+        onFocus={handleTriggerFocus}
+        onMouseEnter={handleTriggerMouseEnter}
+        onMouseLeave={handleTriggerMouseLeave}
         type="button"
       >
         {PLAN_STEP_STATUS_LABELS[status]}
       </button>
+      {hasRuntimeHint && isHintVisible && !isOpen ? (
+        <div
+          className="workspace-nodeActionPopover workspace-planStepStatusHintPopover"
+          role="note"
+        >
+          {runtimeHintLines.map((line, index) => (
+            <p
+              className="workspace-planStepStatusHintText"
+              data-tone={index === 0 ? 'primary' : 'secondary'}
+              key={line}
+            >
+              {line}
+            </p>
+          ))}
+        </div>
+      ) : null}
       {isOpen ? (
         <div className="workspace-nodeActionPopover" role="menu">
           <section className="workspace-nodeActionPopoverSection">
@@ -106,6 +130,7 @@ export default function PlanStepStatusMenu({
   function handleTriggerClick(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
     onOpen();
+    setIsHintVisible(false);
     setIsOpen((currentIsOpen) => !currentIsOpen);
   }
 
@@ -115,5 +140,29 @@ export default function PlanStepStatusMenu({
       setIsOpen(false);
       onStatusChange(nextStatus);
     };
+  }
+
+  function handleTriggerFocus() {
+    if (!hasRuntimeHint || isOpen) {
+      return;
+    }
+
+    setIsHintVisible(true);
+  }
+
+  function handleTriggerBlur() {
+    setIsHintVisible(false);
+  }
+
+  function handleTriggerMouseEnter() {
+    if (!hasRuntimeHint || isOpen) {
+      return;
+    }
+
+    setIsHintVisible(true);
+  }
+
+  function handleTriggerMouseLeave() {
+    setIsHintVisible(false);
   }
 }

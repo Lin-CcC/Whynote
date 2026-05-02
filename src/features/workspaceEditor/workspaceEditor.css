@@ -712,6 +712,32 @@
   position: relative;
 }
 
+.workspace-planStepStatusHintPopover {
+  top: calc(100% + 0.35rem);
+  width: min(24rem, 56vw);
+  padding: 0.64rem 0.72rem;
+  pointer-events: none;
+}
+
+.workspace-planStepStatusHintText {
+  margin: 0;
+  color: #334155;
+  font-size: 0.78rem;
+  line-height: 1.42;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.workspace-planStepStatusHintText[data-tone='secondary'] {
+  color: #64748b;
+}
+
+.workspace-planStepStatusHintText + .workspace-planStepStatusHintText {
+  margin-top: 0.34rem;
+  padding-top: 0.34rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
 .workspace-planStepStatusBadgeButton[data-status='todo'] {
   background: rgba(148, 163, 184, 0.18);
   color: #475569;
