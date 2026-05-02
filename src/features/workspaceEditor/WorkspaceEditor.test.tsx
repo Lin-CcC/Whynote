@@ -179,13 +179,9 @@ test('renders a map-global status toolbar while keeping question focus controls 
   ).not.toBeInTheDocument();
 
   fireEvent.click(
-    within(
-      openStructureMapNodeMenu(
-        screen.getByTestId('structure-map-item-question-block:question-structure-map-a'),
-      ),
-    ).getByRole('button', {
-      name: '聚焦当前问题簇',
-    }),
+    getStructureMapFocusAction(
+      screen.getByTestId('structure-map-item-question-block:question-structure-map-a'),
+    ),
   );
 
   const focusedBadge = within(
@@ -257,7 +253,7 @@ test('projects only the current module into the structure map and excludes root 
   ).not.toBeInTheDocument();
 });
 
-test('keeps cluster actions inline in the header while preserving logic-graph connectors and drag handles', async () => {
+test('keeps cluster actions inline in the header while preserving logic-graph connectors and node-surface dragging', async () => {
   renderWorkspaceEditorWithViewState({
     initialModuleId: 'module-structure-map-rich',
     initialSelectedNodeId: 'question-structure-map-rich',
@@ -278,33 +274,41 @@ test('keeps cluster actions inline in the header while preserving logic-graph co
   const inlineActions = clusterItem.querySelector(
     '[data-structure-cluster-actions="inline"]',
   );
-  const collapseAction = within(clusterItem).getByRole('button', {
-    name: '收起问题簇',
-  });
+  const collapseAction = getStructureMapCollapseAction(clusterItem);
+  const focusAction = getStructureMapFocusAction(clusterItem);
   const moreMenu = within(clusterItem).getByTestId(
     'structure-map-node-menu-question-block:question-structure-map-rich',
   );
 
   expect(collapseAction).toHaveAttribute('data-structure-cluster-action', 'collapse');
   expect(collapseAction).toHaveAttribute('data-structure-node-action-style', 'icon');
+  expect(collapseAction).toHaveAttribute('data-structure-node-collapse-action', 'true');
   expect(inlineActions).not.toBeNull();
   expect(inlineActions).toContainElement(collapseAction);
+  expect(inlineActions?.lastElementChild).toBe(collapseAction);
+  expect(focusAction).toHaveAttribute('data-structure-node-focus-action', 'true');
   expect(moreMenu).toHaveAttribute('data-structure-node-menu', 'more');
   expect(
-    within(clusterItem).getByTestId(
-      'structure-map-drag-handle-question-block:question-structure-map-rich',
-    ),
-  ).toHaveAttribute('data-structure-drag-handle', 'true');
+    clusterItem,
+  ).toHaveAttribute('data-structure-node-draggable-surface', 'true');
   expect(
-    within(clusterItem).getByTestId(
+    within(clusterItem).queryByTestId(
       'structure-map-drag-handle-question-block:question-structure-map-rich',
     ),
-  ).toHaveAttribute('data-structure-node-action-style', 'handle');
+  ).not.toBeInTheDocument();
   expect(
     cluster.querySelector(
       ':scope > .workspace-structureMapClusterCanvas > .workspace-structureMapClusterBody > [data-structure-cluster-action="collapse"]',
     ),
   ).toBeNull();
+  const menu = openStructureMapNodeMenu(clusterItem);
+  expect(within(menu).getByRole('button', { name: '编辑标题' })).toBeInTheDocument();
+  expect(
+    within(menu).queryByRole('button', { name: '聚焦当前问题簇' }),
+  ).not.toBeInTheDocument();
+  expect(
+    within(menu).queryByRole('button', { name: '收起问题簇' }),
+  ).not.toBeInTheDocument();
   expect(cluster).toHaveAttribute('data-structure-layout', 'logic-graph');
   expect(
     structureMapShell.querySelector('[data-structure-connector="supporting-spine"]'),
@@ -2270,6 +2274,26 @@ function openStructureMapNodeMenu(item: HTMLElement) {
   );
 
   return within(item).getByRole('menu');
+}
+
+function getStructureMapFocusAction(item: HTMLElement) {
+  const action = item.querySelector(
+    '[data-structure-node-focus-action="true"]',
+  ) as HTMLButtonElement | null;
+
+  expect(action).not.toBeNull();
+
+  return action as HTMLButtonElement;
+}
+
+function getStructureMapCollapseAction(item: HTMLElement) {
+  const action = item.querySelector(
+    '[data-structure-node-collapse-action="true"]',
+  ) as HTMLButtonElement | null;
+
+  expect(action).not.toBeNull();
+
+  return action as HTMLButtonElement;
 }
 
 function getSectionByHeading(name: string) {

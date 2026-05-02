@@ -393,19 +393,22 @@ test('persists structure-map collapse and manual focus in workspace local view s
   const stepActions = stepItem.querySelector(
     '[data-structure-step-actions="inline"]',
   ) as HTMLElement | null;
+  const stepMenu = openStructureMapNodeMenu(stepItem);
 
   expect(stepActions).not.toBeNull();
-
-  fireEvent.click(
-    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+  expect(
+    within(stepMenu).queryByRole('button', {
       name: '聚焦当前步骤',
     }),
-  );
-  fireEvent.click(
-    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+  ).not.toBeInTheDocument();
+  expect(
+    within(stepMenu).queryByRole('button', {
       name: '收起面板',
     }),
-  );
+  ).not.toBeInTheDocument();
+
+  fireEvent.click(getStructureMapFocusAction(stepItem));
+  fireEvent.click(getStructureMapCollapseAction(stepItem));
 
   await waitFor(() => {
     expect(
@@ -444,11 +447,25 @@ test('persists structure-map collapse and manual focus in workspace local view s
     'data-structure-node-action-visibility',
     'active',
   );
+  expect(getStructureMapFocusAction(remountedStepItem)).toHaveAttribute(
+    'data-structure-node-focus-action',
+    'true',
+  );
+  expect(getStructureMapCollapseAction(remountedStepItem)).toHaveAttribute(
+    'data-collapsed',
+    'true',
+  );
+  const remountedMenu = openStructureMapNodeMenu(remountedStepItem);
   expect(
-    within(openStructureMapNodeMenu(remountedStepItem)).getByRole('button', {
-      name: '展开面板',
+    within(remountedMenu).getByRole('button', {
+      name: '编辑标题',
     }),
   ).toBeInTheDocument();
+  expect(
+    within(remountedMenu).queryByRole('button', {
+      name: '展开面板',
+    }),
+  ).not.toBeInTheDocument();
   expect(screen.getByText('退出聚焦')).toBeInTheDocument();
 });
 
@@ -948,6 +965,26 @@ function openStructureMapNodeMenu(item: HTMLElement) {
   );
 
   return within(item).getByRole('menu');
+}
+
+function getStructureMapFocusAction(item: HTMLElement) {
+  const action = item.querySelector(
+    '[data-structure-node-focus-action="true"]',
+  ) as HTMLButtonElement | null;
+
+  expect(action).not.toBeNull();
+
+  return action as HTMLButtonElement;
+}
+
+function getStructureMapCollapseAction(item: HTMLElement) {
+  const action = item.querySelector(
+    '[data-structure-node-collapse-action="true"]',
+  ) as HTMLButtonElement | null;
+
+  expect(action).not.toBeNull();
+
+  return action as HTMLButtonElement;
 }
 
 function createPlanStepViewStateSnapshot(): WorkspaceSnapshot {
