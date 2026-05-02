@@ -1147,6 +1147,35 @@ test('keeps the expanded plan-step rendered as a lightweight section divider she
   );
 });
 
+test('reveals plan-step runtime hints from the status badge without inserting text into the body flow', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'step-question-block',
+  });
+
+  const planStepNode = screen.getByTestId('editor-node-step-question-block');
+  const statusTrigger = within(planStepNode).getByTestId(
+    'plan-step-status-trigger-step-question-block',
+  );
+
+  expect(within(planStepNode).queryByText(/系统判断：/)).not.toBeInTheDocument();
+
+  fireEvent.mouseEnter(statusTrigger);
+
+  expect(within(planStepNode).getByText(/系统判断：/)).toBeInTheDocument();
+
+  fireEvent.mouseLeave(statusTrigger);
+
+  expect(within(planStepNode).queryByText(/系统判断：/)).not.toBeInTheDocument();
+
+  fireEvent.focus(statusTrigger);
+
+  expect(within(planStepNode).getByText(/系统判断：/)).toBeInTheDocument();
+
+  fireEvent.blur(statusTrigger);
+
+  expect(within(planStepNode).queryByText(/系统判断：/)).not.toBeInTheDocument();
+});
+
 test('collapses and expands a plan-step while keeping its header visible', async () => {
   const viewStateChanges: WorkspaceViewState[] = [];
 
