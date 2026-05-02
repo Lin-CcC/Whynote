@@ -698,19 +698,19 @@ function rejectStructureMapMove(
 function getStructureMapDropRejectionMessage(code: StructureMapDropRejectionCode) {
   switch (code) {
     case 'NON_DRAGGABLE_NODE':
-      return 'This node is not draggable in the structure map.';
+      return '这个节点不能在结构地图里单独拖动。';
     case 'RESULT_NODE_SINGLETON':
-      return 'Paired result nodes cannot move on their own.';
+      return '成对结果节点不能脱离所属回答或总结单独移动。';
     case 'CROSS_MODULE':
-      return 'Structure map moves cannot cross module boundaries.';
+      return '结构地图中的重排不能跨模块进行。';
     case 'ROOT_NOT_ALLOWED':
-      return 'Structure map moves cannot target the theme root.';
+      return '结构地图中的重排不能落到主题根节点。';
     case 'RESOURCE_NOT_ALLOWED':
-      return 'Structure map moves cannot target resources.';
+      return '结构地图中的重排不能落到资料节点。';
     case 'FOLLOW_UP_PARENT_LOCKED':
-      return 'Follow-up questions must stay under their original parent question.';
+      return '追问必须保留在原始父问题下面。';
     case 'INVALID_PARENT_TYPE':
-      return 'The target parent type is not allowed for this structure map unit.';
+      return '这个结构地图单元不能落到当前目标父节点下。';
   }
 }
 
