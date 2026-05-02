@@ -229,30 +229,76 @@ test('reveals the light toolbar only on hover, focus, or active', () => {
 
   const answerNode = screen.getByTestId('editor-node-answer-first');
   const answerToolbar = screen.getByTestId('node-actions-answer-first');
+  const titleControls = answerNode.querySelector('.workspace-nodeTitleControls');
+  const hiddenBodyToggle = within(answerNode).getByRole('button', {
+    hidden: true,
+    name: '收起正文',
+  });
 
   expect(answerNode).toHaveAttribute('data-node-shell', 'document-inline');
+  expect(titleControls).not.toBeNull();
+  expect(titleControls).toContainElement(hiddenBodyToggle);
+  expect(titleControls).toHaveAttribute('aria-hidden', 'true');
+  expect(titleControls?.children).toHaveLength(2);
   expect(answerToolbar).toHaveAttribute('data-visible', 'false');
+  expect(answerToolbar).toHaveAttribute('aria-hidden', 'true');
   expect(
     within(answerNode).queryByRole('button', { name: '收起正文' }),
   ).not.toBeInTheDocument();
 
   fireEvent.mouseEnter(answerNode);
+  expect(titleControls).toHaveAttribute('aria-hidden', 'false');
+  expect(titleControls?.children).toHaveLength(2);
   expect(answerToolbar).toHaveAttribute('data-visible', 'true');
+  expect(answerToolbar).toHaveAttribute('aria-hidden', 'false');
   expect(
     within(answerNode).getByRole('button', { name: '收起正文' }),
   ).toBeInTheDocument();
 
   fireEvent.mouseLeave(answerNode);
+  expect(titleControls).toHaveAttribute('aria-hidden', 'true');
+  expect(titleControls?.children).toHaveLength(2);
   expect(answerToolbar).toHaveAttribute('data-visible', 'false');
+  expect(answerToolbar).toHaveAttribute('aria-hidden', 'true');
   expect(
     within(answerNode).queryByRole('button', { name: '收起正文' }),
   ).not.toBeInTheDocument();
 
   fireEvent.focus(screen.getByLabelText('第一版回答 标题'));
+  expect(titleControls).toHaveAttribute('aria-hidden', 'false');
   expect(answerToolbar).toHaveAttribute('data-visible', 'true');
   expect(
     within(answerNode).getByRole('button', { name: '收起正文' }),
   ).toBeInTheDocument();
+});
+
+test('keeps question, answer, judgment, summary, summary-check, and plan-step title rails mounted while hidden', () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+  });
+
+  expectMountedTitleControls('editor-node-step-question-block', [
+    '收起步骤',
+    '问题块步骤 状态：进行中',
+  ]);
+  expectStableHiddenTitleControls('editor-node-question-secondary', ['收起问题']);
+  expectStableHiddenTitleControls('editor-node-answer-first', ['收起正文', '追问']);
+  expectStableHiddenTitleControls('editor-node-judgment-first-latest', [
+    '收起正文',
+    '追问',
+  ]);
+  expectStableHiddenTitleControls('editor-node-summary-first-latest', [
+    '收起正文',
+    '追问',
+  ]);
+  expectStableHiddenTitleControls('editor-node-summary-manual', [
+    '收起正文',
+    '追问',
+  ]);
+  expectStableHiddenTitleControls('editor-node-judgment-summary-latest', [
+    '收起正文',
+    '追问',
+  ]);
 });
 
 test('clicking the question body enters the light editing state without moving the toolbar back to the block shell', async () => {
@@ -1818,6 +1864,37 @@ function openToolbarMenu(toolbar: HTMLElement, menuLabel: string) {
 
 function openOverflowMenu(toolbar: HTMLElement) {
   return openToolbarMenu(toolbar, '⋯');
+}
+
+function expectMountedTitleControls(
+  nodeTestId: string,
+  hiddenButtonNames: string[],
+) {
+  const node = screen.getByTestId(nodeTestId);
+  const titleControls = node.querySelector('.workspace-nodeTitleControls');
+
+  expect(titleControls).not.toBeNull();
+
+  for (const buttonName of hiddenButtonNames) {
+    expect(
+      within(node).getByRole('button', {
+        hidden: true,
+        name: buttonName,
+      }),
+    ).toBeInTheDocument();
+  }
+}
+
+function expectStableHiddenTitleControls(
+  nodeTestId: string,
+  hiddenButtonNames: string[],
+) {
+  const node = screen.getByTestId(nodeTestId);
+  const titleControls = node.querySelector('.workspace-nodeTitleControls');
+
+  expectMountedTitleControls(nodeTestId, hiddenButtonNames);
+  expect(titleControls).toHaveAttribute('data-visible', 'false');
+  expect(titleControls).toHaveAttribute('aria-hidden', 'true');
 }
 
 function expectSingleShellNode(nodeId: string, title: string) {

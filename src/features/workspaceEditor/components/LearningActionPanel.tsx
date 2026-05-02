@@ -102,7 +102,9 @@ export default function LearningActionPanel({
 
   return (
     <div
+      aria-hidden={!isVisible}
       className="workspace-nodeActionToolbar"
+      data-surface={surface}
       data-testid={testId}
       data-visible={isVisible}
       ref={rootRef}

@@ -129,6 +129,7 @@ export default function DocumentNodeSection({
     onToggleBodyCollapsed !== undefined ||
     Boolean(headerControls) ||
     Boolean(actions);
+  const titleControlsVisible = hasTitleControls && titleControlVisible;
   const showPlanStepRuntimeStatusHints =
     node.type === 'plan-step' && (isSelected || hasFocusWithin || isEditing);
   const renderedActions = renderActions(actions, titleControlVisible);
@@ -337,8 +338,8 @@ export default function DocumentNodeSection({
               {hasTitleControls ? (
                 <div
                   className="workspace-nodeTitleControls"
-                  data-visible={titleControlVisible}
-                  hidden={!titleControlVisible}
+                  aria-hidden={!titleControlsVisible}
+                  data-visible={titleControlsVisible}
                 >
                   {node.type === 'plan-step' ? (
                     <PlanStepStatusMenu
@@ -380,7 +381,8 @@ export default function DocumentNodeSection({
                   {renderedActions ? (
                     <div
                       className="workspace-nodeTitleToolbar"
-                      data-visible={titleControlVisible}
+                      aria-hidden={!titleControlsVisible}
+                      data-visible={titleControlsVisible}
                     >
                       {renderedActions}
                     </div>
