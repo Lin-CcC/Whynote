@@ -1541,6 +1541,77 @@ test.each([
   },
 );
 
+test('renders plan-step panels as question clusters with local answers, follow-up branches, and step-level scaffold nodes', async () => {
+  renderQuestionBlockEditor({
+    initialSnapshot: createStructureMapClusterSnapshot(),
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: {
+      ...DEFAULT_WORKSPACE_VIEW_STATE,
+      mainViewMode: 'structure-map',
+    },
+  });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+  });
+
+  const panel = screen.getByTestId('structure-map-panel-step-question-block');
+
+  expect(panel).toHaveAttribute('data-structure-panel', 'step-question-block');
+  expect(panel).toHaveAttribute('data-structure-role', 'plan-step-panel');
+  expect(
+    within(panel).getByTestId('structure-map-item-plan-step:step-question-block'),
+  ).toBeInTheDocument();
+
+  const scaffold = within(panel).getByTestId(
+    'structure-map-scaffold-summary-scaffold-step',
+  );
+
+  expect(scaffold).toHaveAttribute('data-structure-role', 'scaffold');
+
+  const topLevelCluster = within(panel).getByTestId(
+    'structure-map-question-question-main',
+  );
+
+  expect(topLevelCluster).toHaveAttribute('data-structure-role', 'question-cluster');
+  expect(topLevelCluster).toHaveAttribute('data-structure-level', 'top-level');
+  expect(
+    within(topLevelCluster).getByTestId(
+      'structure-map-supporting-group-question-main',
+    ),
+  ).toHaveAttribute('data-structure-role', 'supporting-group');
+  expect(
+    within(topLevelCluster).getByTestId('structure-map-item-answer-group:answer-first'),
+  ).toBeInTheDocument();
+  expect(
+    within(topLevelCluster).getByTestId(
+      'structure-map-item-summary-group:summary-manual',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(topLevelCluster).queryByTestId(
+      'structure-map-scaffold-summary-scaffold-step',
+    ),
+  ).not.toBeInTheDocument();
+
+  const followUpBranch = within(topLevelCluster).getByTestId(
+    'structure-map-branch-question-main',
+  );
+
+  expect(followUpBranch).toHaveAttribute('data-structure-branch', 'follow-up');
+
+  const followUpCluster = within(followUpBranch).getByTestId(
+    'structure-map-question-question-follow-up',
+  );
+
+  expect(followUpCluster).toHaveAttribute('data-structure-level', 'follow-up');
+  expect(
+    within(followUpCluster).getByTestId(
+      'structure-map-item-answer-group:answer-follow-up',
+    ),
+  ).toBeInTheDocument();
+});
+
 test('dragging a structure-map unit reorders the document, selects the moved anchor, and expands the target path', async () => {
   const snapshots: WorkspaceSnapshot[] = [];
 
@@ -1966,6 +2037,43 @@ function createQuestionBlockSnapshot(): WorkspaceSnapshot {
       content: '用来验证 block 激活只跟当前 question block 走。',
       createdAt: '2026-04-30T09:13:00.000Z',
       updatedAt: '2026-04-30T09:13:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createStructureMapClusterSnapshot(): WorkspaceSnapshot {
+  const snapshot = createQuestionBlockSnapshot();
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    'step-question-block',
+    createNode({
+      type: 'summary',
+      id: 'summary-scaffold-step',
+      title: '进入这个步骤前先交代背景',
+      content: '这是 step 级 scaffold，不应该并入任何 question cluster。',
+      summaryKind: 'scaffold',
+      createdAt: '2026-04-30T08:59:00.000Z',
+      updatedAt: '2026-04-30T08:59:00.000Z',
+    }),
+    0,
+  );
+  tree = insertChildNode(
+    tree,
+    'question-follow-up',
+    createNode({
+      type: 'answer',
+      id: 'answer-follow-up',
+      title: '追问回答',
+      content: '这是 follow-up question 自己的回答。',
+      createdAt: '2026-04-30T09:05:30.000Z',
+      updatedAt: '2026-04-30T09:05:30.000Z',
     }),
   );
 

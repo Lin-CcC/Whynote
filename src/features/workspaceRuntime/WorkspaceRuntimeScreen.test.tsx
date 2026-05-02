@@ -374,6 +374,29 @@ test('persists the main view mode in workspace local view state across remounts'
   });
 });
 
+test('renders the runtime structure map with plan-step panels and question clusters', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createRuntimeQuestionBlockSnapshot(),
+  );
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(screen.getByRole('button', { name: '结构地图' }));
+
+  await waitFor(() => {
+    expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+  });
+
+  const panel = screen.getByTestId('structure-map-panel-step-runtime-question-block');
+
+  expect(panel).toHaveAttribute('data-structure-role', 'plan-step-panel');
+  expect(panel).toHaveAttribute('data-structure-panel', 'step-runtime-question-block');
+  expect(
+    within(panel).getByTestId('structure-map-question-question-runtime-main'),
+  ).toHaveAttribute('data-structure-role', 'question-cluster');
+});
+
 test('keeps the left runtime action card auxiliary while the main question block path stays reachable', async () => {
   const dependencies = await createPreloadedDependencies(
     createRuntimeQuestionNeedingAnswerSnapshot(),

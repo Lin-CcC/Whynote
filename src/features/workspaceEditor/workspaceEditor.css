@@ -193,6 +193,11 @@
   gap: 0.65rem;
 }
 
+.workspace-structureMapPanelBody {
+  display: grid;
+  gap: 0.8rem;
+}
+
 .workspace-structureMapList {
   display: grid;
   gap: 0.65rem;
@@ -203,15 +208,102 @@
   gap: 0.65rem;
 }
 
+.workspace-structureMapCluster {
+  gap: 0.85rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(14, 116, 144, 0.14);
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(circle at top right, rgba(224, 242, 254, 0.4), transparent 46%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.04);
+}
+
+.workspace-structureMapCluster[data-structure-level='follow-up'] {
+  padding: 0.85rem;
+  border-color: rgba(148, 163, 184, 0.22);
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.94), rgba(255, 255, 255, 0.98));
+  box-shadow: none;
+}
+
+.workspace-structureMapClusterBody {
+  display: grid;
+  gap: 0.85rem;
+}
+
 .workspace-structureMapSlot {
   display: grid;
   gap: 0.4rem;
 }
 
-.workspace-structureMapList .workspace-structureMapList {
-  margin-left: 1.1rem;
-  padding-left: 0.9rem;
-  border-left: 1px solid rgba(148, 163, 184, 0.24);
+.workspace-structureMapScaffoldItem {
+  padding: 0.8rem 0.9rem;
+  border: 1px dashed rgba(148, 163, 184, 0.34);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.82);
+}
+
+.workspace-structureMapScaffoldItem .workspace-structureMapButton {
+  padding: 0.72rem 0.82rem;
+  border-style: none;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.workspace-structureMapSupportingList,
+.workspace-structureMapBranchList {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.workspace-structureMapSupportingList {
+  padding-left: 0.35rem;
+}
+
+.workspace-structureMapSupportingCard {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.workspace-structureMapSupportingCard .workspace-structureMapButton {
+  padding: 0.72rem 0.85rem;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.workspace-structureMapMetaList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  padding-left: 0.35rem;
+}
+
+.workspace-structureMapMetaBadge {
+  padding: 0.16rem 0.48rem;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.8);
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.workspace-structureMapBranchList {
+  position: relative;
+  gap: 0.75rem;
+  padding-left: 1rem;
+  border-left: 1px solid rgba(148, 163, 184, 0.26);
+}
+
+.workspace-structureMapBranchNode {
+  position: relative;
+}
+
+.workspace-structureMapBranchNode::before {
+  content: '';
+  position: absolute;
+  top: 1.2rem;
+  left: -1rem;
+  width: 0.7rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.26);
 }
 
 .workspace-structureMapButton {
@@ -231,6 +323,15 @@
 .workspace-structureMapButton[data-selected='true'] {
   border-color: rgba(14, 116, 144, 0.22);
   background: rgba(240, 249, 255, 0.94);
+}
+
+.workspace-structureMapButton[data-structure-role='question'] {
+  border-color: rgba(14, 116, 144, 0.18);
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.96), #ffffff);
+}
+
+.workspace-structureMapButton[data-structure-role='plan-step'] {
+  background: linear-gradient(180deg, rgba(240, 253, 250, 0.94), #ffffff);
 }
 
 .workspace-structureMapLabel,
@@ -1611,6 +1712,19 @@
   .workspace-documentNode,
   .workspace-questionBlock {
     padding-left: 0;
+  }
+
+  .workspace-structureMapCluster {
+    padding: 0.8rem;
+  }
+
+  .workspace-structureMapBranchList {
+    padding-left: 0.75rem;
+  }
+
+  .workspace-structureMapBranchNode::before {
+    left: -0.75rem;
+    width: 0.48rem;
   }
 
   .workspace-documentNode {
