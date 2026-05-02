@@ -387,12 +387,18 @@ test('persists structure-map collapse and manual focus in workspace local view s
   fireEvent.click(screen.getByRole('button', { name: '结构地图' }));
 
   const panel = await screen.findByTestId('structure-map-panel-step-runtime-question-block');
+  const getToolbarActions = () =>
+    screen
+      .getByTestId('workspace-structure-map-shell')
+      .querySelector('[data-structure-toolbar-section="actions"]') as HTMLElement;
 
-  fireEvent.click(within(panel).getByRole('button', { name: '聚焦当前步骤' }));
-  fireEvent.click(within(panel).getByRole('button', { name: '收起步骤面板' }));
+  fireEvent.click(within(getToolbarActions()).getByRole('button', { name: '聚焦当前步骤' }));
+  fireEvent.click(within(getToolbarActions()).getByText('收起面板'));
 
   await waitFor(() => {
-    expect(within(panel).getByText('当前步骤面板已折叠。')).toBeInTheDocument();
+    expect(
+      within(panel).queryByTestId('structure-map-question-question-runtime-main'),
+    ).not.toBeInTheDocument();
   });
 
   expect(
@@ -415,15 +421,15 @@ test('persists structure-map collapse and manual focus in workspace local view s
 
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
-  const restoredPanel = await screen.findByTestId(
-    'structure-map-panel-step-runtime-question-block',
-  );
-
-  expect(within(restoredPanel).getByText('当前步骤面板已折叠。')).toBeInTheDocument();
+  await screen.findByTestId('structure-map-panel-step-runtime-question-block');
   expect(
-    within(restoredPanel).getByRole('button', { name: '展开步骤面板' }),
+    within(
+      screen
+        .getByTestId('workspace-structure-map-shell')
+        .querySelector('[data-structure-toolbar-section="actions"]') as HTMLElement,
+    ).getByText('展开面板'),
   ).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '退出地图聚焦' })).toBeInTheDocument();
+  expect(screen.getByText('退出聚焦')).toBeInTheDocument();
 });
 
 test('renders the runtime structure map with plan-step panels and question clusters', async () => {

@@ -11,24 +11,53 @@
   align-items: center;
 }
 
+.workspace-mainViewShell {
+  position: relative;
+  width: 100%;
+  align-items: stretch;
+  padding-bottom: 5.5rem;
+}
+
+.workspace-mainViewContent {
+  width: 100%;
+}
+
+.workspace-mainViewModeDock {
+  position: fixed;
+  left: 50%;
+  bottom: 1.2rem;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-start;
+  width: max(
+    18rem,
+    calc(min(96rem, 100vw - 3rem) - clamp(30rem, 38vw, 38rem))
+  );
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .workspace-mainViewModeBar {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem;
+  gap: 0.2rem;
+  padding: 0.24rem;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
 }
 
 .workspace-mainViewModeButton {
-  padding: 0.45rem 0.85rem;
+  padding: 0.38rem 0.72rem;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 0.72rem;
   background: transparent;
   color: #475569;
   cursor: pointer;
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
@@ -183,6 +212,103 @@
   gap: 1.1rem;
 }
 
+.workspace-structureMapToolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.88rem 0.96rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.workspace-structureMapToolbarContext {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.workspace-structureMapToolbarLabel,
+.workspace-structureMapToolbarBadge {
+  flex: 0 0 auto;
+  padding: 0.16rem 0.46rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.workspace-structureMapToolbarLabel {
+  background: rgba(226, 232, 240, 0.82);
+  color: #475569;
+}
+
+.workspace-structureMapToolbarTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 0.98rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-structureMapToolbarStatus {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 2rem;
+}
+
+.workspace-structureMapToolbarBadge {
+  background: rgba(224, 242, 254, 0.94);
+  color: #0369a1;
+}
+
+.workspace-structureMapToolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.workspace-structureMapToolbarButton {
+  min-height: 2rem;
+  padding: 0.34rem 0.76rem;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.workspace-structureMapToolbarButton[data-tone='subtle'] {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #334155;
+}
+
+.workspace-structureMapToolbarButton[data-tone='ghost'] {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #64748b;
+}
+
+.workspace-structureMapToolbarButton:not(:disabled):hover {
+  border-color: rgba(14, 116, 144, 0.22);
+  background: rgba(255, 255, 255, 0.98);
+  color: #0f172a;
+}
+
+.workspace-structureMapToolbarButton:focus-visible {
+  outline: 2px solid rgba(14, 116, 144, 0.22);
+  outline-offset: 2px;
+}
+
+.workspace-structureMapToolbarButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .workspace-structureMapBody {
   display: grid;
   gap: 0.85rem;
@@ -263,6 +389,12 @@
   gap: 0.62rem;
 }
 
+.workspace-structureMapClusterHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
 .workspace-structureMapClusterBody {
   display: grid;
   gap: 0.56rem;
@@ -278,6 +410,7 @@
 }
 
 .workspace-structureMapQuestionHub {
+  flex: 1 1 auto;
   width: min(100%, 34rem);
 }
 
@@ -333,6 +466,48 @@
   min-height: 4.15rem;
   padding: 0.72rem 0.85rem;
   background: rgba(255, 255, 255, 0.94);
+}
+
+.workspace-structureMapClusterActionButton {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: #64748b;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  opacity: 0.28;
+  transition:
+    opacity 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.workspace-structureMapCluster:hover .workspace-structureMapClusterActionButton,
+.workspace-structureMapCluster[data-cluster-active='true']
+  .workspace-structureMapClusterActionButton,
+.workspace-structureMapClusterActionButton:focus-visible {
+  opacity: 1;
+  border-color: rgba(14, 116, 144, 0.22);
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+}
+
+.workspace-structureMapClusterActionButton:focus-visible {
+  outline: 2px solid rgba(14, 116, 144, 0.18);
+  outline-offset: 2px;
+}
+
+.workspace-structureMapClusterActionButton:disabled {
+  opacity: 0.22;
+  cursor: not-allowed;
 }
 
 .workspace-structureMapMetaList {
@@ -1915,6 +2090,15 @@
 }
 
 @media (max-width: 900px) {
+  .workspace-mainViewShell {
+    padding-bottom: 5rem;
+  }
+
+  .workspace-mainViewModeDock {
+    width: calc(100vw - 2rem);
+    bottom: 0.9rem;
+  }
+
   .workspace-learningActionGrid,
   .workspace-actionGrid,
   .workspace-typeSwitchList {
@@ -1928,6 +2112,18 @@
 
   .workspace-structureMapCluster {
     padding: 0.74rem;
+  }
+
+  .workspace-structureMapToolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-structureMapToolbarStatus {
+    min-height: 0;
+  }
+
+  .workspace-structureMapToolbarActions {
+    justify-content: flex-start;
   }
 
   .workspace-structureMapSupportingList {

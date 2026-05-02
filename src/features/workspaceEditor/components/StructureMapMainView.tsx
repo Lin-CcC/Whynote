@@ -79,6 +79,15 @@ type StructureMapSelectionContext = {
   questionNodeId: string | null;
 };
 
+type StructureMapToolbarState = {
+  contextKind: 'plan-step' | 'question-cluster';
+  contextLabel: string;
+  focusTarget: StructureMapFocusTarget;
+  isFocused: boolean;
+  stepNodeId: string | null;
+  stepCollapsed: boolean;
+};
+
 type StructureMapRenderProps = {
   activeDropZoneId: string | null;
   dragState: DragState | null;
@@ -173,6 +182,19 @@ export default function StructureMapMainView({
     : null;
   const sectionNodeIds = focusedSections.map((section) => section.anchor.nodeId);
   const selectionContext = resolveStructureMapSelectionContext(tree, selectedNodeId);
+  const toolbarState = resolveStructureMapToolbarState(
+    model.sections,
+    tree,
+    selectionContext,
+    structureMapFocusTarget,
+    workspaceViewState,
+  );
+  const questionClusterFocusTarget = selectionContext.questionNodeId
+    ? ({
+        kind: 'question-cluster',
+        nodeId: selectionContext.questionNodeId,
+      } satisfies StructureMapFocusTarget)
+    : null;
   const visibleSelectionTestId = getVisibleStructureMapSelectionTestId(
     tree,
     selectedItemId,
@@ -344,26 +366,6 @@ export default function StructureMapMainView({
           <p className="workspace-helpText">
             这里负责按问题聚合结构、联动文档和拖动重排，正文编辑仍留在文档视图。
           </p>
-          {structureMapFocusTarget ? (
-            <div className="workspace-structureMapActionRow">
-              <p className="workspace-helpText">
-                {getStructureMapFocusSummaryLabel(tree, structureMapFocusTarget)}
-              </p>
-              <button
-                className="workspace-nodeBodyToggle"
-                disabled={isInteractionLocked}
-                onClick={() =>
-                  updateWorkspaceViewState((state) => ({
-                    ...state,
-                    structureMapFocusTarget: null,
-                  }))
-                }
-                type="button"
-              >
-                退出地图聚焦
-              </button>
-            </div>
-          ) : null}
         </header>
         {dragStatus ? (
           <div
@@ -372,6 +374,104 @@ export default function StructureMapMainView({
             role="status"
           >
             <span className="workspace-structureMapStatusText">{dragStatus.text}</span>
+          </div>
+        ) : null}
+        {toolbarState ? (
+          <div
+            className="workspace-structureMapToolbar"
+            data-structure-toolbar="map-mode"
+          >
+            <div
+              className="workspace-structureMapToolbarContext"
+              data-structure-toolbar-section="context"
+            >
+              <span className="workspace-structureMapToolbarLabel">
+                {toolbarState.contextKind === 'plan-step' ? '步骤' : '问题'}
+              </span>
+              <span className="workspace-structureMapToolbarTitle">
+                {toolbarState.contextLabel}
+              </span>
+            </div>
+            <div
+              className="workspace-structureMapToolbarStatus"
+              data-structure-toolbar-section="status"
+            >
+              {toolbarState.isFocused ? (
+                <span className="workspace-structureMapToolbarBadge">聚焦中</span>
+              ) : null}
+            </div>
+            <div
+              className="workspace-structureMapToolbarActions"
+              data-structure-toolbar-section="actions"
+            >
+              <button
+                className="workspace-structureMapToolbarButton"
+                data-tone="subtle"
+                disabled={isInteractionLocked}
+                onClick={() => {
+                  if (toolbarState.isFocused) {
+                    updateWorkspaceViewState((state) => ({
+                      ...state,
+                      structureMapFocusTarget: null,
+                    }));
+                    return;
+                  }
+
+                  toggleStructureMapFocusTarget(toolbarState.focusTarget);
+                }}
+                type="button"
+              >
+                {toolbarState.isFocused ? (
+                  <span
+                    aria-label={
+                      toolbarState.focusTarget.kind === 'plan-step'
+                        ? '退出步骤聚焦'
+                        : '退出地图聚焦'
+                    }
+                  >
+                    退出聚焦
+                  </span>
+                ) : (
+                  toolbarState.focusTarget.kind === 'plan-step'
+                    ? '聚焦当前步骤'
+                    : '聚焦当前问题簇'
+                )}
+              </button>
+              {toolbarState.focusTarget.kind === 'plan-step' &&
+              !toolbarState.isFocused &&
+              questionClusterFocusTarget ? (
+                <button
+                  className="workspace-structureMapToolbarButton"
+                  data-tone="ghost"
+                  disabled={isInteractionLocked}
+                  onClick={() =>
+                    toggleStructureMapFocusTarget(questionClusterFocusTarget)
+                  }
+                  type="button"
+                >
+                  聚焦当前问题簇
+                </button>
+              ) : null}
+              {toolbarState.stepNodeId ? (
+                <button
+                  className="workspace-structureMapToolbarButton"
+                  data-tone="ghost"
+                  disabled={isInteractionLocked}
+                  onClick={() =>
+                    toggleStructureMapStepCollapsed(toolbarState.stepNodeId as string)
+                  }
+                  type="button"
+                >
+                  <span
+                    aria-label={
+                      toolbarState.stepCollapsed ? '展开步骤面板' : '收起步骤面板'
+                    }
+                  >
+                    {toolbarState.stepCollapsed ? '展开面板' : '收起面板'}
+                  </span>
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
         <div className="workspace-structureMapBody">
@@ -476,9 +576,6 @@ function SectionNode({
     section.planStep.id,
   );
   const isCurrentPlanStep = selectionContext.planStepNodeId === section.planStep.id;
-  const isFocused =
-    structureMapFocusTarget?.kind === 'plan-step' &&
-    structureMapFocusTarget.nodeId === section.planStep.id;
 
   return (
     <div className="workspace-structureMapPanelBody">
@@ -498,34 +595,7 @@ function SectionNode({
         structureRole="plan-step"
         title={getStructureMapNodeLabel(tree, section.planStep, 'step')}
       />
-      <div className="workspace-structureMapActionRow">
-        <button
-          className="workspace-nodeBodyToggle"
-          disabled={isInteractionLocked}
-          onClick={() => onToggleStructureMapStepCollapsed(section.planStep.id)}
-          type="button"
-        >
-          {isCollapsed ? '展开步骤面板' : '收起步骤面板'}
-        </button>
-        {isCurrentPlanStep || isFocused ? (
-          <button
-            className="workspace-nodeBodyToggle"
-            disabled={isInteractionLocked}
-            onClick={() =>
-              onToggleStructureMapFocusTarget({
-                kind: 'plan-step',
-                nodeId: section.planStep.id,
-              })
-            }
-            type="button"
-          >
-            {isFocused ? '退出步骤聚焦' : '聚焦当前步骤'}
-          </button>
-        ) : null}
-      </div>
-      {isCollapsed ? (
-        <p className="workspace-helpText">当前步骤面板已折叠。</p>
-      ) : (
+      {!isCollapsed ? (
         <div className="workspace-structureMapList">
           {section.items.map((item, index) => (
             <div
@@ -594,7 +664,7 @@ function SectionNode({
             validateStructureMapMove={validateStructureMapMove}
           />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -685,10 +755,12 @@ function QuestionBlockNode({
   const isFocused =
     structureMapFocusTarget?.kind === 'question-cluster' &&
     structureMapFocusTarget.nodeId === node.question.id;
+  const collapseTooltip = isCollapsed ? '展开问题簇' : '收起问题簇';
 
   return (
     <div
       className="workspace-structureMapItem workspace-structureMapCluster"
+      data-cluster-active={isCurrentQuestionCluster || isFocused}
       data-structure-cluster={node.question.id}
       data-structure-layout="logic-graph"
       data-structure-level={clusterTone}
@@ -705,68 +777,48 @@ function QuestionBlockNode({
           data-has-supporting={hasSupportingEntries ? 'true' : 'false'}
           data-structure-cluster-region="main"
         >
-          <div
-            className="workspace-structureMapQuestionHub"
-            data-structure-node="question-hub"
-          >
-            <StructureMapButton
-              anchor={node.anchor}
-              dragNodeId={node.question.id}
-              dragPermission={node.drag}
-              dragState={dragState}
-              isCurrentAnswer={false}
-              isInteractionLocked={isInteractionLocked}
-              isSelectedOverride={isCollapsed && isCurrentQuestionCluster}
-              kindLabel="问题"
-              onDragEnd={onDragEnd}
-              onDragStart={onDragStart}
-              onOpenDocumentNode={onOpenDocumentNode}
-              selectedItemId={selectedItemId}
-              structureRole="question"
-              title={getStructureMapNodeLabel(tree, node.question, 'question')}
-            />
-            <div className="workspace-structureMapActionRow">
-              <button
-                className="workspace-nodeBodyToggle"
-                disabled={isInteractionLocked}
-                onClick={() =>
-                  isTopLevelCluster
-                    ? onToggleStructureMapClusterCollapsed(node.question.id)
-                    : onToggleStructureMapFollowUpCollapsed(node.question.id)
-                }
-                type="button"
-              >
-                {isCollapsed
-                  ? isTopLevelCluster
-                    ? '展开问题簇'
-                    : '展开追问分支'
-                  : isTopLevelCluster
-                    ? '收起问题簇'
-                    : '收起追问分支'}
-              </button>
-              {isCurrentQuestionCluster || isFocused ? (
-                <button
-                  className="workspace-nodeBodyToggle"
-                  disabled={isInteractionLocked}
-                  onClick={() =>
-                    onToggleStructureMapFocusTarget({
-                      kind: 'question-cluster',
-                      nodeId: node.question.id,
-                    })
-                  }
-                  type="button"
-                >
-                  {isFocused ? '退出问题簇聚焦' : '聚焦当前问题簇'}
-                </button>
-              ) : null}
+          <div className="workspace-structureMapClusterHeader">
+            <div
+              className="workspace-structureMapQuestionHub"
+              data-structure-node="question-hub"
+            >
+              <StructureMapButton
+                anchor={node.anchor}
+                dragNodeId={node.question.id}
+                dragPermission={node.drag}
+                dragState={dragState}
+                isCurrentAnswer={false}
+                isInteractionLocked={isInteractionLocked}
+                isSelectedOverride={isCollapsed && isCurrentQuestionCluster}
+                kindLabel="问题"
+                onDragEnd={onDragEnd}
+                onDragStart={onDragStart}
+                onOpenDocumentNode={onOpenDocumentNode}
+                selectedItemId={selectedItemId}
+                structureRole="question"
+                title={getStructureMapNodeLabel(tree, node.question, 'question')}
+              />
             </div>
+            <button
+              aria-label={collapseTooltip}
+              className="workspace-structureMapClusterActionButton"
+              data-collapsed={isCollapsed}
+              data-structure-cluster-action="collapse"
+              data-structure-cluster-action-style="icon-tooltip"
+              disabled={isInteractionLocked}
+              onClick={() =>
+                isTopLevelCluster
+                  ? onToggleStructureMapClusterCollapsed(node.question.id)
+                  : onToggleStructureMapFollowUpCollapsed(node.question.id)
+              }
+              title={collapseTooltip}
+              type="button"
+            >
+              {isCollapsed ? 'v' : '^'}
+            </button>
           </div>
         </div>
-        {isCollapsed ? (
-          <p className="workspace-helpText">
-            {isTopLevelCluster ? '当前问题簇已折叠。' : '当前追问分支已折叠。'}
-          </p>
-        ) : node.entries.length > 0 ? (
+        {!isCollapsed && node.entries.length > 0 ? (
           <div className="workspace-structureMapClusterBody">
             {supportingEntries.length > 0 ? (
               <>
@@ -1500,6 +1552,124 @@ function toggleId(ids: string[], id: string) {
   return ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id];
 }
 
+function resolveStructureMapToolbarState(
+  sections: StructureMapSection[],
+  tree: NodeTree,
+  selectionContext: StructureMapSelectionContext,
+  focusTarget: StructureMapFocusTarget | null,
+  workspaceViewState: WorkspaceViewState,
+): StructureMapToolbarState | null {
+  if (focusTarget?.kind === 'question-cluster') {
+    return createQuestionClusterToolbarState(
+      sections,
+      tree,
+      focusTarget.nodeId,
+      true,
+      workspaceViewState,
+    );
+  }
+
+  if (focusTarget?.kind === 'plan-step') {
+    return createPlanStepToolbarState(
+      tree,
+      focusTarget.nodeId,
+      true,
+      workspaceViewState,
+    );
+  }
+
+  const fallbackStepNodeId = selectionContext.planStepNodeId ?? sections[0]?.planStep.id ?? null;
+
+  if (fallbackStepNodeId) {
+    return createPlanStepToolbarState(
+      tree,
+      fallbackStepNodeId,
+      false,
+      workspaceViewState,
+    );
+  }
+
+  if (selectionContext.questionNodeId) {
+    return createQuestionClusterToolbarState(
+      sections,
+      tree,
+      selectionContext.questionNodeId,
+      false,
+      workspaceViewState,
+    );
+  }
+
+  return null;
+}
+
+function createQuestionClusterToolbarState(
+  sections: StructureMapSection[],
+  tree: NodeTree,
+  questionNodeId: string,
+  isFocused: boolean,
+  workspaceViewState: WorkspaceViewState,
+): StructureMapToolbarState | null {
+  const questionNode = tree.nodes[questionNodeId];
+  const section = findStructureMapSectionForQuestionNodeId(sections, questionNodeId);
+
+  if (!questionNode) {
+    return null;
+  }
+
+  return {
+    contextKind: 'question-cluster',
+    contextLabel: getStructureMapNodeLabel(tree, questionNode, 'question'),
+    focusTarget: {
+      kind: 'question-cluster',
+      nodeId: questionNodeId,
+    },
+    isFocused,
+    stepNodeId: section?.planStep.id ?? null,
+    stepCollapsed:
+      section === null
+        ? false
+        : workspaceViewState.collapsedStructureMapStepIds.includes(section.planStep.id),
+  };
+}
+
+function createPlanStepToolbarState(
+  tree: NodeTree,
+  planStepNodeId: string,
+  isFocused: boolean,
+  workspaceViewState: WorkspaceViewState,
+): StructureMapToolbarState | null {
+  const planStepNode = tree.nodes[planStepNodeId];
+
+  if (!planStepNode) {
+    return null;
+  }
+
+  return {
+    contextKind: 'plan-step',
+    contextLabel: getStructureMapNodeLabel(tree, planStepNode, 'step'),
+    focusTarget: {
+      kind: 'plan-step',
+      nodeId: planStepNodeId,
+    },
+    isFocused,
+    stepNodeId: planStepNodeId,
+    stepCollapsed: workspaceViewState.collapsedStructureMapStepIds.includes(
+      planStepNodeId,
+    ),
+  };
+}
+
+function findStructureMapSectionForQuestionNodeId(
+  sections: StructureMapSection[],
+  questionNodeId: string,
+) {
+  return (
+    sections.find((section) =>
+      findQuestionBlockNode(section.questionBlocks, questionNodeId),
+    ) ?? null
+  );
+}
+
 function resolveStructureMapSelectionContext(
   tree: NodeTree,
   selectedNodeId: string | null,
@@ -1685,14 +1855,3 @@ function findElementByTestId(root: HTMLElement, testId: string) {
   return root.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
 }
 
-function getStructureMapFocusSummaryLabel(
-  tree: NodeTree,
-  target: StructureMapFocusTarget,
-) {
-  const targetNode = tree.nodes[target.nodeId];
-  const label = targetNode ? getStructureMapNodeLabel(tree, targetNode) : target.nodeId;
-
-  return target.kind === 'plan-step'
-    ? `当前仅显示步骤：${label}`
-    : `当前仅显示问题簇：${label}`;
-}
