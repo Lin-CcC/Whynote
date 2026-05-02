@@ -387,13 +387,17 @@ test('persists structure-map collapse and manual focus in workspace local view s
   fireEvent.click(screen.getByRole('button', { name: '结构地图' }));
 
   const panel = await screen.findByTestId('structure-map-panel-step-runtime-question-block');
-  const getToolbarActions = () =>
-    screen
-      .getByTestId('workspace-structure-map-shell')
-      .querySelector('[data-structure-toolbar-section="actions"]') as HTMLElement;
+  const stepItem = within(panel).getByTestId(
+    'structure-map-item-plan-step:step-runtime-question-block',
+  );
+  const stepActions = stepItem.querySelector(
+    '[data-structure-step-actions="inline"]',
+  ) as HTMLElement | null;
 
-  fireEvent.click(within(getToolbarActions()).getByRole('button', { name: '聚焦当前步骤' }));
-  fireEvent.click(within(getToolbarActions()).getByText('收起面板'));
+  expect(stepActions).not.toBeNull();
+
+  fireEvent.click(within(stepItem).getByRole('button', { name: '聚焦当前步骤' }));
+  fireEvent.click(within(stepActions as HTMLElement).getByText('收起面板'));
 
   await waitFor(() => {
     expect(
@@ -422,12 +426,14 @@ test('persists structure-map collapse and manual focus in workspace local view s
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
   await screen.findByTestId('structure-map-panel-step-runtime-question-block');
+  const remountedPanel = screen.getByTestId(
+    'structure-map-panel-step-runtime-question-block',
+  );
+  const remountedStepItem = within(remountedPanel).getByTestId(
+    'structure-map-item-plan-step:step-runtime-question-block',
+  );
   expect(
-    within(
-      screen
-        .getByTestId('workspace-structure-map-shell')
-        .querySelector('[data-structure-toolbar-section="actions"]') as HTMLElement,
-    ).getByText('展开面板'),
+    within(remountedStepItem).getByText('展开面板'),
   ).toBeInTheDocument();
   expect(screen.getByText('退出聚焦')).toBeInTheDocument();
 });
