@@ -1,4 +1,12 @@
-import { type ReactNode, useEffect, useRef } from 'react';
+import {
+  type ChangeEvent,
+  type FocusEvent,
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   buildQuestionBlockData,
@@ -13,6 +21,11 @@ import type {
   WorkspaceEditorNodeRenderContext,
   WorkspaceViewState,
 } from '../workspaceEditorTypes';
+import {
+  getChildNodes,
+  getDisplayTitleForNode,
+  getNodeInputPlaceholderForNode,
+} from '../utils/treeSelectors';
 import {
   getAnswerHistorySectionId,
   getSummaryHistorySectionId,
@@ -134,6 +147,7 @@ export default function TextMainView({
   }
 
   const currentModule = getNodeOrThrow(tree, currentModuleId);
+  const moduleChildNodes = getChildNodes(tree, currentModule.id);
 
   return (
     <div className="workspace-mainPanel">
@@ -142,50 +156,307 @@ export default function TextMainView({
         data-layout="single-column"
         data-testid="workspace-document-shell"
       >
-        <header
-          className="workspace-documentHeader"
-          data-testid="workspace-document-header"
-        >
-          <div className="workspace-documentHeaderMain">
-            <p className="workspace-kicker">当前模块</p>
-            <h2 className="workspace-documentTitle">{currentModule.title}</h2>
-          </div>
-          {isInteractionLocked && interactionLockReason ? (
-            <p className="workspace-lockText" role="status">
-              {interactionLockReason}
-            </p>
-          ) : null}
-        </header>
+        <ModuleDocumentSurface
+          currentModule={currentModule}
+          interactionLockReason={interactionLockReason}
+          isInteractionLocked={isInteractionLocked}
+          onSelectNode={onSelectNode}
+          onUpdateNode={onUpdateNode}
+          registerNodeElement={registerNodeElement}
+          selectedNodeId={selectedNodeId}
+          tree={tree}
+        />
         <div className="workspace-documentBody">
-          <EditorNodeSection
-            activeQuestionBlockId={activeQuestionBlockId}
-            depth={0}
-            isInteractionLocked={isInteractionLocked}
-            nodeId={currentModule.id}
-            onDeleteNode={onDeleteNode}
-            onDeleteNodeById={onDeleteNodeById}
-            onDirectAnswerQuestion={onDirectAnswerQuestion}
-            onEvaluateAnswer={onEvaluateAnswer}
-            onEvaluateSummary={onEvaluateSummary}
-            onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
-            onGenerateSummary={onGenerateSummary}
-            onInsertAnswerForQuestion={onInsertAnswerForQuestion}
-            onInsertFollowUpQuestion={onInsertFollowUpQuestion}
-            onInsertSummaryForNode={onInsertSummaryForNode}
-            onRunLearningAction={onRunLearningAction}
-            onRunLearningActionForNode={onRunLearningActionForNode}
-            onSelectNode={onSelectNode}
-            onSetCurrentAnswer={onSetCurrentAnswer}
-            onUpdateNode={onUpdateNode}
-            onWorkspaceViewStateChange={onWorkspaceViewStateChange}
-            registerNodeElement={registerNodeElement}
-            renderNodeInlineActions={renderNodeInlineActions}
-            selectedNodeId={selectedNodeId}
-            tree={tree}
-            workspaceViewState={workspaceViewState}
-          />
+          {moduleChildNodes.map((childNode) => (
+            <EditorNodeSection
+              activeQuestionBlockId={activeQuestionBlockId}
+              depth={1}
+              isInteractionLocked={isInteractionLocked}
+              key={childNode.id}
+              nodeId={childNode.id}
+              onDeleteNode={onDeleteNode}
+              onDeleteNodeById={onDeleteNodeById}
+              onDirectAnswerQuestion={onDirectAnswerQuestion}
+              onEvaluateAnswer={onEvaluateAnswer}
+              onEvaluateSummary={onEvaluateSummary}
+              onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
+              onGenerateSummary={onGenerateSummary}
+              onInsertAnswerForQuestion={onInsertAnswerForQuestion}
+              onInsertFollowUpQuestion={onInsertFollowUpQuestion}
+              onInsertSummaryForNode={onInsertSummaryForNode}
+              onRunLearningAction={onRunLearningAction}
+              onRunLearningActionForNode={onRunLearningActionForNode}
+              onSelectNode={onSelectNode}
+              onSetCurrentAnswer={onSetCurrentAnswer}
+              onUpdateNode={onUpdateNode}
+              onWorkspaceViewStateChange={onWorkspaceViewStateChange}
+              registerNodeElement={registerNodeElement}
+              renderNodeInlineActions={renderNodeInlineActions}
+              selectedNodeId={selectedNodeId}
+              tree={tree}
+              workspaceViewState={workspaceViewState}
+            />
+          ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+type ModuleDocumentSurfaceProps = {
+  currentModule: TreeNode;
+  interactionLockReason: string | null;
+  isInteractionLocked: boolean;
+  onSelectNode: (nodeId: string) => void;
+  onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
+  registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
+  selectedNodeId: string | null;
+  tree: NodeTree;
+};
+
+type ModuleEditableField = 'content' | 'title' | null;
+
+function ModuleDocumentSurface({
+  currentModule,
+  interactionLockReason,
+  isInteractionLocked,
+  onSelectNode,
+  onUpdateNode,
+  registerNodeElement,
+  selectedNodeId,
+  tree,
+}: ModuleDocumentSurfaceProps) {
+  const [activeField, setActiveField] = useState<ModuleEditableField>(null);
+  const [hasFocusWithin, setHasFocusWithin] = useState(false);
+  const [pendingFocusField, setPendingFocusField] =
+    useState<ModuleEditableField>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const introInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const isSelected = selectedNodeId === currentModule.id;
+  const displayTitle = getDisplayTitleForNode(tree, currentModule);
+  const trimmedDisplayTitle = displayTitle.trim();
+  const titlePlaceholder = getNodeInputPlaceholderForNode(
+    tree,
+    currentModule,
+    'title',
+  );
+  const introPlaceholder = '补充模块引言';
+  const titleInputVisible = isSelected;
+  const introInputVisible =
+    pendingFocusField === 'content' || activeField === 'content';
+  const showIntro =
+    currentModule.content.trim().length > 0 || isSelected || introInputVisible;
+  const isEditing = activeField !== null || pendingFocusField !== null;
+  const frameVisible = isSelected || hasFocusWithin || isEditing;
+
+  useEffect(() => {
+    if (isSelected) {
+      return;
+    }
+
+    setActiveField(null);
+    setHasFocusWithin(false);
+    setPendingFocusField(null);
+  }, [isSelected]);
+
+  useEffect(() => {
+    if (!pendingFocusField) {
+      return;
+    }
+
+    const target =
+      pendingFocusField === 'title'
+        ? titleInputRef.current
+        : introInputRef.current;
+
+    if (!target) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      target.focus();
+      if (pendingFocusField === 'title') {
+        target.select();
+      }
+      setPendingFocusField(null);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [pendingFocusField, titleInputVisible]);
+
+  useEffect(() => {
+    if (!introInputVisible) {
+      return;
+    }
+
+    syncTextareaHeight(introInputRef.current);
+  }, [currentModule.content, introInputVisible]);
+
+  function handleWrapperClick() {
+    onSelectNode(currentModule.id);
+  }
+
+  function handleFocusCapture() {
+    setHasFocusWithin(true);
+    if (!isSelected) {
+      onSelectNode(currentModule.id);
+    }
+  }
+
+  function handleBlurCapture(event: FocusEvent<HTMLElement>) {
+    if (
+      event.relatedTarget instanceof Node &&
+      event.currentTarget.contains(event.relatedTarget)
+    ) {
+      return;
+    }
+
+    setHasFocusWithin(false);
+  }
+
+  function handleEditableBlur(event: FocusEvent<HTMLElement>) {
+    if (
+      event.relatedTarget instanceof Node &&
+      (titleInputRef.current?.contains(event.relatedTarget) ||
+        introInputRef.current?.contains(event.relatedTarget))
+    ) {
+      return;
+    }
+
+    setActiveField(null);
+  }
+
+  function handleTitleFocus() {
+    setActiveField('title');
+  }
+
+  function handleIntroFocus() {
+    setActiveField('content');
+  }
+
+  function handleTitleChange(event: ChangeEvent<HTMLInputElement>) {
+    onUpdateNode(currentModule.id, { title: event.target.value });
+  }
+
+  function handleIntroChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    syncTextareaHeight(event.currentTarget);
+    onUpdateNode(currentModule.id, { content: event.target.value });
+  }
+
+  function startEditingField(
+    field: Exclude<ModuleEditableField, null>,
+    event: MouseEvent<HTMLElement>,
+  ) {
+    event.stopPropagation();
+
+    if (isInteractionLocked) {
+      return;
+    }
+
+    onSelectNode(currentModule.id);
+    setActiveField(field);
+    setPendingFocusField(field);
+  }
+
+  return (
+    <div
+      aria-selected={isSelected}
+      className="workspace-documentModuleSurface"
+      data-node-editing={isEditing}
+      data-node-frame-visible={frameVisible}
+      data-node-selected={isSelected}
+      data-node-type="module"
+      data-testid={`editor-node-${currentModule.id}`}
+      onBlurCapture={handleBlurCapture}
+      onClick={handleWrapperClick}
+      onFocusCapture={handleFocusCapture}
+      ref={(element) => registerNodeElement(currentModule.id, element)}
+      tabIndex={-1}
+    >
+      <header
+        className="workspace-documentHeader"
+        data-testid="workspace-document-header"
+      >
+        <div className="workspace-documentHeaderMain">
+          <p className="workspace-kicker">当前模块</p>
+          {titleInputVisible ? (
+            <input
+              aria-label="当前模块 标题"
+              className="workspace-documentTitleInput"
+              disabled={isInteractionLocked}
+              onBlur={handleEditableBlur}
+              onChange={handleTitleChange}
+              onClick={(event) => event.stopPropagation()}
+              onFocus={handleTitleFocus}
+              placeholder={titlePlaceholder}
+              ref={titleInputRef}
+              value={displayTitle}
+            />
+          ) : (
+            <h2 className="workspace-documentTitle">
+              <button
+                className="workspace-documentTitleDisplay"
+                data-testid="workspace-document-title-display"
+                disabled={isInteractionLocked}
+                onClick={(event) => startEditingField('title', event)}
+                type="button"
+              >
+                {trimmedDisplayTitle.length > 0 ? (
+                  trimmedDisplayTitle
+                ) : (
+                  <span className="workspace-documentTitlePlaceholder">
+                    {titlePlaceholder}
+                  </span>
+                )}
+              </button>
+            </h2>
+          )}
+        </div>
+        {isInteractionLocked && interactionLockReason ? (
+          <p className="workspace-lockText" role="status">
+            {interactionLockReason}
+          </p>
+        ) : null}
+      </header>
+      {showIntro ? (
+        <div className="workspace-documentIntro">
+          {introInputVisible ? (
+            <textarea
+              aria-label="当前模块 引言"
+              className="workspace-documentIntroInput"
+              disabled={isInteractionLocked}
+              onBlur={handleEditableBlur}
+              onChange={handleIntroChange}
+              onClick={(event) => event.stopPropagation()}
+              onFocus={handleIntroFocus}
+              placeholder={introPlaceholder}
+              ref={introInputRef}
+              rows={2}
+              value={currentModule.content}
+            />
+          ) : (
+            <button
+              aria-label="当前模块 引言"
+              className="workspace-documentIntroDisplay"
+              data-placeholder={currentModule.content.trim().length === 0}
+              data-testid="workspace-document-intro-display"
+              disabled={isInteractionLocked}
+              onClick={(event) => startEditingField('content', event)}
+              type="button"
+            >
+              {currentModule.content.trim().length > 0 ? (
+                currentModule.content
+              ) : (
+                <span className="workspace-documentIntroPlaceholder">
+                  {introPlaceholder}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -351,4 +622,13 @@ function expandHistorySection(
       sectionId,
     ],
   };
+}
+
+function syncTextareaHeight(textarea: HTMLTextAreaElement | null) {
+  if (!textarea) {
+    return;
+  }
+
+  textarea.style.height = '0px';
+  textarea.style.height = `${textarea.scrollHeight}px`;
 }
