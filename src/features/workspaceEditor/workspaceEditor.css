@@ -333,7 +333,15 @@
 }
 
 .workspace-structureMapConnector {
+  display: block;
   pointer-events: none;
+}
+
+.workspace-structureMapConnector[data-structure-connector-role='supporting'][data-structure-connector-segment='root'] {
+  justify-self: center;
+  width: 1px;
+  height: 0.88rem;
+  background: rgba(100, 116, 139, 0.38);
 }
 
 .workspace-structureMapConnector[data-structure-connector-role='supporting'][data-structure-connector-segment='spine'] {
@@ -363,7 +371,6 @@
   margin-left: 0.58rem;
   border-top: 1px solid rgba(100, 116, 139, 0.38);
   border-left: 1px solid rgba(100, 116, 139, 0.38);
-  border-top-left-radius: 0.85rem;
 }
 
 .workspace-structureMapConnector[data-structure-connector-role='branch'][data-structure-connector-segment='trunk'] {
