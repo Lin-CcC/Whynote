@@ -122,7 +122,10 @@ export default function DocumentNodeSection({
     presentation.sectionKind,
     titleControlVisible,
   );
-  const showNodeMeta = showNodeTypeLabel || visibleSemanticBadges.length > 0;
+  const reserveNodeMeta =
+    presentation.sectionKind !== 'resource' ||
+    presentation.semanticVisibility.badges.length > 0;
+  const showNodeMeta = reserveNodeMeta || visibleSemanticBadges.length > 0;
   const frameVisible = hasFocusWithin || isEditing || pendingFocusField !== null;
   const hasTitleControls =
     node.type === 'plan-step' ||
@@ -316,16 +319,22 @@ export default function DocumentNodeSection({
           <div className="workspace-nodeHeader">
             {showNodeMeta ? (
               <div className="workspace-nodeMeta">
-                {showNodeTypeLabel ? (
-                  <span className="workspace-nodeType">
+                {reserveNodeMeta ? (
+                  <span
+                    aria-hidden={!showNodeTypeLabel}
+                    className="workspace-nodeType"
+                    data-visible={showNodeTypeLabel}
+                  >
                     {presentation.displayLabel}
                   </span>
                 ) : null}
                 {visibleSemanticBadges.map((badge) => (
                   <span
+                    aria-hidden={badge.visibility !== 'persistent' && !titleControlVisible}
                     className="workspace-semanticBadge"
                     data-badge-tone={badge.tone}
                     data-badge-visibility={badge.visibility}
+                    data-visible={badge.visibility === 'persistent' || titleControlVisible}
                     key={badge.key}
                   >
                     {badge.label}

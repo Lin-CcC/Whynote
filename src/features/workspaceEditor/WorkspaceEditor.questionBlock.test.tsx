@@ -230,12 +230,17 @@ test('reveals the light toolbar only on hover, focus, or active', () => {
   const answerNode = screen.getByTestId('editor-node-answer-first');
   const answerToolbar = screen.getByTestId('node-actions-answer-first');
   const titleControls = answerNode.querySelector('.workspace-nodeTitleControls');
+  const hiddenTypeLabel = answerNode.querySelector(
+    '.workspace-nodeType[data-visible="false"]',
+  );
   const hiddenBodyToggle = within(answerNode).getByRole('button', {
     hidden: true,
     name: '收起正文',
   });
 
   expect(answerNode).toHaveAttribute('data-node-shell', 'document-inline');
+  expect(hiddenTypeLabel).not.toBeNull();
+  expect(hiddenTypeLabel).toHaveTextContent('回答');
   expect(titleControls).not.toBeNull();
   expect(titleControls).toContainElement(hiddenBodyToggle);
   expect(titleControls).toHaveAttribute('aria-hidden', 'true');
@@ -247,6 +252,9 @@ test('reveals the light toolbar only on hover, focus, or active', () => {
   ).not.toBeInTheDocument();
 
   fireEvent.mouseEnter(answerNode);
+  expect(
+    answerNode.querySelector('.workspace-nodeType[data-visible="true"]'),
+  ).toHaveTextContent('回答');
   expect(titleControls).toHaveAttribute('aria-hidden', 'false');
   expect(titleControls?.children).toHaveLength(2);
   expect(answerToolbar).toHaveAttribute('data-visible', 'true');
