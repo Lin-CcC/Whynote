@@ -188,6 +188,31 @@
   gap: 0.85rem;
 }
 
+.workspace-structureMapStatus {
+  display: flex;
+  align-items: center;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.workspace-structureMapStatus[data-tone='info'] {
+  border-color: rgba(14, 116, 144, 0.18);
+  background: rgba(240, 249, 255, 0.92);
+}
+
+.workspace-structureMapStatus[data-tone='invalid'] {
+  border-color: rgba(220, 38, 38, 0.18);
+  background: rgba(254, 242, 242, 0.94);
+}
+
+.workspace-structureMapStatusText {
+  color: #334155;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
 .workspace-structureMapSection {
   display: grid;
   gap: 0.65rem;
@@ -407,6 +432,17 @@
   text-align: left;
 }
 
+.workspace-structureMapButton[data-draggable='true'] {
+  cursor: grab;
+}
+
+.workspace-structureMapButton[data-dragging='true'] {
+  border-color: rgba(14, 116, 144, 0.3);
+  background: rgba(224, 242, 254, 0.96);
+  box-shadow: 0 0 0 2px rgba(14, 116, 144, 0.12);
+  cursor: grabbing;
+}
+
 .workspace-structureMapButton[data-selected='true'] {
   border-color: rgba(14, 116, 144, 0.22);
   background: rgba(240, 249, 255, 0.94);
@@ -447,19 +483,85 @@
   white-space: nowrap;
 }
 
+.workspace-structureMapDragHint {
+  flex: 0 0 auto;
+  padding: 0.16rem 0.45rem;
+  border: 1px solid rgba(14, 116, 144, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #0e7490;
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateY(2px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.workspace-structureMapButton[data-draggable='true']:hover .workspace-structureMapDragHint,
+.workspace-structureMapButton[data-draggable='true']:focus-visible .workspace-structureMapDragHint,
+.workspace-structureMapButton[data-dragging='true'] .workspace-structureMapDragHint {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.workspace-structureMapDragHint[data-drag-hint='dragging'] {
+  border-color: rgba(14, 116, 144, 0.24);
+  background: rgba(224, 242, 254, 0.96);
+}
+
 .workspace-structureMapBadge {
   background: rgba(224, 242, 254, 0.94);
   color: #0369a1;
 }
 
 .workspace-structureMapDropZone {
-  height: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0.35rem;
   border-radius: 999px;
   background: transparent;
+  transition:
+    min-height 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
-.workspace-structureMapDropZone[data-active='true'] {
-  background: rgba(14, 116, 144, 0.2);
+.workspace-structureMapDropZone[data-drop-state='valid'] {
+  min-height: 0.82rem;
+  border: 1px dashed rgba(14, 116, 144, 0.28);
+  background: rgba(240, 249, 255, 0.56);
+}
+
+.workspace-structureMapDropZone[data-drop-state='valid'][data-active='true'] {
+  min-height: 1.7rem;
+  border-style: solid;
+  background: rgba(224, 242, 254, 0.96);
+  box-shadow: 0 0 0 2px rgba(14, 116, 144, 0.12);
+}
+
+.workspace-structureMapDropZone[data-drop-state='invalid'][data-active='true'] {
+  min-height: 1.7rem;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  background: rgba(254, 226, 226, 0.92);
+}
+
+.workspace-structureMapDropZone[data-drop-state='noop'][data-active='true'] {
+  min-height: 1.2rem;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  background: rgba(241, 245, 249, 0.82);
+}
+
+.workspace-structureMapDropZoneLabel {
+  padding: 0.12rem 0.48rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #0f172a;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .workspace-documentBody > .workspace-documentNode[data-node-section-kind='plan-step']:first-child {
