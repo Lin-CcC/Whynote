@@ -117,6 +117,19 @@ export interface WorkspaceEditorNodeRenderContext {
   tree: NodeTree;
 }
 
+export interface WorkspaceEditorToolbarButton {
+  className?: string;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+  title?: string;
+}
+
+export interface WorkspaceEditorToolbarSection {
+  buttons: WorkspaceEditorToolbarButton[];
+  title: string;
+}
+
 export interface WorkspaceEditorProps {
   initialSnapshot?: WorkspaceSnapshot;
   initialModuleId?: string;
@@ -144,5 +157,8 @@ export interface WorkspaceEditorProps {
   renderNodeInlineActions?: (
     context: WorkspaceEditorNodeRenderContext,
   ) => ReactNode;
+  renderNodeToolbarSections?: (
+    context: WorkspaceEditorNodeRenderContext,
+  ) => WorkspaceEditorToolbarSection[] | null;
   workspaceViewState?: WorkspaceViewState;
 }
