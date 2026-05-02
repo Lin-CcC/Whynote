@@ -100,13 +100,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
                 currentModuleId={workspaceEditor.currentModuleId}
                 isInteractionLocked={props.isInteractionLocked ?? false}
                 onCreateModule={workspaceEditor.createModule}
-                onMoveStructureMapNode={(request) => {
-                  updateWorkspaceViewState((state) => ({
-                    ...state,
-                    mainViewMode: 'document',
-                  }));
-                  workspaceEditor.moveStructureMapNode(request);
-                }}
+                onMoveStructureMapNode={workspaceEditor.moveStructureMapNode}
                 onOpenDocumentNode={(nodeId) => {
                   updateWorkspaceViewState((state) => ({
                     ...state,
@@ -114,6 +108,10 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
                   }));
                   workspaceEditor.selectNode(nodeId);
                 }}
+                onRenameStructureMapNode={(nodeId, title) => {
+                  workspaceEditor.updateNode(nodeId, { title });
+                }}
+                onSelectStructureMapNode={workspaceEditor.selectNode}
                 onWorkspaceViewStateChange={handleWorkspaceViewStateChange}
                 selectedNodeId={workspaceEditor.selectedNodeId}
                 tree={workspaceEditor.tree}

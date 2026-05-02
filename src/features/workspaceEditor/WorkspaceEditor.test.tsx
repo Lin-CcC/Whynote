@@ -138,7 +138,7 @@ test('renders the global view switch inside the floating bottom-left dock instea
   ).not.toBeInTheDocument();
 });
 
-test('renders a map mode toolbar with context, status, and actions, and keeps 聚焦中 as a status badge', async () => {
+test('renders a map-global status toolbar while keeping question focus controls inline', async () => {
   renderWorkspaceEditorWithViewState({
     initialModuleId: 'module-structure-map-a',
     initialSelectedNodeId: 'question-structure-map-a',
@@ -151,7 +151,7 @@ test('renders a map mode toolbar with context, status, and actions, and keeps �
     'workspace-structure-map-shell',
   );
   const toolbar = structureMapShell.querySelector(
-    '[data-structure-toolbar="map-mode"]',
+    '[data-structure-toolbar="map-global-status"]',
   );
 
   expect(toolbar).not.toBeNull();
@@ -169,9 +169,16 @@ test('renders a map mode toolbar with context, status, and actions, and keeps �
   expect(contextSection).not.toBeNull();
   expect(statusSection).not.toBeNull();
   expect(actionsSection).not.toBeNull();
+  expect(
+    within(actionsSection as HTMLElement).queryByRole('button', {
+      name: '聚焦当前问题簇',
+    }),
+  ).not.toBeInTheDocument();
 
   fireEvent.click(
-    within(actionsSection as HTMLElement).getByRole('button', {
+    within(
+      screen.getByTestId('structure-map-item-question-block:question-structure-map-a'),
+    ).getByRole('button', {
       name: '聚焦当前问题簇',
     }),
   );
@@ -181,7 +188,9 @@ test('renders a map mode toolbar with context, status, and actions, and keeps �
     within(statusSection as HTMLElement).queryByRole('button', { name: '聚焦中' }),
   ).not.toBeInTheDocument();
   expect(within(actionsSection as HTMLElement).getByText('退出聚焦')).toBeInTheDocument();
-  expect(within(actionsSection as HTMLElement).getByText('收起面板')).toBeInTheDocument();
+  expect(
+    within(actionsSection as HTMLElement).queryByText('收起面板'),
+  ).not.toBeInTheDocument();
 });
 
 test('projects only the current module into the structure map and excludes root resources', async () => {
@@ -238,7 +247,7 @@ test('projects only the current module into the structure map and excludes root 
   ).not.toBeInTheDocument();
 });
 
-test('keeps cluster collapse in the header icon slot and preserves logic-graph connectors and drag targets', async () => {
+test('keeps cluster actions inline in the header while preserving logic-graph connectors and drag handles', async () => {
   renderWorkspaceEditorWithViewState({
     initialModuleId: 'module-structure-map-rich',
     initialSelectedNodeId: 'question-structure-map-rich',
@@ -253,20 +262,24 @@ test('keeps cluster collapse in the header icon slot and preserves logic-graph c
   const cluster = within(structureMapShell).getByTestId(
     'structure-map-question-question-structure-map-rich',
   );
-  const collapseAction = within(
-    cluster.querySelector('.workspace-structureMapClusterHeader') as HTMLElement,
-  ).getByRole('button', {
+  const clusterItem = within(cluster).getByTestId(
+    'structure-map-item-question-block:question-structure-map-rich',
+  );
+  const inlineActions = clusterItem.querySelector(
+    '[data-structure-cluster-actions="inline"]',
+  );
+  const collapseAction = within(clusterItem).getByRole('button', {
     name: '收起问题簇',
   });
 
   expect(collapseAction).toHaveAttribute('data-structure-cluster-action', 'collapse');
-  expect(collapseAction).toHaveAttribute(
-    'data-structure-cluster-action-style',
-    'icon-tooltip',
-  );
-  expect(cluster.querySelector('.workspace-structureMapClusterHeader')).toContainElement(
-    collapseAction,
-  );
+  expect(inlineActions).not.toBeNull();
+  expect(inlineActions).toContainElement(collapseAction);
+  expect(
+    within(clusterItem).getByTestId(
+      'structure-map-drag-handle-question-block:question-structure-map-rich',
+    ),
+  ).toHaveAttribute('data-structure-drag-handle', 'true');
   expect(
     cluster.querySelector(
       ':scope > .workspace-structureMapClusterCanvas > .workspace-structureMapClusterBody > [data-structure-cluster-action="collapse"]',

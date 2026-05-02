@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react';
 
 import {
   buildStructureMapPresentationModel,
@@ -31,6 +38,8 @@ type StructureMapMainViewProps = {
   onCreateModule: () => void;
   onMoveStructureMapNode: (request: StructureMapMoveRequest) => void;
   onOpenDocumentNode: (nodeId: string) => void;
+  onRenameStructureMapNode: (nodeId: string, title: string) => void;
+  onSelectStructureMapNode: (nodeId: string) => void;
   selectedNodeId: string | null;
   tree: NodeTree;
   validateStructureMapMove: (
@@ -47,6 +56,11 @@ type DragState = {
 type DropFeedback = {
   code: StructureMapDropRejectionCode;
   message: string;
+};
+
+type MoveFeedback = {
+  message: string;
+  targetTestId: string | null;
 };
 
 type StructureMapDropZoneState =
@@ -84,14 +98,22 @@ type StructureMapToolbarState = {
   contextLabel: string;
   focusTarget: StructureMapFocusTarget;
   isFocused: boolean;
-  stepNodeId: string | null;
   stepCollapsed: boolean;
+  stepNodeId: string | null;
+};
+
+type TitleEditingState = {
+  draft: string;
+  itemId: string;
+  nodeId: string;
+  originalTitle: string;
 };
 
 type StructureMapRenderProps = {
   activeDropZoneId: string | null;
   dragState: DragState | null;
   isInteractionLocked: boolean;
+  onCancelTitleEditing: () => void;
   onDragEnd: () => void;
   onInvalidDrop: (feedback: DropFeedback) => void;
   onDragStart: (nodeId: string) => void;
@@ -101,6 +123,10 @@ type StructureMapRenderProps = {
   ) => void;
   onDropZoneEnter: (dropZoneId: string | null) => void;
   onOpenDocumentNode: (nodeId: string) => void;
+  onSelectStructureMapNode: (nodeId: string) => void;
+  onStartTitleEditing: (nodeId: string, itemId: string, title: string) => void;
+  onSubmitTitleEditing: () => void;
+  onTitleEditingDraftChange: (draft: string) => void;
   onToggleStructureMapClusterCollapsed: (questionNodeId: string) => void;
   onToggleStructureMapFocusTarget: (target: StructureMapFocusTarget) => void;
   onToggleStructureMapFollowUpCollapsed: (questionNodeId: string) => void;
@@ -108,6 +134,7 @@ type StructureMapRenderProps = {
   selectedItemId: string | null;
   selectionContext: StructureMapSelectionContext;
   structureMapFocusTarget: StructureMapFocusTarget | null;
+  titleEditingState: TitleEditingState | null;
   tree: NodeTree;
   validateStructureMapMove: (
     request: StructureMapMoveRequest,
@@ -121,6 +148,8 @@ export default function StructureMapMainView({
   onCreateModule,
   onMoveStructureMapNode,
   onOpenDocumentNode,
+  onRenameStructureMapNode,
+  onSelectStructureMapNode,
   onWorkspaceViewStateChange,
   selectedNodeId,
   tree,
@@ -130,7 +159,14 @@ export default function StructureMapMainView({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [activeDropZoneId, setActiveDropZoneId] = useState<string | null>(null);
   const [dropFeedback, setDropFeedback] = useState<DropFeedback | null>(null);
+  const [moveFeedback, setMoveFeedback] = useState<MoveFeedback | null>(null);
+  const [titleEditingState, setTitleEditingState] =
+    useState<TitleEditingState | null>(null);
+  const [forcedScrollTargetTestId, setForcedScrollTargetTestId] = useState<
+    string | null
+  >(null);
   const structureMapShellRef = useRef<HTMLDivElement | null>(null);
+  const lastAutoScrollTargetTestIdRef = useRef<string | null>(null);
 
   if (!currentModuleId || !tree.nodes[currentModuleId]) {
     return (
@@ -189,19 +225,13 @@ export default function StructureMapMainView({
     structureMapFocusTarget,
     workspaceViewState,
   );
-  const questionClusterFocusTarget = selectionContext.questionNodeId
-    ? ({
-        kind: 'question-cluster',
-        nodeId: selectionContext.questionNodeId,
-      } satisfies StructureMapFocusTarget)
-    : null;
   const visibleSelectionTestId = getVisibleStructureMapSelectionTestId(
     tree,
     selectedItemId,
     selectionContext,
     workspaceViewState,
   );
-  const dragStatus = dragState
+  const mapStatus = dragState
     ? {
         text: '拖动中：蓝色提示表示可落点，红色提示表示当前落点不允许。',
         tone: 'info' as const,
@@ -211,21 +241,30 @@ export default function StructureMapMainView({
           text: `当前落点无效：${dropFeedback.message}`,
           tone: 'invalid' as const,
         }
-      : null;
+      : moveFeedback
+        ? {
+            text: moveFeedback.message,
+            tone: 'success' as const,
+          }
+        : null;
 
   useEffect(() => {
     const shell = structureMapShellRef.current;
+    const targetTestId = forcedScrollTargetTestId ?? visibleSelectionTestId;
 
-    if (!shell) {
+    if (!shell || !targetTestId) {
       return;
     }
 
-    const targetTestId =
-      (structureMapFocusTarget
-        ? getStructureMapFocusTargetTestId(structureMapFocusTarget)
-        : null) ?? visibleSelectionTestId;
-    const targetElement =
-      targetTestId === null ? null : findElementByTestId(shell, targetTestId);
+    if (
+      forcedScrollTargetTestId === null &&
+      lastAutoScrollTargetTestIdRef.current === targetTestId
+    ) {
+      return;
+    }
+
+    lastAutoScrollTargetTestIdRef.current = targetTestId;
+    const targetElement = findElementByTestId(shell, targetTestId);
 
     if (!targetElement) {
       return;
@@ -241,13 +280,29 @@ export default function StructureMapMainView({
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [
-    structureMapFocusTarget,
-    visibleSelectionTestId,
-    workspaceViewState.collapsedStructureMapClusterIds,
-    workspaceViewState.collapsedStructureMapFollowUpIds,
-    workspaceViewState.collapsedStructureMapStepIds,
-  ]);
+  }, [forcedScrollTargetTestId, visibleSelectionTestId]);
+
+  useEffect(() => {
+    if (!moveFeedback) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setMoveFeedback(null);
+    }, 1800);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [moveFeedback]);
+
+  useEffect(() => {
+    if (!titleEditingState || tree.nodes[titleEditingState.nodeId]) {
+      return;
+    }
+
+    setTitleEditingState(null);
+  }, [titleEditingState, tree]);
 
   function updateWorkspaceViewState(
     updater: (state: WorkspaceViewState) => WorkspaceViewState,
@@ -286,6 +341,7 @@ export default function StructureMapMainView({
   }
 
   function toggleStructureMapFocusTarget(target: StructureMapFocusTarget) {
+    setMoveFeedback(null);
     updateWorkspaceViewState((state) => ({
       ...state,
       structureMapFocusTarget:
@@ -298,6 +354,7 @@ export default function StructureMapMainView({
 
   function handleDragStart(nodeId: string) {
     setDropFeedback(null);
+    setMoveFeedback(null);
     setDragState({ nodeId });
   }
 
@@ -338,14 +395,74 @@ export default function StructureMapMainView({
       return;
     }
 
+    const movedAnchor = resolveStructureMapSelectionAnchor(
+      tree,
+      currentModuleId,
+      dragState.nodeId,
+    );
+    const movedTargetTestId = movedAnchor
+      ? `structure-map-item-${getStructureMapSelectionId(movedAnchor)}`
+      : null;
+    const movedNode = tree.nodes[dragState.nodeId];
+
     onMoveStructureMapNode(nextRequest);
     setActiveDropZoneId(null);
     setDropFeedback(null);
     setDragState(null);
+    setForcedScrollTargetTestId(movedTargetTestId);
+    setMoveFeedback({
+      message: movedNode
+        ? `已移动：${getStructureMapNodeLabel(tree, movedNode, '节点')}`
+        : '已移动，仍停留在结构地图',
+      targetTestId: movedTargetTestId,
+    });
   }
 
   function handleInvalidDrop(feedback: DropFeedback) {
+    setMoveFeedback(null);
     setDropFeedback(feedback);
+  }
+
+  function handleStartTitleEditing(nodeId: string, itemId: string, title: string) {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    setTitleEditingState({
+      draft: title,
+      itemId,
+      nodeId,
+      originalTitle: title,
+    });
+  }
+
+  function handleTitleEditingDraftChange(draft: string) {
+    setTitleEditingState((previousState) =>
+      previousState
+        ? {
+            ...previousState,
+            draft,
+          }
+        : previousState,
+    );
+  }
+
+  function handleSubmitTitleEditing() {
+    setTitleEditingState((previousState) => {
+      if (!previousState) {
+        return previousState;
+      }
+
+      if (previousState.draft !== previousState.originalTitle) {
+        onRenameStructureMapNode(previousState.nodeId, previousState.draft);
+      }
+
+      return null;
+    });
+  }
+
+  function handleCancelTitleEditing() {
+    setTitleEditingState(null);
   }
 
   return (
@@ -353,6 +470,7 @@ export default function StructureMapMainView({
       <div
         className="workspace-documentShell workspace-structureMapShell"
         data-layout="single-column"
+        data-structure-drop-behavior="stay-in-map"
         data-testid="workspace-structure-map-shell"
         ref={structureMapShellRef}
       >
@@ -367,19 +485,19 @@ export default function StructureMapMainView({
             这里负责按问题聚合结构、联动文档和拖动重排，正文编辑仍留在文档视图。
           </p>
         </header>
-        {dragStatus ? (
+        {mapStatus ? (
           <div
             className="workspace-structureMapStatus"
-            data-tone={dragStatus.tone}
+            data-tone={mapStatus.tone}
             role="status"
           >
-            <span className="workspace-structureMapStatusText">{dragStatus.text}</span>
+            <span className="workspace-structureMapStatusText">{mapStatus.text}</span>
           </div>
         ) : null}
         {toolbarState ? (
           <div
             className="workspace-structureMapToolbar"
-            data-structure-toolbar="map-mode"
+            data-structure-toolbar="map-global-status"
           >
             <div
               className="workspace-structureMapToolbarContext"
@@ -404,24 +522,19 @@ export default function StructureMapMainView({
               className="workspace-structureMapToolbarActions"
               data-structure-toolbar-section="actions"
             >
-              <button
-                className="workspace-structureMapToolbarButton"
-                data-tone="subtle"
-                disabled={isInteractionLocked}
-                onClick={() => {
-                  if (toolbarState.isFocused) {
+              {toolbarState.isFocused ? (
+                <button
+                  className="workspace-structureMapToolbarButton"
+                  data-tone="subtle"
+                  disabled={isInteractionLocked}
+                  onClick={() =>
                     updateWorkspaceViewState((state) => ({
                       ...state,
                       structureMapFocusTarget: null,
-                    }));
-                    return;
+                    }))
                   }
-
-                  toggleStructureMapFocusTarget(toolbarState.focusTarget);
-                }}
-                type="button"
-              >
-                {toolbarState.isFocused ? (
+                  type="button"
+                >
                   <span
                     aria-label={
                       toolbarState.focusTarget.kind === 'plan-step'
@@ -430,44 +543,6 @@ export default function StructureMapMainView({
                     }
                   >
                     退出聚焦
-                  </span>
-                ) : (
-                  toolbarState.focusTarget.kind === 'plan-step'
-                    ? '聚焦当前步骤'
-                    : '聚焦当前问题簇'
-                )}
-              </button>
-              {toolbarState.focusTarget.kind === 'plan-step' &&
-              !toolbarState.isFocused &&
-              questionClusterFocusTarget ? (
-                <button
-                  className="workspace-structureMapToolbarButton"
-                  data-tone="ghost"
-                  disabled={isInteractionLocked}
-                  onClick={() =>
-                    toggleStructureMapFocusTarget(questionClusterFocusTarget)
-                  }
-                  type="button"
-                >
-                  聚焦当前问题簇
-                </button>
-              ) : null}
-              {toolbarState.stepNodeId ? (
-                <button
-                  className="workspace-structureMapToolbarButton"
-                  data-tone="ghost"
-                  disabled={isInteractionLocked}
-                  onClick={() =>
-                    toggleStructureMapStepCollapsed(toolbarState.stepNodeId as string)
-                  }
-                  type="button"
-                >
-                  <span
-                    aria-label={
-                      toolbarState.stepCollapsed ? '展开步骤面板' : '收起步骤面板'
-                    }
-                  >
-                    {toolbarState.stepCollapsed ? '展开面板' : '收起面板'}
                   </span>
                 </button>
               ) : null}
@@ -502,12 +577,17 @@ export default function StructureMapMainView({
                 activeDropZoneId={activeDropZoneId}
                 dragState={dragState}
                 isInteractionLocked={isInteractionLocked}
+                onCancelTitleEditing={handleCancelTitleEditing}
                 onDragEnd={handleDragEnd}
                 onInvalidDrop={handleInvalidDrop}
                 onDragStart={handleDragStart}
                 onDropRequest={handleDropRequest}
                 onDropZoneEnter={setActiveDropZoneId}
                 onOpenDocumentNode={onOpenDocumentNode}
+                onSelectStructureMapNode={onSelectStructureMapNode}
+                onStartTitleEditing={handleStartTitleEditing}
+                onSubmitTitleEditing={handleSubmitTitleEditing}
+                onTitleEditingDraftChange={handleTitleEditingDraftChange}
                 onToggleStructureMapClusterCollapsed={
                   toggleStructureMapClusterCollapsed
                 }
@@ -520,6 +600,7 @@ export default function StructureMapMainView({
                 selectedItemId={selectedItemId}
                 selectionContext={selectionContext}
                 structureMapFocusTarget={structureMapFocusTarget}
+                titleEditingState={titleEditingState}
                 tree={tree}
                 validateStructureMapMove={validateStructureMapMove}
                 workspaceViewState={workspaceViewState}
@@ -551,12 +632,17 @@ function SectionNode({
   activeDropZoneId,
   dragState,
   isInteractionLocked,
+  onCancelTitleEditing,
   onDragEnd,
   onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
+  onSelectStructureMapNode,
+  onStartTitleEditing,
+  onSubmitTitleEditing,
+  onTitleEditingDraftChange,
   onToggleStructureMapClusterCollapsed,
   onToggleStructureMapFocusTarget,
   onToggleStructureMapFollowUpCollapsed,
@@ -565,6 +651,7 @@ function SectionNode({
   selectedItemId,
   selectionContext,
   structureMapFocusTarget,
+  titleEditingState,
   tree,
   validateStructureMapMove,
   workspaceViewState,
@@ -576,24 +663,63 @@ function SectionNode({
     section.planStep.id,
   );
   const isCurrentPlanStep = selectionContext.planStepNodeId === section.planStep.id;
+  const isFocused =
+    structureMapFocusTarget?.kind === 'plan-step' &&
+    structureMapFocusTarget.nodeId === section.planStep.id;
+  const itemId = getStructureMapSelectionId(section.anchor);
 
   return (
     <div className="workspace-structureMapPanelBody">
-      <StructureMapButton
+      <StructureMapNodeCard
+        actionButtons={
+          <>
+            <button
+              className="workspace-structureMapNodeActionButton"
+              disabled={isInteractionLocked}
+              onClick={() =>
+                onToggleStructureMapFocusTarget({
+                  kind: 'plan-step',
+                  nodeId: section.planStep.id,
+                })
+              }
+              type="button"
+            >
+              {isFocused ? '退出步骤聚焦' : '聚焦当前步骤'}
+            </button>
+            <button
+              className="workspace-structureMapNodeActionButton"
+              disabled={isInteractionLocked}
+              onClick={() => onToggleStructureMapStepCollapsed(section.planStep.id)}
+              type="button"
+            >
+              {isCollapsed ? '展开面板' : '收起面板'}
+            </button>
+          </>
+        }
         anchor={section.anchor}
         dragNodeId={section.planStep.id}
         dragPermission={section.drag}
         dragState={dragState}
+        hasInlineStepActions
         isCurrentAnswer={false}
+        isEditingTitle={titleEditingState?.itemId === itemId}
         isInteractionLocked={isInteractionLocked}
         kindLabel="步骤"
+        onCancelTitleEditing={onCancelTitleEditing}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
+        onSelectStructureMapNode={onSelectStructureMapNode}
+        onStartTitleEditing={onStartTitleEditing}
+        onSubmitTitleEditing={onSubmitTitleEditing}
+        onTitleEditingDraftChange={onTitleEditingDraftChange}
         isSelectedOverride={isCollapsed && isCurrentPlanStep}
         selectedItemId={selectedItemId}
         structureRole="plan-step"
         title={getStructureMapNodeLabel(tree, section.planStep, 'step')}
+        titleEditingDraft={
+          titleEditingState?.itemId === itemId ? titleEditingState.draft : null
+        }
       />
       {!isCollapsed ? (
         <div className="workspace-structureMapList">
@@ -625,12 +751,17 @@ function SectionNode({
                 dragState={dragState}
                 isInteractionLocked={isInteractionLocked}
                 item={item}
+                onCancelTitleEditing={onCancelTitleEditing}
                 onDragEnd={onDragEnd}
                 onInvalidDrop={onInvalidDrop}
                 onDragStart={onDragStart}
                 onDropRequest={onDropRequest}
                 onDropZoneEnter={onDropZoneEnter}
                 onOpenDocumentNode={onOpenDocumentNode}
+                onSelectStructureMapNode={onSelectStructureMapNode}
+                onStartTitleEditing={onStartTitleEditing}
+                onSubmitTitleEditing={onSubmitTitleEditing}
+                onTitleEditingDraftChange={onTitleEditingDraftChange}
                 onToggleStructureMapClusterCollapsed={
                   onToggleStructureMapClusterCollapsed
                 }
@@ -642,6 +773,7 @@ function SectionNode({
                 selectedItemId={selectedItemId}
                 selectionContext={selectionContext}
                 structureMapFocusTarget={structureMapFocusTarget}
+                titleEditingState={titleEditingState}
                 tree={tree}
                 validateStructureMapMove={validateStructureMapMove}
                 workspaceViewState={workspaceViewState}
@@ -675,26 +807,39 @@ function SectionItemNode(
   },
 ) {
   if (props.item.kind === 'scaffold-summary') {
+    const itemId = getStructureMapSelectionId(props.item.node.anchor);
+
     return (
       <div
         className="workspace-structureMapScaffoldItem"
         data-structure-role="scaffold"
         data-testid={`structure-map-scaffold-${props.item.node.node.id}`}
       >
-        <StructureMapButton
+        <StructureMapNodeCard
           anchor={props.item.node.anchor}
           dragNodeId={props.item.node.node.id}
           dragPermission={props.item.node.drag}
           dragState={props.dragState}
           isCurrentAnswer={false}
+          isEditingTitle={props.titleEditingState?.itemId === itemId}
           isInteractionLocked={props.isInteractionLocked}
           kindLabel="铺垫"
+          onCancelTitleEditing={props.onCancelTitleEditing}
           onDragEnd={props.onDragEnd}
           onDragStart={props.onDragStart}
           onOpenDocumentNode={props.onOpenDocumentNode}
+          onSelectStructureMapNode={props.onSelectStructureMapNode}
+          onStartTitleEditing={props.onStartTitleEditing}
+          onSubmitTitleEditing={props.onSubmitTitleEditing}
+          onTitleEditingDraftChange={props.onTitleEditingDraftChange}
           selectedItemId={props.selectedItemId}
           structureRole="scaffold-summary"
           title={getStructureMapNodeLabel(props.tree, props.item.node.node, 'scaffold')}
+          titleEditingDraft={
+            props.titleEditingState?.itemId === itemId
+              ? props.titleEditingState.draft
+              : null
+          }
         />
       </div>
     );
@@ -709,12 +854,17 @@ function QuestionBlockNode({
   dragState,
   isInteractionLocked,
   node,
+  onCancelTitleEditing,
   onDragEnd,
   onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
+  onSelectStructureMapNode,
+  onStartTitleEditing,
+  onSubmitTitleEditing,
+  onTitleEditingDraftChange,
   onToggleStructureMapClusterCollapsed,
   onToggleStructureMapFocusTarget,
   onToggleStructureMapFollowUpCollapsed,
@@ -722,6 +872,7 @@ function QuestionBlockNode({
   selectedItemId,
   selectionContext,
   structureMapFocusTarget,
+  titleEditingState,
   tree,
   validateStructureMapMove,
   workspaceViewState,
@@ -755,6 +906,7 @@ function QuestionBlockNode({
   const isFocused =
     structureMapFocusTarget?.kind === 'question-cluster' &&
     structureMapFocusTarget.nodeId === node.question.id;
+  const itemId = getStructureMapSelectionId(node.anchor);
   const collapseTooltip = isCollapsed ? '展开问题簇' : '收起问题簇';
 
   return (
@@ -782,40 +934,67 @@ function QuestionBlockNode({
               className="workspace-structureMapQuestionHub"
               data-structure-node="question-hub"
             >
-              <StructureMapButton
+              <StructureMapNodeCard
+                actionButtons={
+                  <>
+                    <button
+                      className="workspace-structureMapNodeActionButton"
+                      disabled={isInteractionLocked}
+                      onClick={() =>
+                        onToggleStructureMapFocusTarget({
+                          kind: 'question-cluster',
+                          nodeId: node.question.id,
+                        })
+                      }
+                      type="button"
+                    >
+                      {isFocused ? '退出问题聚焦' : '聚焦当前问题簇'}
+                    </button>
+                    <button
+                      aria-label={collapseTooltip}
+                      className="workspace-structureMapNodeActionButton"
+                      data-collapsed={isCollapsed}
+                      data-structure-cluster-action="collapse"
+                      disabled={isInteractionLocked}
+                      onClick={() =>
+                        isTopLevelCluster
+                          ? onToggleStructureMapClusterCollapsed(node.question.id)
+                          : onToggleStructureMapFollowUpCollapsed(node.question.id)
+                      }
+                      type="button"
+                    >
+                      {isCollapsed ? '展开' : '收起'}
+                    </button>
+                  </>
+                }
                 anchor={node.anchor}
                 dragNodeId={node.question.id}
                 dragPermission={node.drag}
                 dragState={dragState}
+                hasInlineClusterActions
                 isCurrentAnswer={false}
+                isEditingTitle={titleEditingState?.itemId === itemId}
                 isInteractionLocked={isInteractionLocked}
+                onCancelTitleEditing={onCancelTitleEditing}
                 isSelectedOverride={isCollapsed && isCurrentQuestionCluster}
                 kindLabel="问题"
                 onDragEnd={onDragEnd}
                 onDragStart={onDragStart}
                 onOpenDocumentNode={onOpenDocumentNode}
+                onSelectStructureMapNode={onSelectStructureMapNode}
+                onStartTitleEditing={onStartTitleEditing}
+                onSubmitTitleEditing={onSubmitTitleEditing}
+                onTitleEditingDraftChange={onTitleEditingDraftChange}
                 selectedItemId={selectedItemId}
                 structureRole="question"
                 title={getStructureMapNodeLabel(tree, node.question, 'question')}
+                titleEditingDraft={
+                  titleEditingState?.itemId === itemId
+                    ? titleEditingState.draft
+                    : null
+                }
               />
             </div>
-            <button
-              aria-label={collapseTooltip}
-              className="workspace-structureMapClusterActionButton"
-              data-collapsed={isCollapsed}
-              data-structure-cluster-action="collapse"
-              data-structure-cluster-action-style="icon-tooltip"
-              disabled={isInteractionLocked}
-              onClick={() =>
-                isTopLevelCluster
-                  ? onToggleStructureMapClusterCollapsed(node.question.id)
-                  : onToggleStructureMapFollowUpCollapsed(node.question.id)
-              }
-              title={collapseTooltip}
-              type="button"
-            >
-              {isCollapsed ? 'v' : '^'}
-            </button>
           </div>
         </div>
         {!isCollapsed && node.entries.length > 0 ? (
@@ -836,12 +1015,17 @@ function QuestionBlockNode({
                   groupKind="supporting"
                   isInteractionLocked={isInteractionLocked}
                   node={node}
+                  onCancelTitleEditing={onCancelTitleEditing}
                   onDragEnd={onDragEnd}
                   onInvalidDrop={onInvalidDrop}
                   onDragStart={onDragStart}
                   onDropRequest={onDropRequest}
                   onDropZoneEnter={onDropZoneEnter}
                   onOpenDocumentNode={onOpenDocumentNode}
+                  onSelectStructureMapNode={onSelectStructureMapNode}
+                  onStartTitleEditing={onStartTitleEditing}
+                  onSubmitTitleEditing={onSubmitTitleEditing}
+                  onTitleEditingDraftChange={onTitleEditingDraftChange}
                   onToggleStructureMapClusterCollapsed={
                     onToggleStructureMapClusterCollapsed
                   }
@@ -853,6 +1037,7 @@ function QuestionBlockNode({
                   selectedItemId={selectedItemId}
                   selectionContext={selectionContext}
                   structureMapFocusTarget={structureMapFocusTarget}
+                  titleEditingState={titleEditingState}
                   tree={tree}
                   validateStructureMapMove={validateStructureMapMove}
                   workspaceViewState={workspaceViewState}
@@ -869,12 +1054,17 @@ function QuestionBlockNode({
                 groupKind="follow-up"
                 isInteractionLocked={isInteractionLocked}
                 node={node}
+                onCancelTitleEditing={onCancelTitleEditing}
                 onDragEnd={onDragEnd}
                 onInvalidDrop={onInvalidDrop}
                 onDragStart={onDragStart}
                 onDropRequest={onDropRequest}
                 onDropZoneEnter={onDropZoneEnter}
                 onOpenDocumentNode={onOpenDocumentNode}
+                onSelectStructureMapNode={onSelectStructureMapNode}
+                onStartTitleEditing={onStartTitleEditing}
+                onSubmitTitleEditing={onSubmitTitleEditing}
+                onTitleEditingDraftChange={onTitleEditingDraftChange}
                 onToggleStructureMapClusterCollapsed={
                   onToggleStructureMapClusterCollapsed
                 }
@@ -886,6 +1076,7 @@ function QuestionBlockNode({
                 selectedItemId={selectedItemId}
                 selectionContext={selectionContext}
                 structureMapFocusTarget={structureMapFocusTarget}
+                titleEditingState={titleEditingState}
                 tree={tree}
                 validateStructureMapMove={validateStructureMapMove}
                 workspaceViewState={workspaceViewState}
@@ -907,12 +1098,17 @@ function QuestionEntryGroup({
   groupKind,
   isInteractionLocked,
   node,
+  onCancelTitleEditing,
   onDragEnd,
   onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
+  onSelectStructureMapNode,
+  onStartTitleEditing,
+  onSubmitTitleEditing,
+  onTitleEditingDraftChange,
   onToggleStructureMapClusterCollapsed,
   onToggleStructureMapFocusTarget,
   onToggleStructureMapFollowUpCollapsed,
@@ -920,6 +1116,7 @@ function QuestionEntryGroup({
   selectedItemId,
   selectionContext,
   structureMapFocusTarget,
+  titleEditingState,
   tree,
   validateStructureMapMove,
   workspaceViewState,
@@ -1026,12 +1223,17 @@ function QuestionEntryGroup({
               dragState={dragState}
               entry={entry}
               isInteractionLocked={isInteractionLocked}
+              onCancelTitleEditing={onCancelTitleEditing}
               onDragEnd={onDragEnd}
               onInvalidDrop={onInvalidDrop}
               onDragStart={onDragStart}
               onDropRequest={onDropRequest}
               onDropZoneEnter={onDropZoneEnter}
               onOpenDocumentNode={onOpenDocumentNode}
+              onSelectStructureMapNode={onSelectStructureMapNode}
+              onStartTitleEditing={onStartTitleEditing}
+              onSubmitTitleEditing={onSubmitTitleEditing}
+              onTitleEditingDraftChange={onTitleEditingDraftChange}
               onToggleStructureMapClusterCollapsed={
                 onToggleStructureMapClusterCollapsed
               }
@@ -1043,6 +1245,7 @@ function QuestionEntryGroup({
               selectedItemId={selectedItemId}
               selectionContext={selectionContext}
               structureMapFocusTarget={structureMapFocusTarget}
+              titleEditingState={titleEditingState}
               tree={tree}
               validateStructureMapMove={validateStructureMapMove}
               workspaceViewState={workspaceViewState}
@@ -1097,12 +1300,17 @@ function QuestionEntryNode({
   dragState,
   entry,
   isInteractionLocked,
+  onCancelTitleEditing,
   onDragEnd,
   onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
+  onSelectStructureMapNode,
+  onStartTitleEditing,
+  onSubmitTitleEditing,
+  onTitleEditingDraftChange,
   onToggleStructureMapClusterCollapsed,
   onToggleStructureMapFocusTarget,
   onToggleStructureMapFollowUpCollapsed,
@@ -1110,6 +1318,7 @@ function QuestionEntryNode({
   selectedItemId,
   selectionContext,
   structureMapFocusTarget,
+  titleEditingState,
   tree,
   validateStructureMapMove,
   workspaceViewState,
@@ -1128,11 +1337,17 @@ function QuestionEntryNode({
         isInteractionLocked={isInteractionLocked}
         kindLabel="回答"
         metaBadges={getAnswerGroupMetaBadges(entry.group)}
+        onCancelTitleEditing={onCancelTitleEditing}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
+        onSelectStructureMapNode={onSelectStructureMapNode}
+        onStartTitleEditing={onStartTitleEditing}
+        onSubmitTitleEditing={onSubmitTitleEditing}
+        onTitleEditingDraftChange={onTitleEditingDraftChange}
         selectedItemId={selectedItemId}
         structureRole="answer-group"
+        titleEditingState={titleEditingState}
         title={getStructureMapNodeLabel(tree, entry.group.node, 'answer')}
       />
     );
@@ -1149,11 +1364,17 @@ function QuestionEntryNode({
         isInteractionLocked={isInteractionLocked}
         kindLabel="手写总结"
         metaBadges={getManualSummaryGroupMetaBadges(entry.group)}
+        onCancelTitleEditing={onCancelTitleEditing}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
+        onSelectStructureMapNode={onSelectStructureMapNode}
+        onStartTitleEditing={onStartTitleEditing}
+        onSubmitTitleEditing={onSubmitTitleEditing}
+        onTitleEditingDraftChange={onTitleEditingDraftChange}
         selectedItemId={selectedItemId}
         structureRole="summary-group"
+        titleEditingState={titleEditingState}
         title={getStructureMapNodeLabel(tree, entry.group.node, 'summary')}
       />
     );
@@ -1166,12 +1387,17 @@ function QuestionEntryNode({
       dragState={dragState}
       isInteractionLocked={isInteractionLocked}
       node={entry.node}
+      onCancelTitleEditing={onCancelTitleEditing}
       onDragEnd={onDragEnd}
       onInvalidDrop={onInvalidDrop}
       onDragStart={onDragStart}
       onDropRequest={onDropRequest}
       onDropZoneEnter={onDropZoneEnter}
       onOpenDocumentNode={onOpenDocumentNode}
+      onSelectStructureMapNode={onSelectStructureMapNode}
+      onStartTitleEditing={onStartTitleEditing}
+      onSubmitTitleEditing={onSubmitTitleEditing}
+      onTitleEditingDraftChange={onTitleEditingDraftChange}
       onToggleStructureMapClusterCollapsed={onToggleStructureMapClusterCollapsed}
       onToggleStructureMapFocusTarget={onToggleStructureMapFocusTarget}
       onToggleStructureMapFollowUpCollapsed={onToggleStructureMapFollowUpCollapsed}
@@ -1179,6 +1405,7 @@ function QuestionEntryNode({
       selectedItemId={selectedItemId}
       selectionContext={selectionContext}
       structureMapFocusTarget={structureMapFocusTarget}
+      titleEditingState={titleEditingState}
       tree={tree}
       validateStructureMapMove={validateStructureMapMove}
       workspaceViewState={workspaceViewState}
@@ -1195,11 +1422,17 @@ function SupportingGroupNode({
   isInteractionLocked,
   kindLabel,
   metaBadges,
+  onCancelTitleEditing,
   onDragEnd,
   onDragStart,
   onOpenDocumentNode,
+  onSelectStructureMapNode,
+  onStartTitleEditing,
+  onSubmitTitleEditing,
+  onTitleEditingDraftChange,
   selectedItemId,
   structureRole,
+  titleEditingState,
   title,
 }: {
   anchor: StructureMapAnchor;
@@ -1210,13 +1443,21 @@ function SupportingGroupNode({
   isInteractionLocked: boolean;
   kindLabel: string;
   metaBadges: string[];
+  onCancelTitleEditing: () => void;
   onDragEnd: () => void;
   onDragStart: (nodeId: string) => void;
   onOpenDocumentNode: (nodeId: string) => void;
+  onSelectStructureMapNode: (nodeId: string) => void;
+  onStartTitleEditing: (nodeId: string, itemId: string, title: string) => void;
+  onSubmitTitleEditing: () => void;
+  onTitleEditingDraftChange: (draft: string) => void;
   selectedItemId: string | null;
   structureRole: 'answer-group' | 'summary-group';
+  titleEditingState: TitleEditingState | null;
   title: string;
 }) {
+  const itemId = getStructureMapSelectionId(anchor);
+
   return (
     <div
       className="workspace-structureMapSupportingCard"
@@ -1224,20 +1465,29 @@ function SupportingGroupNode({
       data-structure-supporting={structureRole}
       data-testid={`structure-map-supporting-${anchor.nodeId}`}
     >
-      <StructureMapButton
+      <StructureMapNodeCard
         anchor={anchor}
         dragNodeId={dragNodeId}
         dragPermission={dragPermission}
         dragState={dragState}
         isCurrentAnswer={isCurrentAnswer}
+        isEditingTitle={titleEditingState?.itemId === itemId}
         isInteractionLocked={isInteractionLocked}
         kindLabel={kindLabel}
+        onCancelTitleEditing={onCancelTitleEditing}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
+        onSelectStructureMapNode={onSelectStructureMapNode}
+        onStartTitleEditing={onStartTitleEditing}
+        onSubmitTitleEditing={onSubmitTitleEditing}
+        onTitleEditingDraftChange={onTitleEditingDraftChange}
         selectedItemId={selectedItemId}
         structureRole={structureRole}
         title={title}
+        titleEditingDraft={
+          titleEditingState?.itemId === itemId ? titleEditingState.draft : null
+        }
       />
       {metaBadges.length > 0 ? (
         <div className="workspace-structureMapMetaList">
@@ -1331,6 +1581,185 @@ function StructureMapButton({
       ) : null}
     </button>
   );
+}
+
+void StructureMapButton;
+
+function StructureMapNodeCard({
+  actionButtons,
+  anchor,
+  dragNodeId,
+  dragPermission,
+  dragState,
+  hasInlineClusterActions = false,
+  hasInlineStepActions = false,
+  isCurrentAnswer,
+  isEditingTitle,
+  isInteractionLocked,
+  kindLabel,
+  onCancelTitleEditing,
+  onDragEnd,
+  onDragStart,
+  onOpenDocumentNode,
+  onSelectStructureMapNode,
+  onStartTitleEditing,
+  onSubmitTitleEditing,
+  onTitleEditingDraftChange,
+  isSelectedOverride = false,
+  selectedItemId,
+  structureRole,
+  title,
+  titleEditingDraft,
+}: {
+  actionButtons?: ReactNode;
+  anchor: StructureMapAnchor;
+  dragNodeId: string;
+  dragPermission: StructureMapPresentationModel['drag'];
+  dragState: DragState | null;
+  hasInlineClusterActions?: boolean;
+  hasInlineStepActions?: boolean;
+  isCurrentAnswer: boolean;
+  isEditingTitle: boolean;
+  isInteractionLocked: boolean;
+  kindLabel: string;
+  onCancelTitleEditing: () => void;
+  onDragEnd: () => void;
+  onDragStart: (nodeId: string) => void;
+  onOpenDocumentNode: (nodeId: string) => void;
+  onSelectStructureMapNode: (nodeId: string) => void;
+  onStartTitleEditing: (nodeId: string, itemId: string, title: string) => void;
+  onSubmitTitleEditing: () => void;
+  onTitleEditingDraftChange: (draft: string) => void;
+  isSelectedOverride?: boolean;
+  selectedItemId: string | null;
+  structureRole: StructureRole;
+  title: string;
+  titleEditingDraft: string | null;
+}) {
+  const itemId = getStructureMapSelectionId(anchor);
+  const isDragging = dragState?.nodeId === dragNodeId;
+  const isSelected = isSelectedOverride || selectedItemId === itemId;
+
+  function handleTitleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      onSubmitTitleEditing();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onCancelTitleEditing();
+    }
+  }
+
+  return (
+    <div
+      aria-current={isSelected ? 'true' : undefined}
+      className="workspace-structureMapButton"
+      data-draggable={dragPermission.canDrag}
+      data-dragging={isDragging}
+      data-kind={itemId.split(':')[0]}
+      data-selected={isSelected}
+      data-structure-node-editable="title"
+      data-structure-node-editing={isEditingTitle}
+      data-structure-role={structureRole}
+      data-testid={`structure-map-item-${itemId}`}
+    >
+      <div className="workspace-structureMapButtonMain">
+        <span className="workspace-structureMapLabel">{kindLabel}</span>
+        {isEditingTitle ? (
+          <input
+            aria-label={`${title || kindLabel} 标题`}
+            autoFocus
+            className="workspace-structureMapTitleInput"
+            data-structure-node-editable="title"
+            onBlur={onSubmitTitleEditing}
+            onChange={(event) => onTitleEditingDraftChange(event.target.value)}
+            onKeyDown={handleTitleKeyDown}
+            type="text"
+            value={titleEditingDraft ?? title}
+          />
+        ) : (
+          <button
+            className="workspace-structureMapTitleButton"
+            data-structure-node-editable="title"
+            disabled={isInteractionLocked}
+            onClick={() => onSelectStructureMapNode(anchor.nodeId)}
+            onDoubleClick={() =>
+              onStartTitleEditing(dragNodeId, itemId, title)
+            }
+            type="button"
+          >
+            <span className="workspace-structureMapText">{title}</span>
+          </button>
+        )}
+        {isCurrentAnswer ? (
+          <span className="workspace-structureMapBadge">当前回答</span>
+        ) : null}
+      </div>
+      <div
+        className="workspace-structureMapNodeActions"
+        data-structure-cluster-actions={hasInlineClusterActions ? 'inline' : undefined}
+        data-structure-step-actions={hasInlineStepActions ? 'inline' : undefined}
+      >
+        <button
+          className="workspace-structureMapNodeActionButton"
+          disabled={isInteractionLocked}
+          onClick={() => onOpenDocumentNode(anchor.nodeId)}
+          type="button"
+        >
+          文档
+        </button>
+        {actionButtons}
+        {dragPermission.canDrag ? (
+          <button
+            aria-label={`拖动${kindLabel}`}
+            className="workspace-structureMapDragHandle"
+            data-drag-hint={isDragging ? 'dragging' : 'ready'}
+            data-structure-drag-handle="true"
+            data-testid={`structure-map-drag-handle-${itemId}`}
+            disabled={isInteractionLocked}
+            draggable={!isInteractionLocked}
+            onDragEnd={onDragEnd}
+            onDragStart={(event) => {
+              if (!dragPermission.canDrag) {
+                event.preventDefault();
+                return;
+              }
+
+              if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', dragNodeId);
+                const transparentDragPreview = getTransparentDragPreviewImage();
+
+                if (transparentDragPreview) {
+                  event.dataTransfer.setDragImage(transparentDragPreview, 0, 0);
+                }
+              }
+
+              onDragStart(dragNodeId);
+            }}
+            type="button"
+          >
+            {isDragging ? '拖动中' : '拖动'}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function getTransparentDragPreviewImage() {
+  if (typeof Image === 'undefined') {
+    return null;
+  }
+
+  const transparentImage = new Image();
+  transparentImage.src =
+    'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+
+  return transparentImage;
 }
 
 function StructureMapDropZone({
@@ -1789,12 +2218,6 @@ function findQuestionBlockNode(
   }
 
   return null;
-}
-
-function getStructureMapFocusTargetTestId(target: StructureMapFocusTarget) {
-  return target.kind === 'plan-step'
-    ? `structure-map-panel-${target.nodeId}`
-    : `structure-map-question-${target.nodeId}`;
 }
 
 function getVisibleStructureMapSelectionTestId(
