@@ -402,16 +402,33 @@ function QuestionBlockNode({
   const followUpEntries = entryDescriptors.filter(
     (descriptor) => descriptor.entry.kind === 'question-block',
   );
+  const hasSupportingEntries = supportingEntries.length > 0;
+  const hasFollowUpEntries = followUpEntries.length > 0;
 
   return (
     <div
       className="workspace-structureMapItem workspace-structureMapCluster"
       data-structure-cluster={node.question.id}
+      data-structure-layout="logic-graph"
       data-structure-level={clusterTone}
       data-structure-role="question-cluster"
       data-testid={`structure-map-question-${node.question.id}`}
     >
-      <StructureMapButton
+      <div
+        className="workspace-structureMapClusterCanvas"
+        data-structure-layout="logic-graph"
+      >
+        <div
+          className="workspace-structureMapClusterRegion workspace-structureMapClusterRegionMain"
+          data-has-branch={hasFollowUpEntries ? 'true' : 'false'}
+          data-has-supporting={hasSupportingEntries ? 'true' : 'false'}
+          data-structure-cluster-region="main"
+        >
+          <div
+            className="workspace-structureMapQuestionHub"
+            data-structure-node="question-hub"
+          >
+            <StructureMapButton
         anchor={node.anchor}
         dragNodeId={node.question.id}
         dragPermission={node.drag}
@@ -425,12 +442,15 @@ function QuestionBlockNode({
         selectedItemId={selectedItemId}
         structureRole="question"
         title={getStructureMapNodeLabel(tree, node.question, 'question')}
-      />
+            />
+          </div>
+        </div>
       {node.entries.length > 0 ? (
         <div className="workspace-structureMapClusterBody">
           {supportingEntries.length > 0 ? (
             <QuestionEntryGroup
               activeDropZoneId={activeDropZoneId}
+              clusterTone={clusterTone}
               descriptors={supportingEntries}
               dragState={dragState}
               entryNodeIds={entryNodeIds}
@@ -449,6 +469,7 @@ function QuestionBlockNode({
           {followUpEntries.length > 0 ? (
             <QuestionEntryGroup
               activeDropZoneId={activeDropZoneId}
+              clusterTone={clusterTone}
               descriptors={followUpEntries}
               dragState={dragState}
               entryNodeIds={entryNodeIds}
@@ -466,12 +487,14 @@ function QuestionBlockNode({
           ) : null}
         </div>
       ) : null}
+      </div>
     </div>
   );
 }
 
 function QuestionEntryGroup({
   activeDropZoneId,
+  clusterTone,
   descriptors,
   dragState,
   entryNodeIds,
@@ -486,6 +509,7 @@ function QuestionEntryGroup({
   selectedItemId,
   tree,
 }: StructureMapRenderProps & {
+  clusterTone: 'follow-up' | 'top-level';
   descriptors: QuestionEntryDescriptor[];
   entryNodeIds: string[];
   groupKind: 'follow-up' | 'supporting';
@@ -493,15 +517,28 @@ function QuestionEntryGroup({
 }) {
   const lastDescriptor = descriptors[descriptors.length - 1];
   const shouldRenderTrailingDropZone = lastDescriptor?.index === node.entries.length - 1;
+  const branchDirection =
+    groupKind === 'follow-up'
+      ? clusterTone === 'top-level'
+        ? 'down-right'
+        : 'down'
+      : undefined;
 
   return (
     <div
       className={
         groupKind === 'supporting'
-          ? 'workspace-structureMapSupportingList'
-          : 'workspace-structureMapBranchList'
+          ? 'workspace-structureMapClusterRegion workspace-structureMapClusterRegionSupporting'
+          : 'workspace-structureMapClusterRegion workspace-structureMapClusterRegionBranch'
+      }
+      data-structure-attachment={
+        groupKind === 'supporting' ? 'supporting-rail' : undefined
       }
       data-structure-branch={groupKind === 'follow-up' ? 'follow-up' : undefined}
+      data-structure-branch-direction={branchDirection}
+      data-structure-cluster-region={
+        groupKind === 'supporting' ? 'supporting' : 'branch'
+      }
       data-structure-role={
         groupKind === 'supporting' ? 'supporting-group' : 'follow-up-group'
       }
@@ -511,6 +548,13 @@ function QuestionEntryGroup({
           : `structure-map-branch-${node.question.id}`
       }
     >
+      <div
+        className={
+          groupKind === 'supporting'
+            ? 'workspace-structureMapSupportingList'
+            : 'workspace-structureMapBranchList'
+        }
+      >
       {descriptors.map(({ entry, index }) => (
         <div
           className={
@@ -574,6 +618,7 @@ function QuestionEntryGroup({
           onDropZoneEnter={onDropZoneEnter}
         />
       ) : null}
+      </div>
     </div>
   );
 }

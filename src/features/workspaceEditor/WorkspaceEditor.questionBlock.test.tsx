@@ -1575,16 +1575,38 @@ test('renders plan-step panels as question clusters with local answers, follow-u
 
   expect(topLevelCluster).toHaveAttribute('data-structure-role', 'question-cluster');
   expect(topLevelCluster).toHaveAttribute('data-structure-level', 'top-level');
+  expect(topLevelCluster).toHaveAttribute('data-structure-layout', 'logic-graph');
+
+  const topLevelMainRegion = topLevelCluster.querySelector(
+    '[data-structure-cluster-region="main"]',
+  );
+
+  expect(topLevelMainRegion).not.toBeNull();
+  expect(topLevelMainRegion).toHaveAttribute('data-structure-cluster-region', 'main');
   expect(
-    within(topLevelCluster).getByTestId(
-      'structure-map-supporting-group-question-main',
+    within(topLevelMainRegion as HTMLElement).getByTestId(
+      'structure-map-item-question-block:question-main',
     ),
-  ).toHaveAttribute('data-structure-role', 'supporting-group');
+  ).toBeInTheDocument();
+
+  const supportingRegion = within(topLevelCluster).getByTestId(
+    'structure-map-supporting-group-question-main',
+  );
+
+  expect(supportingRegion).toHaveAttribute('data-structure-role', 'supporting-group');
+  expect(supportingRegion).toHaveAttribute(
+    'data-structure-cluster-region',
+    'supporting',
+  );
+  expect(supportingRegion).toHaveAttribute(
+    'data-structure-attachment',
+    'supporting-rail',
+  );
   expect(
-    within(topLevelCluster).getByTestId('structure-map-item-answer-group:answer-first'),
+    within(supportingRegion).getByTestId('structure-map-item-answer-group:answer-first'),
   ).toBeInTheDocument();
   expect(
-    within(topLevelCluster).getByTestId(
+    within(supportingRegion).getByTestId(
       'structure-map-item-summary-group:summary-manual',
     ),
   ).toBeInTheDocument();
@@ -1599,12 +1621,18 @@ test('renders plan-step panels as question clusters with local answers, follow-u
   );
 
   expect(followUpBranch).toHaveAttribute('data-structure-branch', 'follow-up');
+  expect(followUpBranch).toHaveAttribute('data-structure-cluster-region', 'branch');
+  expect(followUpBranch).toHaveAttribute(
+    'data-structure-branch-direction',
+    'down-right',
+  );
 
   const followUpCluster = within(followUpBranch).getByTestId(
     'structure-map-question-question-follow-up',
   );
 
   expect(followUpCluster).toHaveAttribute('data-structure-level', 'follow-up');
+  expect(followUpCluster).toHaveAttribute('data-structure-layout', 'logic-graph');
   expect(
     within(followUpCluster).getByTestId(
       'structure-map-item-answer-group:answer-follow-up',

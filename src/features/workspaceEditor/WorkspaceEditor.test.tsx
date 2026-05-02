@@ -138,6 +138,11 @@ test('projects only the current module into the structure map and excludes root 
     ),
   ).toBeInTheDocument();
   expect(
+    within(structureMapShell).getByTestId(
+      'structure-map-question-question-structure-map-a',
+    ),
+  ).toHaveAttribute('data-structure-layout', 'logic-graph');
+  expect(
     within(structureMapShell).queryByTestId(
       'structure-map-question-question-structure-map-b',
     ),
