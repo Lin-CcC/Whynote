@@ -552,11 +552,13 @@ function QuestionEntryGroup({
           : `structure-map-branch-${node.question.id}`
       }
     >
-      <StructureMapConnector
-        connector={connectorKind}
-        role={connectorRole}
-        segment="root"
-      />
+      {groupKind === 'follow-up' ? (
+        <StructureMapConnector
+          connector={connectorKind}
+          role={connectorRole}
+          segment="root"
+        />
+      ) : null}
       <div
         className={
           groupKind === 'supporting'
