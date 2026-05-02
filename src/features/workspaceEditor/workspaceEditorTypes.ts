@@ -70,11 +70,14 @@ export interface LearningActionOption {
   label: string;
 }
 
+export type WorkspaceMainViewMode = 'document' | 'structure-map';
+
 export interface WorkspaceViewState {
   collapsedPlanStepIds: string[];
   collapsedQuestionBlockIds: string[];
   collapsedNodeBodyIds: string[];
   expandedHistorySectionIds: string[];
+  mainViewMode?: WorkspaceMainViewMode;
 }
 
 export interface WorkspaceEditorSelectionState {
