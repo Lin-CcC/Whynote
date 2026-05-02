@@ -18,6 +18,7 @@ import {
 import type {
   LearningActionId,
   NodeContentPatch,
+  WorkspaceMainViewMode,
   WorkspaceEditorNodeRenderContext,
   WorkspaceEditorToolbarSection,
   WorkspaceViewState,
@@ -32,6 +33,7 @@ import {
   getSummaryHistorySectionId,
 } from '../utils/workspaceViewState';
 import EditorNodeSection from './EditorNodeSection';
+import StructureMapView from './StructureMapView';
 
 type TextMainViewProps = {
   currentModuleId: string | null;
@@ -153,6 +155,7 @@ export default function TextMainView({
 
   const currentModule = getNodeOrThrow(tree, currentModuleId);
   const moduleChildNodes = getChildNodes(tree, currentModule.id);
+  const mainViewMode = workspaceViewState.mainViewMode ?? 'document';
 
   return (
     <div className="workspace-mainPanel">
@@ -165,44 +168,64 @@ export default function TextMainView({
           currentModule={currentModule}
           interactionLockReason={interactionLockReason}
           isInteractionLocked={isInteractionLocked}
+          mainViewMode={mainViewMode}
+          onMainViewModeChange={(nextMode) => {
+            onWorkspaceViewStateChange({
+              ...workspaceViewState,
+              mainViewMode: nextMode,
+            });
+          }}
           onSelectNode={onSelectNode}
           onUpdateNode={onUpdateNode}
           registerNodeElement={registerNodeElement}
           selectedNodeId={selectedNodeId}
           tree={tree}
         />
-        <div className="workspace-documentBody">
-          {moduleChildNodes.map((childNode) => (
-            <EditorNodeSection
-              activeQuestionBlockId={activeQuestionBlockId}
-              depth={1}
-              isInteractionLocked={isInteractionLocked}
-              key={childNode.id}
-              nodeId={childNode.id}
-              onDeleteNode={onDeleteNode}
-              onDeleteNodeById={onDeleteNodeById}
-              onDirectAnswerQuestion={onDirectAnswerQuestion}
-              onEvaluateAnswer={onEvaluateAnswer}
-              onEvaluateSummary={onEvaluateSummary}
-              onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
-              onGenerateSummary={onGenerateSummary}
-              onInsertAnswerForQuestion={onInsertAnswerForQuestion}
-              onInsertFollowUpQuestion={onInsertFollowUpQuestion}
-              onInsertSummaryForNode={onInsertSummaryForNode}
-              onRunLearningAction={onRunLearningAction}
-              onRunLearningActionForNode={onRunLearningActionForNode}
-              onSelectNode={onSelectNode}
-              onSetCurrentAnswer={onSetCurrentAnswer}
-              onUpdateNode={onUpdateNode}
-              onWorkspaceViewStateChange={onWorkspaceViewStateChange}
-              registerNodeElement={registerNodeElement}
-              renderNodeInlineActions={renderNodeInlineActions}
-              selectedNodeId={selectedNodeId}
-              tree={tree}
-              workspaceViewState={workspaceViewState}
-            />
-          ))}
-        </div>
+        {mainViewMode === 'structure-map' ? (
+          <StructureMapView
+            currentModuleId={currentModule.id}
+            onSelectNode={onSelectNode}
+            selectedNodeId={selectedNodeId}
+            tree={tree}
+          />
+        ) : (
+          <div
+            className="workspace-documentBody"
+            data-testid="workspace-document-body"
+          >
+            {moduleChildNodes.map((childNode) => (
+              <EditorNodeSection
+                activeQuestionBlockId={activeQuestionBlockId}
+                depth={1}
+                isInteractionLocked={isInteractionLocked}
+                key={childNode.id}
+                nodeId={childNode.id}
+                onDeleteNode={onDeleteNode}
+                onDeleteNodeById={onDeleteNodeById}
+                onDirectAnswerQuestion={onDirectAnswerQuestion}
+                onEvaluateAnswer={onEvaluateAnswer}
+                onEvaluateSummary={onEvaluateSummary}
+                onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
+                onGenerateSummary={onGenerateSummary}
+                onInsertAnswerForQuestion={onInsertAnswerForQuestion}
+                onInsertFollowUpQuestion={onInsertFollowUpQuestion}
+                onInsertSummaryForNode={onInsertSummaryForNode}
+                onRunLearningAction={onRunLearningAction}
+                onRunLearningActionForNode={onRunLearningActionForNode}
+                onSelectNode={onSelectNode}
+                onSetCurrentAnswer={onSetCurrentAnswer}
+                onUpdateNode={onUpdateNode}
+                onWorkspaceViewStateChange={onWorkspaceViewStateChange}
+                registerNodeElement={registerNodeElement}
+                renderNodeInlineActions={renderNodeInlineActions}
+                renderNodeToolbarSections={renderNodeToolbarSections}
+                selectedNodeId={selectedNodeId}
+                tree={tree}
+                workspaceViewState={workspaceViewState}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -212,6 +235,8 @@ type ModuleDocumentSurfaceProps = {
   currentModule: TreeNode;
   interactionLockReason: string | null;
   isInteractionLocked: boolean;
+  mainViewMode: WorkspaceMainViewMode;
+  onMainViewModeChange: (mode: WorkspaceMainViewMode) => void;
   onSelectNode: (nodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
@@ -225,6 +250,8 @@ function ModuleDocumentSurface({
   currentModule,
   interactionLockReason,
   isInteractionLocked,
+  mainViewMode,
+  onMainViewModeChange,
   onSelectNode,
   onUpdateNode,
   registerNodeElement,
@@ -425,6 +452,28 @@ function ModuleDocumentSurface({
             {interactionLockReason}
           </p>
         ) : null}
+        <div className="workspace-mainViewTabs" role="tablist" aria-label="主编辑区视图">
+          <button
+            aria-pressed={mainViewMode === 'document'}
+            className="workspace-mainViewTab"
+            data-active={mainViewMode === 'document'}
+            data-testid="workspace-main-view-tab-document"
+            onClick={() => onMainViewModeChange('document')}
+            type="button"
+          >
+            文档
+          </button>
+          <button
+            aria-pressed={mainViewMode === 'structure-map'}
+            className="workspace-mainViewTab"
+            data-active={mainViewMode === 'structure-map'}
+            data-testid="workspace-main-view-tab-structure-map"
+            onClick={() => onMainViewModeChange('structure-map')}
+            type="button"
+          >
+            结构地图
+          </button>
+        </div>
       </header>
       {showIntro ? (
         <div className="workspace-documentIntro">

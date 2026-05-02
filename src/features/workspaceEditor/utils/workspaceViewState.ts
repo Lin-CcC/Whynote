@@ -1,11 +1,15 @@
 import type { PreferenceValue, UiPreferences } from '../../nodeDomain';
-import type { WorkspaceViewState } from '../workspaceEditorTypes';
+import type {
+  WorkspaceMainViewMode,
+  WorkspaceViewState,
+} from '../workspaceEditorTypes';
 
 export const DEFAULT_WORKSPACE_VIEW_STATE: WorkspaceViewState = {
   collapsedPlanStepIds: [],
   collapsedQuestionBlockIds: [],
   collapsedNodeBodyIds: [],
   expandedHistorySectionIds: [],
+  mainViewMode: 'document',
 };
 
 export function readWorkspaceViewState(
@@ -43,6 +47,7 @@ export function normalizeWorkspaceViewState(value: unknown): WorkspaceViewState 
     expandedHistorySectionIds: normalizeStringArray(
       source.expandedHistorySectionIds,
     ),
+    mainViewMode: normalizeMainViewMode(source.mainViewMode),
   };
 }
 
@@ -76,6 +81,10 @@ export function getAnswerHistorySectionId(answerNodeId: string) {
 
 export function getSummaryHistorySectionId(summaryNodeId: string) {
   return `summary:${summaryNodeId}:history`;
+}
+
+function normalizeMainViewMode(value: unknown): WorkspaceMainViewMode {
+  return value === 'structure-map' ? 'structure-map' : 'document';
 }
 
 function normalizeStringArray(value: unknown) {

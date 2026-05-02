@@ -82,6 +82,86 @@ test('renders the main view inside a single-column document shell with a tighten
   expect(screen.queryByText('主视图规则')).not.toBeInTheDocument();
 });
 
+test('shows document and structure map tabs and switches only the main editor surface', async () => {
+  renderWorkspaceEditorWithViewState({});
+
+  expect(
+    screen.getByTestId('workspace-main-view-tab-document'),
+  ).toHaveAttribute('aria-pressed', 'true');
+  expect(
+    screen.getByTestId('workspace-main-view-tab-structure-map'),
+  ).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.getByTestId('workspace-document-body')).toBeInTheDocument();
+  expect(
+    screen.queryByTestId('workspace-structure-map-shell'),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole('tree', { name: '当前模块结构' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId('workspace-main-view-tab-structure-map'));
+
+  await waitFor(() => {
+    expect(
+      screen.getByTestId('workspace-structure-map-shell'),
+    ).toBeInTheDocument();
+  });
+
+  expect(
+    screen.getByTestId('workspace-main-view-tab-structure-map'),
+  ).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.queryByTestId('workspace-document-body')).not.toBeInTheDocument();
+  expect(screen.getByRole('tree', { name: '当前模块结构' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId('workspace-main-view-tab-document'));
+
+  await waitFor(() => {
+    expect(screen.getByTestId('workspace-document-body')).toBeInTheDocument();
+  });
+});
+
+test('projects only the current module into the structure map and excludes root resources', async () => {
+  renderWorkspaceEditorWithViewState({
+    initialModuleId: 'module-structure-map-a',
+    initialSelectedNodeId: 'question-structure-map-a',
+    initialSnapshot: createStructureMapProjectionSnapshot(),
+  });
+
+  fireEvent.click(screen.getByTestId('workspace-main-view-tab-structure-map'));
+
+  const structureMapShell = await screen.findByTestId(
+    'workspace-structure-map-shell',
+  );
+
+  expect(
+    within(structureMapShell).getByTestId(
+      'structure-map-question-question-structure-map-a',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(structureMapShell).queryByTestId(
+      'structure-map-question-question-structure-map-b',
+    ),
+  ).not.toBeInTheDocument();
+  expect(
+    within(structureMapShell).queryByText('根资源节点'),
+  ).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '第二模块' }));
+
+  await waitFor(() => {
+    expect(
+      within(screen.getByTestId('workspace-structure-map-shell')).getByTestId(
+        'structure-map-question-question-structure-map-b',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  expect(
+    within(screen.getByTestId('workspace-structure-map-shell')).queryByTestId(
+      'structure-map-question-question-structure-map-a',
+    ),
+  ).not.toBeInTheDocument();
+});
+
 test('edits the current module from the top header and keeps the intro without a duplicated module card', async () => {
   const snapshots: WorkspaceSnapshot[] = [];
 
@@ -2024,4 +2104,110 @@ function getSectionByHeading(name: string) {
   }
 
   return section;
+}
+
+function createStructureMapProjectionSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '结构地图投影',
+    workspaceId: 'workspace-structure-map-projection',
+    rootId: 'theme-structure-map-projection',
+    createdAt: '2026-05-02T00:00:00.000Z',
+    updatedAt: '2026-05-02T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-structure-map-a',
+      title: '第一模块',
+      content: '',
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-structure-map-a',
+    createNode({
+      type: 'plan-step',
+      id: 'step-structure-map-a',
+      title: '第一步骤',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-structure-map-a',
+    createNode({
+      type: 'question',
+      id: 'question-structure-map-a',
+      title: '第一模块问题',
+      content: '',
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    }),
+  );
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-structure-map-b',
+      title: '第二模块',
+      content: '',
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-structure-map-b',
+    createNode({
+      type: 'plan-step',
+      id: 'step-structure-map-b',
+      title: '第二步骤',
+      content: '',
+      status: 'todo',
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-structure-map-b',
+    createNode({
+      type: 'question',
+      id: 'question-structure-map-b',
+      title: '第二模块问题',
+      content: '',
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    }),
+  );
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'resource',
+      id: 'resource-structure-map-root',
+      title: '根资源节点',
+      content: '不应进入结构地图。',
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
 }

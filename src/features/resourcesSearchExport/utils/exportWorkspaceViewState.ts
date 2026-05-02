@@ -48,6 +48,7 @@ export function readCompleteWorkspaceViewStateForExport(
     collapsedNodeBodyIds,
     collapsedQuestionBlockIds,
     expandedHistorySectionIds,
+    mainViewMode: 'document',
   };
 }
 
