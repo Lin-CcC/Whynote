@@ -1714,7 +1714,7 @@ test('renders plan-step panels as question clusters with local answers, follow-u
 test('shows drag affordance on draggable structure-map items', async () => {
   renderQuestionBlockEditor({
     initialSnapshot: createCrossStepStructureMapSnapshot(),
-    initialSelectedNodeId: 'question-main',
+    initialSelectedNodeId: 'step-question-block',
     initialWorkspaceViewState: createWorkspaceViewState({
       mainViewMode: 'structure-map',
     }),
@@ -1850,21 +1850,23 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
   });
 
   const panel = await screen.findByTestId('structure-map-panel-step-question-block');
+  const getToolbarActions = () =>
+    screen
+      .getByTestId('workspace-structure-map-shell')
+      .querySelector('[data-structure-toolbar-section="actions"]') as HTMLElement;
 
-  fireEvent.click(within(panel).getByRole('button', { name: '收起步骤面板' }));
+  fireEvent.click(within(getToolbarActions()).getByText('收起面板'));
 
   await waitFor(() => {
-    expect(within(panel).getByText('当前步骤面板已折叠。')).toBeInTheDocument();
+    expect(
+      within(panel).queryByTestId('structure-map-question-question-main'),
+    ).not.toBeInTheDocument();
   });
 
   expect(viewStateChanges.at(-1)?.collapsedStructureMapStepIds).toContain(
     'step-question-block',
   );
-  expect(
-    within(panel).queryByTestId('structure-map-question-question-main'),
-  ).not.toBeInTheDocument();
-
-  fireEvent.click(within(panel).getByRole('button', { name: '展开步骤面板' }));
+  fireEvent.click(within(getToolbarActions()).getByText('展开面板'));
 
   await waitFor(() => {
     expect(
@@ -1874,18 +1876,24 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
 
   const topLevelCluster = within(panel).getByTestId('structure-map-question-question-main');
 
-  fireEvent.click(within(topLevelCluster).getByRole('button', { name: '收起问题簇' }));
+  fireEvent.click(
+    within(
+      topLevelCluster.querySelector('.workspace-structureMapClusterHeader') as HTMLElement,
+    ).getByRole('button', { name: '收起问题簇' }),
+  );
 
   await waitFor(() => {
-    expect(within(topLevelCluster).getByText('当前问题簇已折叠。')).toBeInTheDocument();
+    expect(
+      within(topLevelCluster).queryByTestId('structure-map-branch-question-main'),
+    ).not.toBeInTheDocument();
   });
 
   expect(viewStateChanges.at(-1)?.collapsedStructureMapClusterIds).toContain('question-main');
-  expect(
-    within(topLevelCluster).queryByTestId('structure-map-branch-question-main'),
-  ).not.toBeInTheDocument();
-
-  fireEvent.click(within(topLevelCluster).getByRole('button', { name: '展开问题簇' }));
+  fireEvent.click(
+    within(
+      topLevelCluster.querySelector('.workspace-structureMapClusterHeader') as HTMLElement,
+    ).getByRole('button', { name: '展开问题簇' }),
+  );
 
   await waitFor(() => {
     expect(
@@ -1895,20 +1903,28 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
 
   const followUpCluster = screen.getByTestId('structure-map-question-question-follow-up');
 
-  fireEvent.click(within(followUpCluster).getByRole('button', { name: '收起追问分支' }));
+  fireEvent.click(
+    within(
+      followUpCluster.querySelector('.workspace-structureMapClusterHeader') as HTMLElement,
+    ).getByRole('button', { name: '收起问题簇' }),
+  );
 
   await waitFor(() => {
-    expect(within(followUpCluster).getByText('当前追问分支已折叠。')).toBeInTheDocument();
+    expect(
+      within(followUpCluster).queryByTestId(
+        'structure-map-item-answer-group:answer-follow-up',
+      ),
+    ).not.toBeInTheDocument();
   });
 
   expect(viewStateChanges.at(-1)?.collapsedStructureMapFollowUpIds).toContain(
     'question-follow-up',
   );
-  expect(
-    within(followUpCluster).queryByTestId('structure-map-item-answer-group:answer-follow-up'),
-  ).not.toBeInTheDocument();
-
-  fireEvent.click(within(followUpCluster).getByRole('button', { name: '展开追问分支' }));
+  fireEvent.click(
+    within(
+      followUpCluster.querySelector('.workspace-structureMapClusterHeader') as HTMLElement,
+    ).getByRole('button', { name: '展开问题簇' }),
+  );
 
   await waitFor(() => {
     expect(
@@ -1931,11 +1947,16 @@ test('supports manually focusing the current plan-step from the structure map', 
     },
   });
 
-  const currentPanel = await screen.findByTestId('structure-map-panel-step-question-block');
-
+  await screen.findByTestId('structure-map-panel-step-question-block');
   expect(screen.getByTestId('structure-map-panel-step-secondary')).toBeInTheDocument();
 
-  fireEvent.click(within(currentPanel).getByRole('button', { name: '聚焦当前步骤' }));
+  fireEvent.click(
+    within(
+      screen
+        .getByTestId('workspace-structure-map-shell')
+        .querySelector('[data-structure-toolbar-section="actions"]') as HTMLElement,
+    ).getByRole('button', { name: '聚焦当前步骤' }),
+  );
 
   await waitFor(() => {
     expect(
@@ -1947,9 +1968,9 @@ test('supports manually focusing the current plan-step from the structure map', 
     kind: 'plan-step',
     nodeId: 'step-question-block',
   });
-  expect(screen.getByRole('button', { name: '退出地图聚焦' })).toBeInTheDocument();
+  expect(screen.getByText('退出聚焦')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '退出地图聚焦' }));
+  fireEvent.click(screen.getByText('退出聚焦'));
 
   await waitFor(() => {
     expect(screen.getByTestId('structure-map-panel-step-secondary')).toBeInTheDocument();
@@ -1972,11 +1993,16 @@ test('supports manually focusing the current question cluster from the structure
     },
   });
 
-  const topLevelCluster = await screen.findByTestId('structure-map-question-question-main');
-
+  await screen.findByTestId('structure-map-question-question-main');
   expect(screen.getByTestId('structure-map-scaffold-summary-scaffold-step')).toBeInTheDocument();
 
-  fireEvent.click(within(topLevelCluster).getByRole('button', { name: '聚焦当前问题簇' }));
+  fireEvent.click(
+    within(
+      screen
+        .getByTestId('workspace-structure-map-shell')
+        .querySelector('[data-structure-toolbar-section="actions"]') as HTMLElement,
+    ).getByRole('button', { name: '聚焦当前问题簇' }),
+  );
 
   await waitFor(() => {
     expect(
@@ -1988,9 +2014,9 @@ test('supports manually focusing the current question cluster from the structure
     kind: 'question-cluster',
     nodeId: 'question-main',
   });
-  expect(screen.getByRole('button', { name: '退出地图聚焦' })).toBeInTheDocument();
+  expect(screen.getByText('退出聚焦')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: '退出地图聚焦' }));
+  fireEvent.click(screen.getByText('退出聚焦'));
 
   await waitFor(() => {
     expect(
@@ -2017,7 +2043,7 @@ test('regular structure-map selection does not automatically enter focus mode', 
     expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
   });
 
-  expect(screen.queryByRole('button', { name: '退出地图聚焦' })).not.toBeInTheDocument();
+  expect(screen.queryByText('退出聚焦')).not.toBeInTheDocument();
   expect(viewStateChanges.at(-1)?.structureMapFocusTarget).toBeNull();
 
   fireEvent.click(screen.getByTestId('structure-map-item-answer-group:answer-first'));

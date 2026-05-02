@@ -119,6 +119,71 @@ test('shows document and structure map tabs and switches only the main editor su
   });
 });
 
+test('renders the global view switch inside the floating bottom-left dock instead of the top header', () => {
+  renderWorkspaceEditorWithViewState({});
+
+  const viewSwitch = screen.getByTestId('workspace-main-view-switch');
+
+  expect(viewSwitch).toHaveAttribute(
+    'data-structure-view-switch',
+    'floating-bottom-left',
+  );
+  expect(
+    within(viewSwitch).getByTestId('workspace-main-view-tab-document'),
+  ).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('workspace-document-header')).queryByTestId(
+      'workspace-main-view-switch',
+    ),
+  ).not.toBeInTheDocument();
+});
+
+test('renders a map mode toolbar with context, status, and actions, and keeps 聚焦中 as a status badge', async () => {
+  renderWorkspaceEditorWithViewState({
+    initialModuleId: 'module-structure-map-a',
+    initialSelectedNodeId: 'question-structure-map-a',
+    initialSnapshot: createStructureMapProjectionSnapshot(),
+  });
+
+  fireEvent.click(screen.getByTestId('workspace-main-view-tab-structure-map'));
+
+  const structureMapShell = await screen.findByTestId(
+    'workspace-structure-map-shell',
+  );
+  const toolbar = structureMapShell.querySelector(
+    '[data-structure-toolbar="map-mode"]',
+  );
+
+  expect(toolbar).not.toBeNull();
+
+  const contextSection = toolbar?.querySelector(
+    '[data-structure-toolbar-section="context"]',
+  );
+  const statusSection = toolbar?.querySelector(
+    '[data-structure-toolbar-section="status"]',
+  );
+  const actionsSection = toolbar?.querySelector(
+    '[data-structure-toolbar-section="actions"]',
+  );
+
+  expect(contextSection).not.toBeNull();
+  expect(statusSection).not.toBeNull();
+  expect(actionsSection).not.toBeNull();
+
+  fireEvent.click(
+    within(actionsSection as HTMLElement).getByRole('button', {
+      name: '聚焦当前问题簇',
+    }),
+  );
+
+  expect(within(statusSection as HTMLElement).getByText('聚焦中')).toBeInTheDocument();
+  expect(
+    within(statusSection as HTMLElement).queryByRole('button', { name: '聚焦中' }),
+  ).not.toBeInTheDocument();
+  expect(within(actionsSection as HTMLElement).getByText('退出聚焦')).toBeInTheDocument();
+  expect(within(actionsSection as HTMLElement).getByText('收起面板')).toBeInTheDocument();
+});
+
 test('projects only the current module into the structure map and excludes root resources', async () => {
   renderWorkspaceEditorWithViewState({
     initialModuleId: 'module-structure-map-a',
@@ -171,6 +236,61 @@ test('projects only the current module into the structure map and excludes root 
       'structure-map-question-question-structure-map-a',
     ),
   ).not.toBeInTheDocument();
+});
+
+test('keeps cluster collapse in the header icon slot and preserves logic-graph connectors and drag targets', async () => {
+  renderWorkspaceEditorWithViewState({
+    initialModuleId: 'module-structure-map-rich',
+    initialSelectedNodeId: 'question-structure-map-rich',
+    initialSnapshot: createStructureMapChromeSnapshot(),
+  });
+
+  fireEvent.click(screen.getByTestId('workspace-main-view-tab-structure-map'));
+
+  const structureMapShell = await screen.findByTestId(
+    'workspace-structure-map-shell',
+  );
+  const cluster = within(structureMapShell).getByTestId(
+    'structure-map-question-question-structure-map-rich',
+  );
+  const collapseAction = within(
+    cluster.querySelector('.workspace-structureMapClusterHeader') as HTMLElement,
+  ).getByRole('button', {
+    name: '收起问题簇',
+  });
+
+  expect(collapseAction).toHaveAttribute('data-structure-cluster-action', 'collapse');
+  expect(collapseAction).toHaveAttribute(
+    'data-structure-cluster-action-style',
+    'icon-tooltip',
+  );
+  expect(cluster.querySelector('.workspace-structureMapClusterHeader')).toContainElement(
+    collapseAction,
+  );
+  expect(
+    cluster.querySelector(
+      ':scope > .workspace-structureMapClusterCanvas > .workspace-structureMapClusterBody > [data-structure-cluster-action="collapse"]',
+    ),
+  ).toBeNull();
+  expect(cluster).toHaveAttribute('data-structure-layout', 'logic-graph');
+  expect(
+    structureMapShell.querySelector('[data-structure-connector="supporting-spine"]'),
+  ).not.toBeNull();
+  expect(
+    within(structureMapShell).getByTestId(
+      'structure-map-supporting-group-question-structure-map-rich',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(structureMapShell).getByTestId(
+      'structure-map-supporting-answer-structure-map-rich',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(structureMapShell).getByTestId(
+      'structure-map-dropzone-question-structure-map-rich-0',
+    ),
+  ).toBeInTheDocument();
 });
 
 test('edits the current module from the top header and keeps the intro without a duplicated module card', async () => {
@@ -2217,6 +2337,85 @@ function createStructureMapProjectionSnapshot(): WorkspaceSnapshot {
       content: '不应进入结构地图。',
       createdAt: '2026-05-02T00:00:00.000Z',
       updatedAt: '2026-05-02T00:00:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createStructureMapChromeSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '结构地图界面层级',
+    workspaceId: 'workspace-structure-map-rich',
+    rootId: 'theme-structure-map-rich',
+    createdAt: '2026-05-03T00:00:00.000Z',
+    updatedAt: '2026-05-03T00:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-structure-map-rich',
+      title: '结构地图样式模块',
+      content: '',
+      createdAt: '2026-05-03T00:00:00.000Z',
+      updatedAt: '2026-05-03T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-structure-map-rich',
+    createNode({
+      type: 'plan-step',
+      id: 'step-structure-map-rich',
+      title: '神经网络的微观构成',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-05-03T00:00:00.000Z',
+      updatedAt: '2026-05-03T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-structure-map-rich',
+    createNode({
+      type: 'question',
+      id: 'question-structure-map-rich',
+      title: '什么是神经网络的微观构成？',
+      content: '',
+      createdAt: '2026-05-03T00:00:00.000Z',
+      updatedAt: '2026-05-03T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-structure-map-rich',
+    createNode({
+      type: 'answer',
+      id: 'answer-structure-map-rich',
+      title: '权重与激活',
+      content: '',
+      createdAt: '2026-05-03T00:00:00.000Z',
+      updatedAt: '2026-05-03T00:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-structure-map-rich',
+    createNode({
+      type: 'question',
+      id: 'question-structure-map-follow-up',
+      title: '激活函数如何影响表达能力？',
+      content: '',
+      createdAt: '2026-05-03T00:00:00.000Z',
+      updatedAt: '2026-05-03T00:00:00.000Z',
     }),
   );
 
