@@ -118,6 +118,35 @@ export default function TextMainView({
     }
   }, [onWorkspaceViewStateChange, selectedNodeId, tree, workspaceViewState]);
 
+  useEffect(() => {
+    if (!selectedNodeId) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      const selectedNodeElement = document.querySelector<HTMLElement>(
+        `[data-testid="editor-node-${selectedNodeId}"]`,
+      );
+      const activeElement = document.activeElement;
+
+      if (
+        !selectedNodeElement ||
+        selectedNodeElement.contains(activeElement)
+      ) {
+        return;
+      }
+
+      selectedNodeElement.focus();
+      selectedNodeElement.scrollIntoView?.({
+        block: 'nearest',
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [selectedNodeId, tree, workspaceViewState]);
+
   if (!currentModuleId || !tree.nodes[currentModuleId]) {
     return (
       <div className="workspace-mainPanel">
@@ -197,6 +226,7 @@ export default function TextMainView({
               onWorkspaceViewStateChange={onWorkspaceViewStateChange}
               registerNodeElement={registerNodeElement}
               renderNodeInlineActions={renderNodeInlineActions}
+              renderNodeToolbarSections={renderNodeToolbarSections}
               selectedNodeId={selectedNodeId}
               tree={tree}
               workspaceViewState={workspaceViewState}

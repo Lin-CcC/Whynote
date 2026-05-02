@@ -17,6 +17,7 @@ import {
   insertSiblingNode,
   liftNode,
   lowerNode,
+  moveNode,
   type WorkspaceSnapshot,
 } from '../nodeDomain';
 import WorkspaceEditor from './WorkspaceEditor';
@@ -1145,6 +1146,9 @@ function createOperationSpies(): WorkspaceEditorOperations {
     deleteNode: vi.fn((tree, nodeId) => deleteNode(tree, nodeId)),
     liftNode: vi.fn((tree, nodeId) => liftNode(tree, nodeId)),
     lowerNode: vi.fn((tree, nodeId) => lowerNode(tree, nodeId)),
+    moveNode: vi.fn((tree, nodeId, targetParentNodeId, index) =>
+      moveNode(tree, nodeId, targetParentNodeId, index),
+    ),
   };
 }
 

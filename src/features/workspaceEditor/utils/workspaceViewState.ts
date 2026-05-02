@@ -6,6 +6,7 @@ export const DEFAULT_WORKSPACE_VIEW_STATE: WorkspaceViewState = {
   collapsedQuestionBlockIds: [],
   collapsedNodeBodyIds: [],
   expandedHistorySectionIds: [],
+  mainViewMode: 'document',
 };
 
 export function readWorkspaceViewState(
@@ -43,6 +44,8 @@ export function normalizeWorkspaceViewState(value: unknown): WorkspaceViewState 
     expandedHistorySectionIds: normalizeStringArray(
       source.expandedHistorySectionIds,
     ),
+    mainViewMode:
+      source.mainViewMode === 'structure-map' ? 'structure-map' : 'document',
   };
 }
 

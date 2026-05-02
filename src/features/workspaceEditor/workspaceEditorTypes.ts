@@ -5,6 +5,8 @@ import type {
   NonRootNode,
   NodeTree,
   PlanStepStatus,
+  StructureMapMoveRequest,
+  StructureMapMoveValidationResult,
   WorkspaceSnapshot,
 } from '../nodeDomain';
 
@@ -24,6 +26,12 @@ export interface WorkspaceEditorOperations {
   deleteNode: (tree: NodeTree, nodeId: string) => NodeTree;
   liftNode: (tree: NodeTree, nodeId: string) => NodeTree;
   lowerNode: (tree: NodeTree, nodeId: string) => NodeTree;
+  moveNode: (
+    tree: NodeTree,
+    nodeId: string,
+    targetParentNodeId: string,
+    index?: number,
+  ) => NodeTree;
 }
 
 export interface NodeContentPatch {
@@ -75,7 +83,10 @@ export interface WorkspaceViewState {
   collapsedQuestionBlockIds: string[];
   collapsedNodeBodyIds: string[];
   expandedHistorySectionIds: string[];
+  mainViewMode: WorkspaceMainViewMode;
 }
+
+export type WorkspaceMainViewMode = 'document' | 'structure-map';
 
 export interface WorkspaceEditorSelectionState {
   currentModuleId: string | null;
@@ -103,10 +114,14 @@ export interface WorkspaceEditorRenderContext
   ) => void;
   createModule: () => void;
   currentModule: TreeNode | null;
+  moveStructureMapNode: (request: StructureMapMoveRequest) => void;
   runLearningAction: (actionId: LearningActionId) => void;
   selectedNode: TreeNode | null;
   selectNode: (nodeId: string) => void;
   tree: NodeTree;
+  validateStructureMapMove: (
+    request: StructureMapMoveRequest,
+  ) => StructureMapMoveValidationResult;
   workspaceTitle: string;
 }
 

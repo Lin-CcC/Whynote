@@ -1271,6 +1271,7 @@ test('restores inner question block, body, and history state after collapsing an
       collapsedQuestionBlockIds: ['question-main'],
       collapsedNodeBodyIds: ['answer-first'],
       expandedHistorySectionIds: [getAnswerHistorySectionId('answer-first')],
+      mainViewMode: 'document',
     },
   });
 
@@ -1335,6 +1336,7 @@ test('does not auto-reopen a group history section after the user collapses it',
       collapsedQuestionBlockIds: [],
       collapsedNodeBodyIds: [],
       expandedHistorySectionIds: [getAnswerHistorySectionId('answer-first')],
+      mainViewMode: 'document',
     },
   });
 
@@ -1373,6 +1375,7 @@ test('does not auto-reopen a plan-step after the user manually collapses it', as
       collapsedQuestionBlockIds: [],
       collapsedNodeBodyIds: [],
       expandedHistorySectionIds: [],
+      mainViewMode: 'document',
     },
   });
 
@@ -1446,6 +1449,7 @@ test('auto-expands a collapsed plan-step, block, and hidden history when selecti
       collapsedQuestionBlockIds: ['question-main'],
       collapsedNodeBodyIds: ['judgment-first-history'],
       expandedHistorySectionIds: [],
+      mainViewMode: 'document',
     },
   });
 
@@ -1477,6 +1481,191 @@ test('auto-expands a collapsed plan-step, block, and hidden history when selecti
   ).toBeInTheDocument();
 });
 
+test('clicking a structure-map answer group switches back to document and reveals the target', async () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: {
+      collapsedPlanStepIds: ['step-question-block'],
+      collapsedQuestionBlockIds: ['question-main'],
+      collapsedNodeBodyIds: ['answer-first'],
+      expandedHistorySectionIds: [],
+      mainViewMode: 'structure-map',
+    },
+  });
+
+  expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId('structure-map-item-answer-group:answer-first'));
+
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('workspace-structure-map-shell'),
+    ).not.toBeInTheDocument();
+  });
+
+  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+    'data-collapsed',
+    'false',
+  );
+  expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+  expect(
+    screen.queryByRole('button', { name: '展开正文' }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByTestId('editor-node-content-display-answer-first')).toBeInTheDocument();
+});
+
+test.each([
+  ['judgment-first-latest', 'structure-map-item-answer-group:answer-first'],
+  ['judgment-summary-latest', 'structure-map-item-summary-group:summary-manual'],
+  ['question-follow-up', 'structure-map-item-question-block:question-follow-up'],
+])(
+  'keeps document selection mapped to the correct structure-map unit for %s',
+  async (selectedNodeId, expectedMapItemTestId) => {
+    renderQuestionBlockEditor({
+      initialSelectedNodeId: selectedNodeId,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '结构地图' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId(expectedMapItemTestId)).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+  },
+);
+
+test('dragging a structure-map unit reorders the document, selects the moved anchor, and expands the target path', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'summary-manual',
+    initialWorkspaceViewState: {
+      collapsedPlanStepIds: ['step-question-block'],
+      collapsedQuestionBlockIds: ['question-main'],
+      collapsedNodeBodyIds: [],
+      expandedHistorySectionIds: [],
+      mainViewMode: 'structure-map',
+    },
+    onSnapshotChange: (snapshot) => {
+      snapshots.push(snapshot);
+    },
+  });
+
+  fireEvent.dragStart(
+    screen.getByTestId('structure-map-item-summary-group:summary-manual'),
+  );
+  fireEvent.dragOver(
+    screen.getByTestId('structure-map-dropzone-question-main-0'),
+  );
+  fireEvent.drop(screen.getByTestId('structure-map-dropzone-question-main-0'));
+
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('workspace-structure-map-shell'),
+    ).not.toBeInTheDocument();
+  });
+
+  expect(screen.getByTestId('editor-node-summary-manual')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+    'data-collapsed',
+    'false',
+  );
+  expectVisibleNodeOrder('question-main', [
+    'summary-manual',
+    'judgment-summary-latest',
+    'answer-first',
+    'judgment-first-latest',
+    'summary-first-latest',
+    'answer-second',
+    'judgment-second-latest',
+    'summary-second-latest',
+    'question-follow-up',
+  ]);
+
+  expect(
+    snapshots.at(-1)?.tree.nodes['question-main']?.childIds[0],
+  ).toBe('summary-manual');
+});
+
+test('allows moving a top-level question block across plan steps from the structure map', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+
+  renderQuestionBlockEditor({
+    initialSnapshot: createCrossStepStructureMapSnapshot(),
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: {
+      collapsedPlanStepIds: ['step-question-block', 'step-secondary'],
+      collapsedQuestionBlockIds: ['question-main'],
+      collapsedNodeBodyIds: [],
+      expandedHistorySectionIds: [],
+      mainViewMode: 'structure-map',
+    },
+    onSnapshotChange: (snapshot) => {
+      snapshots.push(snapshot);
+    },
+  });
+
+  fireEvent.dragStart(
+    screen.getByTestId('structure-map-item-question-block:question-main'),
+  );
+  fireEvent.dragOver(screen.getByTestId('structure-map-dropzone-step-secondary-1'));
+  fireEvent.drop(screen.getByTestId('structure-map-dropzone-step-secondary-1'));
+
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('workspace-structure-map-shell'),
+    ).not.toBeInTheDocument();
+  });
+
+  expect(screen.getByTestId('editor-node-question-main')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+  expect(screen.getByTestId('editor-node-step-secondary')).toBeInTheDocument();
+  expect(screen.getByTestId('editor-node-question-cross-step')).toBeInTheDocument();
+  expect(screen.getByTestId('question-block-question-main')).toBeInTheDocument();
+  expect(snapshots.at(-1)?.tree.nodes['question-main']?.parentId).toBe('step-secondary');
+  expect(snapshots.at(-1)?.tree.nodes['step-secondary']?.childIds).toEqual([
+    'question-cross-step',
+    'question-main',
+  ]);
+});
+
+test('keeps unsupported resource nodes out of the structure map projection', async () => {
+  renderQuestionBlockEditor({
+    initialSnapshot: createStructureMapSnapshotWithResource(),
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: {
+      ...DEFAULT_WORKSPACE_VIEW_STATE,
+      mainViewMode: 'structure-map',
+    },
+  });
+
+  await waitFor(() => {
+    expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+  });
+
+  const structureMapShell = screen.getByTestId('workspace-structure-map-shell');
+
+  expect(screen.getByTestId('structure-map-item-plan-step:step-question-block')).toBeInTheDocument();
+  expect(
+    within(structureMapShell).queryByText('Reference material'),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByTestId('structure-map-item-question-block:resource-module-direct'),
+  ).not.toBeInTheDocument();
+});
+
 test('falls back to the latest non-empty answer when currentAnswerId is missing', () => {
   renderQuestionBlockEditor({
     initialSnapshot: createLegacyAnswerFallbackSnapshot(),
@@ -1497,15 +1686,20 @@ function renderQuestionBlockEditor(
     onViewStateChange?: (state: WorkspaceViewState) => void;
   },
 ) {
-  const snapshot = options?.initialSnapshot ?? createQuestionBlockSnapshot();
-  const initialWorkspaceViewState =
-    options?.initialWorkspaceViewState ?? DEFAULT_WORKSPACE_VIEW_STATE;
-  const onDirectAnswerQuestion = options?.onDirectAnswerQuestion ?? vi.fn();
-  const onEvaluateAnswer = options?.onEvaluateAnswer ?? vi.fn();
-  const onEvaluateSummary = options?.onEvaluateSummary ?? vi.fn();
+  const {
+    initialWorkspaceViewState = DEFAULT_WORKSPACE_VIEW_STATE,
+    onViewStateChange,
+    ...workspaceEditorProps
+  } = options ?? {};
+  const snapshot =
+    workspaceEditorProps.initialSnapshot ?? createQuestionBlockSnapshot();
+  const onDirectAnswerQuestion =
+    workspaceEditorProps.onDirectAnswerQuestion ?? vi.fn();
+  const onEvaluateAnswer = workspaceEditorProps.onEvaluateAnswer ?? vi.fn();
+  const onEvaluateSummary = workspaceEditorProps.onEvaluateSummary ?? vi.fn();
   const onGenerateFollowUpQuestion =
-    options?.onGenerateFollowUpQuestion ?? vi.fn();
-  const onGenerateSummary = options?.onGenerateSummary ?? vi.fn();
+    workspaceEditorProps.onGenerateFollowUpQuestion ?? vi.fn();
+  const onGenerateSummary = workspaceEditorProps.onGenerateSummary ?? vi.fn();
 
   function Wrapper() {
     const [workspaceViewState, setWorkspaceViewState] = useState(
@@ -1514,10 +1708,14 @@ function renderQuestionBlockEditor(
 
     return (
       <WorkspaceEditor
+        {...workspaceEditorProps}
         initialModuleId={
-          options?.initialModuleId ?? snapshot.tree.nodes[snapshot.workspace.rootNodeId].childIds[0]
+          workspaceEditorProps.initialModuleId ??
+          snapshot.tree.nodes[snapshot.workspace.rootNodeId].childIds[0]
         }
-        initialSelectedNodeId={options?.initialSelectedNodeId ?? 'question-main'}
+        initialSelectedNodeId={
+          workspaceEditorProps.initialSelectedNodeId ?? 'question-main'
+        }
         initialSnapshot={snapshot}
         onDirectAnswerQuestion={onDirectAnswerQuestion}
         onEvaluateAnswer={onEvaluateAnswer}
@@ -1526,7 +1724,7 @@ function renderQuestionBlockEditor(
         onGenerateSummary={onGenerateSummary}
         onWorkspaceViewStateChange={(state) => {
           setWorkspaceViewState(state);
-          options?.onViewStateChange?.(state);
+          onViewStateChange?.(state);
         }}
         workspaceViewState={workspaceViewState}
       />
@@ -1855,6 +2053,79 @@ function createLegacyAnswerFallbackSnapshot(): WorkspaceSnapshot {
   if (legacyQuestionNode?.type === 'question') {
     delete legacyQuestionNode.currentAnswerId;
   }
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createCrossStepStructureMapSnapshot(): WorkspaceSnapshot {
+  const snapshot = createQuestionBlockSnapshot();
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    'module-question-block',
+    createNode({
+      type: 'plan-step',
+      id: 'step-secondary',
+      title: '第二步骤',
+      content: '',
+      status: 'todo',
+      createdAt: '2026-04-30T09:20:00.000Z',
+      updatedAt: '2026-04-30T09:20:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-secondary',
+    createNode({
+      type: 'question',
+      id: 'question-cross-step',
+      title: '第二步骤问题',
+      content: '用于验证 question block 可以跨 step 移动。',
+      createdAt: '2026-04-30T09:21:00.000Z',
+      updatedAt: '2026-04-30T09:21:00.000Z',
+    }),
+  );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createStructureMapSnapshotWithResource(): WorkspaceSnapshot {
+  const snapshot = createQuestionBlockSnapshot();
+  const resourceNode = createNode({
+    type: 'resource',
+    id: 'resource-module-direct',
+    title: 'Reference material',
+    sourceUri: 'file:///reference.md',
+    createdAt: '2026-04-30T09:20:00.000Z',
+    updatedAt: '2026-04-30T09:20:00.000Z',
+  });
+
+  resourceNode.parentId = 'module-question-block';
+  resourceNode.order =
+    snapshot.tree.nodes['module-question-block']?.childIds.length ?? 0;
+
+  const tree = {
+    ...snapshot.tree,
+    nodes: {
+      ...snapshot.tree.nodes,
+      [resourceNode.id]: resourceNode,
+    },
+  };
+
+  const moduleNode = tree.nodes['module-question-block'];
+
+  if (moduleNode?.type !== 'module') {
+    throw new Error('Expected module-question-block to exist.');
+  }
+
+  moduleNode.childIds = [...moduleNode.childIds, resourceNode.id];
 
   return {
     ...snapshot,

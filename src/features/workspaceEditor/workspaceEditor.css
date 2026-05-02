@@ -1,12 +1,41 @@
 .workspace-panelStack,
-.workspace-mainPanel {
+.workspace-mainPanel,
+.workspace-mainViewShell {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.workspace-mainPanel {
+.workspace-mainPanel,
+.workspace-mainViewShell {
   align-items: center;
+}
+
+.workspace-mainViewModeBar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.workspace-mainViewModeButton {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.workspace-mainViewModeButton[data-active='true'] {
+  border-color: rgba(14, 116, 144, 0.16);
+  background: rgba(240, 249, 255, 0.94);
+  color: #0e7490;
 }
 
 .workspace-panelStack {
@@ -148,6 +177,97 @@
 .workspace-documentBody {
   display: grid;
   gap: 1.25rem;
+}
+
+.workspace-structureMapShell {
+  gap: 1.1rem;
+}
+
+.workspace-structureMapBody {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.workspace-structureMapSection {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.workspace-structureMapList {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.workspace-structureMapItem {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.workspace-structureMapSlot {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.workspace-structureMapList .workspace-structureMapList {
+  margin-left: 1.1rem;
+  padding-left: 0.9rem;
+  border-left: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.workspace-structureMapButton {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.88);
+  color: #0f172a;
+  cursor: pointer;
+  text-align: left;
+}
+
+.workspace-structureMapButton[data-selected='true'] {
+  border-color: rgba(14, 116, 144, 0.22);
+  background: rgba(240, 249, 255, 0.94);
+}
+
+.workspace-structureMapLabel,
+.workspace-structureMapBadge {
+  flex: 0 0 auto;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.workspace-structureMapLabel {
+  background: rgba(240, 253, 250, 0.92);
+  color: #0f766e;
+}
+
+.workspace-structureMapText {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-structureMapBadge {
+  background: rgba(224, 242, 254, 0.94);
+  color: #0369a1;
+}
+
+.workspace-structureMapDropZone {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.workspace-structureMapDropZone[data-active='true'] {
+  background: rgba(14, 116, 144, 0.2);
 }
 
 .workspace-documentBody > .workspace-documentNode[data-node-section-kind='plan-step']:first-child {

@@ -22,13 +22,17 @@ import {
   insertSiblingNode,
   liftNode,
   lowerNode,
+  moveNode,
+  moveStructureMapNode as moveStructureMapNodeInDomain,
   type NodeTree,
   type NonRootNode,
   type PlanStepNode,
+  type StructureMapMoveRequest,
   shouldConvertToModuleAtRoot,
   stripRedundantDisplayTypePrefix,
   switchNodeType as switchNodeTypeInDomain,
   type TreeNode,
+  validateStructureMapMove as validateStructureMapMoveInDomain,
   type WorkspaceSnapshot,
 } from '../../nodeDomain';
 import type {
@@ -75,6 +79,7 @@ export const defaultWorkspaceEditorOperations: WorkspaceEditorOperations = {
   deleteNode,
   liftNode,
   lowerNode,
+  moveNode,
 };
 
 export function useWorkspaceEditor({
@@ -618,6 +623,33 @@ export function useWorkspaceEditor({
     );
   }
 
+  function moveStructureMapNode(request: StructureMapMoveRequest) {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    runStructuralOperation(
+      () => {
+        const nextTree = moveStructureMapNodeInDomain(tree, request);
+
+        return {
+          nextTree,
+          nextSelectedNodeId: request.nodeId,
+          preferredModuleId: resolveModuleId(
+            nextTree,
+            request.nodeId,
+            currentModuleId,
+          ),
+        };
+      },
+      '结构地图重排失败，请检查落点。',
+    );
+  }
+
+  function validateStructureMapMove(request: StructureMapMoveRequest) {
+    return validateStructureMapMoveInDomain(tree, request);
+  }
+
   function insertAnswerForQuestion(questionNodeId: string) {
     if (isInteractionLocked) {
       return;
@@ -918,7 +950,9 @@ export function useWorkspaceEditor({
     deleteSelection,
     liftSelection,
     lowerSelection,
+    moveStructureMapNode,
     switchSelectedNodeType,
+    validateStructureMapMove,
   };
 
   function switchSelectedNodeType(
