@@ -386,7 +386,7 @@ function ModuleDocumentSurface({
         data-testid="workspace-document-header"
       >
         <div className="workspace-documentHeaderMain">
-          <p className="workspace-kicker">当前模块</p>
+          <p className="workspace-kicker workspace-documentKicker">当前模块</p>
           {titleInputVisible ? (
             <input
               aria-label="当前模块 标题"
