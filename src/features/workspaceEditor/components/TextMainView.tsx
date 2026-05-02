@@ -37,6 +37,7 @@ type TextMainViewProps = {
   currentModuleId: string | null;
   interactionLockReason: string | null;
   isInteractionLocked: boolean;
+  showSemanticNotes: boolean;
   onCreateModule: () => void;
   onDeleteNodeById: (nodeId: string) => void;
   onDirectAnswerQuestion?: (questionNodeId: string) => void;
@@ -73,6 +74,7 @@ export default function TextMainView({
   currentModuleId,
   interactionLockReason,
   isInteractionLocked,
+  showSemanticNotes,
   onCreateModule,
   onDeleteNodeById,
   onDirectAnswerQuestion,
@@ -200,7 +202,10 @@ export default function TextMainView({
           selectedNodeId={selectedNodeId}
           tree={tree}
         />
-        <div className="workspace-documentBody">
+        <div
+          className="workspace-documentBody"
+          data-testid="workspace-document-body"
+        >
           {moduleChildNodes.map((childNode) => (
             <EditorNodeSection
               activeQuestionBlockId={activeQuestionBlockId}
@@ -208,6 +213,7 @@ export default function TextMainView({
               isInteractionLocked={isInteractionLocked}
               key={childNode.id}
               nodeId={childNode.id}
+              showSemanticNotes={showSemanticNotes}
               onDeleteNode={onDeleteNode}
               onDeleteNodeById={onDeleteNodeById}
               onDirectAnswerQuestion={onDirectAnswerQuestion}
@@ -433,6 +439,7 @@ function ModuleDocumentSurface({
           ) : (
             <h2 className="workspace-documentTitle">
               <button
+                aria-label={`${trimmedDisplayTitle.length > 0 ? trimmedDisplayTitle : titlePlaceholder} 标题`}
                 className="workspace-documentTitleDisplay"
                 data-testid="workspace-document-title-display"
                 disabled={isInteractionLocked}

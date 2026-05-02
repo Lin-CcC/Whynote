@@ -48,6 +48,7 @@ export default function QuestionBlockSection({
   renderChildNode,
   renderNodeInlineActions,
   renderNodeToolbarSections,
+  showSemanticNotes,
   selectedNodeId,
   tree,
   workspaceViewState,
@@ -212,6 +213,7 @@ export default function QuestionBlockSection({
         onUpdateNode={onUpdateNode}
         registerNodeElement={registerNodeElement}
         selectedNodeId={selectedNodeId}
+        showSemanticNotes={showSemanticNotes}
         supplementalActions={inlineActions}
         tree={tree}
       />
@@ -418,6 +420,7 @@ export default function QuestionBlockSection({
           onUpdateNode={onUpdateNode}
           registerNodeElement={registerNodeElement}
           selectedNodeId={selectedNodeId}
+          showSemanticNotes={showSemanticNotes}
           tree={tree}
         />
         {answerGroup.latestEvaluationNode
@@ -519,6 +522,7 @@ export default function QuestionBlockSection({
           onUpdateNode={onUpdateNode}
           registerNodeElement={registerNodeElement}
           selectedNodeId={selectedNodeId}
+          showSemanticNotes={showSemanticNotes}
           tree={tree}
         />
         {summaryGroup.latestCheckNode
@@ -582,6 +586,7 @@ export default function QuestionBlockSection({
         onUpdateNode={onUpdateNode}
         registerNodeElement={registerNodeElement}
         selectedNodeId={selectedNodeId}
+        showSemanticNotes={showSemanticNotes}
         tree={tree}
       />
       {isCollapsed

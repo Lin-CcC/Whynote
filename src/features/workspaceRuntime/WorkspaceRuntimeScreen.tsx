@@ -121,6 +121,7 @@ export default function WorkspaceRuntimeScreen({
       interactionLockReason={interactionLockReason}
       isInteractionLocked={runtime.isAiRunning}
       key={`${workspaceSnapshot.workspace.id}:${String(runtime.editorSessionKey)}`}
+      showSemanticNotes={true}
       onDirectAnswerQuestion={handleDirectAnswerQuestion}
       onEvaluateAnswer={(questionNodeId, answerNodeId) => {
         void runtime.runQuestionEvaluation({

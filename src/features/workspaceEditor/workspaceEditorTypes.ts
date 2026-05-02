@@ -153,6 +153,7 @@ export interface WorkspaceEditorProps {
   onGenerateSummary?: (sourceNodeId: string) => void;
   interactionLockReason?: string | null;
   isInteractionLocked?: boolean;
+  showSemanticNotes?: boolean;
   onDirectAnswerQuestion?: (questionNodeId: string) => void;
   onEvaluateAnswer?: (questionNodeId: string, answerNodeId: string) => void;
   onEvaluateSummary?: (summaryNodeId: string) => void;

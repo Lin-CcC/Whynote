@@ -96,8 +96,10 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
         <div className="workspace-mainViewShell">
           <div className="workspace-mainViewModeBar">
             <button
+              aria-pressed={workspaceViewState.mainViewMode === 'document'}
               className="workspace-mainViewModeButton"
               data-active={workspaceViewState.mainViewMode === 'document'}
+              data-testid="workspace-main-view-tab-document"
               onClick={() =>
                 updateWorkspaceViewState((state) => ({
                   ...state,
@@ -109,8 +111,10 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
               文档
             </button>
             <button
+              aria-pressed={workspaceViewState.mainViewMode === 'structure-map'}
               className="workspace-mainViewModeButton"
               data-active={workspaceViewState.mainViewMode === 'structure-map'}
+              data-testid="workspace-main-view-tab-structure-map"
               onClick={() =>
                 updateWorkspaceViewState((state) => ({
                   ...state,
@@ -150,6 +154,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
               currentModuleId={workspaceEditor.currentModuleId}
               interactionLockReason={props.interactionLockReason ?? null}
               isInteractionLocked={props.isInteractionLocked ?? false}
+              showSemanticNotes={props.showSemanticNotes ?? false}
               onCreateModule={workspaceEditor.createModule}
               onDeleteNodeById={workspaceEditor.deleteNodeById}
               onDirectAnswerQuestion={props.onDirectAnswerQuestion}

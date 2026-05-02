@@ -56,13 +56,12 @@ export default function StructureMapMainView({
           data-testid="workspace-structure-map-shell"
         >
           <header className="workspace-documentHeader">
-            <p className="workspace-kicker">Structure Map</p>
-            <h2 className="workspace-documentTitle">No module available yet</h2>
+            <p className="workspace-kicker">结构地图</p>
+            <h2 className="workspace-documentTitle">还没有可展示的模块</h2>
           </header>
           <div className="workspace-emptyState">
             <p className="workspace-helpText">
-              Create a module first, then use the map for selection, reveal, and
-              reordering.
+              先创建模块，再用结构地图做定位、联动和重排。
             </p>
             <button
               className="workspace-inlineAction"
@@ -70,7 +69,7 @@ export default function StructureMapMainView({
               onClick={onCreateModule}
               type="button"
             >
-              Create module
+              新建模块
             </button>
           </div>
         </div>
@@ -146,13 +145,14 @@ export default function StructureMapMainView({
         <header className="workspace-documentHeader">
           <div className="workspace-documentHeaderMain">
             <p className="workspace-kicker workspace-documentKicker">
-              Structure Map
+              结构地图
             </p>
-            <h2 className="workspace-documentTitle">{currentModule.title}</h2>
+            <h2 className="workspace-documentTitle">
+              {getStructureMapNodeLabel(tree, currentModule, '模块')}
+            </h2>
           </div>
           <p className="workspace-helpText">
-            This surface only handles selection, reveal, and reorder. Document
-            editing stays in the document view.
+            这里只负责定位、联动和重排；正文编辑仍然留在文档视图。
           </p>
         </header>
         <div className="workspace-structureMapBody">
@@ -253,7 +253,7 @@ function SectionNode({
         dragState={dragState}
         isCurrentAnswer={false}
         isInteractionLocked={isInteractionLocked}
-        kindLabel="Step"
+        kindLabel="步骤"
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
@@ -329,7 +329,7 @@ function SectionItemNode(
         dragState={props.dragState}
         isCurrentAnswer={false}
         isInteractionLocked={props.isInteractionLocked}
-        kindLabel="Scaffold"
+        kindLabel="铺垫"
         onDragEnd={props.onDragEnd}
         onDragStart={props.onDragStart}
         onOpenDocumentNode={props.onOpenDocumentNode}
@@ -360,7 +360,10 @@ function QuestionBlockNode({
   const entryNodeIds = node.entries.map((entry) => getQuestionEntryAnchorNodeId(entry));
 
   return (
-    <div className="workspace-structureMapItem">
+    <div
+      className="workspace-structureMapItem"
+      data-testid={`structure-map-question-${node.question.id}`}
+    >
       <StructureMapButton
         anchor={node.anchor}
         dragNodeId={node.question.id}
@@ -368,7 +371,7 @@ function QuestionBlockNode({
         dragState={dragState}
         isCurrentAnswer={false}
         isInteractionLocked={isInteractionLocked}
-        kindLabel="Question"
+        kindLabel="问题"
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
@@ -456,7 +459,7 @@ function QuestionEntryNode({
         dragState={dragState}
         isCurrentAnswer={entry.group.isCurrentAnswer}
         isInteractionLocked={isInteractionLocked}
-        kindLabel="Answer"
+        kindLabel="回答"
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
@@ -475,7 +478,7 @@ function QuestionEntryNode({
         dragState={dragState}
         isCurrentAnswer={false}
         isInteractionLocked={isInteractionLocked}
-        kindLabel="Summary"
+        kindLabel="手写总结"
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
@@ -605,7 +608,7 @@ function StructureMapButton({
       <span className="workspace-structureMapLabel">{kindLabel}</span>
       <span className="workspace-structureMapText">{title}</span>
       {isCurrentAnswer ? (
-        <span className="workspace-structureMapBadge">Current</span>
+        <span className="workspace-structureMapBadge">当前回答</span>
       ) : null}
     </button>
   );

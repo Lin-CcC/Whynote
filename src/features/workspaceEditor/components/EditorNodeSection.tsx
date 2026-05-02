@@ -118,6 +118,7 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
       onUpdateNode={props.onUpdateNode}
       registerNodeElement={props.registerNodeElement}
       selectedNodeId={props.selectedNodeId}
+      showSemanticNotes={props.showSemanticNotes}
       supplementalActions={planStepCollapsed ? null : inlineActions}
       tree={tree}
     >

@@ -11,9 +11,9 @@
 
 ## 最新自动化基线
 
-### 2026-05-01 · V1.2 文档式主视图 integration
+### 2026-05-02 · V1.3 结构地图第一阶段 integration
 
-- `pnpm test`：52 个测试文件、334 个测试全绿
+- `pnpm test`：52 个测试文件、367 个测试全绿
 - `pnpm run typecheck`：通过
 - `pnpm run build`：通过
 
@@ -156,6 +156,16 @@
 - follow-up `question` 必须以缩进子章节显示，同时 active block 仍保持唯一；选中子 follow-up 时，父问题 block 动作面要静默。
 - 折叠摘要态、连续正文编辑、正文 / block / history 折叠和 `plan-step` 折叠要能同时成立，刷新后继续按本地 view state 恢复。
 - 旧的 `question block / plan-step / node body / history` 回归测试必须继续通过；runtime 与 inspector 也要继续对接当前文档式主视图，而不是退回旧卡片流。
+
+### 15. V1.3 结构地图三树联调
+
+- 主视图顶部的 `文档` / `结构地图` 视图切换必须可双向切回，刷新后仍按 workspace 级本地偏好恢复，不依赖 snapshot。
+- 结构地图里看到的 `步骤 / 铺垫 / 问题 / 回答 / 手写总结` 层级必须和真实 node tree 一致；不要出现地图把 closure 结果、历史结果或 inspector 专用语义误投成可重排主链节点。
+- 地图内可拖动项与 domain 校验必须一致：`plan-step`、铺垫、`question`、answer group、manual summary group 的允许落位和禁拖边界，要与正文里实际允许的结构重排完全一致。
+- 地图拖动完成后，主视图应自动切回 `文档`，文档树要立即反映新顺序，并把目标真实节点滚动到可见位置；不能出现地图顺序已变、正文还停在旧位置的分叉。
+- 从结构地图点击任一节点后，应跳回文档视图并选中真实节点；如果目标位于折叠的 `plan-step / question block / 正文 / 历史区` 内，主视图要自动展开到可见。
+- `currentAnswerId`、`当前结果 / 历史结果 / 已过期`、`配对回答 / 检查对象`、follow-up 来源上下文等 V1.2 runtime 语义，在接入结构地图后仍要维持原判定，不允许因为拖动或跳转把闭环关系拖坏。
+- runtime 壳层需要展示的语义提示仍可见，但编辑器默认文档视图不应额外把所有 semantic notes 直接渲染进节点正文区；这一点要同时回归 editor 与 runtime 测试。
 
 ## 自动化覆盖基线
 

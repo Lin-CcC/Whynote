@@ -40,6 +40,7 @@ export type DocumentNodeSectionProps = {
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
   selectedNodeId: string | null;
+  showSemanticNotes?: boolean;
   supplementalActions?: ReactNode;
   tree: NodeTree;
 };
@@ -62,6 +63,7 @@ export default function DocumentNodeSection({
   onUpdateNode,
   registerNodeElement,
   selectedNodeId,
+  showSemanticNotes = false,
   supplementalActions,
   tree,
 }: DocumentNodeSectionProps) {
@@ -412,7 +414,17 @@ export default function DocumentNodeSection({
           </div>
           {bodyCollapsed ? (
             <p className="workspace-nodeHint">{bodyCollapsedHint}</p>
-          ) : contentInputVisible ? (
+          ) : showSemanticNotes &&
+            presentation.semanticVisibility.notes.length > 0 ? (
+            <div className="workspace-nodeSemanticNotes">
+              {presentation.semanticVisibility.notes.map((note) => (
+                <p className="workspace-nodeSemanticNote" key={note}>
+                  {note}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          {!bodyCollapsed && contentInputVisible ? (
             <textarea
               aria-label={`${presentation.displayTitle || presentation.displayLabel} 内容`}
               className="workspace-nodeContentInput"
@@ -426,7 +438,7 @@ export default function DocumentNodeSection({
               rows={presentation.bodyRows}
               value={node.content}
             />
-          ) : (
+          ) : bodyCollapsed ? null : (
             <button
               aria-label={`${presentation.displayTitle || presentation.displayLabel} 内容`}
               className="workspace-nodeContentDisplay"
