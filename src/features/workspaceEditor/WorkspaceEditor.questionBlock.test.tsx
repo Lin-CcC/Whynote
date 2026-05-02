@@ -1499,7 +1499,9 @@ test('clicking a structure-map answer group keeps map active, and the inline 文
 
   expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
 
-  fireEvent.click(within(answerGroupItem).getByRole('button', { name: '文档' }));
+  fireEvent.click(
+    within(answerGroupItem).getByRole('button', { name: '在文档中查看' }),
+  );
 
   await waitFor(() => {
     expect(
@@ -1750,8 +1752,9 @@ test('shows drag affordance on draggable structure-map items', async () => {
 
   expect(answerGroupButton).toHaveAttribute('data-draggable', 'true');
   expect(dragHandle).toHaveAttribute('data-structure-drag-handle', 'true');
+  expect(dragHandle).toHaveAttribute('data-structure-node-action-style', 'handle');
+  expect(dragHandle).toHaveAttribute('aria-label', '拖动回答');
   expect(dragHandle).toHaveAttribute('data-drag-hint', 'ready');
-  expect(dragHandle).toHaveTextContent('拖动');
 
   fireEvent.dragStart(dragHandle);
 
@@ -1759,7 +1762,6 @@ test('shows drag affordance on draggable structure-map items', async () => {
     expect(answerGroupButton).toHaveAttribute('data-dragging', 'true');
   });
   expect(dragHandle).toHaveAttribute('data-drag-hint', 'dragging');
-  expect(dragHandle).toHaveTextContent('拖动中');
 });
 
 test('highlights valid structure-map dropzones and stabilizes the hovered legal target', async () => {
@@ -1879,8 +1881,16 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
   ) as HTMLElement | null;
 
   expect(stepActions).not.toBeNull();
+  expect(stepItem).toHaveAttribute('data-structure-node-action-visibility', 'default');
+  expect(
+    within(stepItem).queryByRole('button', { name: '收起面板' }),
+  ).not.toBeInTheDocument();
 
-  fireEvent.click(within(stepActions as HTMLElement).getByText('收起面板'));
+  fireEvent.click(
+    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+      name: '收起面板',
+    }),
+  );
 
   await waitFor(() => {
     expect(
@@ -1891,7 +1901,11 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
   expect(viewStateChanges.at(-1)?.collapsedStructureMapStepIds).toContain(
     'step-question-block',
   );
-  fireEvent.click(within(stepActions as HTMLElement).getByText('展开面板'));
+  fireEvent.click(
+    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+      name: '展开面板',
+    }),
+  );
 
   await waitFor(() => {
     expect(
@@ -1980,7 +1994,9 @@ test('supports manually focusing the current plan-step from the structure map', 
   );
 
   fireEvent.click(
-    within(stepItem).getByRole('button', { name: '聚焦当前步骤' }),
+    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+      name: '聚焦当前步骤',
+    }),
   );
 
   await waitFor(() => {
@@ -2025,8 +2041,14 @@ test('supports manually focusing the current question cluster from the structure
     'structure-map-item-question-block:question-main',
   );
 
+  expect(
+    within(clusterItem).queryByRole('button', { name: '聚焦当前问题簇' }),
+  ).not.toBeInTheDocument();
+
   fireEvent.click(
-    within(clusterItem).getByRole('button', { name: '聚焦当前问题簇' }),
+    within(openStructureMapNodeMenu(clusterItem)).getByRole('button', {
+      name: '聚焦当前问题簇',
+    }),
   );
 
   await waitFor(() => {
@@ -2117,10 +2139,22 @@ test('structure-map local controls do not trigger extra scrollIntoView jumps', a
 
   const initialCallCount = scrollIntoViewSpy.mock.calls.length;
 
-  fireEvent.click(within(stepItem).getByRole('button', { name: '聚焦当前步骤' }));
+  fireEvent.click(
+    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+      name: '聚焦当前步骤',
+    }),
+  );
   fireEvent.click(screen.getByText('退出聚焦'));
-  fireEvent.click(within(stepItem).getByText('收起面板'));
-  fireEvent.click(within(stepItem).getByText('展开面板'));
+  fireEvent.click(
+    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+      name: '收起面板',
+    }),
+  );
+  fireEvent.click(
+    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+      name: '展开面板',
+    }),
+  );
   fireEvent.click(within(clusterItem).getByRole('button', { name: '收起问题簇' }));
 
   expect(scrollIntoViewSpy).toHaveBeenCalledTimes(initialCallCount);
@@ -2133,6 +2167,61 @@ test('structure-map local controls do not trigger extra scrollIntoView jumps', a
     // jsdom may not define this API.
     delete (Element.prototype as Partial<Element>).scrollIntoView;
   }
+});
+
+test('keeps structure-map node controls quiet by default and reveals icon actions on hover or active state', async () => {
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: createWorkspaceViewState({
+      mainViewMode: 'structure-map',
+    }),
+  });
+
+  const answerGroupItem = await screen.findByTestId(
+    'structure-map-item-answer-group:answer-first',
+  );
+  const actions = answerGroupItem.querySelector(
+    '.workspace-structureMapNodeActions',
+  ) as HTMLElement | null;
+  const titleButton = answerGroupItem.querySelector(
+    '.workspace-structureMapTitleButton',
+  ) as HTMLButtonElement | null;
+
+  expect(actions).not.toBeNull();
+  expect(titleButton).not.toBeNull();
+  expect(answerGroupItem).toHaveAttribute(
+    'data-structure-node-action-visibility',
+    'default',
+  );
+  expect(actions).toHaveAttribute('data-structure-node-action-visibility', 'default');
+  expect(within(answerGroupItem).queryByText('文档')).not.toBeInTheDocument();
+  expect(within(answerGroupItem).queryByText('拖动')).not.toBeInTheDocument();
+  expect(within(answerGroupItem).queryByText('收起')).not.toBeInTheDocument();
+  expect(
+    within(answerGroupItem).getByTestId(
+      'structure-map-open-document-answer-group:answer-first',
+    ),
+  ).toHaveAttribute('data-structure-node-action-style', 'icon');
+  expect(
+    within(answerGroupItem).getByTestId(
+      'structure-map-drag-handle-answer-group:answer-first',
+    ),
+  ).toHaveAttribute('data-structure-node-action-style', 'handle');
+
+  fireEvent.mouseEnter(answerGroupItem);
+  expect(answerGroupItem).toHaveAttribute(
+    'data-structure-node-action-visibility',
+    'hover',
+  );
+
+  fireEvent.click(titleButton as HTMLButtonElement);
+
+  await waitFor(() => {
+    expect(answerGroupItem).toHaveAttribute(
+      'data-structure-node-action-visibility',
+      'active',
+    );
+  });
 });
 
 test('supports inline title editing with Enter commit, Escape cancel, and blur commit', async () => {
@@ -2859,6 +2948,16 @@ function openToolbarMenu(toolbar: HTMLElement, menuLabel: string) {
 
 function openOverflowMenu(toolbar: HTMLElement) {
   return openToolbarMenu(toolbar, '⋯');
+}
+
+function openStructureMapNodeMenu(item: HTMLElement) {
+  fireEvent.click(
+    within(item).getByRole('button', {
+      name: /更多操作：/,
+    }),
+  );
+
+  return within(item).getByRole('menu');
 }
 
 function expectMountedTitleControls(

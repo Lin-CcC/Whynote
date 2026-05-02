@@ -710,6 +710,161 @@
   color: #0369a1;
 }
 
+.workspace-structureMapButton {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  min-height: 4.4rem;
+  cursor: default;
+}
+
+.workspace-structureMapButton[data-draggable='true'] {
+  cursor: default;
+}
+
+.workspace-structureMapButtonMain {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.workspace-structureMapButton[data-structure-role='question'] .workspace-structureMapButtonMain {
+  gap: 0.65rem;
+}
+
+.workspace-structureMapTitleButton,
+.workspace-structureMapTitleInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  text-align: left;
+}
+
+.workspace-structureMapTitleButton {
+  cursor: pointer;
+}
+
+.workspace-structureMapTitleInput {
+  padding-bottom: 0.08rem;
+  border-bottom: 1px solid rgba(14, 116, 144, 0.24);
+}
+
+.workspace-structureMapTitleInput:focus,
+.workspace-structureMapTitleButton:focus-visible {
+  outline: none;
+}
+
+.workspace-structureMapTitleButton:focus-visible {
+  border-radius: 0.45rem;
+  box-shadow: 0 0 0 2px rgba(14, 116, 144, 0.18);
+}
+
+.workspace-structureMapBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.workspace-structureMapBadge[data-structure-node-status='badge'][data-tone='focused'] {
+  background: rgba(15, 118, 110, 0.14);
+  color: #0f766e;
+}
+
+.workspace-structureMapBadge[data-structure-node-status='badge'][data-tone='current-answer'] {
+  background: rgba(224, 242, 254, 0.94);
+  color: #0369a1;
+}
+
+.workspace-structureMapNodeActions {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.28rem;
+  margin-left: auto;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-1px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.workspace-structureMapButton[data-structure-node-action-visibility='hover'] .workspace-structureMapNodeActions,
+.workspace-structureMapButton[data-structure-node-action-visibility='active'] .workspace-structureMapNodeActions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.workspace-structureMapNodeIconButton,
+.workspace-structureMapDragHandle {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.72rem;
+  background: transparent;
+  color: rgba(71, 85, 105, 0.92);
+  box-shadow: none;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.workspace-structureMapNodeIconButton:hover,
+.workspace-structureMapDragHandle:hover,
+.workspace-structureMapNodeIconButton:focus-visible,
+.workspace-structureMapDragHandle:focus-visible,
+.workspace-structureMapNodeMenu[data-structure-node-menu='more'] > button[aria-expanded='true'] {
+  border-color: rgba(14, 116, 144, 0.16);
+  background: rgba(240, 249, 255, 0.88);
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  outline: none;
+}
+
+.workspace-structureMapNodeIconButton:disabled,
+.workspace-structureMapDragHandle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.workspace-structureMapDragHandle {
+  cursor: grab;
+}
+
+.workspace-structureMapButton[data-dragging='true'] .workspace-structureMapDragHandle {
+  cursor: grabbing;
+}
+
+.workspace-structureMapActionIcon {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.workspace-structureMapNodeMenu {
+  position: relative;
+}
+
+.workspace-structureMapNodeMenu .workspace-nodeActionPopover {
+  top: calc(100% + 0.35rem);
+  min-width: 10rem;
+}
+
 .workspace-structureMapDropZone {
   display: flex;
   align-items: center;

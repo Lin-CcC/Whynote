@@ -396,8 +396,16 @@ test('persists structure-map collapse and manual focus in workspace local view s
 
   expect(stepActions).not.toBeNull();
 
-  fireEvent.click(within(stepItem).getByRole('button', { name: '聚焦当前步骤' }));
-  fireEvent.click(within(stepActions as HTMLElement).getByText('收起面板'));
+  fireEvent.click(
+    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+      name: '聚焦当前步骤',
+    }),
+  );
+  fireEvent.click(
+    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+      name: '收起面板',
+    }),
+  );
 
   await waitFor(() => {
     expect(
@@ -432,8 +440,14 @@ test('persists structure-map collapse and manual focus in workspace local view s
   const remountedStepItem = within(remountedPanel).getByTestId(
     'structure-map-item-plan-step:step-runtime-question-block',
   );
+  expect(remountedStepItem).toHaveAttribute(
+    'data-structure-node-action-visibility',
+    'active',
+  );
   expect(
-    within(remountedStepItem).getByText('展开面板'),
+    within(openStructureMapNodeMenu(remountedStepItem)).getByRole('button', {
+      name: '展开面板',
+    }),
   ).toBeInTheDocument();
   expect(screen.getByText('退出聚焦')).toBeInTheDocument();
 });
@@ -924,6 +938,16 @@ async function createPreloadedDependencies(snapshot: WorkspaceSnapshot) {
   return createTestDependencies({
     storage,
   });
+}
+
+function openStructureMapNodeMenu(item: HTMLElement) {
+  fireEvent.click(
+    within(item).getByRole('button', {
+      name: /更多操作：/,
+    }),
+  );
+
+  return within(item).getByRole('menu');
 }
 
 function createPlanStepViewStateSnapshot(): WorkspaceSnapshot {
