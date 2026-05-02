@@ -374,6 +374,58 @@ test('persists the main view mode in workspace local view state across remounts'
   });
 });
 
+test('persists structure-map collapse and manual focus in workspace local view state across remounts', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createRuntimeQuestionBlockSnapshot(),
+  );
+  const firstRender = render(
+    <WorkspaceRuntimeScreen dependencies={dependencies} />,
+  );
+
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(screen.getByRole('button', { name: '结构地图' }));
+
+  const panel = await screen.findByTestId('structure-map-panel-step-runtime-question-block');
+
+  fireEvent.click(within(panel).getByRole('button', { name: '聚焦当前步骤' }));
+  fireEvent.click(within(panel).getByRole('button', { name: '收起步骤面板' }));
+
+  await waitFor(() => {
+    expect(within(panel).getByText('当前步骤面板已折叠。')).toBeInTheDocument();
+  });
+
+  expect(
+    (
+      dependencies.localPreferenceStorage.loadUiPreferences()?.values
+        .workspaceViews as Record<string, unknown>
+    )?.['workspace-runtime-question-block'],
+  ).toEqual(
+    expect.objectContaining({
+      collapsedStructureMapStepIds: ['step-runtime-question-block'],
+      mainViewMode: 'structure-map',
+      structureMapFocusTarget: {
+        kind: 'plan-step',
+        nodeId: 'step-runtime-question-block',
+      },
+    }),
+  );
+
+  firstRender.unmount();
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  const restoredPanel = await screen.findByTestId(
+    'structure-map-panel-step-runtime-question-block',
+  );
+
+  expect(within(restoredPanel).getByText('当前步骤面板已折叠。')).toBeInTheDocument();
+  expect(
+    within(restoredPanel).getByRole('button', { name: '展开步骤面板' }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '退出地图聚焦' })).toBeInTheDocument();
+});
+
 test('renders the runtime structure map with plan-step panels and question clusters', async () => {
   const dependencies = await createPreloadedDependencies(
     createRuntimeQuestionBlockSnapshot(),

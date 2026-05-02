@@ -82,11 +82,20 @@ export interface WorkspaceViewState {
   collapsedPlanStepIds: string[];
   collapsedQuestionBlockIds: string[];
   collapsedNodeBodyIds: string[];
+  collapsedStructureMapStepIds: string[];
+  collapsedStructureMapClusterIds: string[];
+  collapsedStructureMapFollowUpIds: string[];
   expandedHistorySectionIds: string[];
   mainViewMode: WorkspaceMainViewMode;
+  structureMapFocusTarget: StructureMapFocusTarget | null;
 }
 
 export type WorkspaceMainViewMode = 'document' | 'structure-map';
+
+export interface StructureMapFocusTarget {
+  kind: 'plan-step' | 'question-cluster';
+  nodeId: string;
+}
 
 export interface WorkspaceEditorSelectionState {
   currentModuleId: string | null;

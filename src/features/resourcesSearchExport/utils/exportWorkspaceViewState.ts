@@ -47,8 +47,12 @@ export function readCompleteWorkspaceViewStateForExport(
     collapsedPlanStepIds,
     collapsedNodeBodyIds,
     collapsedQuestionBlockIds,
+    collapsedStructureMapClusterIds: [],
+    collapsedStructureMapFollowUpIds: [],
+    collapsedStructureMapStepIds: [],
     expandedHistorySectionIds,
     mainViewMode: 'document',
+    structureMapFocusTarget: null,
   };
 }
 

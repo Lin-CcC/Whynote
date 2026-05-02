@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
@@ -1266,13 +1266,11 @@ test('collapses and expands a plan-step while keeping its header visible', async
 test('restores inner question block, body, and history state after collapsing and reopening a plan-step', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'step-question-block',
-    initialWorkspaceViewState: {
-      collapsedPlanStepIds: [],
+    initialWorkspaceViewState: createWorkspaceViewState({
       collapsedQuestionBlockIds: ['question-main'],
       collapsedNodeBodyIds: ['answer-first'],
       expandedHistorySectionIds: [getAnswerHistorySectionId('answer-first')],
-      mainViewMode: 'document',
-    },
+    }),
   });
 
   const planStepNode = screen.getByTestId('editor-node-step-question-block');
@@ -1331,13 +1329,9 @@ test('restores inner question block, body, and history state after collapsing an
 test('does not auto-reopen a group history section after the user collapses it', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'judgment-first-history',
-    initialWorkspaceViewState: {
-      collapsedPlanStepIds: [],
-      collapsedQuestionBlockIds: [],
-      collapsedNodeBodyIds: [],
+    initialWorkspaceViewState: createWorkspaceViewState({
       expandedHistorySectionIds: [getAnswerHistorySectionId('answer-first')],
-      mainViewMode: 'document',
-    },
+    }),
   });
 
   expect(
@@ -1370,13 +1364,9 @@ test('does not auto-reopen a group history section after the user collapses it',
 test('does not auto-reopen a plan-step after the user manually collapses it', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
-    initialWorkspaceViewState: {
+    initialWorkspaceViewState: createWorkspaceViewState({
       collapsedPlanStepIds: ['step-question-block'],
-      collapsedQuestionBlockIds: [],
-      collapsedNodeBodyIds: [],
-      expandedHistorySectionIds: [],
-      mainViewMode: 'document',
-    },
+    }),
   });
 
   await waitFor(() => {
@@ -1444,13 +1434,11 @@ test('shows 未命名步骤 in the compact collapsed summary when the plan-step 
 test('auto-expands a collapsed plan-step, block, and hidden history when selecting a historical node from the structure tree', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'step-question-block',
-    initialWorkspaceViewState: {
+    initialWorkspaceViewState: createWorkspaceViewState({
       collapsedPlanStepIds: ['step-question-block'],
       collapsedQuestionBlockIds: ['question-main'],
       collapsedNodeBodyIds: ['judgment-first-history'],
-      expandedHistorySectionIds: [],
-      mainViewMode: 'document',
-    },
+    }),
   });
 
   expect(screen.queryByTestId('question-block-question-main')).not.toBeInTheDocument();
@@ -1484,13 +1472,12 @@ test('auto-expands a collapsed plan-step, block, and hidden history when selecti
 test('clicking a structure-map answer group switches back to document and reveals the target', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
-    initialWorkspaceViewState: {
+    initialWorkspaceViewState: createWorkspaceViewState({
       collapsedPlanStepIds: ['step-question-block'],
       collapsedQuestionBlockIds: ['question-main'],
       collapsedNodeBodyIds: ['answer-first'],
-      expandedHistorySectionIds: [],
       mainViewMode: 'structure-map',
-    },
+    }),
   });
 
   expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
@@ -1545,10 +1532,9 @@ test('renders plan-step panels as question clusters with local answers, follow-u
   renderQuestionBlockEditor({
     initialSnapshot: createStructureMapClusterSnapshot(),
     initialSelectedNodeId: 'question-main',
-    initialWorkspaceViewState: {
-      ...DEFAULT_WORKSPACE_VIEW_STATE,
+    initialWorkspaceViewState: createWorkspaceViewState({
       mainViewMode: 'structure-map',
-    },
+    }),
   });
 
   await waitFor(() => {
@@ -1619,6 +1605,16 @@ test('renders plan-step panels as question clusters with local answers, follow-u
       'structure-map-scaffold-summary-scaffold-step',
     ),
   ).not.toBeInTheDocument();
+  expect(supportingRegion.previousElementSibling).not.toBeNull();
+  expect(supportingRegion.previousElementSibling).toHaveAttribute(
+    'data-structure-connector-role',
+    'supporting',
+  );
+  expect(supportingRegion.previousElementSibling).toHaveAttribute(
+    'data-structure-connector-segment',
+    'root',
+  );
+
   const supportingNodes = supportingRegion.querySelectorAll(
     '[data-structure-role="supporting-node"]',
   );
@@ -1632,13 +1628,7 @@ test('renders plan-step panels as question clusters with local answers, follow-u
         connector.getAttribute('data-structure-connector-segment'),
       ),
     ),
-  ).toEqual(new Set(['root', 'spine', 'leaf']));
-  expect(
-    supportingConnectors.filter(
-      (connector) =>
-        connector.getAttribute('data-structure-connector-segment') === 'root',
-    ),
-  ).toHaveLength(1);
+  ).toEqual(new Set(['spine', 'leaf']));
   expect(
     supportingConnectors.filter(
       (connector) =>
@@ -1652,8 +1642,10 @@ test('renders plan-step panels as question clusters with local answers, follow-u
     ),
   ).toHaveLength(supportingNodes.length);
   expect(
-    supportingRegion.firstElementChild,
-  ).toHaveAttribute('data-structure-connector-segment', 'root');
+    supportingRegion.querySelector(
+      '[data-structure-connector-role="supporting"][data-structure-connector-segment="root"]',
+    ),
+  ).toBeNull();
 
   const followUpBranch = within(topLevelCluster).getByTestId(
     'structure-map-branch-question-main',
@@ -1702,10 +1694,6 @@ test('renders plan-step panels as question clusters with local answers, follow-u
         connector.getAttribute('data-structure-connector-segment') === 'leaf',
     ),
   ).toHaveLength(followUpNodes.length);
-  expect(followUpBranch.firstElementChild).toHaveAttribute(
-    'data-structure-connector-segment',
-    'root',
-  );
   expect(followUpBranch.getAttribute('data-structure-connector')).not.toBe(
     supportingRegion.getAttribute('data-structure-connector'),
   );
@@ -1723,13 +1711,13 @@ test('renders plan-step panels as question clusters with local answers, follow-u
   ).toBeInTheDocument();
 });
 
-test('marks draggable structure-map units with a stable affordance and promotes the active dragged item', async () => {
+test('shows drag affordance on draggable structure-map items', async () => {
   renderQuestionBlockEditor({
+    initialSnapshot: createCrossStepStructureMapSnapshot(),
     initialSelectedNodeId: 'question-main',
-    initialWorkspaceViewState: {
-      ...DEFAULT_WORKSPACE_VIEW_STATE,
+    initialWorkspaceViewState: createWorkspaceViewState({
       mainViewMode: 'structure-map',
-    },
+    }),
   });
 
   await waitFor(() => {
@@ -1757,10 +1745,9 @@ test('highlights valid structure-map dropzones and stabilizes the hovered legal 
   renderQuestionBlockEditor({
     initialSnapshot: createCrossStepStructureMapSnapshot(),
     initialSelectedNodeId: 'question-main',
-    initialWorkspaceViewState: {
-      ...DEFAULT_WORKSPACE_VIEW_STATE,
+    initialWorkspaceViewState: createWorkspaceViewState({
       mainViewMode: 'structure-map',
-    },
+    }),
   });
 
   await waitFor(() => {
@@ -1787,10 +1774,9 @@ test('shows explicit invalid structure-map drop feedback instead of failing sile
   renderQuestionBlockEditor({
     initialSnapshot: createCrossStepStructureMapSnapshot(),
     initialSelectedNodeId: 'question-main',
-    initialWorkspaceViewState: {
-      ...DEFAULT_WORKSPACE_VIEW_STATE,
+    initialWorkspaceViewState: createWorkspaceViewState({
       mainViewMode: 'structure-map',
-    },
+    }),
   });
 
   await waitFor(() => {
@@ -1826,10 +1812,9 @@ test('keeps structure-map drag item and dropzone test ids stable', async () => {
   renderQuestionBlockEditor({
     initialSnapshot: createCrossStepStructureMapSnapshot(),
     initialSelectedNodeId: 'question-main',
-    initialWorkspaceViewState: {
-      ...DEFAULT_WORKSPACE_VIEW_STATE,
+    initialWorkspaceViewState: createWorkspaceViewState({
       mainViewMode: 'structure-map',
-    },
+    }),
   });
 
   await waitFor(() => {
@@ -1850,71 +1835,259 @@ test('keeps structure-map drag item and dropzone test ids stable', async () => {
   ).toBeInTheDocument();
 });
 
+test('supports collapsing structure-map step panels, top-level clusters, and follow-up branches', async () => {
+  const viewStateChanges: WorkspaceViewState[] = [];
+
+  renderQuestionBlockEditor({
+    initialSnapshot: createStructureMapClusterSnapshot(),
+    initialSelectedNodeId: 'question-follow-up',
+    initialWorkspaceViewState: createWorkspaceViewState({
+      mainViewMode: 'structure-map',
+    }),
+    onViewStateChange: (state) => {
+      viewStateChanges.push(state);
+    },
+  });
+
+  const panel = await screen.findByTestId('structure-map-panel-step-question-block');
+
+  fireEvent.click(within(panel).getByRole('button', { name: '收起步骤面板' }));
+
+  await waitFor(() => {
+    expect(within(panel).getByText('当前步骤面板已折叠。')).toBeInTheDocument();
+  });
+
+  expect(viewStateChanges.at(-1)?.collapsedStructureMapStepIds).toContain(
+    'step-question-block',
+  );
+  expect(
+    within(panel).queryByTestId('structure-map-question-question-main'),
+  ).not.toBeInTheDocument();
+
+  fireEvent.click(within(panel).getByRole('button', { name: '展开步骤面板' }));
+
+  await waitFor(() => {
+    expect(
+      within(panel).getByTestId('structure-map-question-question-main'),
+    ).toBeInTheDocument();
+  });
+
+  const topLevelCluster = within(panel).getByTestId('structure-map-question-question-main');
+
+  fireEvent.click(within(topLevelCluster).getByRole('button', { name: '收起问题簇' }));
+
+  await waitFor(() => {
+    expect(within(topLevelCluster).getByText('当前问题簇已折叠。')).toBeInTheDocument();
+  });
+
+  expect(viewStateChanges.at(-1)?.collapsedStructureMapClusterIds).toContain('question-main');
+  expect(
+    within(topLevelCluster).queryByTestId('structure-map-branch-question-main'),
+  ).not.toBeInTheDocument();
+
+  fireEvent.click(within(topLevelCluster).getByRole('button', { name: '展开问题簇' }));
+
+  await waitFor(() => {
+    expect(
+      within(topLevelCluster).getByTestId('structure-map-branch-question-main'),
+    ).toBeInTheDocument();
+  });
+
+  const followUpCluster = screen.getByTestId('structure-map-question-question-follow-up');
+
+  fireEvent.click(within(followUpCluster).getByRole('button', { name: '收起追问分支' }));
+
+  await waitFor(() => {
+    expect(within(followUpCluster).getByText('当前追问分支已折叠。')).toBeInTheDocument();
+  });
+
+  expect(viewStateChanges.at(-1)?.collapsedStructureMapFollowUpIds).toContain(
+    'question-follow-up',
+  );
+  expect(
+    within(followUpCluster).queryByTestId('structure-map-item-answer-group:answer-follow-up'),
+  ).not.toBeInTheDocument();
+
+  fireEvent.click(within(followUpCluster).getByRole('button', { name: '展开追问分支' }));
+
+  await waitFor(() => {
+    expect(
+      within(followUpCluster).getByTestId('structure-map-item-answer-group:answer-follow-up'),
+    ).toBeInTheDocument();
+  });
+});
+
+test('supports manually focusing the current plan-step from the structure map', async () => {
+  const viewStateChanges: WorkspaceViewState[] = [];
+
+  renderQuestionBlockEditor({
+    initialSnapshot: createCrossStepStructureMapSnapshot(),
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: createWorkspaceViewState({
+      mainViewMode: 'structure-map',
+    }),
+    onViewStateChange: (state) => {
+      viewStateChanges.push(state);
+    },
+  });
+
+  const currentPanel = await screen.findByTestId('structure-map-panel-step-question-block');
+
+  expect(screen.getByTestId('structure-map-panel-step-secondary')).toBeInTheDocument();
+
+  fireEvent.click(within(currentPanel).getByRole('button', { name: '聚焦当前步骤' }));
+
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('structure-map-panel-step-secondary'),
+    ).not.toBeInTheDocument();
+  });
+
+  expect(viewStateChanges.at(-1)?.structureMapFocusTarget).toEqual({
+    kind: 'plan-step',
+    nodeId: 'step-question-block',
+  });
+  expect(screen.getByRole('button', { name: '退出地图聚焦' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '退出地图聚焦' }));
+
+  await waitFor(() => {
+    expect(screen.getByTestId('structure-map-panel-step-secondary')).toBeInTheDocument();
+  });
+
+  expect(viewStateChanges.at(-1)?.structureMapFocusTarget).toBeNull();
+});
+
+test('supports manually focusing the current question cluster from the structure map', async () => {
+  const viewStateChanges: WorkspaceViewState[] = [];
+
+  renderQuestionBlockEditor({
+    initialSnapshot: createStructureMapClusterSnapshot(),
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: createWorkspaceViewState({
+      mainViewMode: 'structure-map',
+    }),
+    onViewStateChange: (state) => {
+      viewStateChanges.push(state);
+    },
+  });
+
+  const topLevelCluster = await screen.findByTestId('structure-map-question-question-main');
+
+  expect(screen.getByTestId('structure-map-scaffold-summary-scaffold-step')).toBeInTheDocument();
+
+  fireEvent.click(within(topLevelCluster).getByRole('button', { name: '聚焦当前问题簇' }));
+
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('structure-map-scaffold-summary-scaffold-step'),
+    ).not.toBeInTheDocument();
+  });
+
+  expect(viewStateChanges.at(-1)?.structureMapFocusTarget).toEqual({
+    kind: 'question-cluster',
+    nodeId: 'question-main',
+  });
+  expect(screen.getByRole('button', { name: '退出地图聚焦' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '退出地图聚焦' }));
+
+  await waitFor(() => {
+    expect(
+      screen.getByTestId('structure-map-scaffold-summary-scaffold-step'),
+    ).toBeInTheDocument();
+  });
+
+  expect(viewStateChanges.at(-1)?.structureMapFocusTarget).toBeNull();
+});
+
+test('regular structure-map selection does not automatically enter focus mode', async () => {
+  const viewStateChanges: WorkspaceViewState[] = [];
+
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'judgment-first-latest',
+    onViewStateChange: (state) => {
+      viewStateChanges.push(state);
+    },
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: '结构地图' }));
+
+  await waitFor(() => {
+    expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+  });
+
+  expect(screen.queryByRole('button', { name: '退出地图聚焦' })).not.toBeInTheDocument();
+  expect(viewStateChanges.at(-1)?.structureMapFocusTarget).toBeNull();
+
+  fireEvent.click(screen.getByTestId('structure-map-item-answer-group:answer-first'));
+
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('workspace-structure-map-shell'),
+    ).not.toBeInTheDocument();
+  });
+
+  expect(viewStateChanges.at(-1)?.structureMapFocusTarget).toBeNull();
+});
+
 test('dragging a structure-map unit reorders the document, selects the moved anchor, and expands the target path', async () => {
   const snapshots: WorkspaceSnapshot[] = [];
-  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
-  const scrollIntoViewSpy = vi.fn();
+  const viewStateChanges: WorkspaceViewState[] = [];
 
-  HTMLElement.prototype.scrollIntoView = scrollIntoViewSpy;
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'summary-manual',
+    initialWorkspaceViewState: createWorkspaceViewState({
+      collapsedPlanStepIds: ['step-question-block'],
+      collapsedQuestionBlockIds: ['question-main'],
+      mainViewMode: 'structure-map',
+    }),
+    onSnapshotChange: (snapshot) => {
+      snapshots.push(snapshot);
+    },
+    onViewStateChange: (state) => {
+      viewStateChanges.push(state);
+    },
+  });
 
-  try {
-    renderQuestionBlockEditor({
-      initialSelectedNodeId: 'summary-manual',
-      initialWorkspaceViewState: {
-        collapsedPlanStepIds: ['step-question-block'],
-        collapsedQuestionBlockIds: ['question-main'],
-        collapsedNodeBodyIds: [],
-        expandedHistorySectionIds: [],
-        mainViewMode: 'structure-map',
-      },
-      onSnapshotChange: (snapshot) => {
-        snapshots.push(snapshot);
-      },
-    });
+  fireEvent.dragStart(
+    screen.getByTestId('structure-map-item-summary-group:summary-manual'),
+  );
+  fireEvent.dragOver(
+    screen.getByTestId('structure-map-dropzone-question-main-0'),
+  );
+  fireEvent.drop(screen.getByTestId('structure-map-dropzone-question-main-0'));
 
-    fireEvent.dragStart(
-      screen.getByTestId('structure-map-item-summary-group:summary-manual'),
-    );
-    fireEvent.dragOver(
-      screen.getByTestId('structure-map-dropzone-question-main-0'),
-    );
-    fireEvent.drop(screen.getByTestId('structure-map-dropzone-question-main-0'));
-
-    await waitFor(() => {
-      expect(
-        screen.queryByTestId('workspace-structure-map-shell'),
-      ).not.toBeInTheDocument();
-    });
-
-    const selectedSummaryNode = screen.getByTestId('editor-node-summary-manual');
-
-    expect(selectedSummaryNode).toHaveAttribute('data-node-selected', 'true');
-    await waitFor(() => {
-      expect(scrollIntoViewSpy).toHaveBeenCalled();
-      expect(selectedSummaryNode).toHaveFocus();
-    });
-    expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
-      'data-collapsed',
-      'false',
-    );
-    expectVisibleNodeOrder('question-main', [
-      'summary-manual',
-      'judgment-summary-latest',
-      'answer-first',
-      'judgment-first-latest',
-      'summary-first-latest',
-      'answer-second',
-      'judgment-second-latest',
-      'summary-second-latest',
-      'question-follow-up',
-    ]);
-
+  await waitFor(() => {
     expect(
-      snapshots.at(-1)?.tree.nodes['question-main']?.childIds[0],
-    ).toBe('summary-manual');
-  } finally {
-    HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
-  }
+      screen.queryByTestId('workspace-structure-map-shell'),
+    ).not.toBeInTheDocument();
+  });
+
+  expect(screen.getByTestId('editor-node-summary-manual')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
+  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+    'data-collapsed',
+    'false',
+  );
+  expectVisibleNodeOrder('question-main', [
+    'summary-manual',
+    'judgment-summary-latest',
+    'answer-first',
+    'judgment-first-latest',
+    'summary-first-latest',
+    'answer-second',
+    'judgment-second-latest',
+    'summary-second-latest',
+    'question-follow-up',
+  ]);
+
+  expect(
+    snapshots.at(-1)?.tree.nodes['question-main']?.childIds[0],
+  ).toBe('summary-manual');
+  expect(viewStateChanges.at(-1)?.structureMapFocusTarget).toBeNull();
 });
 
 test('allows moving a top-level question block across plan steps from the structure map', async () => {
@@ -1923,13 +2096,11 @@ test('allows moving a top-level question block across plan steps from the struct
   renderQuestionBlockEditor({
     initialSnapshot: createCrossStepStructureMapSnapshot(),
     initialSelectedNodeId: 'question-main',
-    initialWorkspaceViewState: {
+    initialWorkspaceViewState: createWorkspaceViewState({
       collapsedPlanStepIds: ['step-question-block', 'step-secondary'],
       collapsedQuestionBlockIds: ['question-main'],
-      collapsedNodeBodyIds: [],
-      expandedHistorySectionIds: [],
       mainViewMode: 'structure-map',
-    },
+    }),
     onSnapshotChange: (snapshot) => {
       snapshots.push(snapshot);
     },
@@ -1965,10 +2136,9 @@ test('keeps unsupported resource nodes out of the structure map projection', asy
   renderQuestionBlockEditor({
     initialSnapshot: createStructureMapSnapshotWithResource(),
     initialSelectedNodeId: 'question-main',
-    initialWorkspaceViewState: {
-      ...DEFAULT_WORKSPACE_VIEW_STATE,
+    initialWorkspaceViewState: createWorkspaceViewState({
       mainViewMode: 'structure-map',
-    },
+    }),
   });
 
   await waitFor(() => {
@@ -2052,6 +2222,15 @@ function renderQuestionBlockEditor(
   }
 
   return render(<Wrapper />);
+}
+
+function createWorkspaceViewState(
+  overrides: Partial<WorkspaceViewState> = {},
+): WorkspaceViewState {
+  return {
+    ...DEFAULT_WORKSPACE_VIEW_STATE,
+    ...overrides,
+  };
 }
 
 function createQuestionBlockSnapshot(): WorkspaceSnapshot {

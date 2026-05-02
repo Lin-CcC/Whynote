@@ -1,12 +1,19 @@
 import type { PreferenceValue, UiPreferences } from '../../nodeDomain';
-import type { WorkspaceViewState } from '../workspaceEditorTypes';
+import type {
+  StructureMapFocusTarget,
+  WorkspaceViewState,
+} from '../workspaceEditorTypes';
 
 export const DEFAULT_WORKSPACE_VIEW_STATE: WorkspaceViewState = {
   collapsedPlanStepIds: [],
   collapsedQuestionBlockIds: [],
   collapsedNodeBodyIds: [],
+  collapsedStructureMapStepIds: [],
+  collapsedStructureMapClusterIds: [],
+  collapsedStructureMapFollowUpIds: [],
   expandedHistorySectionIds: [],
   mainViewMode: 'document',
+  structureMapFocusTarget: null,
 };
 
 export function readWorkspaceViewState(
@@ -41,11 +48,23 @@ export function normalizeWorkspaceViewState(value: unknown): WorkspaceViewState 
       source.collapsedQuestionBlockIds,
     ),
     collapsedNodeBodyIds: normalizeStringArray(source.collapsedNodeBodyIds),
+    collapsedStructureMapStepIds: normalizeStringArray(
+      source.collapsedStructureMapStepIds,
+    ),
+    collapsedStructureMapClusterIds: normalizeStringArray(
+      source.collapsedStructureMapClusterIds,
+    ),
+    collapsedStructureMapFollowUpIds: normalizeStringArray(
+      source.collapsedStructureMapFollowUpIds,
+    ),
     expandedHistorySectionIds: normalizeStringArray(
       source.expandedHistorySectionIds,
     ),
     mainViewMode:
       source.mainViewMode === 'structure-map' ? 'structure-map' : 'document',
+    structureMapFocusTarget: normalizeStructureMapFocusTarget(
+      source.structureMapFocusTarget,
+    ),
   };
 }
 
@@ -87,4 +106,26 @@ function normalizeStringArray(value: unknown) {
   }
 
   return [...new Set(value.filter((item): item is string => typeof item === 'string'))];
+}
+
+function normalizeStructureMapFocusTarget(
+  value: unknown,
+): StructureMapFocusTarget | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const source = value as Record<string, unknown>;
+
+  if (
+    (source.kind !== 'plan-step' && source.kind !== 'question-cluster') ||
+    typeof source.nodeId !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    kind: source.kind,
+    nodeId: source.nodeId,
+  };
 }
