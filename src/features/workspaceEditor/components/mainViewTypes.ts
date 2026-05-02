@@ -5,6 +5,7 @@ import type {
   LearningActionId,
   NodeContentPatch,
   WorkspaceEditorNodeRenderContext,
+  WorkspaceEditorToolbarSection,
   WorkspaceViewState,
 } from '../workspaceEditorTypes';
 
@@ -36,6 +37,9 @@ export interface MainViewNodeProps {
   renderNodeInlineActions?: (
     context: WorkspaceEditorNodeRenderContext,
   ) => ReactNode;
+  renderNodeToolbarSections?: (
+    context: WorkspaceEditorNodeRenderContext,
+  ) => WorkspaceEditorToolbarSection[] | null;
   selectedNodeId: string | null;
   tree: NodeTree;
   workspaceViewState: WorkspaceViewState;

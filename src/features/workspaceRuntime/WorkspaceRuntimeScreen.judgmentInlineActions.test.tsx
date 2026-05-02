@@ -78,21 +78,20 @@ test('renders inline judgment actions and generates a hint that stays distinct f
 
   const judgmentNode = await screen.findByTestId('editor-node-judgment-inline-primary');
   fireEvent.click(judgmentNode);
-  const actions = within(judgmentNode).getByTestId(
-    'judgment-inline-actions-judgment-inline-primary',
+  const actions = within(judgmentNode).getByTestId('node-actions-judgment-inline-primary');
+
+  expect(within(judgmentNode).queryByText('下一步')).not.toBeInTheDocument();
+  expect(
+    within(judgmentNode).queryByTestId(
+      'judgment-inline-actions-judgment-inline-primary',
+    ),
+  ).not.toBeInTheDocument();
+  expectToolbarVerbs(actions, ['追问', '总结', '⋯']);
+  expect(within(judgmentNode).queryByRole('button', { name: '给我提示' })).not.toBeInTheDocument();
+
+  fireEvent.click(
+    within(openOverflowMenu(actions)).getByRole('button', { name: '给我提示' }),
   );
-
-  expect(
-    within(actions).getByRole('button', { name: '给我提示' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actions).getByRole('button', { name: '查看答案解析' }),
-  ).toBeInTheDocument();
-  expect(
-    within(actions).getByRole('button', { name: '回到当前回答继续修改' }),
-  ).toBeInTheDocument();
-
-  fireEvent.click(within(actions).getByRole('button', { name: '给我提示' }));
 
   const hintCallout = await screen.findByTestId(
     'judgment-inline-hint-judgment-inline-primary',
@@ -114,7 +113,7 @@ test('renders inline judgment actions and generates a hint that stays distinct f
   expect(screen.getByText('判断所依据的资料')).toBeInTheDocument();
 });
 
-test('keeps only one primary action in judgment context and explains why answer explanation is disabled', async () => {
+test('keeps judgment-specific next-step actions in ⋯ and disables answer explanation when the matching summary is missing', async () => {
   const dependencies = await createPreloadedDependencies(
     createJudgmentInlineSnapshotWithoutSummary(),
   );
@@ -124,25 +123,20 @@ test('keeps only one primary action in judgment context and explains why answer 
   const judgmentNode = await screen.findByTestId('editor-node-judgment-inline-primary');
   fireEvent.click(judgmentNode);
 
-  const actions = within(judgmentNode).getByTestId(
-    'judgment-inline-actions-judgment-inline-primary',
-  );
-  const returnButton = within(actions).getByRole('button', {
-    name: '回到当前回答继续修改',
-  });
+  const actions = within(judgmentNode).getByTestId('node-actions-judgment-inline-primary');
+  expectToolbarVerbs(actions, ['追问', '总结', '⋯']);
 
-  expect(screen.getAllByRole('button', { name: '回到当前回答继续修改' })).toHaveLength(
-    1,
-  );
-  expect(returnButton).toHaveClass('workspace-primaryAction');
+  const overflowMenu = openOverflowMenu(actions);
+
   expect(
-    within(actions).getByRole('button', { name: '查看答案解析' }),
+    within(overflowMenu).getByRole('button', { name: '回到当前回答继续修改' }),
+  ).toBeEnabled();
+  expect(
+    within(overflowMenu).getByRole('button', { name: '给我提示' }),
+  ).toBeEnabled();
+  expect(
+    within(overflowMenu).getByRole('button', { name: '查看答案解析' }),
   ).toBeDisabled();
-  expect(
-    within(actions).getByText(
-      '当前还没有对应的答案解析，所以“查看答案解析”会保持禁用。',
-    ),
-  ).toBeInTheDocument();
 });
 
 test('jumps from judgment to the matching summary and shows it as an answer explanation', async () => {
@@ -156,7 +150,11 @@ test('jumps from judgment to the matching summary and shows it as an answer expl
   fireEvent.click(judgmentNode);
 
   fireEvent.click(
-    within(judgmentNode).getByRole('button', { name: '查看答案解析' }),
+    within(
+      openOverflowMenu(
+        within(judgmentNode).getByTestId('node-actions-judgment-inline-primary'),
+      ),
+    ).getByRole('button', { name: '查看答案解析' }),
   );
 
   const summaryNode = await screen.findByTestId('editor-node-summary-inline-primary');
@@ -181,7 +179,13 @@ test('returns from judgment to the matching answer instead of stopping on the pa
   fireEvent.click(currentJudgmentNode);
 
   fireEvent.click(
-    within(currentJudgmentNode).getByRole('button', {
+    within(
+      openOverflowMenu(
+        within(currentJudgmentNode).getByTestId(
+          'node-actions-judgment-inline-current',
+        ),
+      ),
+    ).getByRole('button', {
       name: '回到当前回答继续修改',
     }),
   );
@@ -348,6 +352,29 @@ function createJudgmentInlineSnapshot(): WorkspaceSnapshot {
     ...snapshot,
     tree,
   };
+}
+
+function expectToolbarVerbs(
+  toolbar: HTMLElement,
+  expectedLabels: string[],
+) {
+  expect(
+    within(toolbar)
+      .getAllByRole('button')
+      .map((button) =>
+        (button.textContent?.replace('▾', '').trim() ?? ''),
+      ),
+  ).toEqual(expectedLabels);
+}
+
+function openOverflowMenu(toolbar: HTMLElement) {
+  fireEvent.click(
+    within(toolbar).getByRole('button', {
+      name: '⋯',
+    }),
+  );
+
+  return within(toolbar).getByRole('menu');
 }
 
 function createJudgmentInlineSnapshotWithoutSummary(): WorkspaceSnapshot {

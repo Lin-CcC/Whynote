@@ -938,7 +938,6 @@
 }
 
 .workspace-nodeInlineActions,
-.workspace-judgmentActions,
 .workspace-judgmentHintCallout {
   display: grid;
   gap: 0.75rem;
@@ -1059,11 +1058,6 @@
 .workspace-nodeBodyToggle:disabled {
   opacity: 0.58;
   cursor: not-allowed;
-}
-
-.workspace-judgmentActionsHeader {
-  display: grid;
-  gap: 0.3rem;
 }
 
 .workspace-judgmentHintCallout {

@@ -925,24 +925,23 @@ test('keeps judgment nodes actionable within the current answer revision path', 
   revealHistoryAnswer('editor-node-answer-answer-closure');
   selectNodeByTitle('第一版回答还不完整');
 
-  const inlineActions = await screen.findByTestId(
-    'judgment-inline-actions-judgment-answer-closure-v1',
+  const actionPanel = await screen.findByTestId(
+    'node-actions-judgment-answer-closure-v1',
   );
 
   expect(await screen.findByTestId('judgment-inline-actions')).toBeInTheDocument();
-  expect(within(inlineActions).getByRole('button', { name: '给我提示' })).toBeInTheDocument();
+  const overflowMenu = openToolbarMenu(actionPanel, '⋯');
+  expect(within(overflowMenu).getByRole('button', { name: '给我提示' })).toBeInTheDocument();
+  expect(within(overflowMenu).getByRole('button', { name: '查看答案解析' })).toBeInTheDocument();
   expect(
-    within(inlineActions).getByRole('button', { name: '查看答案解析' }),
-  ).toBeInTheDocument();
-  expect(
-    within(inlineActions).getByRole('button', { name: '回到当前回答继续修改' }),
+    within(overflowMenu).getByRole('button', { name: '回到当前回答继续修改' }),
   ).toBeInTheDocument();
   expect(
     screen.queryByTestId('answer-evaluation-callout'),
   ).not.toBeInTheDocument();
 
   fireEvent.click(
-    within(inlineActions).getByRole('button', { name: '回到当前回答继续修改' }),
+    within(overflowMenu).getByRole('button', { name: '回到当前回答继续修改' }),
   );
   expect(
     getNodeByDisplayTitle('第二版回答'),
@@ -952,7 +951,10 @@ test('keeps judgment nodes actionable within the current answer revision path', 
   selectNodeByTitle('第一版回答还不完整');
   fireEvent.click(
     within(
-      await screen.findByTestId('judgment-inline-actions-judgment-answer-closure-v1'),
+      openToolbarMenu(
+        await screen.findByTestId('node-actions-judgment-answer-closure-v1'),
+        '⋯',
+      ),
     ).getByRole('button', { name: '查看答案解析' }),
   );
   expect(
