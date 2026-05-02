@@ -403,6 +403,9 @@ test('renders the runtime structure map with plan-step panels and question clust
       .getByTestId('structure-map-question-question-runtime-main')
       .querySelector('[data-structure-cluster-region="main"]'),
   ).not.toBeNull();
+  expect(
+    within(panel).getByTestId('structure-map-supporting-group-question-runtime-main'),
+  ).toHaveAttribute('data-structure-connector', 'supporting-spine');
 });
 
 test('keeps the left runtime action card auxiliary while the main question block path stays reachable', async () => {

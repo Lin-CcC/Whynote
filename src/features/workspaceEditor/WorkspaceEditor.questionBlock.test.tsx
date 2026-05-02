@@ -1602,6 +1602,10 @@ test('renders plan-step panels as question clusters with local answers, follow-u
     'data-structure-attachment',
     'supporting-rail',
   );
+  expect(supportingRegion).toHaveAttribute(
+    'data-structure-connector',
+    'supporting-spine',
+  );
   expect(
     within(supportingRegion).getByTestId('structure-map-item-answer-group:answer-first'),
   ).toBeInTheDocument();
@@ -1616,6 +1620,39 @@ test('renders plan-step panels as question clusters with local answers, follow-u
     ),
   ).not.toBeInTheDocument();
 
+  const supportingNodes = supportingRegion.querySelectorAll(
+    '[data-structure-role="supporting-node"]',
+  );
+  const supportingConnectors = Array.from(
+    supportingRegion.querySelectorAll('[data-structure-connector-role="supporting"]'),
+  );
+
+  expect(
+    new Set(
+      supportingConnectors.map((connector) =>
+        connector.getAttribute('data-structure-connector-segment'),
+      ),
+    ),
+  ).toEqual(new Set(['root', 'spine', 'leaf']));
+  expect(
+    supportingConnectors.filter(
+      (connector) =>
+        connector.getAttribute('data-structure-connector-segment') === 'root',
+    ),
+  ).toHaveLength(1);
+  expect(
+    supportingConnectors.filter(
+      (connector) =>
+        connector.getAttribute('data-structure-connector-segment') === 'spine',
+    ),
+  ).toHaveLength(1);
+  expect(
+    supportingConnectors.filter(
+      (connector) =>
+        connector.getAttribute('data-structure-connector-segment') === 'leaf',
+    ),
+  ).toHaveLength(supportingNodes.length);
+
   const followUpBranch = within(topLevelCluster).getByTestId(
     'structure-map-branch-question-main',
   );
@@ -1623,8 +1660,48 @@ test('renders plan-step panels as question clusters with local answers, follow-u
   expect(followUpBranch).toHaveAttribute('data-structure-branch', 'follow-up');
   expect(followUpBranch).toHaveAttribute('data-structure-cluster-region', 'branch');
   expect(followUpBranch).toHaveAttribute(
+    'data-structure-connector',
+    'follow-up-trunk',
+  );
+  expect(followUpBranch).toHaveAttribute(
     'data-structure-branch-direction',
     'down-right',
+  );
+
+  const followUpNodes = followUpBranch.querySelectorAll(
+    '[data-structure-role="follow-up-node"]',
+  );
+  const followUpConnectors = Array.from(
+    followUpBranch.querySelectorAll('[data-structure-connector-role="branch"]'),
+  );
+
+  expect(
+    new Set(
+      followUpConnectors.map((connector) =>
+        connector.getAttribute('data-structure-connector-segment'),
+      ),
+    ),
+  ).toEqual(new Set(['root', 'trunk', 'leaf']));
+  expect(
+    followUpConnectors.filter(
+      (connector) =>
+        connector.getAttribute('data-structure-connector-segment') === 'root',
+    ),
+  ).toHaveLength(1);
+  expect(
+    followUpConnectors.filter(
+      (connector) =>
+        connector.getAttribute('data-structure-connector-segment') === 'trunk',
+    ),
+  ).toHaveLength(1);
+  expect(
+    followUpConnectors.filter(
+      (connector) =>
+        connector.getAttribute('data-structure-connector-segment') === 'leaf',
+    ),
+  ).toHaveLength(followUpNodes.length);
+  expect(followUpBranch.getAttribute('data-structure-connector')).not.toBe(
+    supportingRegion.getAttribute('data-structure-connector'),
   );
 
   const followUpCluster = within(followUpBranch).getByTestId(
