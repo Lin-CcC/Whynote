@@ -448,23 +448,30 @@ function QuestionBlockNode({
       {node.entries.length > 0 ? (
         <div className="workspace-structureMapClusterBody">
           {supportingEntries.length > 0 ? (
-            <QuestionEntryGroup
-              activeDropZoneId={activeDropZoneId}
-              clusterTone={clusterTone}
-              descriptors={supportingEntries}
-              dragState={dragState}
-              entryNodeIds={entryNodeIds}
-              groupKind="supporting"
-              isInteractionLocked={isInteractionLocked}
-              node={node}
-              onDragEnd={onDragEnd}
-              onDragStart={onDragStart}
-              onDropRequest={onDropRequest}
-              onDropZoneEnter={onDropZoneEnter}
-              onOpenDocumentNode={onOpenDocumentNode}
-              selectedItemId={selectedItemId}
-              tree={tree}
-            />
+            <>
+              <StructureMapConnector
+                connector="supporting-spine"
+                role="supporting"
+                segment="root"
+              />
+              <QuestionEntryGroup
+                activeDropZoneId={activeDropZoneId}
+                clusterTone={clusterTone}
+                descriptors={supportingEntries}
+                dragState={dragState}
+                entryNodeIds={entryNodeIds}
+                groupKind="supporting"
+                isInteractionLocked={isInteractionLocked}
+                node={node}
+                onDragEnd={onDragEnd}
+                onDragStart={onDragStart}
+                onDropRequest={onDropRequest}
+                onDropZoneEnter={onDropZoneEnter}
+                onOpenDocumentNode={onOpenDocumentNode}
+                selectedItemId={selectedItemId}
+                tree={tree}
+              />
+            </>
           ) : null}
           {followUpEntries.length > 0 ? (
             <QuestionEntryGroup

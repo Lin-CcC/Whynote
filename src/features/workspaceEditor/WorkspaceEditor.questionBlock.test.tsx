@@ -1619,6 +1619,15 @@ test('renders plan-step panels as question clusters with local answers, follow-u
       'structure-map-scaffold-summary-scaffold-step',
     ),
   ).not.toBeInTheDocument();
+  expect(supportingRegion.previousElementSibling).not.toBeNull();
+  expect(supportingRegion.previousElementSibling).toHaveAttribute(
+    'data-structure-connector-role',
+    'supporting',
+  );
+  expect(supportingRegion.previousElementSibling).toHaveAttribute(
+    'data-structure-connector-segment',
+    'root',
+  );
 
   const supportingNodes = supportingRegion.querySelectorAll(
     '[data-structure-role="supporting-node"]',
