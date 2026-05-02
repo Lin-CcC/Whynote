@@ -223,6 +223,13 @@
   gap: 0.8rem;
 }
 
+.workspace-structureMapActionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
 .workspace-structureMapList {
   display: grid;
   gap: 0.65rem;

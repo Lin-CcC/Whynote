@@ -145,9 +145,11 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
                 }));
                 workspaceEditor.selectNode(nodeId);
               }}
+              onWorkspaceViewStateChange={handleWorkspaceViewStateChange}
               selectedNodeId={workspaceEditor.selectedNodeId}
               tree={workspaceEditor.tree}
               validateStructureMapMove={workspaceEditor.validateStructureMapMove}
+              workspaceViewState={workspaceViewState}
             />
           ) : (
             <TextMainView

@@ -1,7 +1,8 @@
-import { useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 
 import {
   buildStructureMapPresentationModel,
+  findNearestQuestionNodeId,
   getNodeOrThrow,
   getStructureMapNodeLabel,
   getStructureMapSelectionId,
@@ -19,6 +20,10 @@ import {
   type StructureMapSection,
   type StructureMapSectionItem,
 } from '../../nodeDomain';
+import type {
+  StructureMapFocusTarget,
+  WorkspaceViewState,
+} from '../workspaceEditorTypes';
 
 type StructureMapMainViewProps = {
   currentModuleId: string | null;
@@ -31,6 +36,8 @@ type StructureMapMainViewProps = {
   validateStructureMapMove: (
     request: StructureMapMoveRequest,
   ) => StructureMapMoveValidationResult;
+  onWorkspaceViewStateChange: (state: WorkspaceViewState) => void;
+  workspaceViewState: WorkspaceViewState;
 };
 
 type DragState = {
@@ -67,6 +74,11 @@ type QuestionEntryDescriptor = {
   index: number;
 };
 
+type StructureMapSelectionContext = {
+  planStepNodeId: string | null;
+  questionNodeId: string | null;
+};
+
 type StructureMapRenderProps = {
   activeDropZoneId: string | null;
   dragState: DragState | null;
@@ -80,11 +92,18 @@ type StructureMapRenderProps = {
   ) => void;
   onDropZoneEnter: (dropZoneId: string | null) => void;
   onOpenDocumentNode: (nodeId: string) => void;
+  onToggleStructureMapClusterCollapsed: (questionNodeId: string) => void;
+  onToggleStructureMapFocusTarget: (target: StructureMapFocusTarget) => void;
+  onToggleStructureMapFollowUpCollapsed: (questionNodeId: string) => void;
+  onToggleStructureMapStepCollapsed: (planStepNodeId: string) => void;
   selectedItemId: string | null;
+  selectionContext: StructureMapSelectionContext;
+  structureMapFocusTarget: StructureMapFocusTarget | null;
   tree: NodeTree;
   validateStructureMapMove: (
     request: StructureMapMoveRequest,
   ) => StructureMapMoveValidationResult;
+  workspaceViewState: WorkspaceViewState;
 };
 
 export default function StructureMapMainView({
@@ -93,13 +112,16 @@ export default function StructureMapMainView({
   onCreateModule,
   onMoveStructureMapNode,
   onOpenDocumentNode,
+  onWorkspaceViewStateChange,
   selectedNodeId,
   tree,
   validateStructureMapMove,
+  workspaceViewState,
 }: StructureMapMainViewProps) {
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [activeDropZoneId, setActiveDropZoneId] = useState<string | null>(null);
   const [dropFeedback, setDropFeedback] = useState<DropFeedback | null>(null);
+  const structureMapShellRef = useRef<HTMLDivElement | null>(null);
 
   if (!currentModuleId || !tree.nodes[currentModuleId]) {
     return (
@@ -133,6 +155,14 @@ export default function StructureMapMainView({
 
   const currentModule = getNodeOrThrow(tree, currentModuleId);
   const model = buildStructureMapPresentationModel(tree, currentModuleId);
+  const structureMapFocusTarget = resolveStructureMapFocusTarget(
+    model,
+    workspaceViewState.structureMapFocusTarget,
+  );
+  const focusedSections = getStructureMapSectionsForFocus(
+    model,
+    structureMapFocusTarget,
+  );
   const selectedAnchor = resolveStructureMapSelectionAnchor(
     tree,
     currentModuleId,
@@ -141,7 +171,14 @@ export default function StructureMapMainView({
   const selectedItemId = selectedAnchor
     ? getStructureMapSelectionId(selectedAnchor)
     : null;
-  const sectionNodeIds = model.sections.map((section) => section.anchor.nodeId);
+  const sectionNodeIds = focusedSections.map((section) => section.anchor.nodeId);
+  const selectionContext = resolveStructureMapSelectionContext(tree, selectedNodeId);
+  const visibleSelectionTestId = getVisibleStructureMapSelectionTestId(
+    tree,
+    selectedItemId,
+    selectionContext,
+    workspaceViewState,
+  );
   const dragStatus = dragState
     ? {
         text: '拖动中：蓝色提示表示可落点，红色提示表示当前落点不允许。',
@@ -153,6 +190,89 @@ export default function StructureMapMainView({
           tone: 'invalid' as const,
         }
       : null;
+
+  useEffect(() => {
+    const shell = structureMapShellRef.current;
+
+    if (!shell) {
+      return;
+    }
+
+    const targetTestId =
+      (structureMapFocusTarget
+        ? getStructureMapFocusTargetTestId(structureMapFocusTarget)
+        : null) ?? visibleSelectionTestId;
+    const targetElement =
+      targetTestId === null ? null : findElementByTestId(shell, targetTestId);
+
+    if (!targetElement) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      targetElement.scrollIntoView?.({
+        block: 'nearest',
+        inline: 'nearest',
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [
+    structureMapFocusTarget,
+    visibleSelectionTestId,
+    workspaceViewState.collapsedStructureMapClusterIds,
+    workspaceViewState.collapsedStructureMapFollowUpIds,
+    workspaceViewState.collapsedStructureMapStepIds,
+  ]);
+
+  function updateWorkspaceViewState(
+    updater: (state: WorkspaceViewState) => WorkspaceViewState,
+  ) {
+    onWorkspaceViewStateChange(updater(workspaceViewState));
+  }
+
+  function toggleStructureMapStepCollapsed(planStepNodeId: string) {
+    updateWorkspaceViewState((state) => ({
+      ...state,
+      collapsedStructureMapStepIds: toggleId(
+        state.collapsedStructureMapStepIds,
+        planStepNodeId,
+      ),
+    }));
+  }
+
+  function toggleStructureMapClusterCollapsed(questionNodeId: string) {
+    updateWorkspaceViewState((state) => ({
+      ...state,
+      collapsedStructureMapClusterIds: toggleId(
+        state.collapsedStructureMapClusterIds,
+        questionNodeId,
+      ),
+    }));
+  }
+
+  function toggleStructureMapFollowUpCollapsed(questionNodeId: string) {
+    updateWorkspaceViewState((state) => ({
+      ...state,
+      collapsedStructureMapFollowUpIds: toggleId(
+        state.collapsedStructureMapFollowUpIds,
+        questionNodeId,
+      ),
+    }));
+  }
+
+  function toggleStructureMapFocusTarget(target: StructureMapFocusTarget) {
+    updateWorkspaceViewState((state) => ({
+      ...state,
+      structureMapFocusTarget:
+        state.structureMapFocusTarget?.kind === target.kind &&
+        state.structureMapFocusTarget.nodeId === target.nodeId
+          ? null
+          : target,
+    }));
+  }
 
   function handleDragStart(nodeId: string) {
     setDropFeedback(null);
@@ -212,6 +332,7 @@ export default function StructureMapMainView({
         className="workspace-documentShell workspace-structureMapShell"
         data-layout="single-column"
         data-testid="workspace-structure-map-shell"
+        ref={structureMapShellRef}
       >
         <header className="workspace-documentHeader">
           <div className="workspace-documentHeaderMain">
@@ -223,6 +344,26 @@ export default function StructureMapMainView({
           <p className="workspace-helpText">
             这里负责按问题聚合结构、联动文档和拖动重排，正文编辑仍留在文档视图。
           </p>
+          {structureMapFocusTarget ? (
+            <div className="workspace-structureMapActionRow">
+              <p className="workspace-helpText">
+                {getStructureMapFocusSummaryLabel(tree, structureMapFocusTarget)}
+              </p>
+              <button
+                className="workspace-nodeBodyToggle"
+                disabled={isInteractionLocked}
+                onClick={() =>
+                  updateWorkspaceViewState((state) => ({
+                    ...state,
+                    structureMapFocusTarget: null,
+                  }))
+                }
+                type="button"
+              >
+                退出地图聚焦
+              </button>
+            </div>
+          ) : null}
         </header>
         {dragStatus ? (
           <div
@@ -249,7 +390,7 @@ export default function StructureMapMainView({
             siblingNodeIds={sectionNodeIds}
             validateStructureMapMove={validateStructureMapMove}
           />
-          {model.sections.map((section, index) => (
+          {focusedSections.map((section, index) => (
             <div
               className="workspace-structureMapSection"
               data-structure-panel={section.planStep.id}
@@ -267,10 +408,21 @@ export default function StructureMapMainView({
                 onDropRequest={handleDropRequest}
                 onDropZoneEnter={setActiveDropZoneId}
                 onOpenDocumentNode={onOpenDocumentNode}
+                onToggleStructureMapClusterCollapsed={
+                  toggleStructureMapClusterCollapsed
+                }
+                onToggleStructureMapFocusTarget={toggleStructureMapFocusTarget}
+                onToggleStructureMapFollowUpCollapsed={
+                  toggleStructureMapFollowUpCollapsed
+                }
+                onToggleStructureMapStepCollapsed={toggleStructureMapStepCollapsed}
                 section={section}
                 selectedItemId={selectedItemId}
+                selectionContext={selectionContext}
+                structureMapFocusTarget={structureMapFocusTarget}
                 tree={tree}
                 validateStructureMapMove={validateStructureMapMove}
+                workspaceViewState={workspaceViewState}
               />
               <StructureMapDropZone
                 activeDropZoneId={activeDropZoneId}
@@ -305,14 +457,28 @@ function SectionNode({
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
+  onToggleStructureMapClusterCollapsed,
+  onToggleStructureMapFocusTarget,
+  onToggleStructureMapFollowUpCollapsed,
+  onToggleStructureMapStepCollapsed,
   section,
   selectedItemId,
+  selectionContext,
+  structureMapFocusTarget,
   tree,
   validateStructureMapMove,
+  workspaceViewState,
 }: StructureMapRenderProps & {
   section: StructureMapSection;
 }) {
   const itemNodeIds = section.items.map((item) => getSectionItemAnchorNodeId(item));
+  const isCollapsed = workspaceViewState.collapsedStructureMapStepIds.includes(
+    section.planStep.id,
+  );
+  const isCurrentPlanStep = selectionContext.planStepNodeId === section.planStep.id;
+  const isFocused =
+    structureMapFocusTarget?.kind === 'plan-step' &&
+    structureMapFocusTarget.nodeId === section.planStep.id;
 
   return (
     <div className="workspace-structureMapPanelBody">
@@ -327,67 +493,108 @@ function SectionNode({
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
+        isSelectedOverride={isCollapsed && isCurrentPlanStep}
         selectedItemId={selectedItemId}
         structureRole="plan-step"
         title={getStructureMapNodeLabel(tree, section.planStep, 'step')}
       />
-      <div className="workspace-structureMapList">
-        {section.items.map((item, index) => (
-          <div
-            className="workspace-structureMapSlot"
-            data-structure-role={
-              item.kind === 'scaffold-summary' ? 'scaffold-slot' : 'cluster-slot'
+      <div className="workspace-structureMapActionRow">
+        <button
+          className="workspace-nodeBodyToggle"
+          disabled={isInteractionLocked}
+          onClick={() => onToggleStructureMapStepCollapsed(section.planStep.id)}
+          type="button"
+        >
+          {isCollapsed ? '展开步骤面板' : '收起步骤面板'}
+        </button>
+        {isCurrentPlanStep || isFocused ? (
+          <button
+            className="workspace-nodeBodyToggle"
+            disabled={isInteractionLocked}
+            onClick={() =>
+              onToggleStructureMapFocusTarget({
+                kind: 'plan-step',
+                nodeId: section.planStep.id,
+              })
             }
-            key={getSectionItemAnchorNodeId(item)}
+            type="button"
           >
-            <StructureMapDropZone
-              activeDropZoneId={activeDropZoneId}
-              dragState={dragState}
-              dropRequest={{
-                index,
-                targetParentNodeId: section.planStep.id,
-              }}
-              dropZoneId={createDropZoneId(section.planStep.id, index)}
-              isInteractionLocked={isInteractionLocked}
-              onDropRequest={onDropRequest}
-              onDropZoneEnter={onDropZoneEnter}
-              onInvalidDrop={onInvalidDrop}
-              siblingNodeIds={itemNodeIds}
-              validateStructureMapMove={validateStructureMapMove}
-            />
-            <SectionItemNode
-              activeDropZoneId={activeDropZoneId}
-              dragState={dragState}
-              isInteractionLocked={isInteractionLocked}
-              item={item}
-              onDragEnd={onDragEnd}
-              onInvalidDrop={onInvalidDrop}
-              onDragStart={onDragStart}
-              onDropRequest={onDropRequest}
-              onDropZoneEnter={onDropZoneEnter}
-              onOpenDocumentNode={onOpenDocumentNode}
-              selectedItemId={selectedItemId}
-              tree={tree}
-              validateStructureMapMove={validateStructureMapMove}
-            />
-          </div>
-        ))}
-        <StructureMapDropZone
-          activeDropZoneId={activeDropZoneId}
-          dragState={dragState}
-          dropRequest={{
-            index: section.items.length,
-            targetParentNodeId: section.planStep.id,
-          }}
-          dropZoneId={createDropZoneId(section.planStep.id, section.items.length)}
-          isInteractionLocked={isInteractionLocked}
-          onDropRequest={onDropRequest}
-          onDropZoneEnter={onDropZoneEnter}
-          onInvalidDrop={onInvalidDrop}
-          siblingNodeIds={itemNodeIds}
-          validateStructureMapMove={validateStructureMapMove}
-        />
+            {isFocused ? '退出步骤聚焦' : '聚焦当前步骤'}
+          </button>
+        ) : null}
       </div>
+      {isCollapsed ? (
+        <p className="workspace-helpText">当前步骤面板已折叠。</p>
+      ) : (
+        <div className="workspace-structureMapList">
+          {section.items.map((item, index) => (
+            <div
+              className="workspace-structureMapSlot"
+              data-structure-role={
+                item.kind === 'scaffold-summary' ? 'scaffold-slot' : 'cluster-slot'
+              }
+              key={getSectionItemAnchorNodeId(item)}
+            >
+              <StructureMapDropZone
+                activeDropZoneId={activeDropZoneId}
+                dragState={dragState}
+                dropRequest={{
+                  index,
+                  targetParentNodeId: section.planStep.id,
+                }}
+                dropZoneId={createDropZoneId(section.planStep.id, index)}
+                isInteractionLocked={isInteractionLocked}
+                onDropRequest={onDropRequest}
+                onDropZoneEnter={onDropZoneEnter}
+                onInvalidDrop={onInvalidDrop}
+                siblingNodeIds={itemNodeIds}
+                validateStructureMapMove={validateStructureMapMove}
+              />
+              <SectionItemNode
+                activeDropZoneId={activeDropZoneId}
+                dragState={dragState}
+                isInteractionLocked={isInteractionLocked}
+                item={item}
+                onDragEnd={onDragEnd}
+                onInvalidDrop={onInvalidDrop}
+                onDragStart={onDragStart}
+                onDropRequest={onDropRequest}
+                onDropZoneEnter={onDropZoneEnter}
+                onOpenDocumentNode={onOpenDocumentNode}
+                onToggleStructureMapClusterCollapsed={
+                  onToggleStructureMapClusterCollapsed
+                }
+                onToggleStructureMapFocusTarget={onToggleStructureMapFocusTarget}
+                onToggleStructureMapFollowUpCollapsed={
+                  onToggleStructureMapFollowUpCollapsed
+                }
+                onToggleStructureMapStepCollapsed={onToggleStructureMapStepCollapsed}
+                selectedItemId={selectedItemId}
+                selectionContext={selectionContext}
+                structureMapFocusTarget={structureMapFocusTarget}
+                tree={tree}
+                validateStructureMapMove={validateStructureMapMove}
+                workspaceViewState={workspaceViewState}
+              />
+            </div>
+          ))}
+          <StructureMapDropZone
+            activeDropZoneId={activeDropZoneId}
+            dragState={dragState}
+            dropRequest={{
+              index: section.items.length,
+              targetParentNodeId: section.planStep.id,
+            }}
+            dropZoneId={createDropZoneId(section.planStep.id, section.items.length)}
+            isInteractionLocked={isInteractionLocked}
+            onDropRequest={onDropRequest}
+            onDropZoneEnter={onDropZoneEnter}
+            onInvalidDrop={onInvalidDrop}
+            siblingNodeIds={itemNodeIds}
+            validateStructureMapMove={validateStructureMapMove}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -438,9 +645,16 @@ function QuestionBlockNode({
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
+  onToggleStructureMapClusterCollapsed,
+  onToggleStructureMapFocusTarget,
+  onToggleStructureMapFollowUpCollapsed,
+  onToggleStructureMapStepCollapsed,
   selectedItemId,
+  selectionContext,
+  structureMapFocusTarget,
   tree,
   validateStructureMapMove,
+  workspaceViewState,
 }: StructureMapRenderProps & {
   clusterTone: 'follow-up' | 'top-level';
   node: StructureMapQuestionBlockNode;
@@ -458,6 +672,19 @@ function QuestionBlockNode({
   );
   const hasSupportingEntries = supportingEntries.length > 0;
   const hasFollowUpEntries = followUpEntries.length > 0;
+  const isTopLevelCluster = clusterTone === 'top-level';
+  const isCollapsed = isTopLevelCluster
+    ? workspaceViewState.collapsedStructureMapClusterIds.includes(
+        node.question.id,
+      )
+    : workspaceViewState.collapsedStructureMapFollowUpIds.includes(
+        node.question.id,
+      );
+  const isCurrentQuestionCluster =
+    selectionContext.questionNodeId === node.question.id;
+  const isFocused =
+    structureMapFocusTarget?.kind === 'question-cluster' &&
+    structureMapFocusTarget.nodeId === node.question.id;
 
   return (
     <div
@@ -483,38 +710,111 @@ function QuestionBlockNode({
             data-structure-node="question-hub"
           >
             <StructureMapButton
-        anchor={node.anchor}
-        dragNodeId={node.question.id}
-        dragPermission={node.drag}
-        dragState={dragState}
-        isCurrentAnswer={false}
-        isInteractionLocked={isInteractionLocked}
-        kindLabel="问题"
-        onDragEnd={onDragEnd}
-        onDragStart={onDragStart}
-        onOpenDocumentNode={onOpenDocumentNode}
-        selectedItemId={selectedItemId}
-        structureRole="question"
-        title={getStructureMapNodeLabel(tree, node.question, 'question')}
+              anchor={node.anchor}
+              dragNodeId={node.question.id}
+              dragPermission={node.drag}
+              dragState={dragState}
+              isCurrentAnswer={false}
+              isInteractionLocked={isInteractionLocked}
+              isSelectedOverride={isCollapsed && isCurrentQuestionCluster}
+              kindLabel="问题"
+              onDragEnd={onDragEnd}
+              onDragStart={onDragStart}
+              onOpenDocumentNode={onOpenDocumentNode}
+              selectedItemId={selectedItemId}
+              structureRole="question"
+              title={getStructureMapNodeLabel(tree, node.question, 'question')}
             />
+            <div className="workspace-structureMapActionRow">
+              <button
+                className="workspace-nodeBodyToggle"
+                disabled={isInteractionLocked}
+                onClick={() =>
+                  isTopLevelCluster
+                    ? onToggleStructureMapClusterCollapsed(node.question.id)
+                    : onToggleStructureMapFollowUpCollapsed(node.question.id)
+                }
+                type="button"
+              >
+                {isCollapsed
+                  ? isTopLevelCluster
+                    ? '展开问题簇'
+                    : '展开追问分支'
+                  : isTopLevelCluster
+                    ? '收起问题簇'
+                    : '收起追问分支'}
+              </button>
+              {isCurrentQuestionCluster || isFocused ? (
+                <button
+                  className="workspace-nodeBodyToggle"
+                  disabled={isInteractionLocked}
+                  onClick={() =>
+                    onToggleStructureMapFocusTarget({
+                      kind: 'question-cluster',
+                      nodeId: node.question.id,
+                    })
+                  }
+                  type="button"
+                >
+                  {isFocused ? '退出问题簇聚焦' : '聚焦当前问题簇'}
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
-      {node.entries.length > 0 ? (
-        <div className="workspace-structureMapClusterBody">
-          {supportingEntries.length > 0 ? (
-            <>
-              <StructureMapConnector
-                connector="supporting-spine"
-                role="supporting"
-                segment="root"
-              />
+        {isCollapsed ? (
+          <p className="workspace-helpText">
+            {isTopLevelCluster ? '当前问题簇已折叠。' : '当前追问分支已折叠。'}
+          </p>
+        ) : node.entries.length > 0 ? (
+          <div className="workspace-structureMapClusterBody">
+            {supportingEntries.length > 0 ? (
+              <>
+                <StructureMapConnector
+                  connector="supporting-spine"
+                  role="supporting"
+                  segment="root"
+                />
+                <QuestionEntryGroup
+                  activeDropZoneId={activeDropZoneId}
+                  clusterTone={clusterTone}
+                  descriptors={supportingEntries}
+                  dragState={dragState}
+                  entryNodeIds={entryNodeIds}
+                  groupKind="supporting"
+                  isInteractionLocked={isInteractionLocked}
+                  node={node}
+                  onDragEnd={onDragEnd}
+                  onInvalidDrop={onInvalidDrop}
+                  onDragStart={onDragStart}
+                  onDropRequest={onDropRequest}
+                  onDropZoneEnter={onDropZoneEnter}
+                  onOpenDocumentNode={onOpenDocumentNode}
+                  onToggleStructureMapClusterCollapsed={
+                    onToggleStructureMapClusterCollapsed
+                  }
+                  onToggleStructureMapFocusTarget={onToggleStructureMapFocusTarget}
+                  onToggleStructureMapFollowUpCollapsed={
+                    onToggleStructureMapFollowUpCollapsed
+                  }
+                  onToggleStructureMapStepCollapsed={onToggleStructureMapStepCollapsed}
+                  selectedItemId={selectedItemId}
+                  selectionContext={selectionContext}
+                  structureMapFocusTarget={structureMapFocusTarget}
+                  tree={tree}
+                  validateStructureMapMove={validateStructureMapMove}
+                  workspaceViewState={workspaceViewState}
+                />
+              </>
+            ) : null}
+            {followUpEntries.length > 0 ? (
               <QuestionEntryGroup
                 activeDropZoneId={activeDropZoneId}
                 clusterTone={clusterTone}
-                descriptors={supportingEntries}
+                descriptors={followUpEntries}
                 dragState={dragState}
                 entryNodeIds={entryNodeIds}
-                groupKind="supporting"
+                groupKind="follow-up"
                 isInteractionLocked={isInteractionLocked}
                 node={node}
                 onDragEnd={onDragEnd}
@@ -523,35 +823,24 @@ function QuestionBlockNode({
                 onDropRequest={onDropRequest}
                 onDropZoneEnter={onDropZoneEnter}
                 onOpenDocumentNode={onOpenDocumentNode}
+                onToggleStructureMapClusterCollapsed={
+                  onToggleStructureMapClusterCollapsed
+                }
+                onToggleStructureMapFocusTarget={onToggleStructureMapFocusTarget}
+                onToggleStructureMapFollowUpCollapsed={
+                  onToggleStructureMapFollowUpCollapsed
+                }
+                onToggleStructureMapStepCollapsed={onToggleStructureMapStepCollapsed}
                 selectedItemId={selectedItemId}
+                selectionContext={selectionContext}
+                structureMapFocusTarget={structureMapFocusTarget}
                 tree={tree}
                 validateStructureMapMove={validateStructureMapMove}
+                workspaceViewState={workspaceViewState}
               />
-            </>
-          ) : null}
-          {followUpEntries.length > 0 ? (
-            <QuestionEntryGroup
-              activeDropZoneId={activeDropZoneId}
-              clusterTone={clusterTone}
-              descriptors={followUpEntries}
-              dragState={dragState}
-              entryNodeIds={entryNodeIds}
-              groupKind="follow-up"
-              isInteractionLocked={isInteractionLocked}
-              node={node}
-              onDragEnd={onDragEnd}
-              onInvalidDrop={onInvalidDrop}
-              onDragStart={onDragStart}
-              onDropRequest={onDropRequest}
-              onDropZoneEnter={onDropZoneEnter}
-              onOpenDocumentNode={onOpenDocumentNode}
-              selectedItemId={selectedItemId}
-              tree={tree}
-              validateStructureMapMove={validateStructureMapMove}
-            />
-          ) : null}
-        </div>
-      ) : null}
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -572,9 +861,16 @@ function QuestionEntryGroup({
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
+  onToggleStructureMapClusterCollapsed,
+  onToggleStructureMapFocusTarget,
+  onToggleStructureMapFollowUpCollapsed,
+  onToggleStructureMapStepCollapsed,
   selectedItemId,
+  selectionContext,
+  structureMapFocusTarget,
   tree,
   validateStructureMapMove,
+  workspaceViewState,
 }: StructureMapRenderProps & {
   clusterTone: 'follow-up' | 'top-level';
   descriptors: QuestionEntryDescriptor[];
@@ -619,11 +915,13 @@ function QuestionEntryGroup({
           : `structure-map-branch-${node.question.id}`
       }
     >
-      <StructureMapConnector
-        connector={connectorKind}
-        role={connectorRole}
-        segment="root"
-      />
+      {groupKind === 'follow-up' ? (
+        <StructureMapConnector
+          connector={connectorKind}
+          role={connectorRole}
+          segment="root"
+        />
+      ) : null}
       <div
         className={
           groupKind === 'supporting'
@@ -682,9 +980,20 @@ function QuestionEntryGroup({
               onDropRequest={onDropRequest}
               onDropZoneEnter={onDropZoneEnter}
               onOpenDocumentNode={onOpenDocumentNode}
+              onToggleStructureMapClusterCollapsed={
+                onToggleStructureMapClusterCollapsed
+              }
+              onToggleStructureMapFocusTarget={onToggleStructureMapFocusTarget}
+              onToggleStructureMapFollowUpCollapsed={
+                onToggleStructureMapFollowUpCollapsed
+              }
+              onToggleStructureMapStepCollapsed={onToggleStructureMapStepCollapsed}
               selectedItemId={selectedItemId}
+              selectionContext={selectionContext}
+              structureMapFocusTarget={structureMapFocusTarget}
               tree={tree}
               validateStructureMapMove={validateStructureMapMove}
+              workspaceViewState={workspaceViewState}
             />
           </div>
         ))}
@@ -742,9 +1051,16 @@ function QuestionEntryNode({
   onDropRequest,
   onDropZoneEnter,
   onOpenDocumentNode,
+  onToggleStructureMapClusterCollapsed,
+  onToggleStructureMapFocusTarget,
+  onToggleStructureMapFollowUpCollapsed,
+  onToggleStructureMapStepCollapsed,
   selectedItemId,
+  selectionContext,
+  structureMapFocusTarget,
   tree,
   validateStructureMapMove,
+  workspaceViewState,
 }: StructureMapRenderProps & {
   clusterTone: 'follow-up' | 'top-level';
   entry: StructureMapQuestionEntry;
@@ -804,9 +1120,16 @@ function QuestionEntryNode({
       onDropRequest={onDropRequest}
       onDropZoneEnter={onDropZoneEnter}
       onOpenDocumentNode={onOpenDocumentNode}
+      onToggleStructureMapClusterCollapsed={onToggleStructureMapClusterCollapsed}
+      onToggleStructureMapFocusTarget={onToggleStructureMapFocusTarget}
+      onToggleStructureMapFollowUpCollapsed={onToggleStructureMapFollowUpCollapsed}
+      onToggleStructureMapStepCollapsed={onToggleStructureMapStepCollapsed}
       selectedItemId={selectedItemId}
+      selectionContext={selectionContext}
+      structureMapFocusTarget={structureMapFocusTarget}
       tree={tree}
       validateStructureMapMove={validateStructureMapMove}
+      workspaceViewState={workspaceViewState}
     />
   );
 }
@@ -888,6 +1211,7 @@ function StructureMapButton({
   onDragEnd,
   onDragStart,
   onOpenDocumentNode,
+  isSelectedOverride = false,
   selectedItemId,
   structureRole,
   title,
@@ -902,21 +1226,23 @@ function StructureMapButton({
   onDragEnd: () => void;
   onDragStart: (nodeId: string) => void;
   onOpenDocumentNode: (nodeId: string) => void;
+  isSelectedOverride?: boolean;
   selectedItemId: string | null;
   structureRole: StructureRole;
   title: string;
 }) {
   const itemId = getStructureMapSelectionId(anchor);
   const isDragging = dragState?.nodeId === dragNodeId;
+  const isSelected = isSelectedOverride || selectedItemId === itemId;
 
   return (
     <button
-      aria-current={selectedItemId === itemId ? 'true' : undefined}
+      aria-current={isSelected ? 'true' : undefined}
       className="workspace-structureMapButton"
       data-draggable={dragPermission.canDrag}
       data-dragging={isDragging}
       data-kind={itemId.split(':')[0]}
-      data-selected={selectedItemId === itemId}
+      data-selected={isSelected}
       data-structure-role={structureRole}
       data-testid={`structure-map-item-${itemId}`}
       disabled={isInteractionLocked}
@@ -1168,4 +1494,205 @@ function getStructureMapDropZoneLabel(
     case 'idle':
       return null;
   }
+}
+
+function toggleId(ids: string[], id: string) {
+  return ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id];
+}
+
+function resolveStructureMapSelectionContext(
+  tree: NodeTree,
+  selectedNodeId: string | null,
+): StructureMapSelectionContext {
+  return {
+    planStepNodeId: findNearestPlanStepNodeId(tree, selectedNodeId),
+    questionNodeId: findNearestQuestionNodeId(tree, selectedNodeId),
+  };
+}
+
+function findNearestPlanStepNodeId(
+  tree: NodeTree,
+  nodeId: string | null | undefined,
+) {
+  if (!nodeId || !tree.nodes[nodeId]) {
+    return null;
+  }
+
+  let currentNode: NodeTree['nodes'][string] | undefined = getNodeOrThrow(tree, nodeId);
+
+  while (currentNode) {
+    if (currentNode.type === 'plan-step') {
+      return currentNode.id;
+    }
+
+    currentNode =
+      currentNode.parentId === null ? undefined : tree.nodes[currentNode.parentId];
+  }
+
+  return null;
+}
+
+function resolveStructureMapFocusTarget(
+  model: StructureMapPresentationModel,
+  focusTarget: StructureMapFocusTarget | null,
+) {
+  if (!focusTarget) {
+    return null;
+  }
+
+  if (focusTarget.kind === 'plan-step') {
+    return model.sections.some((section) => section.planStep.id === focusTarget.nodeId)
+      ? focusTarget
+      : null;
+  }
+
+  return model.sections.some((section) =>
+    findQuestionBlockNode(section.questionBlocks, focusTarget.nodeId),
+  )
+    ? focusTarget
+    : null;
+}
+
+function getStructureMapSectionsForFocus(
+  model: StructureMapPresentationModel,
+  focusTarget: StructureMapFocusTarget | null,
+) {
+  if (!focusTarget) {
+    return model.sections;
+  }
+
+  if (focusTarget.kind === 'plan-step') {
+    return model.sections.filter((section) => section.planStep.id === focusTarget.nodeId);
+  }
+
+  const focusedSection = model.sections.find((section) =>
+    findQuestionBlockNode(section.questionBlocks, focusTarget.nodeId),
+  );
+
+  if (!focusedSection) {
+    return model.sections;
+  }
+
+  const focusedQuestionBlock = findQuestionBlockNode(
+    focusedSection.questionBlocks,
+    focusTarget.nodeId,
+  );
+
+  if (!focusedQuestionBlock) {
+    return model.sections;
+  }
+
+  const focusedQuestionItem: StructureMapSectionItem = {
+    kind: 'question-block',
+    node: focusedQuestionBlock,
+  };
+
+  return [
+    {
+      ...focusedSection,
+      items: [focusedQuestionItem],
+      questionBlocks: [focusedQuestionBlock],
+      scaffoldSummaries: [],
+    },
+  ];
+}
+
+function findQuestionBlockNode(
+  questionBlocks: StructureMapQuestionBlockNode[],
+  nodeId: string,
+): StructureMapQuestionBlockNode | null {
+  for (const questionBlock of questionBlocks) {
+    if (questionBlock.question.id === nodeId) {
+      return questionBlock;
+    }
+
+    const nestedQuestionBlocks = questionBlock.entries
+      .filter((entry): entry is Extract<StructureMapQuestionEntry, { kind: 'question-block' }> =>
+        entry.kind === 'question-block',
+      )
+      .map((entry) => entry.node);
+    const nestedMatch = findQuestionBlockNode(nestedQuestionBlocks, nodeId);
+
+    if (nestedMatch) {
+      return nestedMatch;
+    }
+  }
+
+  return null;
+}
+
+function getStructureMapFocusTargetTestId(target: StructureMapFocusTarget) {
+  return target.kind === 'plan-step'
+    ? `structure-map-panel-${target.nodeId}`
+    : `structure-map-question-${target.nodeId}`;
+}
+
+function getVisibleStructureMapSelectionTestId(
+  tree: NodeTree,
+  selectedItemId: string | null,
+  selectionContext: StructureMapSelectionContext,
+  workspaceViewState: WorkspaceViewState,
+) {
+  if (
+    selectionContext.planStepNodeId &&
+    workspaceViewState.collapsedStructureMapStepIds.includes(
+      selectionContext.planStepNodeId,
+    )
+  ) {
+    return `structure-map-panel-${selectionContext.planStepNodeId}`;
+  }
+
+  const collapsedQuestionNodeId = findCollapsedQuestionClusterNodeId(
+    tree,
+    selectionContext.questionNodeId,
+    workspaceViewState,
+  );
+
+  if (collapsedQuestionNodeId) {
+    return `structure-map-question-${collapsedQuestionNodeId}`;
+  }
+
+  return selectedItemId === null ? null : `structure-map-item-${selectedItemId}`;
+}
+
+function findCollapsedQuestionClusterNodeId(
+  tree: NodeTree,
+  questionNodeId: string | null,
+  workspaceViewState: WorkspaceViewState,
+) {
+  if (!questionNodeId) {
+    return null;
+  }
+
+  let currentNode: NodeTree['nodes'][string] | undefined = tree.nodes[questionNodeId];
+
+  while (currentNode) {
+    if (
+      workspaceViewState.collapsedStructureMapClusterIds.includes(currentNode.id) ||
+      workspaceViewState.collapsedStructureMapFollowUpIds.includes(currentNode.id)
+    ) {
+      return currentNode.id;
+    }
+
+    currentNode =
+      currentNode.parentId === null ? undefined : tree.nodes[currentNode.parentId];
+  }
+
+  return null;
+}
+
+function findElementByTestId(root: HTMLElement, testId: string) {
+  return root.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
+}
+
+function getStructureMapFocusSummaryLabel(
+  tree: NodeTree,
+  target: StructureMapFocusTarget,
+) {
+  const targetNode = tree.nodes[target.nodeId];
+  const label = targetNode ? getStructureMapNodeLabel(tree, targetNode) : target.nodeId;
+
+  return target.kind === 'plan-step'
+    ? `当前仅显示步骤：${label}`
+    : `当前仅显示问题簇：${label}`;
 }
