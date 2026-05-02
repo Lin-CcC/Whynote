@@ -97,15 +97,19 @@ test('edits the current module from the top header and keeps the intro without a
   );
 
   const documentShell = screen.getByTestId('workspace-document-shell');
-  const titleInput = screen.getByLabelText('当前模块 标题');
+  const titleDisplay = screen.getByTestId('workspace-document-title-display');
   const introDisplay = screen.getByTestId('workspace-document-intro-display');
 
-  expect(titleInput).toHaveValue('模块');
+  expect(titleDisplay).toHaveTextContent('模块');
   expect(introDisplay).toHaveTextContent('验证节点类型切换。');
   expect(
     documentShell.querySelector('.workspace-documentBody section[data-node-type="module"]'),
   ).toBeNull();
   expect(screen.getByTestId('editor-node-step-type-switch')).toBeInTheDocument();
+
+  fireEvent.click(titleDisplay);
+
+  const titleInput = await screen.findByLabelText('当前模块 标题');
 
   fireEvent.change(titleInput, {
     target: {
@@ -1088,7 +1092,9 @@ test('recovers with a new module after deleting the last module', () => {
     }),
   );
 
-  expect(screen.getByDisplayValue('新模块')).toBeInTheDocument();
+  expect(
+    screen.getByTestId('workspace-document-title-display'),
+  ).toHaveTextContent('新模块');
   expect(
     within(getSectionByHeading('当前学习模块')).getByRole('button', {
       name: /新模块/i,

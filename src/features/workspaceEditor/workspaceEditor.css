@@ -69,7 +69,7 @@
 .workspace-documentIntroDisplay {
   padding: 0;
   text-align: left;
-  cursor: text;
+  cursor: default;
 }
 
 .workspace-documentTitleDisplay {
@@ -119,12 +119,10 @@
   outline: none;
 }
 
-.workspace-documentModuleSurface[data-node-selected='true'] .workspace-documentTitleInput,
 .workspace-documentTitleInput:focus {
   box-shadow: inset 0 -1px 0 rgba(148, 163, 184, 0.55);
 }
 
-.workspace-documentModuleSurface[data-node-editing='true'] .workspace-documentIntroInput,
 .workspace-documentIntroInput:focus {
   box-shadow: inset 0 -1px 0 rgba(14, 116, 144, 0.24);
 }
