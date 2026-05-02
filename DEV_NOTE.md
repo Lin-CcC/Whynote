@@ -350,6 +350,17 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - `currentAnswerId`、`sourceAnswerId / sourceSummaryId`、`source...UpdatedAt`、`stale` 判定和闭环结果归属都由真实树语义决定；结构地图接入后只能消费这些语义，不得改写或简化它们。
 - runtime 需要更强的语义可见性时，可以在运行壳层显式打开附加提示；编辑器默认文档视图仍保持轻量，不把所有语义备注都直接抛到节点正文区。
 
+### 40. 结构地图验收必须经过真实 runtime 闭环
+
+- 结构地图是否“收口完成”，不能只看组件测试或 domain 测试是否通过；至少要存在一条能在真实 runtime 里讲清楚的 `document -> structure-map -> drag -> document` 闭环。
+- 这条闭环至少要覆盖四类验收点：
+  - 顺序写回是否正确
+  - 文档折叠 / 展开是否仍正常
+  - `currentAnswerId` 是否稳定
+  - source pairing 与 `stale` 判定是否稳定
+- 如果仓库默认 demo workspace 不足以同时承载这些语义，可以使用 runtime seed 的真实工作区快照补演示；但 seed 只是验收载体，不得引入新的产品语义或新的持久化模型。
+- 演示阶段允许只补文档和可复现路径，不把录屏、截图或素材目录当成硬门槛；但必须把 walkthrough、手工清单、已知边界和可复述的结果沉淀进仓库文档。
+
 ## 后续需要重新评估这些决策的触发条件
 
 - 需要公开注册或公开商用
