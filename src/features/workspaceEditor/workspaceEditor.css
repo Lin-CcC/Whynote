@@ -263,20 +263,13 @@
   background: rgba(255, 255, 255, 0.84);
 }
 
-.workspace-structureMapClusterRegionSupporting {
-  display: grid;
-  justify-items: center;
-  gap: 0;
-  padding-top: 0.05rem;
-}
-
 .workspace-structureMapSupportingList {
   position: relative;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.95rem 1rem;
-  padding-top: 0.92rem;
+  padding-top: 0.8rem;
 }
 
 .workspace-structureMapSupportingSlot {
@@ -341,12 +334,6 @@
 
 .workspace-structureMapConnector {
   pointer-events: none;
-}
-
-.workspace-structureMapConnector[data-structure-connector-role='supporting'][data-structure-connector-segment='root'] {
-  width: 1px;
-  height: 0.82rem;
-  background: rgba(100, 116, 139, 0.38);
 }
 
 .workspace-structureMapConnector[data-structure-connector-role='supporting'][data-structure-connector-segment='spine'] {

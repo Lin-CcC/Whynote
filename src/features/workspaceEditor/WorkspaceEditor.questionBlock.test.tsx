@@ -1633,13 +1633,7 @@ test('renders plan-step panels as question clusters with local answers, follow-u
         connector.getAttribute('data-structure-connector-segment'),
       ),
     ),
-  ).toEqual(new Set(['root', 'spine', 'leaf']));
-  expect(
-    supportingConnectors.filter(
-      (connector) =>
-        connector.getAttribute('data-structure-connector-segment') === 'root',
-    ),
-  ).toHaveLength(1);
+  ).toEqual(new Set(['spine', 'leaf']));
   expect(
     supportingConnectors.filter(
       (connector) =>
@@ -1652,6 +1646,11 @@ test('renders plan-step panels as question clusters with local answers, follow-u
         connector.getAttribute('data-structure-connector-segment') === 'leaf',
     ),
   ).toHaveLength(supportingNodes.length);
+  expect(
+    supportingRegion.querySelector(
+      '[data-structure-connector-role="supporting"][data-structure-connector-segment="root"]',
+    ),
+  ).toBeNull();
 
   const followUpBranch = within(topLevelCluster).getByTestId(
     'structure-map-branch-question-main',
