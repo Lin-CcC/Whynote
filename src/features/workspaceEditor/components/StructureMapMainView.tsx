@@ -8,6 +8,8 @@ import {
   resolveStructureMapSelectionAnchor,
   type NodeTree,
   type StructureMapAnchor,
+  type StructureMapAnswerGroupNode,
+  type StructureMapManualSummaryGroupNode,
   type StructureMapMoveRequest,
   type StructureMapMoveValidationResult,
   type StructureMapPresentationModel,
@@ -32,6 +34,34 @@ type StructureMapMainViewProps = {
 
 type DragState = {
   nodeId: string;
+};
+
+type StructureRole =
+  | 'answer-group'
+  | 'plan-step'
+  | 'question'
+  | 'scaffold-summary'
+  | 'summary-group';
+
+type QuestionEntryDescriptor = {
+  entry: StructureMapQuestionEntry;
+  index: number;
+};
+
+type StructureMapRenderProps = {
+  activeDropZoneId: string | null;
+  dragState: DragState | null;
+  isInteractionLocked: boolean;
+  onDragEnd: () => void;
+  onDragStart: (nodeId: string) => void;
+  onDropRequest: (
+    request: Omit<StructureMapMoveRequest, 'nodeId'>,
+    siblingNodeIds: string[],
+  ) => void;
+  onDropZoneEnter: (dropZoneId: string | null) => void;
+  onOpenDocumentNode: (nodeId: string) => void;
+  selectedItemId: string | null;
+  tree: NodeTree;
 };
 
 export default function StructureMapMainView({
@@ -144,15 +174,13 @@ export default function StructureMapMainView({
       >
         <header className="workspace-documentHeader">
           <div className="workspace-documentHeaderMain">
-            <p className="workspace-kicker workspace-documentKicker">
-              结构地图
-            </p>
+            <p className="workspace-kicker workspace-documentKicker">结构地图</p>
             <h2 className="workspace-documentTitle">
               {getStructureMapNodeLabel(tree, currentModule, '模块')}
             </h2>
           </div>
           <p className="workspace-helpText">
-            这里只负责定位、联动和重排；正文编辑仍然留在文档视图。
+            这里负责按问题聚合结构、联动文档和拖动重排，正文编辑仍留在文档视图。
           </p>
         </header>
         <div className="workspace-structureMapBody">
@@ -173,7 +201,13 @@ export default function StructureMapMainView({
             onDropZoneEnter={setActiveDropZoneId}
           />
           {model.sections.map((section, index) => (
-            <div className="workspace-structureMapSection" key={section.anchor.nodeId}>
+            <div
+              className="workspace-structureMapSection"
+              data-structure-panel={section.planStep.id}
+              data-structure-role="plan-step-panel"
+              data-testid={`structure-map-panel-${section.planStep.id}`}
+              key={section.anchor.nodeId}
+            >
               <SectionNode
                 activeDropZoneId={activeDropZoneId}
                 dragState={dragState}
@@ -211,22 +245,6 @@ export default function StructureMapMainView({
   );
 }
 
-type StructureMapRenderProps = {
-  activeDropZoneId: string | null;
-  dragState: DragState | null;
-  isInteractionLocked: boolean;
-  onDragEnd: () => void;
-  onDragStart: (nodeId: string) => void;
-  onDropRequest: (
-    request: Omit<StructureMapMoveRequest, 'nodeId'>,
-    siblingNodeIds: string[],
-  ) => void;
-  onDropZoneEnter: (dropZoneId: string | null) => void;
-  onOpenDocumentNode: (nodeId: string) => void;
-  selectedItemId: string | null;
-  tree: NodeTree;
-};
-
 function SectionNode({
   activeDropZoneId,
   dragState,
@@ -245,7 +263,7 @@ function SectionNode({
   const itemNodeIds = section.items.map((item) => getSectionItemAnchorNodeId(item));
 
   return (
-    <>
+    <div className="workspace-structureMapPanelBody">
       <StructureMapButton
         anchor={section.anchor}
         dragNodeId={section.planStep.id}
@@ -258,11 +276,18 @@ function SectionNode({
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
         selectedItemId={selectedItemId}
+        structureRole="plan-step"
         title={getStructureMapNodeLabel(tree, section.planStep, 'step')}
       />
       <div className="workspace-structureMapList">
         {section.items.map((item, index) => (
-          <div className="workspace-structureMapSlot" key={getSectionItemAnchorNodeId(item)}>
+          <div
+            className="workspace-structureMapSlot"
+            data-structure-role={
+              item.kind === 'scaffold-summary' ? 'scaffold-slot' : 'cluster-slot'
+            }
+            key={getSectionItemAnchorNodeId(item)}
+          >
             <StructureMapDropZone
               activeDropZoneId={activeDropZoneId}
               dragState={dragState}
@@ -311,7 +336,7 @@ function SectionNode({
           onDropZoneEnter={onDropZoneEnter}
         />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -322,28 +347,36 @@ function SectionItemNode(
 ) {
   if (props.item.kind === 'scaffold-summary') {
     return (
-      <StructureMapButton
-        anchor={props.item.node.anchor}
-        dragNodeId={props.item.node.node.id}
-        dragPermission={props.item.node.drag}
-        dragState={props.dragState}
-        isCurrentAnswer={false}
-        isInteractionLocked={props.isInteractionLocked}
-        kindLabel="铺垫"
-        onDragEnd={props.onDragEnd}
-        onDragStart={props.onDragStart}
-        onOpenDocumentNode={props.onOpenDocumentNode}
-        selectedItemId={props.selectedItemId}
-        title={getStructureMapNodeLabel(props.tree, props.item.node.node, 'scaffold')}
-      />
+      <div
+        className="workspace-structureMapScaffoldItem"
+        data-structure-role="scaffold"
+        data-testid={`structure-map-scaffold-${props.item.node.node.id}`}
+      >
+        <StructureMapButton
+          anchor={props.item.node.anchor}
+          dragNodeId={props.item.node.node.id}
+          dragPermission={props.item.node.drag}
+          dragState={props.dragState}
+          isCurrentAnswer={false}
+          isInteractionLocked={props.isInteractionLocked}
+          kindLabel="铺垫"
+          onDragEnd={props.onDragEnd}
+          onDragStart={props.onDragStart}
+          onOpenDocumentNode={props.onOpenDocumentNode}
+          selectedItemId={props.selectedItemId}
+          structureRole="scaffold-summary"
+          title={getStructureMapNodeLabel(props.tree, props.item.node.node, 'scaffold')}
+        />
+      </div>
     );
   }
 
-  return <QuestionBlockNode {...props} node={props.item.node} />;
+  return <QuestionBlockNode {...props} clusterTone="top-level" node={props.item.node} />;
 }
 
 function QuestionBlockNode({
   activeDropZoneId,
+  clusterTone,
   dragState,
   isInteractionLocked,
   node,
@@ -355,13 +388,27 @@ function QuestionBlockNode({
   selectedItemId,
   tree,
 }: StructureMapRenderProps & {
+  clusterTone: 'follow-up' | 'top-level';
   node: StructureMapQuestionBlockNode;
 }) {
   const entryNodeIds = node.entries.map((entry) => getQuestionEntryAnchorNodeId(entry));
+  const entryDescriptors = node.entries.map((entry, index) => ({
+    entry,
+    index,
+  }));
+  const supportingEntries = entryDescriptors.filter(
+    (descriptor) => descriptor.entry.kind !== 'question-block',
+  );
+  const followUpEntries = entryDescriptors.filter(
+    (descriptor) => descriptor.entry.kind === 'question-block',
+  );
 
   return (
     <div
-      className="workspace-structureMapItem"
+      className="workspace-structureMapItem workspace-structureMapCluster"
+      data-structure-cluster={node.question.id}
+      data-structure-level={clusterTone}
+      data-structure-role="question-cluster"
       data-testid={`structure-map-question-${node.question.id}`}
     >
       <StructureMapButton
@@ -376,52 +423,116 @@ function QuestionBlockNode({
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
         selectedItemId={selectedItemId}
+        structureRole="question"
         title={getStructureMapNodeLabel(tree, node.question, 'question')}
       />
       {node.entries.length > 0 ? (
-        <div className="workspace-structureMapList">
-          {node.entries.map((entry, index) => (
-            <div className="workspace-structureMapSlot" key={getQuestionEntryAnchorNodeId(entry)}>
-              <StructureMapDropZone
-                activeDropZoneId={activeDropZoneId}
-                dragState={dragState}
-                dropZoneId={createDropZoneId(node.question.id, index)}
-                isInteractionLocked={isInteractionLocked}
-                onDropRequest={() =>
-                  onDropRequest(
-                    {
-                      index,
-                      targetParentNodeId: node.question.id,
-                    },
-                    entryNodeIds,
-                  )
-                }
-                onDropZoneEnter={onDropZoneEnter}
-              />
-              <QuestionEntryNode
-                activeDropZoneId={activeDropZoneId}
-                dragState={dragState}
-                entry={entry}
-                isInteractionLocked={isInteractionLocked}
-                onDragEnd={onDragEnd}
-                onDragStart={onDragStart}
-                onDropRequest={onDropRequest}
-                onDropZoneEnter={onDropZoneEnter}
-                onOpenDocumentNode={onOpenDocumentNode}
-                selectedItemId={selectedItemId}
-                tree={tree}
-              />
-            </div>
-          ))}
+        <div className="workspace-structureMapClusterBody">
+          {supportingEntries.length > 0 ? (
+            <QuestionEntryGroup
+              activeDropZoneId={activeDropZoneId}
+              descriptors={supportingEntries}
+              dragState={dragState}
+              entryNodeIds={entryNodeIds}
+              groupKind="supporting"
+              isInteractionLocked={isInteractionLocked}
+              node={node}
+              onDragEnd={onDragEnd}
+              onDragStart={onDragStart}
+              onDropRequest={onDropRequest}
+              onDropZoneEnter={onDropZoneEnter}
+              onOpenDocumentNode={onOpenDocumentNode}
+              selectedItemId={selectedItemId}
+              tree={tree}
+            />
+          ) : null}
+          {followUpEntries.length > 0 ? (
+            <QuestionEntryGroup
+              activeDropZoneId={activeDropZoneId}
+              descriptors={followUpEntries}
+              dragState={dragState}
+              entryNodeIds={entryNodeIds}
+              groupKind="follow-up"
+              isInteractionLocked={isInteractionLocked}
+              node={node}
+              onDragEnd={onDragEnd}
+              onDragStart={onDragStart}
+              onDropRequest={onDropRequest}
+              onDropZoneEnter={onDropZoneEnter}
+              onOpenDocumentNode={onOpenDocumentNode}
+              selectedItemId={selectedItemId}
+              tree={tree}
+            />
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function QuestionEntryGroup({
+  activeDropZoneId,
+  descriptors,
+  dragState,
+  entryNodeIds,
+  groupKind,
+  isInteractionLocked,
+  node,
+  onDragEnd,
+  onDragStart,
+  onDropRequest,
+  onDropZoneEnter,
+  onOpenDocumentNode,
+  selectedItemId,
+  tree,
+}: StructureMapRenderProps & {
+  descriptors: QuestionEntryDescriptor[];
+  entryNodeIds: string[];
+  groupKind: 'follow-up' | 'supporting';
+  node: StructureMapQuestionBlockNode;
+}) {
+  const lastDescriptor = descriptors[descriptors.length - 1];
+  const shouldRenderTrailingDropZone = lastDescriptor?.index === node.entries.length - 1;
+
+  return (
+    <div
+      className={
+        groupKind === 'supporting'
+          ? 'workspace-structureMapSupportingList'
+          : 'workspace-structureMapBranchList'
+      }
+      data-structure-branch={groupKind === 'follow-up' ? 'follow-up' : undefined}
+      data-structure-role={
+        groupKind === 'supporting' ? 'supporting-group' : 'follow-up-group'
+      }
+      data-testid={
+        groupKind === 'supporting'
+          ? `structure-map-supporting-group-${node.question.id}`
+          : `structure-map-branch-${node.question.id}`
+      }
+    >
+      {descriptors.map(({ entry, index }) => (
+        <div
+          className={
+            groupKind === 'supporting'
+              ? 'workspace-structureMapSlot workspace-structureMapSupportingSlot'
+              : 'workspace-structureMapSlot workspace-structureMapBranchNode'
+          }
+          data-structure-branch={groupKind === 'follow-up' ? 'follow-up' : undefined}
+          data-structure-role={
+            entry.kind === 'question-block' ? 'follow-up-node' : 'supporting-node'
+          }
+          key={getQuestionEntryAnchorNodeId(entry)}
+        >
           <StructureMapDropZone
             activeDropZoneId={activeDropZoneId}
             dragState={dragState}
-            dropZoneId={createDropZoneId(node.question.id, node.entries.length)}
+            dropZoneId={createDropZoneId(node.question.id, index)}
             isInteractionLocked={isInteractionLocked}
             onDropRequest={() =>
               onDropRequest(
                 {
-                  index: node.entries.length,
+                  index,
                   targetParentNodeId: node.question.id,
                 },
                 entryNodeIds,
@@ -429,7 +540,39 @@ function QuestionBlockNode({
             }
             onDropZoneEnter={onDropZoneEnter}
           />
+          <QuestionEntryNode
+            activeDropZoneId={activeDropZoneId}
+            clusterTone={groupKind === 'follow-up' ? 'follow-up' : 'top-level'}
+            dragState={dragState}
+            entry={entry}
+            isInteractionLocked={isInteractionLocked}
+            onDragEnd={onDragEnd}
+            onDragStart={onDragStart}
+            onDropRequest={onDropRequest}
+            onDropZoneEnter={onDropZoneEnter}
+            onOpenDocumentNode={onOpenDocumentNode}
+            selectedItemId={selectedItemId}
+            tree={tree}
+          />
         </div>
+      ))}
+      {shouldRenderTrailingDropZone ? (
+        <StructureMapDropZone
+          activeDropZoneId={activeDropZoneId}
+          dragState={dragState}
+          dropZoneId={createDropZoneId(node.question.id, node.entries.length)}
+          isInteractionLocked={isInteractionLocked}
+          onDropRequest={() =>
+            onDropRequest(
+              {
+                index: node.entries.length,
+                targetParentNodeId: node.question.id,
+              },
+              entryNodeIds,
+            )
+          }
+          onDropZoneEnter={onDropZoneEnter}
+        />
       ) : null}
     </div>
   );
@@ -437,6 +580,7 @@ function QuestionBlockNode({
 
 function QuestionEntryNode({
   activeDropZoneId,
+  clusterTone,
   dragState,
   entry,
   isInteractionLocked,
@@ -448,6 +592,7 @@ function QuestionEntryNode({
   selectedItemId,
   tree,
 }: StructureMapRenderProps & {
+  clusterTone: 'follow-up' | 'top-level';
   entry: StructureMapQuestionEntry;
 }) {
   if (entry.kind === 'answer-group') {
@@ -460,10 +605,12 @@ function QuestionEntryNode({
         isCurrentAnswer={entry.group.isCurrentAnswer}
         isInteractionLocked={isInteractionLocked}
         kindLabel="回答"
+        metaBadges={getAnswerGroupMetaBadges(entry.group)}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
         selectedItemId={selectedItemId}
+        structureRole="answer-group"
         title={getStructureMapNodeLabel(tree, entry.group.node, 'answer')}
       />
     );
@@ -479,10 +626,12 @@ function QuestionEntryNode({
         isCurrentAnswer={false}
         isInteractionLocked={isInteractionLocked}
         kindLabel="手写总结"
+        metaBadges={getManualSummaryGroupMetaBadges(entry.group)}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
         onOpenDocumentNode={onOpenDocumentNode}
         selectedItemId={selectedItemId}
+        structureRole="summary-group"
         title={getStructureMapNodeLabel(tree, entry.group.node, 'summary')}
       />
     );
@@ -491,6 +640,7 @@ function QuestionEntryNode({
   return (
     <QuestionBlockNode
       activeDropZoneId={activeDropZoneId}
+      clusterTone={clusterTone}
       dragState={dragState}
       isInteractionLocked={isInteractionLocked}
       node={entry.node}
@@ -513,10 +663,12 @@ function SupportingGroupNode({
   isCurrentAnswer,
   isInteractionLocked,
   kindLabel,
+  metaBadges,
   onDragEnd,
   onDragStart,
   onOpenDocumentNode,
   selectedItemId,
+  structureRole,
   title,
 }: {
   anchor: StructureMapAnchor;
@@ -526,27 +678,46 @@ function SupportingGroupNode({
   isCurrentAnswer: boolean;
   isInteractionLocked: boolean;
   kindLabel: string;
+  metaBadges: string[];
   onDragEnd: () => void;
   onDragStart: (nodeId: string) => void;
   onOpenDocumentNode: (nodeId: string) => void;
   selectedItemId: string | null;
+  structureRole: 'answer-group' | 'summary-group';
   title: string;
 }) {
   return (
-    <StructureMapButton
-      anchor={anchor}
-      dragNodeId={dragNodeId}
-      dragPermission={dragPermission}
-      dragState={dragState}
-      isCurrentAnswer={isCurrentAnswer}
-      isInteractionLocked={isInteractionLocked}
-      kindLabel={kindLabel}
-      onDragEnd={onDragEnd}
-      onDragStart={onDragStart}
-      onOpenDocumentNode={onOpenDocumentNode}
-      selectedItemId={selectedItemId}
-      title={title}
-    />
+    <div
+      className="workspace-structureMapSupportingCard"
+      data-structure-role={structureRole}
+      data-structure-supporting={structureRole}
+      data-testid={`structure-map-supporting-${anchor.nodeId}`}
+    >
+      <StructureMapButton
+        anchor={anchor}
+        dragNodeId={dragNodeId}
+        dragPermission={dragPermission}
+        dragState={dragState}
+        isCurrentAnswer={isCurrentAnswer}
+        isInteractionLocked={isInteractionLocked}
+        kindLabel={kindLabel}
+        onDragEnd={onDragEnd}
+        onDragStart={onDragStart}
+        onOpenDocumentNode={onOpenDocumentNode}
+        selectedItemId={selectedItemId}
+        structureRole={structureRole}
+        title={title}
+      />
+      {metaBadges.length > 0 ? (
+        <div className="workspace-structureMapMetaList">
+          {metaBadges.map((badge) => (
+            <span className="workspace-structureMapMetaBadge" key={badge}>
+              {badge}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -562,6 +733,7 @@ function StructureMapButton({
   onDragStart,
   onOpenDocumentNode,
   selectedItemId,
+  structureRole,
   title,
 }: {
   anchor: StructureMapAnchor;
@@ -575,6 +747,7 @@ function StructureMapButton({
   onDragStart: (nodeId: string) => void;
   onOpenDocumentNode: (nodeId: string) => void;
   selectedItemId: string | null;
+  structureRole: StructureRole;
   title: string;
 }) {
   const itemId = getStructureMapSelectionId(anchor);
@@ -586,6 +759,7 @@ function StructureMapButton({
       data-dragging={dragState?.nodeId === dragNodeId}
       data-kind={itemId.split(':')[0]}
       data-selected={selectedItemId === itemId}
+      data-structure-role={structureRole}
       data-testid={`structure-map-item-${itemId}`}
       disabled={isInteractionLocked}
       draggable={!isInteractionLocked && dragPermission.canDrag}
@@ -669,11 +843,43 @@ function StructureMapDropZone({
 }
 
 function getSectionItemAnchorNodeId(item: StructureMapSectionItem) {
-  return item.kind === 'scaffold-summary' ? item.node.anchor.nodeId : item.node.anchor.nodeId;
+  return item.node.anchor.nodeId;
 }
 
 function getQuestionEntryAnchorNodeId(entry: StructureMapQuestionEntry) {
   return entry.kind === 'question-block' ? entry.node.anchor.nodeId : entry.group.anchor.nodeId;
+}
+
+function getAnswerGroupMetaBadges(group: StructureMapAnswerGroupNode) {
+  const badges: string[] = [];
+
+  if (group.latestEvaluationNodeId) {
+    badges.push('评估');
+  }
+
+  if (group.explanationNodeId) {
+    badges.push('解析');
+  }
+
+  if (group.historicalClosureNodeIds.length > 0) {
+    badges.push(`历史 ${group.historicalClosureNodeIds.length}`);
+  }
+
+  return badges;
+}
+
+function getManualSummaryGroupMetaBadges(group: StructureMapManualSummaryGroupNode) {
+  const badges: string[] = [];
+
+  if (group.latestCheckNodeId) {
+    badges.push('检查');
+  }
+
+  if (group.historicalCheckNodeIds.length > 0) {
+    badges.push(`历史 ${group.historicalCheckNodeIds.length}`);
+  }
+
+  return badges;
 }
 
 function createDropZoneId(parentNodeId: string, index: number) {
