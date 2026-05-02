@@ -47,6 +47,7 @@ export default function QuestionBlockSection({
   registerNodeElement,
   renderChildNode,
   renderNodeInlineActions,
+  renderNodeToolbarSections,
   selectedNodeId,
   tree,
   workspaceViewState,
@@ -218,6 +219,7 @@ export default function QuestionBlockSection({
   }
 
   function buildSupportNodeToolbar(node: TreeNode) {
+    const runtimeOverflowSections = getRuntimeOverflowSections(node);
     const sections: LearningActionSection[] = [
       buildCommonProgressionActionSection(node.id),
       buildCommonNodeActionSection(node.id),
@@ -226,8 +228,17 @@ export default function QuestionBlockSection({
       node.parentId !== null
         ? getCurrentQuestionAnswerNodeId(tree, node.parentId)
         : null;
+    const hasExplicitReturnToAnswerAction = runtimeOverflowSections.some((section) =>
+      section.buttons.some(
+        (button) => button.label === '回到当前回答继续修改',
+      ),
+    );
 
-    if (currentAnswerNodeId && currentAnswerNodeId !== node.id) {
+    if (
+      currentAnswerNodeId &&
+      currentAnswerNodeId !== node.id &&
+      !hasExplicitReturnToAnswerAction
+    ) {
       sections.push({
         buttons: [
           {
@@ -266,10 +277,22 @@ export default function QuestionBlockSection({
     return (
       <LearningActionPanel
         isVisible={true}
+        overflowSections={runtimeOverflowSections}
         sections={sections}
         surface="content"
         testId={`node-actions-${node.id}`}
       />
+    );
+  }
+
+  function getRuntimeOverflowSections(node: TreeNode) {
+    return (
+      renderNodeToolbarSections?.({
+        isSelected: node.id === selectedNodeId,
+        node,
+        selectNode: onSelectNode,
+        tree,
+      }) ?? []
     );
   }
 

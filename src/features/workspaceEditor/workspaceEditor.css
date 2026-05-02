@@ -1056,7 +1056,6 @@
 }
 
 .workspace-nodeInlineActions,
-.workspace-judgmentActions,
 .workspace-judgmentHintCallout {
   display: grid;
   gap: 0.75rem;

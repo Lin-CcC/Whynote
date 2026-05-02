@@ -5,19 +5,14 @@ import {
   useRef,
   useState,
 } from 'react';
+import type {
+  WorkspaceEditorToolbarButton,
+  WorkspaceEditorToolbarSection,
+} from '../workspaceEditorTypes';
 
-type LearningActionButton = {
-  className?: string;
-  disabled?: boolean;
-  label: string;
-  onClick: () => void;
-  title?: string;
-};
+type LearningActionButton = WorkspaceEditorToolbarButton;
 
-export type LearningActionSection = {
-  buttons: LearningActionButton[];
-  title: string;
-};
+export type LearningActionSection = WorkspaceEditorToolbarSection;
 
 export type LearningActionSurface = 'answer' | 'content' | 'question';
 
@@ -42,6 +37,7 @@ type LearningActionToolbarItem =
 
 type LearningActionPanelProps = {
   isVisible: boolean;
+  overflowSections?: LearningActionSection[];
   sections: LearningActionSection[];
   surface: LearningActionSurface;
   testId?: string;
@@ -49,6 +45,7 @@ type LearningActionPanelProps = {
 
 export default function LearningActionPanel({
   isVisible,
+  overflowSections: extraOverflowSections = [],
   sections,
   surface,
   testId,
@@ -56,8 +53,8 @@ export default function LearningActionPanel({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const { items, overflowSections } = useMemo(
-    () => buildToolbarModel(surface, sections),
-    [sections, surface],
+    () => buildToolbarModel(surface, sections, extraOverflowSections),
+    [extraOverflowSections, sections, surface],
   );
   const hasOverflowMenu = overflowSections.some(
     (section) => section.buttons.length > 0,
@@ -263,6 +260,7 @@ export default function LearningActionPanel({
 function buildToolbarModel(
   surface: LearningActionSurface,
   sections: LearningActionSection[],
+  extraOverflowSections: LearningActionSection[],
 ) {
   const remainingButtons = sections.flatMap((section) => section.buttons);
   const toolbarItems: LearningActionToolbarItem[] = [];
@@ -321,14 +319,17 @@ function buildToolbarModel(
 
   return {
     items: toolbarItems,
-    overflowSections: remainingButtons.length
-      ? [
-          {
-            buttons: remainingButtons,
-            title: '更多',
-          },
-        ]
-      : [],
+    overflowSections: [
+      ...(remainingButtons.length
+        ? [
+            {
+              buttons: remainingButtons,
+              title: '更多',
+            },
+          ]
+        : []),
+      ...extraOverflowSections.filter((section) => section.buttons.length > 0),
+    ],
   };
 }
 

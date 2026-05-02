@@ -19,7 +19,7 @@ import type {
 } from '../workspaceEditor/workspaceEditorTypes';
 import WorkspaceRuntimeActionCard from './components/WorkspaceRuntimeActionCard';
 import WorkspaceRuntimeAiConfigCard from './components/WorkspaceRuntimeAiConfigCard';
-import WorkspaceRuntimeJudgmentActions from './components/WorkspaceRuntimeJudgmentActions';
+import WorkspaceRuntimeJudgmentHintCallout from './components/WorkspaceRuntimeJudgmentHintCallout';
 import WorkspaceRuntimeStatusCard from './components/WorkspaceRuntimeStatusCard';
 import { useWorkspaceRuntime } from './hooks/useWorkspaceRuntime';
 import { createDefaultWorkspaceRuntimeDependencies } from './services/createDefaultWorkspaceRuntimeDependencies';
@@ -146,6 +146,7 @@ export default function WorkspaceRuntimeScreen({
       onWorkspaceViewStateChange={handleWorkspaceViewStateChange}
       renderLeftPanelExtra={renderLeftPanelExtra}
       renderNodeInlineActions={renderNodeInlineActions}
+      renderNodeToolbarSections={renderNodeToolbarSections}
       renderRightPanelExtra={renderRightPanelExtra}
       workspaceViewState={workspaceViewState}
     />
@@ -243,37 +244,72 @@ export default function WorkspaceRuntimeScreen({
       return null;
     }
 
-    const hasPersistedHint = Boolean(context.node.hint?.trim());
+    if (activeJudgmentHintNodeId !== context.node.id) {
+      return null;
+    }
 
     return (
-      <WorkspaceRuntimeJudgmentActions
-        answerNodeId={actionContext.answerNodeId}
+      <WorkspaceRuntimeJudgmentHintCallout
         hint={actionContext.hint}
-        isBusy={runtime.isAiRunning}
-        isHintVisible={activeJudgmentHintNodeId === context.node.id}
         judgmentNodeId={context.node.id}
-        onReturnToAnswer={() => {
-          if (!actionContext.answerNodeId) {
-            return;
-          }
-
-          setActiveJudgmentHintNodeId(null);
-          context.selectNode(actionContext.answerNodeId);
-        }}
-        onToggleHint={() => {
-          void handleJudgmentHintToggle(context.node.id, hasPersistedHint);
-        }}
-        onViewSummary={() => {
-          if (!actionContext.summaryNodeId) {
-            return;
-          }
-
-          setActiveJudgmentHintNodeId(null);
-          context.selectNode(actionContext.summaryNodeId);
-        }}
-        summaryNodeId={actionContext.summaryNodeId}
       />
     );
+  }
+
+  function renderNodeToolbarSections(context: WorkspaceEditorNodeRenderContext) {
+    if (context.node.type !== 'judgment') {
+      return null;
+    }
+
+    const actionContext = getJudgmentInlineActionContext(
+      context.tree,
+      context.node.id,
+    );
+
+    if (!actionContext) {
+      return null;
+    }
+
+    const hasPersistedHint = Boolean(context.node.hint?.trim());
+
+    return [
+      {
+        buttons: [
+          {
+            disabled: !actionContext.answerNodeId || runtime.isAiRunning,
+            label: '回到当前回答继续修改',
+            onClick: () => {
+              if (!actionContext.answerNodeId) {
+                return;
+              }
+
+              setActiveJudgmentHintNodeId(null);
+              context.selectNode(actionContext.answerNodeId);
+            },
+          },
+          {
+            disabled: runtime.isAiRunning,
+            label: '给我提示',
+            onClick: () => {
+              void handleJudgmentHintToggle(context.node.id, hasPersistedHint);
+            },
+          },
+          {
+            disabled: !actionContext.summaryNodeId || runtime.isAiRunning,
+            label: '查看答案解析',
+            onClick: () => {
+              if (!actionContext.summaryNodeId) {
+                return;
+              }
+
+              setActiveJudgmentHintNodeId(null);
+              context.selectNode(actionContext.summaryNodeId);
+            },
+          },
+        ],
+        title: '判断辅助动作',
+      },
+    ];
   }
 
   function renderRightPanelExtra(context: WorkspaceEditorRenderContext) {
