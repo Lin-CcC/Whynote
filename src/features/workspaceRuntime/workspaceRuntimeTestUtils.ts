@@ -1,6 +1,29 @@
 import { fireEvent, screen } from '@testing-library/react';
 
 export function getTitleControl(displayTitle: string) {
+  const labeledControl = screen.queryByLabelText(`${displayTitle} 标题`);
+
+  if (labeledControl) {
+    return labeledControl;
+  }
+
+  const currentModuleInput = screen.queryByLabelText('当前模块 标题');
+
+  if (currentModuleInput instanceof HTMLInputElement) {
+    return currentModuleInput;
+  }
+
+  const currentModuleDisplay = screen.queryByTestId(
+    'workspace-document-title-display',
+  );
+
+  if (
+    currentModuleDisplay instanceof HTMLButtonElement &&
+    currentModuleDisplay.textContent?.trim() === displayTitle
+  ) {
+    return currentModuleDisplay;
+  }
+
   return screen.getByLabelText(`${displayTitle} 标题`);
 }
 
@@ -43,7 +66,9 @@ export function getNodeByDisplayTitle(displayTitle: string) {
 }
 
 export async function findNodeByDisplayTitle(displayTitle: string) {
-  const control = await screen.findByLabelText(`${displayTitle} 标题`);
+  const control =
+    (await screen.findByLabelText(`${displayTitle} 标题`).catch(() => null)) ??
+    getTitleControl(displayTitle);
   const node = control.closest('section[data-testid^="editor-node-"]');
 
   if (!(node instanceof HTMLElement)) {

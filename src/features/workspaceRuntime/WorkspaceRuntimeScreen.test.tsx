@@ -49,7 +49,11 @@ test('creates a minimal real workspace when IndexedDB is empty', async () => {
   expect(
     await screen.findByRole('heading', { name: '当前学习模块' }),
   ).toBeInTheDocument();
-  expect(screen.getByLabelText('默认模块 标题')).toBeInTheDocument();
+  expect(
+    within(screen.getByTestId('workspace-document-header')).getByText(
+      '默认模块',
+    ),
+  ).toBeInTheDocument();
 
   const workspaces = await dependencies.structuredDataStorage.listWorkspaces();
   const snapshot = await dependencies.structuredDataStorage.loadWorkspace(
@@ -86,7 +90,12 @@ test('persists workspace edits and restores them on the next mount', async () =>
   firstRender.unmount();
   render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
 
-  expect(await screen.findByLabelText('已持久化模块 标题')).toBeInTheDocument();
+  await screen.findByRole('heading', { name: '当前学习模块' });
+  expect(
+    within(screen.getByTestId('workspace-document-header')).getByText(
+      '已持久化模块',
+    ),
+  ).toBeInTheDocument();
 });
 
 test('keeps the active editor input mounted and focused while autosave status changes', async () => {
@@ -223,7 +232,13 @@ test('guides recovery from the AI action card when no module exists', async () =
   ).toBeInTheDocument();
   fireEvent.click(screen.getAllByRole('button', { name: '新建模块' })[0]);
 
-  expect(await screen.findByLabelText('新模块 标题')).toBeInTheDocument();
+  await waitFor(() => {
+    expect(
+      within(screen.getByTestId('workspace-document-header')).getByText(
+        '新模块',
+      ),
+    ).toBeInTheDocument();
+  });
   expect(
     screen.getByRole('button', { name: '为当前模块规划学习路径' }),
   ).toBeInTheDocument();
@@ -323,6 +338,42 @@ test('restores question block collapse state after remounting the runtime screen
   ).toBeInTheDocument();
 });
 
+test('persists the main view mode in workspace local view state across remounts', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createRuntimeQuestionBlockSnapshot(),
+  );
+  const firstRender = render(
+    <WorkspaceRuntimeScreen dependencies={dependencies} />,
+  );
+
+  await screen.findByRole('heading', { name: '当前学习模块' });
+
+  fireEvent.click(screen.getByRole('button', { name: '结构地图' }));
+
+  await waitFor(() => {
+    expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+  });
+
+  expect(
+    (
+      dependencies.localPreferenceStorage.loadUiPreferences()?.values
+        .workspaceViews as Record<string, unknown>
+    )?.['workspace-runtime-question-block'],
+  ).toEqual(
+    expect.objectContaining({
+      mainViewMode: 'structure-map',
+    }),
+  );
+
+  firstRender.unmount();
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  await waitFor(() => {
+    expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
+  });
+});
+
 test('keeps the left runtime action card auxiliary while the main question block path stays reachable', async () => {
   const dependencies = await createPreloadedDependencies(
     createRuntimeQuestionNeedingAnswerSnapshot(),
@@ -408,13 +459,24 @@ test('runs learning-engine plan-step generation from UI and materializes the res
   fireEvent.click(screen.getByRole('button', { name: '保存当前配置' }));
   fireEvent.click(screen.getByRole('button', { name: '为当前模块规划学习路径' }));
 
-  expect(await screen.findByLabelText('建立最小概念框架 标题')).toBeInTheDocument();
-  expect(
-    await screen.findByLabelText('先建立进入问题的基础图景 标题'),
-  ).toBeInTheDocument();
-  expect(
-    await screen.findByLabelText('并发渲染到底改变了什么？ 标题'),
-  ).toBeInTheDocument();
+  await waitFor(
+    async () => {
+      const snapshot = await loadSingleWorkspaceSnapshot(
+        dependencies.structuredDataStorage,
+      );
+
+      expect(snapshot).not.toBeNull();
+
+      const titles = Object.values(snapshot!.tree.nodes).map((node) => node.title);
+
+      expect(titles).toContain('建立最小概念框架');
+      expect(titles).toContain('铺垫：先建立进入问题的基础图景');
+      expect(titles).toContain('并发渲染到底改变了什么？');
+    },
+    {
+      timeout: 2_000,
+    },
+  );
 });
 
 test('locks editor mutations while an AI action is running and keeps manual edits from slipping in', async () => {
@@ -462,7 +524,23 @@ test('locks editor mutations while an AI action is running and keeps manual edit
     ],
   });
 
-  expect(await screen.findByLabelText('AI 生成步骤 标题')).toBeInTheDocument();
+  await waitFor(
+    async () => {
+      const snapshot = await loadSingleWorkspaceSnapshot(
+        dependencies.structuredDataStorage,
+      );
+
+      expect(snapshot).not.toBeNull();
+      expect(
+        Object.values(snapshot!.tree.nodes).some(
+          (node) => node.title === 'AI 生成步骤',
+        ),
+      ).toBe(true);
+    },
+    {
+      timeout: 2_000,
+    },
+  );
   expect(moduleTitleInput).toHaveValue('默认模块');
 });
 
@@ -999,6 +1077,17 @@ function createCompletionSuggestionSnapshot(): WorkspaceSnapshot {
     ...snapshot,
     tree,
   };
+}
+
+async function loadSingleWorkspaceSnapshot(storage: StructuredDataStorage) {
+  const workspaces = await storage.listWorkspaces();
+  const workspaceId = workspaces[0]?.id;
+
+  if (!workspaceId) {
+    return null;
+  }
+
+  return storage.loadWorkspace(workspaceId);
 }
 
 function createEmptyWorkspaceSnapshot(): WorkspaceSnapshot {

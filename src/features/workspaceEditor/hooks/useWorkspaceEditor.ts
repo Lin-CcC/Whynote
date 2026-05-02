@@ -22,14 +22,15 @@ import {
   insertSiblingNode,
   liftNode,
   lowerNode,
+  moveNode,
   moveStructureMapNode as moveStructureMapNodeInDomain,
   type NodeTree,
   type NonRootNode,
   type PlanStepNode,
+  type StructureMapMoveRequest,
   shouldConvertToModuleAtRoot,
   stripRedundantDisplayTypePrefix,
   switchNodeType as switchNodeTypeInDomain,
-  type StructureMapMoveRequest,
   type TreeNode,
   validateStructureMapMove as validateStructureMapMoveInDomain,
   type WorkspaceSnapshot,
@@ -78,6 +79,7 @@ export const defaultWorkspaceEditorOperations: WorkspaceEditorOperations = {
   deleteNode,
   liftNode,
   lowerNode,
+  moveNode,
 };
 
 export function useWorkspaceEditor({
@@ -371,29 +373,6 @@ export function useWorkspaceEditor({
     );
   }
 
-  function moveStructureMapNode(request: StructureMapMoveRequest) {
-    if (isInteractionLocked) {
-      return;
-    }
-
-    runStructuralOperation(
-      () => {
-        const nextTree = moveStructureMapNodeInDomain(tree, request);
-
-        return {
-          nextSelectedNodeId: request.nodeId,
-          nextTree,
-          preferredModuleId: resolveModuleId(nextTree, request.nodeId, currentModuleId),
-        };
-      },
-      '结构地图拖动失败，请检查落点规则。',
-    );
-  }
-
-  function validateStructureMapMove(request: StructureMapMoveRequest) {
-    return validateStructureMapMoveInDomain(tree, request);
-  }
-
   function runLearningAction(actionId: LearningActionId) {
     if (isInteractionLocked) {
       return;
@@ -642,6 +621,33 @@ export function useWorkspaceEditor({
       },
       '结构操作失败，请检查当前节点。',
     );
+  }
+
+  function moveStructureMapNode(request: StructureMapMoveRequest) {
+    if (isInteractionLocked) {
+      return;
+    }
+
+    runStructuralOperation(
+      () => {
+        const nextTree = moveStructureMapNodeInDomain(tree, request);
+
+        return {
+          nextTree,
+          nextSelectedNodeId: request.nodeId,
+          preferredModuleId: resolveModuleId(
+            nextTree,
+            request.nodeId,
+            currentModuleId,
+          ),
+        };
+      },
+      '结构地图重排失败，请检查落点。',
+    );
+  }
+
+  function validateStructureMapMove(request: StructureMapMoveRequest) {
+    return validateStructureMapMoveInDomain(tree, request);
   }
 
   function insertAnswerForQuestion(questionNodeId: string) {
@@ -911,7 +917,6 @@ export function useWorkspaceEditor({
     currentModuleId,
     childInsertOptions,
     createModule,
-    moveStructureMapNode,
     expandedNodeIds,
     insertAnswerForQuestion,
     insertFollowUpQuestion,
@@ -935,7 +940,6 @@ export function useWorkspaceEditor({
     tree,
     toggleSelectedNodeTag,
     updateNode,
-    validateStructureMapMove,
     runLearningActionForNode,
     deleteNodeById,
     setCurrentAnswer,
@@ -946,7 +950,9 @@ export function useWorkspaceEditor({
     deleteSelection,
     liftSelection,
     lowerSelection,
+    moveStructureMapNode,
     switchSelectedNodeType,
+    validateStructureMapMove,
   };
 
   function switchSelectedNodeType(
