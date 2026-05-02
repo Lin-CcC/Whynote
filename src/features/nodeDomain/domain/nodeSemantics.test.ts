@@ -11,10 +11,13 @@ import {
   isAnswerClosureResultNodeStale,
   insertChildNode,
   isAnswerClosureSummaryNode,
+  moveScaffoldWithinStep,
+  moveStructureMapNode,
   isScaffoldSummaryNode,
   isSummaryCheckJudgmentNodeStale,
   isSummaryCheckJudgmentNode,
   stripRedundantDisplayTypePrefix,
+  validateStructureMapMove,
 } from '..';
 
 test('treats plan-step summaries before the first question as scaffold introductions', () => {
@@ -158,6 +161,154 @@ test('keeps body colons intact when they are not a redundant type prefix', () =>
   expect(
     stripRedundantDisplayTypePrefix('从参数到学习：AI 的物理基础', '铺垫'),
   ).toBe('从参数到学习：AI 的物理基础');
+});
+
+test('reorders plan steps within the same module in structure map mode', () => {
+  const tree = createStructureMapSnapshot();
+
+  const moved = moveStructureMapNode(tree, {
+    index: 0,
+    nodeId: 'step-structure-map-a2',
+    targetParentNodeId: 'module-structure-map-a',
+  });
+
+  expect(moved.nodes['module-structure-map-a']).toMatchObject({
+    type: 'module',
+    childIds: ['step-structure-map-a2', 'step-structure-map-a1'],
+  });
+});
+
+test('moves top-level question blocks within a step and across steps in the same module', () => {
+  const tree = createStructureMapSnapshot();
+  const reorderedWithinStep = moveStructureMapNode(tree, {
+    index: 1,
+    nodeId: 'question-structure-map-a2',
+    targetParentNodeId: 'step-structure-map-a1',
+  });
+
+  expect(reorderedWithinStep.nodes['step-structure-map-a1']).toMatchObject({
+    type: 'plan-step',
+    childIds: [
+      'summary-structure-map-scaffold-a1',
+      'question-structure-map-a2',
+      'question-structure-map-a1',
+    ],
+  });
+
+  const movedAcrossSteps = moveStructureMapNode(reorderedWithinStep, {
+    index: 0,
+    nodeId: 'question-structure-map-a1',
+    targetParentNodeId: 'step-structure-map-a2',
+  });
+
+  expect(movedAcrossSteps.nodes['question-structure-map-a1']).toMatchObject({
+    type: 'question',
+    parentId: 'step-structure-map-a2',
+  });
+  expect(movedAcrossSteps.nodes['step-structure-map-a2']).toMatchObject({
+    type: 'plan-step',
+    childIds: [
+      'question-structure-map-a1',
+      'question-structure-map-b1',
+      'summary-structure-map-scaffold-a2',
+    ],
+  });
+});
+
+test('reorders scaffold summaries within a step without changing their scaffold semantics', () => {
+  const tree = createStructureMapSnapshot();
+
+  const moved = moveScaffoldWithinStep(
+    tree,
+    'summary-structure-map-scaffold-a2',
+    0,
+  );
+
+  expect(moved.nodes['step-structure-map-a2']).toMatchObject({
+    type: 'plan-step',
+    childIds: [
+      'summary-structure-map-scaffold-a2',
+      'question-structure-map-b1',
+    ],
+  });
+  expect(getSummaryNodeKind(moved, 'summary-structure-map-scaffold-a2')).toBe(
+    'scaffold',
+  );
+});
+
+test('rejects illegal structure map drop targets and standalone result nodes', () => {
+  const tree = createStructureMapSnapshot();
+
+  expect(
+    validateStructureMapMove(tree, {
+      index: 0,
+      nodeId: 'step-structure-map-a1',
+      targetParentNodeId: tree.rootId,
+    }),
+  ).toMatchObject({
+    allowed: false,
+    code: 'ROOT_NOT_ALLOWED',
+  });
+  expect(
+    validateStructureMapMove(tree, {
+      index: 0,
+      nodeId: 'question-structure-map-a1',
+      targetParentNodeId: 'step-structure-map-b1',
+    }),
+  ).toMatchObject({
+    allowed: false,
+    code: 'CROSS_MODULE',
+  });
+  expect(
+    validateStructureMapMove(tree, {
+      index: 0,
+      nodeId: 'question-structure-map-a1',
+      targetParentNodeId: 'resource-structure-map',
+    }),
+  ).toMatchObject({
+    allowed: false,
+    code: 'RESOURCE_NOT_ALLOWED',
+  });
+  expect(
+    validateStructureMapMove(tree, {
+      index: 0,
+      nodeId: 'answer-structure-map-current',
+      targetParentNodeId: 'question-structure-map-b1',
+    }),
+  ).toMatchObject({
+    allowed: false,
+    code: 'INVALID_PARENT_TYPE',
+  });
+  expect(
+    validateStructureMapMove(tree, {
+      index: 0,
+      nodeId: 'question-structure-map-follow-up',
+      targetParentNodeId: 'question-structure-map-b1',
+    }),
+  ).toMatchObject({
+    allowed: false,
+    code: 'FOLLOW_UP_PARENT_LOCKED',
+  });
+  expect(
+    validateStructureMapMove(tree, {
+      index: 0,
+      nodeId: 'summary-structure-map-answer-result',
+      targetParentNodeId: 'question-structure-map-a1',
+    }),
+  ).toMatchObject({
+    allowed: false,
+    code: 'RESULT_NODE_SINGLETON',
+  });
+  expect(
+    validateStructureMapMove(tree, {
+      index: 0,
+      nodeId: 'judgment-structure-map-summary-result',
+      targetParentNodeId: 'question-structure-map-a1',
+    }),
+  ).toMatchObject({
+    allowed: false,
+    code: 'RESULT_NODE_SINGLETON',
+  });
 });
 
 function createSemanticsSnapshot() {
@@ -828,4 +979,240 @@ function createExplicitSourcePairSnapshot() {
     ...snapshot,
     tree,
   };
+}
+
+function createStructureMapSnapshot() {
+  const snapshot = createWorkspaceSnapshot({
+    title: 'structure map',
+    workspaceId: 'workspace-structure-map',
+    rootId: 'theme-structure-map',
+    createdAt: '2026-05-01T09:00:00.000Z',
+    updatedAt: '2026-05-01T09:00:00.000Z',
+  });
+
+  let tree = snapshot.tree;
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-structure-map-a',
+      title: 'module a',
+      createdAt: '2026-05-01T09:00:00.000Z',
+      updatedAt: '2026-05-01T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-structure-map-b',
+      title: 'module b',
+      createdAt: '2026-05-01T09:00:00.000Z',
+      updatedAt: '2026-05-01T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'resource',
+      id: 'resource-structure-map',
+      title: 'resource',
+      sourceUri: 'file:///structure-map.md',
+      createdAt: '2026-05-01T09:00:00.000Z',
+      updatedAt: '2026-05-01T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-structure-map-a',
+    createNode({
+      type: 'plan-step',
+      id: 'step-structure-map-a1',
+      title: 'step a1',
+      status: 'doing',
+      createdAt: '2026-05-01T09:00:00.000Z',
+      updatedAt: '2026-05-01T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-structure-map-a',
+    createNode({
+      type: 'plan-step',
+      id: 'step-structure-map-a2',
+      title: 'step a2',
+      status: 'todo',
+      createdAt: '2026-05-01T09:00:00.000Z',
+      updatedAt: '2026-05-01T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-structure-map-b',
+    createNode({
+      type: 'plan-step',
+      id: 'step-structure-map-b1',
+      title: 'step b1',
+      status: 'doing',
+      createdAt: '2026-05-01T09:00:00.000Z',
+      updatedAt: '2026-05-01T09:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-structure-map-a1',
+    createNode({
+      type: 'summary',
+      id: 'summary-structure-map-scaffold-a1',
+      title: 'scaffold a1',
+      content: 'scaffold a1',
+      summaryKind: 'scaffold',
+      createdAt: '2026-05-01T09:01:00.000Z',
+      updatedAt: '2026-05-01T09:01:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-structure-map-a1',
+    createNode({
+      type: 'question',
+      id: 'question-structure-map-a1',
+      title: 'question a1',
+      createdAt: '2026-05-01T09:02:00.000Z',
+      updatedAt: '2026-05-01T09:02:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-structure-map-a1',
+    createNode({
+      type: 'question',
+      id: 'question-structure-map-a2',
+      title: 'question a2',
+      createdAt: '2026-05-01T09:03:00.000Z',
+      updatedAt: '2026-05-01T09:03:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-structure-map-a2',
+    createNode({
+      type: 'question',
+      id: 'question-structure-map-b1',
+      title: 'question b1',
+      createdAt: '2026-05-01T09:04:00.000Z',
+      updatedAt: '2026-05-01T09:04:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-structure-map-a2',
+    createNode({
+      type: 'summary',
+      id: 'summary-structure-map-scaffold-a2',
+      title: 'scaffold a2',
+      content: 'scaffold a2',
+      summaryKind: 'scaffold',
+      createdAt: '2026-05-01T09:05:00.000Z',
+      updatedAt: '2026-05-01T09:05:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-structure-map-b1',
+    createNode({
+      type: 'question',
+      id: 'question-structure-map-c1',
+      title: 'question c1',
+      createdAt: '2026-05-01T09:06:00.000Z',
+      updatedAt: '2026-05-01T09:06:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-structure-map-a1',
+    createNode({
+      type: 'answer',
+      id: 'answer-structure-map-current',
+      title: 'current answer',
+      content: 'current answer',
+      createdAt: '2026-05-01T09:07:00.000Z',
+      updatedAt: '2026-05-01T09:07:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-structure-map-a1',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-structure-map-answer-result',
+      title: 'answer result',
+      content: 'answer result',
+      judgmentKind: 'answer-closure',
+      sourceAnswerId: 'answer-structure-map-current',
+      sourceAnswerUpdatedAt: '2026-05-01T09:07:00.000Z',
+      createdAt: '2026-05-01T09:08:00.000Z',
+      updatedAt: '2026-05-01T09:08:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-structure-map-a1',
+    createNode({
+      type: 'summary',
+      id: 'summary-structure-map-answer-result',
+      title: 'answer explanation',
+      content: 'answer explanation',
+      summaryKind: 'answer-closure',
+      sourceAnswerId: 'answer-structure-map-current',
+      sourceAnswerUpdatedAt: '2026-05-01T09:07:00.000Z',
+      createdAt: '2026-05-01T09:09:00.000Z',
+      updatedAt: '2026-05-01T09:09:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-structure-map-a1',
+    createNode({
+      type: 'question',
+      id: 'question-structure-map-follow-up',
+      title: 'follow-up',
+      createdAt: '2026-05-01T09:10:00.000Z',
+      updatedAt: '2026-05-01T09:10:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-structure-map-a1',
+    createNode({
+      type: 'summary',
+      id: 'summary-structure-map-manual',
+      title: 'manual summary',
+      content: 'manual summary',
+      summaryKind: 'manual',
+      createdAt: '2026-05-01T09:11:00.000Z',
+      updatedAt: '2026-05-01T09:11:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-structure-map-a1',
+    createNode({
+      type: 'judgment',
+      id: 'judgment-structure-map-summary-result',
+      title: 'summary result',
+      content: 'summary result',
+      judgmentKind: 'summary-check',
+      sourceSummaryId: 'summary-structure-map-manual',
+      sourceSummaryUpdatedAt: '2026-05-01T09:11:00.000Z',
+      createdAt: '2026-05-01T09:12:00.000Z',
+      updatedAt: '2026-05-01T09:12:00.000Z',
+    }),
+  );
+
+  return tree;
 }

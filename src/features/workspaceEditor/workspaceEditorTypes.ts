@@ -5,6 +5,8 @@ import type {
   NonRootNode,
   NodeTree,
   PlanStepStatus,
+  StructureMapMoveRequest,
+  StructureMapMoveValidationResult,
   WorkspaceSnapshot,
 } from '../nodeDomain';
 
@@ -24,6 +26,12 @@ export interface WorkspaceEditorOperations {
   deleteNode: (tree: NodeTree, nodeId: string) => NodeTree;
   liftNode: (tree: NodeTree, nodeId: string) => NodeTree;
   lowerNode: (tree: NodeTree, nodeId: string) => NodeTree;
+  moveNode: (
+    tree: NodeTree,
+    nodeId: string,
+    targetParentNodeId: string,
+    index?: number,
+  ) => NodeTree;
 }
 
 export interface NodeContentPatch {
@@ -70,15 +78,15 @@ export interface LearningActionOption {
   label: string;
 }
 
-export type WorkspaceMainViewMode = 'document' | 'structure-map';
-
 export interface WorkspaceViewState {
   collapsedPlanStepIds: string[];
   collapsedQuestionBlockIds: string[];
   collapsedNodeBodyIds: string[];
   expandedHistorySectionIds: string[];
-  mainViewMode?: WorkspaceMainViewMode;
+  mainViewMode: WorkspaceMainViewMode;
 }
+
+export type WorkspaceMainViewMode = 'document' | 'structure-map';
 
 export interface WorkspaceEditorSelectionState {
   currentModuleId: string | null;
@@ -106,10 +114,14 @@ export interface WorkspaceEditorRenderContext
   ) => void;
   createModule: () => void;
   currentModule: TreeNode | null;
+  moveStructureMapNode: (request: StructureMapMoveRequest) => void;
   runLearningAction: (actionId: LearningActionId) => void;
   selectedNode: TreeNode | null;
   selectNode: (nodeId: string) => void;
   tree: NodeTree;
+  validateStructureMapMove: (
+    request: StructureMapMoveRequest,
+  ) => StructureMapMoveValidationResult;
   workspaceTitle: string;
 }
 
@@ -141,6 +153,7 @@ export interface WorkspaceEditorProps {
   onGenerateSummary?: (sourceNodeId: string) => void;
   interactionLockReason?: string | null;
   isInteractionLocked?: boolean;
+  showSemanticNotes?: boolean;
   onDirectAnswerQuestion?: (questionNodeId: string) => void;
   onEvaluateAnswer?: (questionNodeId: string, answerNodeId: string) => void;
   onEvaluateSummary?: (summaryNodeId: string) => void;

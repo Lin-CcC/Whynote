@@ -5,6 +5,7 @@ import type { WorkspaceEditorProps } from './workspaceEditorTypes';
 import ModuleSwitcher from './components/ModuleSwitcher';
 import SelectedNodeInspector from './components/SelectedNodeInspector';
 import StructureActionBar from './components/StructureActionBar';
+import StructureMapMainView from './components/StructureMapMainView';
 import StructureTree from './components/StructureTree';
 import TextMainView from './components/TextMainView';
 import { DEFAULT_WORKSPACE_VIEW_STATE } from './utils/workspaceViewState';
@@ -21,13 +22,21 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
     createModule: workspaceEditor.createModule,
     currentModule: workspaceEditor.currentModule,
     currentModuleId: workspaceEditor.currentModuleId,
+    moveStructureMapNode: workspaceEditor.moveStructureMapNode,
     runLearningAction: workspaceEditor.runLearningAction,
     selectNode: workspaceEditor.selectNode,
     selectedNode: workspaceEditor.selectedNode,
     selectedNodeId: workspaceEditor.selectedNodeId,
     tree: workspaceEditor.tree,
+    validateStructureMapMove: workspaceEditor.validateStructureMapMove,
     workspaceTitle: workspaceEditor.workspaceTitle,
   };
+
+  function updateWorkspaceViewState(
+    updater: (state: typeof workspaceViewState) => typeof workspaceViewState,
+  ) {
+    handleWorkspaceViewStateChange(updater(workspaceViewState));
+  }
 
   return (
     <AppLayout
@@ -84,34 +93,94 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
         </div>
       }
       mainPanel={
-        <TextMainView
-          currentModuleId={workspaceEditor.currentModuleId}
-          interactionLockReason={props.interactionLockReason ?? null}
-          isInteractionLocked={props.isInteractionLocked ?? false}
-          onCreateModule={workspaceEditor.createModule}
-          onDeleteNodeById={workspaceEditor.deleteNodeById}
-          onDirectAnswerQuestion={props.onDirectAnswerQuestion}
-          onEvaluateAnswer={props.onEvaluateAnswer}
-          onEvaluateSummary={props.onEvaluateSummary}
-          onGenerateFollowUpQuestion={props.onGenerateFollowUpQuestion}
-          onGenerateSummary={props.onGenerateSummary}
-          onDeleteNode={workspaceEditor.deleteSelection}
-          onInsertAnswerForQuestion={workspaceEditor.insertAnswerForQuestion}
-          onInsertFollowUpQuestion={workspaceEditor.insertFollowUpQuestion}
-          onInsertSummaryForNode={workspaceEditor.insertSummaryForNode}
-          onRunLearningAction={workspaceEditor.runLearningAction}
-          onRunLearningActionForNode={workspaceEditor.runLearningActionForNode}
-          onSelectNode={workspaceEditor.selectNode}
-          onSetCurrentAnswer={workspaceEditor.setCurrentAnswer}
-          onUpdateNode={workspaceEditor.updateNode}
-          onWorkspaceViewStateChange={handleWorkspaceViewStateChange}
-          renderNodeInlineActions={props.renderNodeInlineActions}
-          renderNodeToolbarSections={props.renderNodeToolbarSections}
-          registerNodeElement={workspaceEditor.registerNodeElement}
-          selectedNodeId={workspaceEditor.selectedNodeId}
-          tree={workspaceEditor.tree}
-          workspaceViewState={workspaceViewState}
-        />
+        <div className="workspace-mainViewShell">
+          <div className="workspace-mainViewModeBar">
+            <button
+              aria-pressed={workspaceViewState.mainViewMode === 'document'}
+              className="workspace-mainViewModeButton"
+              data-active={workspaceViewState.mainViewMode === 'document'}
+              data-testid="workspace-main-view-tab-document"
+              onClick={() =>
+                updateWorkspaceViewState((state) => ({
+                  ...state,
+                  mainViewMode: 'document',
+                }))
+              }
+              type="button"
+            >
+              文档
+            </button>
+            <button
+              aria-pressed={workspaceViewState.mainViewMode === 'structure-map'}
+              className="workspace-mainViewModeButton"
+              data-active={workspaceViewState.mainViewMode === 'structure-map'}
+              data-testid="workspace-main-view-tab-structure-map"
+              onClick={() =>
+                updateWorkspaceViewState((state) => ({
+                  ...state,
+                  mainViewMode: 'structure-map',
+                }))
+              }
+              type="button"
+            >
+              结构地图
+            </button>
+          </div>
+          {workspaceViewState.mainViewMode === 'structure-map' ? (
+            <StructureMapMainView
+              currentModuleId={workspaceEditor.currentModuleId}
+              isInteractionLocked={props.isInteractionLocked ?? false}
+              onCreateModule={workspaceEditor.createModule}
+              onMoveStructureMapNode={(request) => {
+                updateWorkspaceViewState((state) => ({
+                  ...state,
+                  mainViewMode: 'document',
+                }));
+                workspaceEditor.moveStructureMapNode(request);
+              }}
+              onOpenDocumentNode={(nodeId) => {
+                updateWorkspaceViewState((state) => ({
+                  ...state,
+                  mainViewMode: 'document',
+                }));
+                workspaceEditor.selectNode(nodeId);
+              }}
+              selectedNodeId={workspaceEditor.selectedNodeId}
+              tree={workspaceEditor.tree}
+              validateStructureMapMove={workspaceEditor.validateStructureMapMove}
+            />
+          ) : (
+            <TextMainView
+              currentModuleId={workspaceEditor.currentModuleId}
+              interactionLockReason={props.interactionLockReason ?? null}
+              isInteractionLocked={props.isInteractionLocked ?? false}
+              showSemanticNotes={props.showSemanticNotes ?? false}
+              onCreateModule={workspaceEditor.createModule}
+              onDeleteNodeById={workspaceEditor.deleteNodeById}
+              onDirectAnswerQuestion={props.onDirectAnswerQuestion}
+              onEvaluateAnswer={props.onEvaluateAnswer}
+              onEvaluateSummary={props.onEvaluateSummary}
+              onGenerateFollowUpQuestion={props.onGenerateFollowUpQuestion}
+              onGenerateSummary={props.onGenerateSummary}
+              onDeleteNode={workspaceEditor.deleteSelection}
+              onInsertAnswerForQuestion={workspaceEditor.insertAnswerForQuestion}
+              onInsertFollowUpQuestion={workspaceEditor.insertFollowUpQuestion}
+              onInsertSummaryForNode={workspaceEditor.insertSummaryForNode}
+              onRunLearningAction={workspaceEditor.runLearningAction}
+              onRunLearningActionForNode={workspaceEditor.runLearningActionForNode}
+              onSelectNode={workspaceEditor.selectNode}
+              onSetCurrentAnswer={workspaceEditor.setCurrentAnswer}
+              onUpdateNode={workspaceEditor.updateNode}
+              onWorkspaceViewStateChange={handleWorkspaceViewStateChange}
+              renderNodeInlineActions={props.renderNodeInlineActions}
+              renderNodeToolbarSections={props.renderNodeToolbarSections}
+              registerNodeElement={workspaceEditor.registerNodeElement}
+              selectedNodeId={workspaceEditor.selectedNodeId}
+              tree={workspaceEditor.tree}
+              workspaceViewState={workspaceViewState}
+            />
+          )}
+        </div>
       }
       rightPanel={
         <div className="workspace-panelStack">

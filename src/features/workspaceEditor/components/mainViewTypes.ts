@@ -14,6 +14,7 @@ export interface MainViewNodeProps {
   depth: number;
   isInteractionLocked: boolean;
   nodeId: string;
+  showSemanticNotes: boolean;
   onDeleteNodeById: (nodeId: string) => void;
   onDirectAnswerQuestion?: (questionNodeId: string) => void;
   onEvaluateAnswer?: (questionNodeId: string, answerNodeId: string) => void;

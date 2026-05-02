@@ -340,6 +340,16 @@ Whynote 保持“万物皆节点”的产品哲学，但系统层不能只有普
 - follow-up `question` 继续作为真实子节点存在，但在主视图里必须以缩进子章节紧跟所属闭环之后显示；当子 follow-up 成为当前激活 block 时，父问题的 block 动作面要静默收起，保持 active block 唯一。
 - `plan-step` 折叠、`question block` 折叠、正文折叠和组内历史折叠继续共用 workspace 级本地 view state；runtime、inspector 和主视图必须基于同一套选中 / 展开契约联动，不能各自漂移。
 
+### 39. V1.3 结构地图第一阶段联调基线
+
+- `structure map` 仍然只是主视图的一种投影与重排入口，不是新的树数据结构；地图里每个 section、question block、answer group、manual summary group 都必须可回指到真实 node tree。
+- 地图展示粒度必须和拖动权限共享同一套语义 helper；能展示为独立地图项的节点，才允许参与对应级别的拖动校验，不能出现“地图能拖、domain 不允许落位”或“domain 允许、地图入口缺失”的漂移。
+- 地图拖动写回后，真正持久化的只有 node tree 与既有 workspace view state；`structure map` 自身不保存独立排序或镜像状态。
+- `document` / `structure-map` 视图切换继续属于 workspace 级本地偏好，按 `workspaceId` 持久化；刷新、重进与 runtime 复用同一份 `workspaceViewState.mainViewMode`，不要额外再造一套 recent-state。
+- 从地图打开正文节点、以及地图拖动完成后的自动回到正文视图，必须统一走“切回 document -> 选中真实节点 -> 自动展开必要折叠区 -> 聚焦可见节点”这条路径，避免地图与正文各自维护一份选中状态。
+- `currentAnswerId`、`sourceAnswerId / sourceSummaryId`、`source...UpdatedAt`、`stale` 判定和闭环结果归属都由真实树语义决定；结构地图接入后只能消费这些语义，不得改写或简化它们。
+- runtime 需要更强的语义可见性时，可以在运行壳层显式打开附加提示；编辑器默认文档视图仍保持轻量，不把所有语义备注都直接抛到节点正文区。
+
 ## 后续需要重新评估这些决策的触发条件
 
 - 需要公开注册或公开商用
