@@ -82,6 +82,48 @@ test('renders the main view inside a single-column document shell with a tighten
   expect(screen.queryByText('主视图规则')).not.toBeInTheDocument();
 });
 
+test('edits the current module from the top header and keeps the intro without a duplicated module card', async () => {
+  const snapshots: WorkspaceSnapshot[] = [];
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-type-switch"
+      initialSelectedNodeId="module-type-switch"
+      initialSnapshot={createTypeSwitchSnapshot()}
+      onSnapshotChange={(snapshot) => {
+        snapshots.push(snapshot);
+      }}
+    />,
+  );
+
+  const documentShell = screen.getByTestId('workspace-document-shell');
+  const titleInput = screen.getByLabelText('当前模块 标题');
+  const introDisplay = screen.getByTestId('workspace-document-intro-display');
+
+  expect(titleInput).toHaveValue('模块');
+  expect(introDisplay).toHaveTextContent('验证节点类型切换。');
+  expect(
+    documentShell.querySelector('.workspace-documentBody section[data-node-type="module"]'),
+  ).toBeNull();
+  expect(screen.getByTestId('editor-node-step-type-switch')).toBeInTheDocument();
+
+  fireEvent.change(titleInput, {
+    target: {
+      value: '新的模块名',
+    },
+  });
+
+  await waitFor(() => {
+    expect(screen.getByDisplayValue('新的模块名')).toBeInTheDocument();
+  });
+
+  const latestSnapshot = snapshots[snapshots.length - 1];
+
+  expect(latestSnapshot?.tree.nodes['module-type-switch']).toMatchObject({
+    title: '新的模块名',
+  });
+});
+
 test('collapses and expands the structure tree', () => {
   render(<WorkspaceEditor />);
 
@@ -1047,11 +1089,6 @@ test('recovers with a new module after deleting the last module', () => {
   );
 
   expect(screen.getByDisplayValue('新模块')).toBeInTheDocument();
-  expect(
-    within(screen.getByTestId('workspace-document-header')).getByRole('heading', {
-      name: '新模块',
-    }),
-  ).toBeInTheDocument();
   expect(
     within(getSectionByHeading('当前学习模块')).getByRole('button', {
       name: /新模块/i,
