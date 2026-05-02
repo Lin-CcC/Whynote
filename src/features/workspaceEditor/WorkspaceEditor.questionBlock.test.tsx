@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import {
@@ -1469,7 +1476,7 @@ test('auto-expands a collapsed plan-step, block, and hidden history when selecti
   ).toBeInTheDocument();
 });
 
-test('clicking a structure-map answer group keeps map active, and the inline 文档 action explicitly opens the document target', async () => {
+test('clicking a structure-map answer group keeps map active without surfacing a document button wall', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
     initialWorkspaceViewState: createWorkspaceViewState({
@@ -1499,28 +1506,11 @@ test('clicking a structure-map answer group keeps map active, and the inline 文
 
   expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
 
-  fireEvent.click(
-    within(answerGroupItem).getByRole('button', { name: '在文档中查看' }),
-  );
-
-  await waitFor(() => {
-    expect(
-      screen.queryByTestId('workspace-structure-map-shell'),
-    ).not.toBeInTheDocument();
-  });
-
-  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
-    'data-collapsed',
-    'false',
-  );
-  expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
-    'data-node-selected',
-    'true',
-  );
+  fireEvent.mouseEnter(answerGroupItem);
   expect(
-    screen.queryByRole('button', { name: '展开正文' }),
+    within(answerGroupItem).queryByRole('button', { name: '在文档中查看' }),
   ).not.toBeInTheDocument();
-  expect(screen.getByTestId('editor-node-content-display-answer-first')).toBeInTheDocument();
+  expect(within(answerGroupItem).queryByText('文档')).not.toBeInTheDocument();
 });
 
 test.each([
@@ -1730,7 +1720,7 @@ test('renders plan-step panels as question clusters with local answers, follow-u
   ).toBeInTheDocument();
 });
 
-test('shows drag affordance on draggable structure-map items', async () => {
+test('drags from the node surface while keeping title and icon zones out of drag start', async () => {
   renderQuestionBlockEditor({
     initialSnapshot: createCrossStepStructureMapSnapshot(),
     initialSelectedNodeId: 'step-question-block',
@@ -1746,22 +1736,42 @@ test('shows drag affordance on draggable structure-map items', async () => {
   const answerGroupButton = screen.getByTestId(
     'structure-map-item-answer-group:answer-first',
   );
-  const dragHandle = screen.getByTestId(
-    'structure-map-drag-handle-answer-group:answer-first',
-  );
+  const titleButton = answerGroupButton.querySelector(
+    '.workspace-structureMapTitleButton',
+  ) as HTMLButtonElement | null;
+  const menuButton = within(answerGroupButton).getByRole('button', {
+    name: /更多操作：/,
+  });
 
   expect(answerGroupButton).toHaveAttribute('data-draggable', 'true');
-  expect(dragHandle).toHaveAttribute('data-structure-drag-handle', 'true');
-  expect(dragHandle).toHaveAttribute('data-structure-node-action-style', 'handle');
-  expect(dragHandle).toHaveAttribute('aria-label', '拖动回答');
-  expect(dragHandle).toHaveAttribute('data-drag-hint', 'ready');
+  expect(answerGroupButton).toHaveAttribute(
+    'data-structure-node-draggable-surface',
+    'true',
+  );
+  expect(titleButton).not.toBeNull();
+  expect(
+    within(answerGroupButton).queryByTestId(
+      'structure-map-drag-handle-answer-group:answer-first',
+    ),
+  ).not.toBeInTheDocument();
 
-  fireEvent.dragStart(dragHandle);
+  fireEvent.pointerDown(answerGroupButton);
+  fireEvent.dragStart(answerGroupButton);
 
   await waitFor(() => {
     expect(answerGroupButton).toHaveAttribute('data-dragging', 'true');
   });
-  expect(dragHandle).toHaveAttribute('data-drag-hint', 'dragging');
+  fireEvent.dragEnd(answerGroupButton);
+
+  fireEvent.pointerDown(titleButton as HTMLButtonElement);
+  const titleDragAttempt = createEvent.dragStart(answerGroupButton);
+  fireEvent(answerGroupButton, titleDragAttempt);
+  expect(titleDragAttempt.defaultPrevented).toBe(true);
+
+  fireEvent.pointerDown(menuButton);
+  const actionDragAttempt = createEvent.dragStart(answerGroupButton);
+  fireEvent(answerGroupButton, actionDragAttempt);
+  expect(actionDragAttempt.defaultPrevented).toBe(true);
 });
 
 test('highlights valid structure-map dropzones and stabilizes the hovered legal target', async () => {
@@ -1777,12 +1787,11 @@ test('highlights valid structure-map dropzones and stabilizes the hovered legal 
     expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
   });
 
-  const questionDragHandle = screen.getByTestId(
-    'structure-map-drag-handle-question-block:question-main',
-  );
+  const questionItem = screen.getByTestId('structure-map-item-question-block:question-main');
   const validDropZone = screen.getByTestId('structure-map-dropzone-step-secondary-1');
 
-  fireEvent.dragStart(questionDragHandle);
+  fireEvent.pointerDown(questionItem);
+  fireEvent.dragStart(questionItem);
 
   expect(validDropZone).toHaveAttribute('data-drop-state', 'valid');
   expect(validDropZone).toHaveTextContent('可落点');
@@ -1807,12 +1816,13 @@ test('shows explicit invalid structure-map drop feedback instead of failing sile
   });
 
   const answerGroupButton = screen.getByTestId(
-    'structure-map-drag-handle-answer-group:answer-first',
+    'structure-map-item-answer-group:answer-first',
   );
   const invalidDropZone = screen.getByTestId(
     'structure-map-dropzone-module-question-block-1',
   );
 
+  fireEvent.pointerDown(answerGroupButton);
   fireEvent.dragStart(answerGroupButton);
 
   await waitFor(() => {
@@ -1851,11 +1861,17 @@ test('keeps structure-map drag item and dropzone test ids stable', async () => {
     screen.getByTestId('structure-map-item-answer-group:answer-first'),
   ).toBeInTheDocument();
   expect(
+    screen.getByTestId('structure-map-item-question-block:question-main'),
+  ).toHaveAttribute('data-structure-node-draggable-surface', 'true');
+  expect(
     screen.getByTestId('structure-map-dropzone-question-main-0'),
   ).toBeInTheDocument();
   expect(
     screen.getByTestId('structure-map-dropzone-step-secondary-1'),
   ).toBeInTheDocument();
+  expect(
+    screen.queryByTestId('structure-map-drag-handle-question-block:question-main'),
+  ).not.toBeInTheDocument();
 });
 
 test('supports collapsing structure-map step panels, top-level clusters, and follow-up branches', async () => {
@@ -1882,15 +1898,18 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
 
   expect(stepActions).not.toBeNull();
   expect(stepItem).toHaveAttribute('data-structure-node-action-visibility', 'default');
+  const stepMenu = openStructureMapNodeMenu(stepItem);
   expect(
-    within(stepItem).queryByRole('button', { name: '收起面板' }),
+    within(stepMenu).queryByRole('button', {
+      name: '聚焦当前步骤',
+    }),
   ).not.toBeInTheDocument();
-
-  fireEvent.click(
-    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+  expect(
+    within(stepMenu).queryByRole('button', {
       name: '收起面板',
     }),
-  );
+  ).not.toBeInTheDocument();
+  fireEvent.click(getStructureMapCollapseAction(stepItem));
 
   await waitFor(() => {
     expect(
@@ -1901,11 +1920,7 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
   expect(viewStateChanges.at(-1)?.collapsedStructureMapStepIds).toContain(
     'step-question-block',
   );
-  fireEvent.click(
-    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
-      name: '展开面板',
-    }),
-  );
+  fireEvent.click(getStructureMapCollapseAction(stepItem));
 
   await waitFor(() => {
     expect(
@@ -1914,12 +1929,11 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
   });
 
   const topLevelCluster = within(panel).getByTestId('structure-map-question-question-main');
-
-  fireEvent.click(
-    within(
-      within(topLevelCluster).getByTestId('structure-map-item-question-block:question-main'),
-    ).getByRole('button', { name: '收起问题簇' }),
+  const topLevelClusterItem = within(topLevelCluster).getByTestId(
+    'structure-map-item-question-block:question-main',
   );
+
+  fireEvent.click(getStructureMapCollapseAction(topLevelClusterItem));
 
   await waitFor(() => {
     expect(
@@ -1928,11 +1942,7 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
   });
 
   expect(viewStateChanges.at(-1)?.collapsedStructureMapClusterIds).toContain('question-main');
-  fireEvent.click(
-    within(
-      within(topLevelCluster).getByTestId('structure-map-item-question-block:question-main'),
-    ).getByRole('button', { name: '展开问题簇' }),
-  );
+  fireEvent.click(getStructureMapCollapseAction(topLevelClusterItem));
 
   await waitFor(() => {
     expect(
@@ -1941,12 +1951,11 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
   });
 
   const followUpCluster = screen.getByTestId('structure-map-question-question-follow-up');
-
-  fireEvent.click(
-    within(
-      within(followUpCluster).getByTestId('structure-map-item-question-block:question-follow-up'),
-    ).getByRole('button', { name: '收起问题簇' }),
+  const followUpClusterItem = within(followUpCluster).getByTestId(
+    'structure-map-item-question-block:question-follow-up',
   );
+
+  fireEvent.click(getStructureMapCollapseAction(followUpClusterItem));
 
   await waitFor(() => {
     expect(
@@ -1959,11 +1968,7 @@ test('supports collapsing structure-map step panels, top-level clusters, and fol
   expect(viewStateChanges.at(-1)?.collapsedStructureMapFollowUpIds).toContain(
     'question-follow-up',
   );
-  fireEvent.click(
-    within(
-      within(followUpCluster).getByTestId('structure-map-item-question-block:question-follow-up'),
-    ).getByRole('button', { name: '展开问题簇' }),
-  );
+  fireEvent.click(getStructureMapCollapseAction(followUpClusterItem));
 
   await waitFor(() => {
     expect(
@@ -1993,11 +1998,17 @@ test('supports manually focusing the current plan-step from the structure map', 
     'structure-map-item-plan-step:step-question-block',
   );
 
-  fireEvent.click(
-    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
+  expect(getStructureMapFocusAction(stepItem)).toHaveAttribute(
+    'data-structure-node-focus-action',
+    'true',
+  );
+  const stepMenu = openStructureMapNodeMenu(stepItem);
+  expect(
+    within(stepMenu).queryByRole('button', {
       name: '聚焦当前步骤',
     }),
-  );
+  ).not.toBeInTheDocument();
+  fireEvent.click(getStructureMapFocusAction(stepItem));
 
   await waitFor(() => {
     expect(
@@ -2040,16 +2051,17 @@ test('supports manually focusing the current question cluster from the structure
   const clusterItem = screen.getByTestId(
     'structure-map-item-question-block:question-main',
   );
+  const clusterMenu = openStructureMapNodeMenu(clusterItem);
 
   expect(
-    within(clusterItem).queryByRole('button', { name: '聚焦当前问题簇' }),
-  ).not.toBeInTheDocument();
-
-  fireEvent.click(
-    within(openStructureMapNodeMenu(clusterItem)).getByRole('button', {
+    getStructureMapFocusAction(clusterItem),
+  ).toHaveAttribute('data-structure-node-focus-action', 'true');
+  expect(
+    within(clusterMenu).queryByRole('button', {
       name: '聚焦当前问题簇',
     }),
-  );
+  ).not.toBeInTheDocument();
+  fireEvent.click(getStructureMapFocusAction(clusterItem));
 
   await waitFor(() => {
     expect(
@@ -2139,23 +2151,11 @@ test('structure-map local controls do not trigger extra scrollIntoView jumps', a
 
   const initialCallCount = scrollIntoViewSpy.mock.calls.length;
 
-  fireEvent.click(
-    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
-      name: '聚焦当前步骤',
-    }),
-  );
+  fireEvent.click(getStructureMapFocusAction(stepItem));
   fireEvent.click(screen.getByText('退出聚焦'));
-  fireEvent.click(
-    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
-      name: '收起面板',
-    }),
-  );
-  fireEvent.click(
-    within(openStructureMapNodeMenu(stepItem)).getByRole('button', {
-      name: '展开面板',
-    }),
-  );
-  fireEvent.click(within(clusterItem).getByRole('button', { name: '收起问题簇' }));
+  fireEvent.click(getStructureMapCollapseAction(stepItem));
+  fireEvent.click(getStructureMapCollapseAction(stepItem));
+  fireEvent.click(getStructureMapCollapseAction(clusterItem));
 
   expect(scrollIntoViewSpy).toHaveBeenCalledTimes(initialCallCount);
   if (originalScrollIntoView) {
@@ -2198,15 +2198,22 @@ test('keeps structure-map node controls quiet by default and reveals icon action
   expect(within(answerGroupItem).queryByText('拖动')).not.toBeInTheDocument();
   expect(within(answerGroupItem).queryByText('收起')).not.toBeInTheDocument();
   expect(
-    within(answerGroupItem).getByTestId(
-      'structure-map-open-document-answer-group:answer-first',
-    ),
-  ).toHaveAttribute('data-structure-node-action-style', 'icon');
+    answerGroupItem,
+  ).toHaveAttribute('data-structure-node-draggable-surface', 'true');
   expect(
-    within(answerGroupItem).getByTestId(
+    actions?.querySelector('[data-structure-node-menu="more"]'),
+  ).not.toBeNull();
+  expect(
+    actions?.querySelector('[data-structure-node-focus-action="true"]'),
+  ).toBeNull();
+  expect(
+    answerGroupItem.querySelector('[data-structure-node-collapse-action="true"]'),
+  ).toBeNull();
+  expect(
+    within(answerGroupItem).queryByTestId(
       'structure-map-drag-handle-answer-group:answer-first',
     ),
-  ).toHaveAttribute('data-structure-node-action-style', 'handle');
+  ).not.toBeInTheDocument();
 
   fireEvent.mouseEnter(answerGroupItem);
   expect(answerGroupItem).toHaveAttribute(
@@ -2306,9 +2313,10 @@ test('dragging a structure-map unit reorders the document while keeping the move
     },
   });
 
-  fireEvent.dragStart(
-    screen.getByTestId('structure-map-drag-handle-summary-group:summary-manual'),
-  );
+  const summaryItem = screen.getByTestId('structure-map-item-summary-group:summary-manual');
+
+  fireEvent.pointerDown(summaryItem);
+  fireEvent.dragStart(summaryItem);
   fireEvent.dragOver(
     screen.getByTestId('structure-map-dropzone-question-main-0'),
   );
@@ -2350,9 +2358,10 @@ test('allows moving a top-level question block across plan steps from the struct
     },
   });
 
-  fireEvent.dragStart(
-    screen.getByTestId('structure-map-drag-handle-question-block:question-main'),
-  );
+  const questionItem = screen.getByTestId('structure-map-item-question-block:question-main');
+
+  fireEvent.pointerDown(questionItem);
+  fireEvent.dragStart(questionItem);
   fireEvent.dragOver(screen.getByTestId('structure-map-dropzone-step-secondary-1'));
   fireEvent.drop(screen.getByTestId('structure-map-dropzone-step-secondary-1'));
 
@@ -2958,6 +2967,26 @@ function openStructureMapNodeMenu(item: HTMLElement) {
   );
 
   return within(item).getByRole('menu');
+}
+
+function getStructureMapFocusAction(item: HTMLElement) {
+  const action = item.querySelector(
+    '[data-structure-node-focus-action="true"]',
+  ) as HTMLButtonElement | null;
+
+  expect(action).not.toBeNull();
+
+  return action as HTMLButtonElement;
+}
+
+function getStructureMapCollapseAction(item: HTMLElement) {
+  const action = item.querySelector(
+    '[data-structure-node-collapse-action="true"]',
+  ) as HTMLButtonElement | null;
+
+  expect(action).not.toBeNull();
+
+  return action as HTMLButtonElement;
 }
 
 function expectMountedTitleControls(

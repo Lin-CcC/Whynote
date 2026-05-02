@@ -9,6 +9,7 @@
 
 ## 当前短期任务
 
+- 结构地图 UI 最后一轮收口：统一节点头部为聚焦 icon / 更多菜单 / 最右收起，删除 drag handle，改成节点非操作区可拖，并完成最后一轮样式降噪与测试收尾
 - 基于真实 runtime + IndexedDB 工作区，选一条结构地图可讲述闭环，确认地图拖动后的文档顺序、折叠、`currentAnswerId`、source pairing 与 stale 都不回归
 - 新增仓库内演示文档：[docs/v1.3-structure-map-showcase.md](docs/v1.3-structure-map-showcase.md)，沉淀 walkthrough、手工清单、已知边界与简历表述
 - 更新 `DEV_NOTE.md`、`TESTING.md`，把“结构地图不只是测试通过，还要可演示验收”补成长期基线
