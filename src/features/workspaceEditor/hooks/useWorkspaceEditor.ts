@@ -315,22 +315,22 @@ export function useWorkspaceEditor({
     });
   }
 
-  function toggleSelectedNodeTag(tagId: string) {
-    if (isInteractionLocked || !selectedNodeId) {
+  function toggleNodeTag(nodeId: string, tagId: string) {
+    if (isInteractionLocked || !tree.nodes[nodeId]) {
       return;
     }
 
     setTree((previousTree) => {
-      if (!previousTree.nodes[selectedNodeId]) {
+      if (!previousTree.nodes[nodeId]) {
         return previousTree;
       }
 
       const normalizedTree = ensureBuiltinTags(previousTree);
-      const selectedNode = getNodeOrThrow(normalizedTree, selectedNodeId);
+      const targetNode = getNodeOrThrow(normalizedTree, nodeId);
       const nextTree = reconcilePlanStepStatuses(
-        selectedNode.tagIds.includes(tagId)
-          ? detachTagFromNode(normalizedTree, selectedNodeId, tagId)
-          : attachTagToNode(normalizedTree, selectedNodeId, tagId),
+        targetNode.tagIds.includes(tagId)
+          ? detachTagFromNode(normalizedTree, nodeId, tagId)
+          : attachTagToNode(normalizedTree, nodeId, tagId),
       );
 
       pendingSnapshotRef.current = createNextSnapshot(initialSnapshot, nextTree);
@@ -338,6 +338,14 @@ export function useWorkspaceEditor({
       return nextTree;
     });
     setOperationError(null);
+  }
+
+  function toggleSelectedNodeTag(tagId: string) {
+    if (!selectedNodeId) {
+      return;
+    }
+
+    toggleNodeTag(selectedNodeId, tagId);
   }
 
   function createModule() {
@@ -1021,6 +1029,7 @@ export function useWorkspaceEditor({
     switchModule,
     toggleNodeExpanded,
     tree,
+    toggleNodeTag,
     toggleSelectedNodeTag,
     updateNode,
     runLearningActionForNode,

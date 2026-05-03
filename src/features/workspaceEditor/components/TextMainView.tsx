@@ -56,7 +56,7 @@ type TextMainViewProps = {
     actionId: LearningActionId,
   ) => void;
   onSelectNode: (nodeId: string) => void;
-  onToggleNodeTag: (tagId: string) => void;
+  onToggleNodeTag: (nodeId: string, tagId: string) => void;
   onSetCurrentAnswer: (questionNodeId: string, answerNodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   onWorkspaceViewStateChange: (state: WorkspaceViewState) => void;

@@ -104,6 +104,7 @@ export function writeWorkspaceViewState(
 
 function normalizeToolPanelId(value: unknown): WorkspaceViewState['toolPanel'] {
   switch (value) {
+    case 'references':
     case 'export':
     case 'ai':
     case 'settings':

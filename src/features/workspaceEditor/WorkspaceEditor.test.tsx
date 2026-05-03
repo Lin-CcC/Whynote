@@ -216,9 +216,7 @@ test('adds tags from the inline editor entry and opens a single-tag square marke
   fireEvent.click(screen.getByTestId('editor-tag-entry-step-tag-rail'));
 
   const tagPopover = await screen.findByTestId('editor-tag-popover-step-tag-rail');
-  const firstTagButton = within(tagPopover).getAllByRole('button')[0];
-
-  fireEvent.click(firstTagButton);
+  fireEvent.click(within(tagPopover).getByRole('button', { name: '重要' }));
 
   const tagChip = await screen.findByTestId('editor-tag-chip-step-tag-rail-tag-important');
 

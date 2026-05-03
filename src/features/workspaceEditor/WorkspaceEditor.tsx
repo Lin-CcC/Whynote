@@ -185,17 +185,20 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
       </header>
       <div className="workspace-workbenchBody">
         <aside className="workspace-leftRail">
-          {isLeftRailCollapsed ? (
-            <CollapsedModuleRail
-              currentModuleId={workspaceEditor.currentModuleId}
-              isInteractionLocked={props.isInteractionLocked ?? false}
-              modules={workspaceEditor.moduleNodes}
-              onCreateModule={workspaceEditor.createModule}
-              onExpand={() => setLeftRailMode('expanded')}
-              onSwitchModule={workspaceEditor.switchModule}
-            />
-          ) : (
-            <div className="workspace-leftRailContent">
+          <ModuleRailTrack
+            currentModuleId={workspaceEditor.currentModuleId}
+            isExpanded={!isLeftRailCollapsed}
+            isInteractionLocked={props.isInteractionLocked ?? false}
+            modules={workspaceEditor.moduleNodes}
+            onCreateModule={workspaceEditor.createModule}
+            onSwitchModule={workspaceEditor.switchModule}
+            onToggle={() =>
+              setLeftRailMode(isLeftRailCollapsed ? 'expanded' : 'collapsed')
+            }
+          />
+          {!isLeftRailCollapsed ? (
+            <div className="workspace-leftRailDrawer">
+              <div className="workspace-leftRailContent">
               <SectionCard>
                 <ModuleSwitcher
                   currentModuleId={workspaceEditor.currentModuleId}
@@ -260,7 +263,8 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
                 ) : null}
               </SectionCard>
             </div>
-          )}
+            </div>
+          ) : null}
         </aside>
         <main className="workspace-workbenchMain">
           <div className="workspace-mainViewShell">
@@ -318,7 +322,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
                   }
                   onSelectNode={workspaceEditor.selectNode}
                   onSetCurrentAnswer={workspaceEditor.setCurrentAnswer}
-                  onToggleNodeTag={workspaceEditor.toggleSelectedNodeTag}
+                  onToggleNodeTag={workspaceEditor.toggleNodeTag}
                   onUpdateNode={workspaceEditor.updateNode}
                   onWorkspaceViewStateChange={handleWorkspaceViewStateChange}
                   registerNodeElement={workspaceEditor.registerNodeElement}
@@ -465,53 +469,70 @@ function resolveRightToolPanels(
   ];
 }
 
-type CollapsedModuleRailProps = {
+type ModuleRailTrackProps = {
   currentModuleId: string | null;
+  isExpanded: boolean;
   isInteractionLocked: boolean;
   modules: Array<{
     id: string;
     title: string;
   }>;
   onCreateModule: () => void;
-  onExpand: () => void;
   onSwitchModule: (moduleId: string) => void;
+  onToggle: () => void;
 };
 
-function CollapsedModuleRail({
+function ModuleRailTrack({
   currentModuleId,
+  isExpanded,
   isInteractionLocked,
   modules,
   onCreateModule,
-  onExpand,
   onSwitchModule,
-}: CollapsedModuleRailProps) {
+  onToggle,
+}: ModuleRailTrackProps) {
   return (
-    <div className="workspace-collapsedModuleRail">
+    <div
+      className="workspace-moduleRailTrack"
+      data-expanded={isExpanded ? 'true' : 'false'}
+    >
       <button
         className="workspace-collapsedRailAction"
-        onClick={onExpand}
+        onClick={onToggle}
         type="button"
       >
         模块
       </button>
       <span className="workspace-collapsedRailCount">{modules.length}</span>
-      <div className="workspace-collapsedModuleRailList">
-        {modules.map((moduleNode, index) => (
-          <button
-            aria-label={moduleNode.title}
-            aria-pressed={moduleNode.id === currentModuleId}
-            className="workspace-collapsedModuleButton"
-            data-active={moduleNode.id === currentModuleId}
-            disabled={isInteractionLocked}
-            key={moduleNode.id}
-            onClick={() => onSwitchModule(moduleNode.id)}
-            title={moduleNode.title}
-            type="button"
-          >
-            {getModuleGlyph(moduleNode.title, index)}
-          </button>
-        ))}
-      </div>
+      {!isExpanded ? (
+        <div className="workspace-collapsedModuleRailList">
+          {modules.map((moduleNode, index) => (
+            <button
+              aria-label={moduleNode.title}
+              aria-pressed={moduleNode.id === currentModuleId}
+              className="workspace-collapsedModuleButton"
+              data-active={moduleNode.id === currentModuleId}
+              disabled={isInteractionLocked}
+              key={moduleNode.id}
+              onClick={() => onSwitchModule(moduleNode.id)}
+              title={moduleNode.title}
+              type="button"
+            >
+              {getModuleGlyph(moduleNode.title, index)}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <span
+          aria-hidden="true"
+          className="workspace-collapsedRailCurrent"
+        >
+          {getModuleGlyph(
+            modules.find((moduleNode) => moduleNode.id === currentModuleId)?.title ?? '',
+            0,
+          )}
+        </span>
+      )}
       <button
         className="workspace-collapsedRailAction"
         disabled={isInteractionLocked}

@@ -388,6 +388,7 @@ test('persists workbench rail state and global tool selection across remounts', 
   expect(workbench).not.toBeNull();
   expect(toolTrack).not.toBeNull();
   expect(within(toolTrack as HTMLElement).getByRole('button', { name: /资料/ })).toBeInTheDocument();
+  expect(within(toolTrack as HTMLElement).getByRole('button', { name: /引用/ })).toBeInTheDocument();
   expect(within(toolTrack as HTMLElement).getByRole('button', { name: /导出/ })).toBeInTheDocument();
   expect(within(toolTrack as HTMLElement).getByRole('button', { name: /AI 配置/ })).toBeInTheDocument();
   expect(within(toolTrack as HTMLElement).getByRole('button', { name: /设置/ })).toBeInTheDocument();

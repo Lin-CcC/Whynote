@@ -97,11 +97,6 @@ export function WorkspaceRuntimeResourcesToolPanel({
         tree={tree}
         workspaceId={workspaceId}
       />
-      <LearningCitationPanel
-        onFocusResourceNode={onFocusResourceNode}
-        selectedEditorNodeId={selectedEditorNodeId}
-        tree={tree}
-      />
       <ResourceFocusPanel
         activeResourceNodeId={activeResourceNodeId}
         currentModuleTitle={currentModuleTitle}
@@ -196,6 +191,23 @@ export function WorkspaceRuntimeResourcesToolPanel({
 
     onClearResourceFocus();
   }
+}
+
+export function WorkspaceRuntimeReferencesToolPanel({
+  onFocusResourceNode,
+  selectedEditorNodeId,
+  tree,
+}: Pick<
+  SharedResourceToolPanelProps,
+  'onFocusResourceNode' | 'selectedEditorNodeId' | 'tree'
+>) {
+  return (
+    <LearningCitationPanel
+      onFocusResourceNode={onFocusResourceNode}
+      selectedEditorNodeId={selectedEditorNodeId}
+      tree={tree}
+    />
+  );
 }
 
 export function WorkspaceRuntimeExportToolPanel({
