@@ -134,7 +134,7 @@ type StructureMapMenuAction = {
 type StructureMapStatusBadge = {
   id: string;
   label: string;
-  tone: 'current-answer' | 'focused';
+  tone: 'focused';
 };
 
 type StructureMapRenderProps = {
@@ -1731,14 +1731,6 @@ function StructureMapNodeCard({
         ...menuActions,
       ];
 
-  if (isCurrentAnswer) {
-    allStatusBadges.unshift({
-      id: 'current-answer',
-      label: '当前回答',
-      tone: 'current-answer',
-    });
-  }
-
   useEffect(() => {
     if (!isMenuOpen) {
       return;
@@ -1829,6 +1821,7 @@ function StructureMapNodeCard({
       data-selected={isSelected}
       data-structure-node-draggable-surface="true"
       data-structure-node-action-visibility={actionVisibility}
+      data-structure-node-current-answer={isCurrentAnswer ? 'true' : 'false'}
       data-structure-node-editable="title"
       data-structure-node-editing={isEditingTitle}
       data-structure-node-focused={hasFocusedBadge ? 'true' : 'false'}
