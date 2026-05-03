@@ -74,7 +74,7 @@ export default function LearningCitationPanel({
   );
 
   return (
-    <SectionCard>
+    <SectionCard className="resources-toolCard resources-toolCard-references">
       <div className="workspace-sectionHeader">
         <div>
           <p className="workspace-kicker">学习节点引用</p>

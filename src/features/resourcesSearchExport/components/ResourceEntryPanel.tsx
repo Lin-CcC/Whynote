@@ -51,7 +51,7 @@ export default function ResourceEntryPanel({
   const [feedback, setFeedback] = useState<SubmissionFeedback>(null);
 
   return (
-    <SectionCard>
+    <SectionCard className="resources-toolCard resources-toolCard-resources">
       <div className="workspace-sectionHeader">
         <div>
           <p className="workspace-kicker">资料入口</p>
