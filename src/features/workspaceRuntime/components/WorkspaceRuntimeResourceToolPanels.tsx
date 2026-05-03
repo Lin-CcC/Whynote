@@ -14,6 +14,7 @@ import SearchLocatorPanel from '../../resourcesSearchExport/components/SearchLoc
 import { useResourcesSearchExport } from '../../resourcesSearchExport/hooks/useResourcesSearchExport';
 import { deleteResourceNode } from '../../resourcesSearchExport/services/resourceDeleteService';
 import type { ResourceImportDraft } from '../../resourcesSearchExport/services/resourceIngestTypes';
+import '../../resourcesSearchExport/resourcesSearchExport.css';
 
 type SharedResourceToolPanelProps = {
   activeResourceNodeId: string | null;
