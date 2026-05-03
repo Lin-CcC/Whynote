@@ -171,6 +171,7 @@ export interface WorkspaceEditorToolPanel {
   content: ReactNode;
   countLabel?: string;
   id: WorkspaceToolPanelId;
+  icon?: 'references' | 'resources' | 'export' | 'ai' | 'settings';
   label: string;
 }
 

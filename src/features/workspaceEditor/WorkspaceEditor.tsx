@@ -388,6 +388,12 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
                   onClick={() => toggleRightToolPanel(panel.id)}
                   type="button"
                 >
+                  <span
+                    aria-hidden="true"
+                    className="workspace-toolRailButtonIcon"
+                  >
+                    <WorkspaceToolRailIcon icon={panel.icon ?? panel.id} />
+                  </span>
                   <span className="workspace-toolRailButtonLabel">
                     {panel.label}
                   </span>
@@ -460,6 +466,7 @@ function resolveRightToolPanels(
         </Fragment>
       ),
       id: 'settings',
+      icon: 'settings',
       label: '设置',
     },
   ];
@@ -548,4 +555,121 @@ function getModuleGlyph(title: string, index: number) {
   }
 
   return String(index + 1);
+}
+
+function WorkspaceToolRailIcon({
+  icon,
+}: {
+  icon:
+    | 'references'
+    | 'resources'
+    | 'export'
+    | 'ai'
+    | 'settings';
+}) {
+  switch (icon) {
+    case 'references':
+      return (
+        <svg
+          className="workspace-toolRailGlyph"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <path
+            d="M8 7.5h8.5M8 12h8.5M8 16.5h5.5M6.75 4.75h10.5A1.75 1.75 0 0 1 19 6.5v11a1.75 1.75 0 0 1-1.75 1.75H6.75A1.75 1.75 0 0 1 5 17.5v-11A1.75 1.75 0 0 1 6.75 4.75Z"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.7"
+          />
+        </svg>
+      );
+    case 'resources':
+      return (
+        <svg
+          className="workspace-toolRailGlyph"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <path
+            d="M5.5 7.25A1.75 1.75 0 0 1 7.25 5.5h3l1.2 1.4h5.3A1.75 1.75 0 0 1 18.5 8.65v7.85a1.75 1.75 0 0 1-1.75 1.75H7.25A1.75 1.75 0 0 1 5.5 16.5V7.25Z"
+            stroke="currentColor"
+            strokeLinejoin="round"
+            strokeWidth="1.7"
+          />
+          <path
+            d="M5.75 9h12.5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="1.7"
+          />
+        </svg>
+      );
+    case 'export':
+      return (
+        <svg
+          className="workspace-toolRailGlyph"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <path
+            d="M12 5.5v8.75m0 0 3.25-3.25M12 14.25 8.75 11M6.75 18.5h10.5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.7"
+          />
+          <path
+            d="M7 4.75h10A1.75 1.75 0 0 1 18.75 6.5v11A1.75 1.75 0 0 1 17 19.25H7A1.75 1.75 0 0 1 5.25 17.5v-11A1.75 1.75 0 0 1 7 4.75Z"
+            stroke="currentColor"
+            strokeLinejoin="round"
+            strokeWidth="1.7"
+          />
+        </svg>
+      );
+    case 'ai':
+      return (
+        <svg
+          className="workspace-toolRailGlyph"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <path
+            d="M9 8.25 12 6l3 2.25v3.5L12 14l-3-2.25v-3.5Z"
+            stroke="currentColor"
+            strokeLinejoin="round"
+            strokeWidth="1.7"
+          />
+          <path
+            d="M12 3.75v2.2m0 12.1v2.2m8.25-8.25h-2.2M5.95 12H3.75m14.09-5.84-1.56 1.55M7.72 16.28l-1.56 1.56m0-11.68 1.56 1.55m8.56 8.57 1.56 1.56"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="1.7"
+          />
+        </svg>
+      );
+    case 'settings':
+      return (
+        <svg
+          className="workspace-toolRailGlyph"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <path
+            d="m9.1 4.75.5 1.7a1 1 0 0 0 .95.72h2.9a1 1 0 0 0 .95-.72l.5-1.7m-7.3 14.5.5-1.7a1 1 0 0 1 .95-.72h2.9a1 1 0 0 1 .95.72l.5 1.7M4.75 9.1l1.7.5a1 1 0 0 1 .72.95v2.9a1 1 0 0 1-.72.95l-1.7.5m14.5-7.3-1.7.5a1 1 0 0 0-.72.95v2.9a1 1 0 0 0 .72.95l1.7.5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+          />
+          <circle
+            cx="12"
+            cy="12"
+            r="2.65"
+            stroke="currentColor"
+            strokeWidth="1.7"
+          />
+        </svg>
+      );
+  }
 }

@@ -365,6 +365,7 @@ export default function WorkspaceRuntimeScreen({
             ? String(selectedNodeReferenceCount)
             : undefined,
         id: 'references',
+        icon: 'references',
         label: '引用',
       },
       {
@@ -393,6 +394,7 @@ export default function WorkspaceRuntimeScreen({
         ),
         countLabel: String(runtime.resourceMetadataRecords.length),
         id: 'resources',
+        icon: 'resources',
         label: '资料',
       },
       {
@@ -406,6 +408,7 @@ export default function WorkspaceRuntimeScreen({
           />
         ),
         id: 'export',
+        icon: 'export',
         label: '导出',
       },
       {
@@ -429,6 +432,7 @@ export default function WorkspaceRuntimeScreen({
         ),
         countLabel: String(runtime.aiPresets.length),
         id: 'ai',
+        icon: 'ai',
         label: 'AI 配置',
       },
       {
@@ -495,6 +499,7 @@ export default function WorkspaceRuntimeScreen({
           </>
         ),
         id: 'settings',
+        icon: 'settings',
         label: '设置',
       },
     ];
