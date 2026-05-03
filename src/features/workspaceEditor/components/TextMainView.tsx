@@ -104,6 +104,7 @@ export default function TextMainView({
 }: TextMainViewProps) {
   const activeQuestionBlockId = findNearestQuestionNodeId(tree, selectedNodeId);
   const lastAutoExpandedSelectionIdRef = useRef<string | null>(null);
+  const lastFocusedSelectionIdRef = useRef<string | null>(null);
   const [activeTagRailTagId, setActiveTagRailTagId] = useState<string | null>(null);
   const [isTagRailCollapsed, setIsTagRailCollapsed] = useState(false);
 
@@ -127,8 +128,15 @@ export default function TextMainView({
 
   useEffect(() => {
     if (!selectedNodeId) {
+      lastFocusedSelectionIdRef.current = null;
       return;
     }
+
+    if (selectedNodeId === lastFocusedSelectionIdRef.current) {
+      return;
+    }
+
+    lastFocusedSelectionIdRef.current = selectedNodeId;
 
     const frameId = window.requestAnimationFrame(() => {
       const selectedNodeElement = document.querySelector<HTMLElement>(
@@ -152,7 +160,7 @@ export default function TextMainView({
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [selectedNodeId, tree, workspaceViewState]);
+  }, [selectedNodeId]);
 
   useEffect(() => {
     if (activeTagRailTagId && !tree.tags[activeTagRailTagId]) {
