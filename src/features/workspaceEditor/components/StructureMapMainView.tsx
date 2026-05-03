@@ -114,6 +114,9 @@ type TitleEditingState = {
   originalTitle: string;
 };
 
+const STRUCTURE_MAP_EDGE_SCROLL_ZONE_PX = 112;
+const STRUCTURE_MAP_EDGE_SCROLL_MAX_SPEED_PX = 26;
+
 type StructureMapIconAction = {
   dataCollapsed?: boolean;
   dataStructureClusterAction?: string;
@@ -200,6 +203,9 @@ export default function StructureMapMainView({
     string | null
   >(null);
   const structureMapShellRef = useRef<HTMLDivElement | null>(null);
+  const autoScrollContainerRef = useRef<HTMLElement | null>(null);
+  const autoScrollFrameRef = useRef<number | null>(null);
+  const autoScrollVelocityRef = useRef(0);
 
   if (!currentModuleId || !tree.nodes[currentModuleId]) {
     return (
@@ -323,6 +329,119 @@ export default function StructureMapMainView({
     setTitleEditingState(null);
   }, [titleEditingState, tree]);
 
+  useEffect(() => {
+    return () => {
+      if (autoScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(autoScrollFrameRef.current);
+      }
+    };
+  }, []);
+
+  function stopAutoScroll() {
+    autoScrollVelocityRef.current = 0;
+    if (autoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(autoScrollFrameRef.current);
+      autoScrollFrameRef.current = null;
+    }
+  }
+
+  function ensureAutoScrollContainer() {
+    if (autoScrollContainerRef.current?.isConnected) {
+      return autoScrollContainerRef.current;
+    }
+
+    autoScrollContainerRef.current = resolveVerticalScrollContainer(
+      structureMapShellRef.current,
+    );
+
+    return autoScrollContainerRef.current;
+  }
+
+  function runAutoScrollFrame() {
+    const container = ensureAutoScrollContainer();
+    const velocity = autoScrollVelocityRef.current;
+
+    if (!container || velocity === 0 || !dragState) {
+      stopAutoScroll();
+      return;
+    }
+
+    container.scrollTop += velocity;
+    autoScrollFrameRef.current = window.requestAnimationFrame(runAutoScrollFrame);
+  }
+
+  function updateAutoScrollVelocity(clientY: number) {
+    const container = ensureAutoScrollContainer();
+
+    if (!container) {
+      stopAutoScroll();
+      return;
+    }
+
+    const containerRect = getVerticalScrollBounds(container);
+    const edgeZone = Math.min(
+      STRUCTURE_MAP_EDGE_SCROLL_ZONE_PX,
+      containerRect.height / 3,
+    );
+    let nextVelocity = 0;
+
+    if (clientY < containerRect.top + edgeZone) {
+      const ratio = Math.min(
+        1,
+        (containerRect.top + edgeZone - clientY) / edgeZone,
+      );
+      nextVelocity = -Math.max(
+        2,
+        Math.round(STRUCTURE_MAP_EDGE_SCROLL_MAX_SPEED_PX * ratio * ratio),
+      );
+    } else if (clientY > containerRect.bottom - edgeZone) {
+      const ratio = Math.min(
+        1,
+        (clientY - (containerRect.bottom - edgeZone)) / edgeZone,
+      );
+      nextVelocity = Math.max(
+        2,
+        Math.round(STRUCTURE_MAP_EDGE_SCROLL_MAX_SPEED_PX * ratio * ratio),
+      );
+    }
+
+    autoScrollVelocityRef.current = nextVelocity;
+
+    if (nextVelocity === 0) {
+      stopAutoScroll();
+      return;
+    }
+
+    if (autoScrollFrameRef.current === null) {
+      autoScrollFrameRef.current = window.requestAnimationFrame(runAutoScrollFrame);
+    }
+  }
+
+  function handleShellDragOverCapture(event: DragEvent<HTMLDivElement>) {
+    if (!dragState || isInteractionLocked) {
+      return;
+    }
+
+    updateAutoScrollVelocity(event.clientY);
+  }
+
+  function handleShellDragLeaveCapture(event: DragEvent<HTMLDivElement>) {
+    if (!dragState) {
+      return;
+    }
+
+    const nextTarget = event.relatedTarget;
+
+    if (
+      nextTarget instanceof Node &&
+      event.currentTarget.contains(nextTarget)
+    ) {
+      return;
+    }
+
+    stopAutoScroll();
+  }
+
   function updateWorkspaceViewState(
     updater: (state: WorkspaceViewState) => WorkspaceViewState,
   ) {
@@ -378,6 +497,7 @@ export default function StructureMapMainView({
   }
 
   function handleDragEnd() {
+    stopAutoScroll();
     setActiveDropZoneId(null);
     setDragState(null);
   }
@@ -491,6 +611,9 @@ export default function StructureMapMainView({
         data-layout="single-column"
         data-structure-drop-behavior="stay-in-map"
         data-testid="workspace-structure-map-shell"
+        onDragLeaveCapture={handleShellDragLeaveCapture}
+        onDragOverCapture={handleShellDragOverCapture}
+        onDropCapture={stopAutoScroll}
         ref={structureMapShellRef}
       >
         <header className="workspace-documentHeader">
@@ -2187,6 +2310,49 @@ function getTransparentDragPreviewImage() {
     'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
   return transparentImage;
+}
+
+function resolveVerticalScrollContainer(element: HTMLElement | null) {
+  let current = element?.parentElement ?? null;
+
+  while (current) {
+    if (isVerticallyScrollable(current)) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+
+  return document.scrollingElement instanceof HTMLElement
+    ? document.scrollingElement
+    : null;
+}
+
+function isVerticallyScrollable(element: HTMLElement) {
+  const { overflowY } = window.getComputedStyle(element);
+
+  if (!['auto', 'scroll', 'overlay'].includes(overflowY)) {
+    return false;
+  }
+
+  return element.scrollHeight > element.clientHeight;
+}
+
+function getVerticalScrollBounds(element: HTMLElement) {
+  if (element === document.scrollingElement) {
+    return {
+      bottom: window.innerHeight,
+      height: window.innerHeight,
+      top: 0,
+    };
+  }
+
+  const { top, bottom, height } = element.getBoundingClientRect();
+
+  return {
+    bottom,
+    height,
+    top,
+  };
 }
 
 function StructureMapDropZone({

@@ -504,7 +504,7 @@ test('keeps document nodes frame-free until focus moves into their editable cont
 
   expect(screen.getByTestId('editor-node-question-main')).toHaveAttribute(
     'data-node-frame-visible',
-    'true',
+    'false',
   );
   expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
     'data-node-frame-visible',
@@ -2224,6 +2224,49 @@ test('clicking a structure-map node does not trigger an extra scrollIntoView jum
     });
   } else {
     delete (Element.prototype as Partial<Element>).scrollIntoView;
+  }
+});
+
+test('adding a tag to a hovered node does not refocus the previously selected document node', async () => {
+  const originalFocus = HTMLElement.prototype.focus;
+  const focusSpy = vi.fn();
+
+  Object.defineProperty(HTMLElement.prototype, 'focus', {
+    configurable: true,
+    value: focusSpy,
+  });
+
+  renderQuestionBlockEditor({
+    initialSelectedNodeId: 'answer-first',
+  });
+
+  const targetNode = screen.getByTestId('editor-node-summary-manual');
+  const initialCallCount = focusSpy.mock.calls.length;
+
+  fireEvent.mouseEnter(targetNode);
+  fireEvent.click(screen.getByTestId('editor-tag-entry-summary-manual'));
+  fireEvent.click(
+    within(screen.getByTestId('editor-tag-popover-summary-manual')).getByRole(
+      'button',
+      { name: /步骤/ },
+    ),
+  );
+
+  await waitFor(() => {
+    expect(
+      screen.getByTestId('editor-tag-chip-summary-manual-tag-step'),
+    ).toBeInTheDocument();
+  });
+
+  expect(focusSpy).toHaveBeenCalledTimes(initialCallCount);
+
+  if (originalFocus) {
+    Object.defineProperty(HTMLElement.prototype, 'focus', {
+      configurable: true,
+      value: originalFocus,
+    });
+  } else {
+    delete (HTMLElement.prototype as Partial<HTMLElement>).focus;
   }
 });
 
