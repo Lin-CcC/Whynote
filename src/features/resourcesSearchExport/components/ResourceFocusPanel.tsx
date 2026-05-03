@@ -177,7 +177,7 @@ export default function ResourceFocusPanel({
     : '当前没有编辑焦点';
 
   return (
-    <SectionCard>
+    <SectionCard className="resources-toolCard resources-toolCard-resources">
       <div className="workspace-sectionHeader">
         <div>
           <p className="workspace-kicker">资料定位</p>

@@ -38,15 +38,15 @@ export default function ExportPanel({
   scope,
 }: ExportPanelProps) {
   return (
-    <SectionCard>
+    <SectionCard className="resources-toolCard resources-toolCard-export">
       <div className="workspace-sectionHeader">
-        <div>
+        <div className="resources-optionGroup">
           <p className="workspace-kicker">基础导出</p>
           <h2 className="workspace-sectionTitle">Markdown / TXT</h2>
         </div>
       </div>
       <div className="resources-exportLayout">
-        <div>
+        <div className="resources-optionGroup">
           <span className="resources-panelFieldLabel">导出范围</span>
           <div className="resources-chipGroup">
             <button
@@ -79,7 +79,7 @@ export default function ExportPanel({
             </button>
           </div>
         </div>
-        <div>
+        <div className="resources-optionGroup">
           <span className="resources-panelFieldLabel">格式</span>
           <div className="resources-chipGroup">
             <button

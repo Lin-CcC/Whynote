@@ -800,3 +800,394 @@
 .resources-tagCount {
   letter-spacing: 0.01em;
 }
+
+/* Workspace tool panel refresh */
+.workspace-rightRailPanel .resources-toolCard {
+  padding: 1.1rem 1rem;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 1.25rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.96)),
+    #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.workspace-rightRailPanel .resources-toolCard .workspace-sectionHeader {
+  align-items: flex-start;
+  gap: 0.9rem;
+  margin-bottom: 0.95rem;
+}
+
+.workspace-rightRailPanel .resources-toolCard .workspace-sectionTitle {
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.workspace-rightRailPanel .resources-toolCard .workspace-kicker {
+  margin-bottom: 0.38rem;
+  color: #0f766e;
+  letter-spacing: 0.04em;
+}
+
+.workspace-rightRailPanel .resources-toolCard .workspace-helpText,
+.workspace-rightRailPanel .resources-toolCard .workspace-errorText {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+  line-height: 1.65;
+}
+
+.workspace-rightRailPanel .resources-toolCard .workspace-errorText {
+  color: #b91c1c;
+}
+
+.resources-optionGroup,
+.resources-entrySection,
+.resources-batchPreview,
+.resources-batchResult,
+.resources-citationBlock,
+.resources-citationEvidence,
+.resources-referenceItem,
+.resources-libraryItem,
+.resources-libraryItem-fragment,
+.resources-deleteConfirmCard {
+  position: relative;
+  overflow: hidden;
+}
+
+.resources-optionGroup::before,
+.resources-entrySection::before,
+.resources-batchPreview::before,
+.resources-citationBlock::before,
+.resources-citationEvidence::before,
+.resources-referenceItem::before,
+.resources-libraryItem::before,
+.resources-libraryItem-fragment::before,
+.resources-deleteConfirmCard::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.18rem;
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.55), rgba(14, 165, 233, 0.7));
+  opacity: 0.9;
+}
+
+.resources-deleteConfirmCard::before {
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.72), rgba(220, 38, 38, 0.86));
+}
+
+.resources-exportLayout {
+  grid-template-columns: 1fr;
+  gap: 0.82rem;
+}
+
+.resources-exportLayout > .resources-checkboxRow,
+.resources-exportLayout > .workspace-helpText,
+.resources-exportLayout > .workspace-errorText,
+.resources-exportLayout > .resources-panelFooter {
+  grid-column: auto;
+}
+
+.resources-optionGroup {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem 1rem 1rem 1.15rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1.08rem;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(248, 250, 252, 0.96)
+  );
+}
+
+.resources-entrySection,
+.resources-batchPreview,
+.resources-batchResult,
+.resources-citationBlock,
+.resources-citationEvidence,
+.resources-deleteConfirmCard {
+  gap: 0.82rem;
+  padding: 1rem 1rem 1rem 1.15rem;
+  border-radius: 1.08rem;
+}
+
+.resources-entrySection {
+  border-top: none;
+}
+
+.resources-panelFieldLabel,
+.resources-tagHeader,
+.resources-citationSectionHeader,
+.resources-citationBlockHeader,
+.resources-citationEvidenceHeader,
+.resources-referenceHeader,
+.resources-resultHeader {
+  color: #0f172a;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.resources-panelInput {
+  min-height: 2.95rem;
+  padding: 0.84rem 0.96rem;
+  border: 1px solid rgba(203, 213, 225, 0.88);
+  border-radius: 0.96rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.97));
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.resources-panelTextarea {
+  min-height: 6.6rem;
+}
+
+.resources-panelInput:hover,
+.resources-fileInput:hover {
+  border-color: rgba(148, 163, 184, 0.42);
+}
+
+.resources-fileInput {
+  min-height: 3.2rem;
+  padding: 0.44rem 0.5rem;
+  color: #64748b;
+}
+
+.resources-fileInput::file-selector-button {
+  margin-right: 0.82rem;
+  padding: 0.62rem 0.92rem;
+  border: 1px solid rgba(186, 230, 253, 0.95);
+  border-radius: 0.82rem;
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.98), rgba(224, 242, 254, 0.94));
+  color: #075985;
+  font-size: 0.8rem;
+  font-weight: 800;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 6px 16px rgba(14, 116, 144, 0.08);
+}
+
+.resources-chipGroup {
+  gap: 0.46rem;
+}
+
+.resources-tagChip {
+  min-height: 2.15rem;
+  padding: 0.46rem 0.78rem;
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  background: rgba(255, 255, 255, 0.98);
+  color: #475569;
+  font-size: 0.81rem;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.resources-tagChip:hover,
+.resources-tagChip:focus-visible {
+  border-color: rgba(125, 211, 252, 0.92);
+  background: rgba(248, 250, 252, 0.98);
+  color: #0f172a;
+}
+
+.resources-tagChip[data-active='true'] {
+  border-color: rgba(103, 232, 249, 0.92);
+  background: linear-gradient(180deg, rgba(236, 254, 255, 0.98), rgba(240, 249, 255, 0.98));
+  color: #0f766e;
+  box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.12);
+}
+
+.resources-tagChip:disabled {
+  border-style: dashed;
+  background: rgba(248, 250, 252, 0.92);
+  color: #94a3b8;
+}
+
+.resources-checkboxRow {
+  padding: 0.86rem 1rem 0.86rem 1.15rem;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.76);
+}
+
+.resources-checkboxRow input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #0e7490;
+}
+
+.resources-entryActionRow {
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+}
+
+.resources-entryButton,
+.resources-exportButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.76rem 1rem;
+  border: 1px solid rgba(125, 211, 252, 0.9);
+  border-radius: 0.96rem;
+  background: linear-gradient(180deg, rgba(240, 249, 255, 0.99), rgba(224, 242, 254, 0.95));
+  color: #075985;
+  font-size: 0.85rem;
+  font-weight: 800;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 8px 18px rgba(14, 116, 144, 0.08);
+}
+
+.resources-entryButton:hover,
+.resources-exportButton:hover {
+  transform: translateY(-1px);
+}
+
+.resources-entryButton:disabled,
+.resources-exportButton:disabled,
+.resources-inlineButton:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.resources-inlineButton {
+  min-height: 2.25rem;
+  padding: 0.56rem 0.82rem;
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.98);
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.resources-inlineButton:hover {
+  transform: translateY(-1px);
+}
+
+.resources-panelFooter {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.resources-citationSection {
+  margin-top: 0.95rem;
+  padding-top: 0.15rem;
+}
+
+.resources-citationCounter,
+.resources-tagCount {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.6rem;
+  padding: 0.16rem 0.5rem;
+  border: 1px solid rgba(186, 230, 253, 0.95);
+  border-radius: 999px;
+  background: rgba(240, 249, 255, 0.92);
+  color: #0369a1;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.resources-citationLabel,
+.resources-libraryType,
+.resources-resultType,
+.resources-resultScope {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0.12rem 0.46rem;
+  border-radius: 999px;
+  background: rgba(236, 254, 255, 0.96);
+  color: #0f766e;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.resources-referenceList,
+.resources-libraryList,
+.resources-resultList,
+.resources-citationEvidenceList,
+.resources-citationBlockList {
+  gap: 0.82rem;
+}
+
+.resources-referenceItem,
+.resources-libraryItem,
+.resources-libraryItem-fragment,
+.resources-resultButton {
+  gap: 0.44rem;
+  padding: 0.95rem 0.95rem 0.95rem 1.1rem;
+  border: 1px solid rgba(226, 232, 240, 0.94);
+  border-radius: 1.02rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 8px 18px rgba(15, 23, 42, 0.04);
+}
+
+.resources-libraryItem-fragment {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.resources-libraryTitle,
+.resources-resultTitle {
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.resources-librarySummary,
+.resources-libraryMeta,
+.resources-resultSnippet,
+.resources-resultPath,
+.resources-resultTags,
+.resources-citationWhyText,
+.resources-citationFocusText {
+  color: #475569;
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.resources-focusList {
+  gap: 0.72rem;
+  padding: 0.15rem 0 0.1rem;
+}
+
+.resources-focusList div {
+  padding: 0.72rem 0.82rem;
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  border-radius: 0.92rem;
+  background: rgba(248, 250, 252, 0.76);
+}
+
+.resources-focusList dt {
+  margin-bottom: 0.16rem;
+}
+
+.resources-libraryActionRow {
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+.resources-fragmentList {
+  gap: 0.7rem;
+  padding-left: 0.8rem;
+  border-left: 1px solid rgba(186, 230, 253, 0.72);
+}
+
+@media (max-width: 720px) {
+  .workspace-rightRailPanel .resources-toolCard {
+    padding: 0.95rem 0.9rem;
+  }
+
+  .resources-entryActionRow,
+  .resources-exportLayout {
+    grid-template-columns: 1fr;
+  }
+}
