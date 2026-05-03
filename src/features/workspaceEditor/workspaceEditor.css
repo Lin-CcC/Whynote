@@ -3491,13 +3491,13 @@
 }
 
 .workspace-leftRail {
-  width: calc(
-    var(--workspace-rail-track-width) + var(--workspace-left-drawer-reserved)
-  );
-  min-width: calc(
-    var(--workspace-rail-track-width) + var(--workspace-left-drawer-reserved)
-  );
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: var(--workspace-rail-track-width) minmax(0, var(--workspace-left-drawer-width));
+  gap: 0.72rem;
+  align-items: start;
+  width: auto;
+  min-width: auto;
+  overflow: visible;
 }
 
 .workspace-rightRail {
@@ -3513,7 +3513,11 @@
 }
 
 .workspace-leftRailDrawer {
-  left: calc(var(--workspace-rail-track-width) + 0.72rem);
+  position: relative;
+  left: auto;
+  top: auto;
+  width: var(--workspace-left-drawer-width);
+  height: 100%;
 }
 
 .workspace-rightRailDrawer {
@@ -3549,6 +3553,16 @@
   width: 100% !important;
   max-width: none !important;
   margin-inline: 0 !important;
+}
+
+.workspace-workbench[data-workspace-left-rail='collapsed'] .workspace-leftRail {
+  grid-template-columns: var(--workspace-rail-track-width);
+  width: var(--workspace-rail-track-width);
+  min-width: var(--workspace-rail-track-width);
+}
+
+.workspace-workbench[data-workspace-left-rail='collapsed'] .workspace-leftRailDrawer {
+  display: none;
 }
 
 .workspace-mainViewModeDock {
@@ -3588,7 +3602,8 @@
 
 .workspace-moduleRailTrack {
   width: var(--workspace-rail-track-width);
-  align-self: flex-start;
+  min-width: var(--workspace-rail-track-width);
+  align-self: stretch;
 }
 
 .workspace-rightRailTrack {
