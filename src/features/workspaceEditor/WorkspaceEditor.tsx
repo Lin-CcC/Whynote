@@ -386,6 +386,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
                   data-active={isActive}
                   key={panel.id}
                   onClick={() => toggleRightToolPanel(panel.id)}
+                  title={panel.label}
                   type="button"
                 >
                   <span
@@ -503,9 +504,15 @@ function ModuleRailTrack({
         aria-label={isExpanded ? '切换模块轨为收起' : '切换模块轨为展开'}
         className="workspace-collapsedRailAction workspace-moduleRailToggle"
         onClick={onToggle}
+        title={isExpanded ? '收起模块栏' : '展开模块栏'}
         type="button"
       >
-        <span className="workspace-moduleRailToggleLabel">模块</span>
+        <span
+          aria-hidden="true"
+          className="workspace-moduleRailToggleIcon"
+        >
+          <ModuleRailIcon />
+        </span>
       </button>
       <span className="workspace-collapsedRailCount">{modules.length}</span>
       {!isExpanded ? (
@@ -539,6 +546,7 @@ function ModuleRailTrack({
         className="workspace-collapsedRailAction workspace-moduleRailCreate"
         disabled={isInteractionLocked}
         onClick={onCreateModule}
+        title="新建模块"
         type="button"
       >
         +
@@ -672,4 +680,21 @@ function WorkspaceToolRailIcon({
         </svg>
       );
   }
+}
+
+function ModuleRailIcon() {
+  return (
+    <svg
+      className="workspace-toolRailGlyph"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M6.5 6.25h4.25v4.25H6.5V6.25Zm6.75 0h4.25v4.25h-4.25V6.25ZM6.5 13.5h4.25v4.25H6.5V13.5Zm6.75 0h4.25v4.25h-4.25V13.5Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
 }
