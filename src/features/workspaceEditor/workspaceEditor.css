@@ -367,6 +367,8 @@
 }
 
 .workspace-structureMapCluster {
+  position: relative;
+  z-index: 0;
   gap: 0.74rem;
   padding: 0.82rem 0.88rem 0.9rem;
   border: 1px solid rgba(148, 163, 184, 0.2);
@@ -385,6 +387,7 @@
 }
 
 .workspace-structureMapClusterCanvas {
+  position: relative;
   display: grid;
   gap: 0.62rem;
 }
@@ -402,6 +405,7 @@
 
 .workspace-structureMapClusterRegion {
   position: relative;
+  z-index: 0;
 }
 
 .workspace-structureMapClusterRegionMain {
@@ -417,6 +421,8 @@
 }
 
 .workspace-structureMapSlot {
+  position: relative;
+  z-index: 0;
   display: grid;
   gap: 0.4rem;
 }
@@ -453,6 +459,7 @@
 
 .workspace-structureMapSupportingSlot {
   position: relative;
+  z-index: 0;
   flex: 1 1 14rem;
   min-width: min(100%, 14rem);
   max-width: 18rem;
@@ -530,6 +537,7 @@
 
 .workspace-structureMapClusterRegionBranch {
   position: relative;
+  z-index: 0;
   display: grid;
   gap: 0;
   width: min(100%, 34rem);
@@ -544,6 +552,7 @@
 
 .workspace-structureMapBranchList {
   position: relative;
+  z-index: 0;
   display: grid;
   gap: 0.72rem;
   padding-left: 0.92rem;
@@ -824,6 +833,15 @@
 .workspace-structureMapButton[data-structure-node-action-visibility='hover'],
 .workspace-structureMapButton[data-structure-node-action-visibility='active'] {
   z-index: 18;
+}
+
+.workspace-structureMapCluster:has(.workspace-nodeActionPopover),
+.workspace-structureMapClusterRegion:has(.workspace-nodeActionPopover),
+.workspace-structureMapSlot:has(.workspace-nodeActionPopover),
+.workspace-structureMapSupportingSlot:has(.workspace-nodeActionPopover),
+.workspace-structureMapBranchNode:has(.workspace-nodeActionPopover),
+.workspace-structureMapQuestionHub:has(.workspace-nodeActionPopover) {
+  z-index: 32;
 }
 
 .workspace-structureMapButton[data-structure-node-editing='true'] .workspace-structureMapNodeActions {
