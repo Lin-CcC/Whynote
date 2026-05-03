@@ -331,7 +331,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
             </div>
             <div
               className="workspace-mainViewModeDock"
-              data-structure-view-switch="floating-bottom-center"
+              data-structure-view-switch="floating-bottom-left"
               data-testid="workspace-main-view-switch"
             >
               <div className="workspace-mainViewModeBar">

@@ -3497,10 +3497,12 @@
   min-width: calc(
     var(--workspace-rail-track-width) + var(--workspace-left-drawer-reserved)
   );
+  align-items: flex-start;
 }
 
 .workspace-rightRail {
   display: flex;
+  align-items: flex-end;
   justify-content: flex-end;
   width: calc(
     var(--workspace-rail-track-width) + var(--workspace-right-drawer-reserved)
@@ -3537,15 +3539,30 @@
   margin-inline: 0;
 }
 
+.workspace-mainViewContent > .workspace-mainPanel {
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.workspace-mainViewContent > .workspace-mainPanel > .workspace-documentShell,
+.workspace-mainViewContent > .workspace-mainPanel > .workspace-structureMapShell {
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+}
+
 .workspace-mainViewModeDock {
-  position: absolute;
-  left: 50%;
-  right: auto;
+  position: fixed;
+  left: calc(
+    1rem + var(--workspace-rail-track-width) + var(--workspace-shell-gap) +
+      var(--workspace-left-drawer-reserved) + 0.75rem
+  );
   bottom: 1rem;
   width: auto;
   margin-top: 0;
-  justify-content: center;
-  transform: translateX(-50%);
+  justify-content: flex-start;
+  transform: none;
+  z-index: 40;
 }
 
 @media (max-width: 1100px) {
@@ -3556,9 +3573,10 @@
   }
 
   .workspace-mainViewModeDock {
-    left: 50%;
+    left: 1rem;
     width: calc(100% - 2rem);
     max-width: max-content;
+    bottom: 0.9rem;
   }
 }
 
@@ -3566,6 +3584,16 @@
 .workspace-rightRailTrack {
   align-items: center;
   padding-inline: 0.48rem;
+}
+
+.workspace-moduleRailTrack {
+  width: var(--workspace-rail-track-width);
+  align-self: flex-start;
+}
+
+.workspace-rightRailTrack {
+  width: var(--workspace-rail-track-width);
+  align-self: flex-end;
 }
 
 .workspace-moduleRailToggle,
