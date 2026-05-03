@@ -234,6 +234,32 @@ test('adds tags from the inline editor entry and opens a single-tag square marke
   expect(marker).toHaveAttribute('data-editor-tag-marker-kind', '重要');
 });
 
+test('renders the remove tag affordance after the tag label inside the chip', async () => {
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-tag-rail"
+      initialSelectedNodeId="question-tag-rail"
+      initialSnapshot={createTaggedRailSnapshot()}
+    />,
+  );
+
+  const chipButton = await screen.findByTestId(
+    'editor-tag-chip-question-tag-rail-tag-important',
+  );
+  const removeButton = await screen.findByTestId(
+    'editor-tag-remove-question-tag-rail-tag-important',
+  );
+  const chip = chipButton.closest('.workspace-nodeTagChip');
+
+  expect(chip).not.toBeNull();
+  expect(chip?.children[0]).toBe(chipButton);
+  expect(chip?.children[1]).toBe(removeButton);
+  expect(removeButton).toHaveAttribute(
+    'data-editor-tag-remove-position',
+    'trailing',
+  );
+});
+
 test('collapses, closes, and navigates from the editor tag rail markers', async () => {
   render(
     <WorkspaceEditor

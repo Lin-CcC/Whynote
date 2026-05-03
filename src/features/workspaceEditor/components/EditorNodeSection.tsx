@@ -122,6 +122,7 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
       selectedNodeId={props.selectedNodeId}
       showSemanticNotes={props.showSemanticNotes}
       supplementalActions={planStepCollapsed ? null : inlineActions}
+      tagVisibilityMode={props.workspaceViewState.tagVisibilityMode}
       tree={tree}
     >
       {planStepCollapsed

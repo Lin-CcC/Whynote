@@ -56,6 +56,7 @@ export function readCompleteWorkspaceViewStateForExport(
     mainViewMode: 'document',
     rightRailMode: 'collapsed',
     structureMapFocusTarget: null,
+    tagVisibilityMode: 'hover',
     toolPanel: 'resources',
   };
 }

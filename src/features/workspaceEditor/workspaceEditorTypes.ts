@@ -91,11 +91,13 @@ export interface WorkspaceViewState {
   mainViewMode: WorkspaceMainViewMode;
   rightRailMode: WorkspaceRailMode;
   structureMapFocusTarget: StructureMapFocusTarget | null;
+  tagVisibilityMode: WorkspaceTagVisibilityMode;
   toolPanel: WorkspaceToolPanelId;
 }
 
 export type WorkspaceMainViewMode = 'document' | 'structure-map';
 export type WorkspaceRailMode = 'collapsed' | 'expanded';
+export type WorkspaceTagVisibilityMode = 'always' | 'hover';
 export type WorkspaceToolPanelId =
   | 'resources'
   | 'references'

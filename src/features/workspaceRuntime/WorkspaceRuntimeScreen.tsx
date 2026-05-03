@@ -434,6 +434,47 @@ export default function WorkspaceRuntimeScreen({
       {
         content: (
           <>
+            <SectionCard>
+              <div className="workspace-sectionHeader">
+                <div>
+                  <p className="workspace-kicker">阅读设置</p>
+                  <h2 className="workspace-sectionTitle">标签显隐</h2>
+                </div>
+              </div>
+              <p className="workspace-helpText">
+                可切换为长期显示，或只在 hover / 当前节点时显示标签。
+              </p>
+              <div className="workspace-actionGrid">
+                <button
+                  aria-pressed={workspaceViewState.tagVisibilityMode === 'hover'}
+                  className="workspace-inlineAction"
+                  data-active={workspaceViewState.tagVisibilityMode === 'hover'}
+                  onClick={() =>
+                    handleWorkspaceViewStateChange({
+                      ...workspaceViewState,
+                      tagVisibilityMode: 'hover',
+                    })
+                  }
+                  type="button"
+                >
+                  Hover 显示
+                </button>
+                <button
+                  aria-pressed={workspaceViewState.tagVisibilityMode === 'always'}
+                  className="workspace-inlineAction"
+                  data-active={workspaceViewState.tagVisibilityMode === 'always'}
+                  onClick={() =>
+                    handleWorkspaceViewStateChange({
+                      ...workspaceViewState,
+                      tagVisibilityMode: 'always',
+                    })
+                  }
+                  type="button"
+                >
+                  长期显式
+                </button>
+              </div>
+            </SectionCard>
             <WorkspaceRuntimeStatusCard
               activeAiActionLabel={runtime.activeAiActionLabel}
               aiError={runtime.aiError}
