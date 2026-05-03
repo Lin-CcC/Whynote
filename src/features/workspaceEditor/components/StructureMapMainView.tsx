@@ -1984,9 +1984,10 @@ function StructureMapNodeCard({
           <button
             className="workspace-structureMapTitleButton"
             data-structure-node-editable="title"
+            data-structure-node-drag-surface="title"
             data-structure-node-title-zone="true"
             disabled={isInteractionLocked}
-            draggable={false}
+            draggable={!isInteractionLocked && dragPermission.canDrag}
             onClick={(event) => {
               event.stopPropagation();
               onSelectStructureMapNode(anchor.nodeId);
@@ -1994,6 +1995,14 @@ function StructureMapNodeCard({
             onDoubleClick={(event) => {
               event.stopPropagation();
               onStartTitleEditing(dragNodeId, itemId, title);
+            }}
+            onDragEnd={(event) => {
+              event.stopPropagation();
+              handleSurfaceDragEnd();
+            }}
+            onDragStart={(event) => {
+              event.stopPropagation();
+              handleSurfaceDragStart(event);
             }}
             type="button"
           >

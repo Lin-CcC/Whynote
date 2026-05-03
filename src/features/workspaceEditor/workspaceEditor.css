@@ -1363,6 +1363,7 @@
   cursor: inherit;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-user-drag: element;
 }
 
 .workspace-structureMapTitleInput {
@@ -1384,6 +1385,11 @@
   display: inline-flex;
   align-items: center;
   gap: 0.28rem;
+  pointer-events: none;
+}
+
+.workspace-structureMapText {
+  pointer-events: none;
 }
 
 .workspace-structureMapBadge[data-structure-node-status='badge'][data-tone='focused'] {
