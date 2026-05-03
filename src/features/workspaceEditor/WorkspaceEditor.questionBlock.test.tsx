@@ -1476,7 +1476,7 @@ test('auto-expands a collapsed plan-step, block, and hidden history when selecti
   ).toBeInTheDocument();
 });
 
-test('clicking a structure-map answer group keeps map active without surfacing a document button wall', async () => {
+test('clicking a structure-map answer group keeps map active, and the leftmost document icon explicitly opens the document target', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
     initialWorkspaceViewState: createWorkspaceViewState({
@@ -1505,12 +1505,28 @@ test('clicking a structure-map answer group keeps map active without surfacing a
   });
 
   expect(screen.getByTestId('workspace-structure-map-shell')).toBeInTheDocument();
-
   fireEvent.mouseEnter(answerGroupItem);
-  expect(
-    within(answerGroupItem).queryByRole('button', { name: '在文档中查看' }),
-  ).not.toBeInTheDocument();
-  expect(within(answerGroupItem).queryByText('文档')).not.toBeInTheDocument();
+  const openDocumentButton = within(answerGroupItem).getByRole('button', {
+    name: '在文档中查看',
+  });
+  expect(openDocumentButton).toHaveAttribute('data-structure-node-action-style', 'icon');
+
+  fireEvent.click(openDocumentButton);
+
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('workspace-structure-map-shell'),
+    ).not.toBeInTheDocument();
+  });
+
+  expect(screen.getByTestId('question-block-question-main')).toHaveAttribute(
+    'data-collapsed',
+    'false',
+  );
+  expect(screen.getByTestId('editor-node-answer-first')).toHaveAttribute(
+    'data-node-selected',
+    'true',
+  );
 });
 
 test.each([
@@ -1720,7 +1736,7 @@ test('renders plan-step panels as question clusters with local answers, follow-u
   ).toBeInTheDocument();
 });
 
-test('drags from the node surface while keeping title and icon zones out of drag start', async () => {
+test('drags from the node surface while keeping icon zones out of drag start', async () => {
   renderQuestionBlockEditor({
     initialSnapshot: createCrossStepStructureMapSnapshot(),
     initialSelectedNodeId: 'step-question-block',
@@ -1764,9 +1780,9 @@ test('drags from the node surface while keeping title and icon zones out of drag
   fireEvent.dragEnd(answerGroupButton);
 
   fireEvent.pointerDown(titleButton as HTMLButtonElement);
-  const titleDragAttempt = createEvent.dragStart(answerGroupButton);
-  fireEvent(answerGroupButton, titleDragAttempt);
-  expect(titleDragAttempt.defaultPrevented).toBe(true);
+  const titleDragAttempt = createEvent.dragStart(titleButton as HTMLButtonElement);
+  fireEvent(titleButton as HTMLButtonElement, titleDragAttempt);
+  expect(titleDragAttempt.defaultPrevented).toBe(false);
 
   fireEvent.pointerDown(menuButton);
   const actionDragAttempt = createEvent.dragStart(answerGroupButton);
