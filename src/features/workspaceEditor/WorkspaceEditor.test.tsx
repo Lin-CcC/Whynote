@@ -121,14 +121,14 @@ test('shows document and structure map tabs and switches only the main editor su
   });
 });
 
-test('renders the global view switch inside the floating bottom-left dock instead of the top header', () => {
+test('renders the global view switch inside the floating bottom-center dock instead of the top header', () => {
   renderWorkspaceEditorWithViewState({});
 
   const viewSwitch = screen.getByTestId('workspace-main-view-switch');
 
   expect(viewSwitch).toHaveAttribute(
     'data-structure-view-switch',
-    'floating-bottom-left',
+    'floating-bottom-center',
   );
   expect(
     within(viewSwitch).getByTestId('workspace-main-view-tab-document'),
