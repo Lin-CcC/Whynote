@@ -410,6 +410,8 @@
 }
 
 .workspace-structureMapQuestionHub {
+  position: relative;
+  z-index: 0;
   flex: 1 1 auto;
   width: min(100%, 34rem);
 }
@@ -549,6 +551,7 @@
 
 .workspace-structureMapBranchNode {
   position: relative;
+  z-index: 0;
 }
 
 .workspace-structureMapConnector {
@@ -613,6 +616,8 @@
 }
 
 .workspace-structureMapButton {
+  position: relative;
+  z-index: 0;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -814,6 +819,11 @@
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
+}
+
+.workspace-structureMapButton[data-structure-node-action-visibility='hover'],
+.workspace-structureMapButton[data-structure-node-action-visibility='active'] {
+  z-index: 18;
 }
 
 .workspace-structureMapButton[data-structure-node-editing='true'] .workspace-structureMapNodeActions {
