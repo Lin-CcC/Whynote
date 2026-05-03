@@ -17,7 +17,10 @@ import {
   type NodeTree,
   type PlanStepStatus,
 } from '../../nodeDomain';
-import type { NodeContentPatch } from '../workspaceEditorTypes';
+import type {
+  NodeContentPatch,
+  WorkspaceTagVisibilityMode,
+} from '../workspaceEditorTypes';
 import {
   buildDocumentNodePresentation,
   PLAN_STEP_STATUS_LABELS,
@@ -45,6 +48,7 @@ export type DocumentNodeSectionProps = {
   selectedNodeId: string | null;
   showSemanticNotes?: boolean;
   supplementalActions?: ReactNode;
+  tagVisibilityMode: WorkspaceTagVisibilityMode;
   tree: NodeTree;
 };
 
@@ -70,6 +74,7 @@ export default function DocumentNodeSection({
   selectedNodeId,
   showSemanticNotes = false,
   supplementalActions,
+  tagVisibilityMode,
   tree,
 }: DocumentNodeSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -362,6 +367,7 @@ export default function DocumentNodeSection({
                   nodeId={node.id}
                   onActivateTagRail={onActivateTagRail}
                   onToggleTag={onToggleNodeTag}
+                  tagVisibilityMode={tagVisibilityMode}
                   tree={tree}
                 />
               </div>

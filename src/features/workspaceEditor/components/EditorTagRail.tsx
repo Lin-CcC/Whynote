@@ -51,23 +51,29 @@ export default function EditorTagRail({
 
   useEffect(() => {
     function measureMarkers() {
+      const shellElement = document.querySelector<HTMLElement>(
+        '[data-testid="workspace-document-shell"]',
+      );
+
+      if (!shellElement) {
+        setMarkers([]);
+        return;
+      }
+
+      const shellRect = shellElement.getBoundingClientRect();
+      const shellHeight = shellRect.height || shellElement.offsetHeight || 1;
       const nextMarkers = taggedNodes
         .map((node, index) => {
           const nodeElement = document.querySelector<HTMLElement>(
             `[data-testid="editor-node-${node.id}"]`,
           );
-          const shellElement = document.querySelector<HTMLElement>(
-            '[data-testid="workspace-document-shell"]',
-          );
 
-          if (!nodeElement || !shellElement) {
+          if (!nodeElement) {
             return null;
           }
 
-          const shellTop = shellElement.getBoundingClientRect().top + window.scrollY;
-          const shellHeight = shellElement.offsetHeight || 1;
-          const nodeTop = nodeElement.getBoundingClientRect().top + window.scrollY;
-          const nodeCenter = nodeTop - shellTop + nodeElement.offsetHeight / 2;
+          const nodeRect = nodeElement.getBoundingClientRect();
+          const nodeCenter = nodeRect.top - shellRect.top + nodeRect.height / 2;
 
           return {
             color: getEditorTagColor(tree, tagId, index),
@@ -86,11 +92,20 @@ export default function EditorTagRail({
       setMarkers(nextMarkers);
     }
 
+    const mainScrollElement = document.querySelector<HTMLElement>(
+      '.workspace-workbenchMain',
+    );
+    const rafMeasure = () => {
+      requestAnimationFrame(measureMarkers);
+    };
+
     measureMarkers();
-    window.addEventListener('resize', measureMarkers);
+    window.addEventListener('resize', rafMeasure);
+    mainScrollElement?.addEventListener('scroll', rafMeasure, { passive: true });
 
     return () => {
-      window.removeEventListener('resize', measureMarkers);
+      window.removeEventListener('resize', rafMeasure);
+      mainScrollElement?.removeEventListener('scroll', rafMeasure);
     };
   }, [selectedNodeId, tagId, taggedNodes, tree]);
 
@@ -103,27 +118,26 @@ export default function EditorTagRail({
       data-editor-tag-rail-mode="single-tag"
     >
       <div className="workspace-editorTagRailHeader">
-        <div>
-          <p className="workspace-editorTagRailKicker">标签分布</p>
-          {!isCollapsed ? (
-            <strong className="workspace-editorTagRailTitle">{tagName}</strong>
-          ) : null}
-        </div>
+        <strong className="workspace-editorTagRailChip" title={tagName}>
+          {tagName}
+        </strong>
         <div className="workspace-editorTagRailActions">
           <button
             aria-label={isCollapsed ? '展开标签分布栏' : '收起标签分布栏'}
             className="workspace-editorTagRailButton"
             data-testid="editor-tag-rail-toggle"
             onClick={onToggleCollapsed}
+            title={isCollapsed ? '展开标签分布栏' : '收起标签分布栏'}
             type="button"
           >
-            {isCollapsed ? '展开' : '收起'}
+            {isCollapsed ? '+' : '−'}
           </button>
           <button
             aria-label="关闭标签分布栏"
             className="workspace-editorTagRailButton"
             data-testid="editor-tag-rail-close"
             onClick={onClose}
+            title="关闭标签分布栏"
             type="button"
           >
             ×
@@ -148,8 +162,8 @@ export default function EditorTagRail({
 
                 if (targetElement && typeof targetElement.scrollIntoView === 'function') {
                   targetElement.scrollIntoView({
-                    block: 'center',
                     behavior: 'smooth',
+                    block: 'center',
                   });
                 }
               }}
@@ -190,7 +204,11 @@ function collectTaggedNodesInModule(
       taggedNodes.push(currentNode);
     }
 
-    for (let childIndex = currentNode.childIds.length - 1; childIndex >= 0; childIndex -= 1) {
+    for (
+      let childIndex = currentNode.childIds.length - 1;
+      childIndex >= 0;
+      childIndex -= 1
+    ) {
       stack.push(currentNode.childIds[childIndex]);
     }
   }
@@ -215,9 +233,7 @@ function isNodeWithinSubtree(
     }
 
     currentNode =
-      currentNode.parentId === null
-        ? undefined
-        : tree.nodes[currentNode.parentId];
+      currentNode.parentId === null ? undefined : tree.nodes[currentNode.parentId];
   }
 
   return false;

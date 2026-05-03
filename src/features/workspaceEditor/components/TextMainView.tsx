@@ -206,6 +206,7 @@ export default function TextMainView({
         data-editor-tag-rail={isTagRailVisible ? 'true' : 'false'}
         data-editor-tag-rail-collapsed={isTagRailCollapsed ? 'true' : 'false'}
         data-editor-tag-rail-mode="single-tag"
+        data-editor-tag-visibility={workspaceViewState.tagVisibilityMode}
       >
         <div className="workspace-editorCanvasMain">
           <div

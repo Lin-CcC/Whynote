@@ -1,20 +1,20 @@
 import { Fragment, useMemo, useRef } from 'react';
 
 import SectionCard from '../../ui/SectionCard';
-import { useWorkspaceEditor } from './hooks/useWorkspaceEditor';
-import type {
-  WorkspaceEditorProps,
-  WorkspaceEditorRenderContext,
-  WorkspaceEditorToolPanel,
-  WorkspaceRailMode,
-} from './workspaceEditorTypes';
 import ModuleSwitcher from './components/ModuleSwitcher';
 import SelectedNodeInspector from './components/SelectedNodeInspector';
 import StructureActionBar from './components/StructureActionBar';
 import StructureMapMainView from './components/StructureMapMainView';
 import StructureTree from './components/StructureTree';
 import TextMainView from './components/TextMainView';
+import { useWorkspaceEditor } from './hooks/useWorkspaceEditor';
 import { DEFAULT_WORKSPACE_VIEW_STATE } from './utils/workspaceViewState';
+import type {
+  WorkspaceEditorProps,
+  WorkspaceEditorRenderContext,
+  WorkspaceEditorToolPanel,
+  WorkspaceRailMode,
+} from './workspaceEditorTypes';
 import './workspaceEditor.css';
 
 export default function WorkspaceEditor(props: WorkspaceEditorProps) {
@@ -116,7 +116,6 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
 
       return {
         ...state,
-        focusMode: state.focusMode,
         rightRailMode: nextRightRailMode,
         toolPanel: panelId,
       };
@@ -140,16 +139,12 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
             </span>
           </div>
           <div className="workspace-workbenchContext">
-            <span className="workspace-workbenchContextBadge">
-              当前模块
-            </span>
+            <span className="workspace-workbenchContextBadge">当前模块</span>
             <strong className="workspace-workbenchContextValue">
               {currentModuleTitle}
             </strong>
             <span className="workspace-workbenchContextDivider" />
-            <span className="workspace-workbenchContextBadge">
-              当前模式
-            </span>
+            <span className="workspace-workbenchContextBadge">当前模式</span>
             <strong className="workspace-workbenchContextValue">
               {currentModeLabel}
             </strong>
@@ -199,70 +194,70 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
           {!isLeftRailCollapsed ? (
             <div className="workspace-leftRailDrawer">
               <div className="workspace-leftRailContent">
-              <SectionCard>
-                <ModuleSwitcher
-                  currentModuleId={workspaceEditor.currentModuleId}
-                  isInteractionLocked={props.isInteractionLocked ?? false}
-                  modules={workspaceEditor.moduleNodes}
-                  onCreateModule={workspaceEditor.createModule}
-                  onSwitchModule={workspaceEditor.switchModule}
-                />
-              </SectionCard>
-              {props.renderLeftPanelExtra?.(renderContext)}
-              <SectionCard>
-                <StructureTree
-                  currentModuleId={workspaceEditor.currentModuleId}
-                  expandedNodeIds={workspaceEditor.expandedNodeIds}
-                  isInteractionLocked={props.isInteractionLocked ?? false}
-                  onCreateModule={workspaceEditor.createModule}
-                  onSelectNode={workspaceEditor.selectNode}
-                  onToggleNode={workspaceEditor.toggleNodeExpanded}
-                  selectedNodeId={workspaceEditor.selectedNodeId}
-                  tree={workspaceEditor.tree}
-                />
-              </SectionCard>
-              <SectionCard>
-                <StructureActionBar
-                  actionAvailability={workspaceEditor.actionAvailability}
-                  childInsertOptions={workspaceEditor.childInsertOptions}
-                  interactionLockReason={props.interactionLockReason ?? null}
-                  isInteractionLocked={props.isInteractionLocked ?? false}
-                  learningActions={workspaceEditor.learningActions}
-                  onChangeSelectedNodeType={
-                    workspaceEditor.switchSelectedNodeType
-                  }
-                  onChildInsertTypeChange={
-                    workspaceEditor.setSelectedChildInsertType
-                  }
-                  onDeleteNode={workspaceEditor.deleteSelection}
-                  onInsertChildNode={workspaceEditor.insertChildAtSelection}
-                  onInsertSiblingNode={workspaceEditor.insertSiblingAtSelection}
-                  onLiftNode={workspaceEditor.liftSelection}
-                  onLowerNode={workspaceEditor.lowerSelection}
-                  onRunLearningAction={workspaceEditor.runLearningAction}
-                  onSiblingInsertTypeChange={
-                    workspaceEditor.setSelectedSiblingInsertType
-                  }
-                  selectedChildInsertType={
-                    workspaceEditor.selectedChildInsertType
-                  }
-                  selectedNodeTitle={workspaceEditor.selectedNode?.title ?? null}
-                  selectedNodeType={workspaceEditor.selectedNode?.type ?? null}
-                  selectedNodeTypeSwitchOptions={
-                    workspaceEditor.selectedNodeTypeSwitchOptions
-                  }
-                  selectedSiblingInsertType={
-                    workspaceEditor.selectedSiblingInsertType
-                  }
-                  siblingInsertOptions={workspaceEditor.siblingInsertOptions}
-                />
-                {workspaceEditor.operationError ? (
-                  <p className="workspace-errorText" role="alert">
-                    {workspaceEditor.operationError}
-                  </p>
-                ) : null}
-              </SectionCard>
-            </div>
+                <SectionCard>
+                  <ModuleSwitcher
+                    currentModuleId={workspaceEditor.currentModuleId}
+                    isInteractionLocked={props.isInteractionLocked ?? false}
+                    modules={workspaceEditor.moduleNodes}
+                    onCreateModule={workspaceEditor.createModule}
+                    onSwitchModule={workspaceEditor.switchModule}
+                  />
+                </SectionCard>
+                {props.renderLeftPanelExtra?.(renderContext)}
+                <SectionCard>
+                  <StructureTree
+                    currentModuleId={workspaceEditor.currentModuleId}
+                    expandedNodeIds={workspaceEditor.expandedNodeIds}
+                    isInteractionLocked={props.isInteractionLocked ?? false}
+                    onCreateModule={workspaceEditor.createModule}
+                    onSelectNode={workspaceEditor.selectNode}
+                    onToggleNode={workspaceEditor.toggleNodeExpanded}
+                    selectedNodeId={workspaceEditor.selectedNodeId}
+                    tree={workspaceEditor.tree}
+                  />
+                </SectionCard>
+                <SectionCard>
+                  <StructureActionBar
+                    actionAvailability={workspaceEditor.actionAvailability}
+                    childInsertOptions={workspaceEditor.childInsertOptions}
+                    interactionLockReason={props.interactionLockReason ?? null}
+                    isInteractionLocked={props.isInteractionLocked ?? false}
+                    learningActions={workspaceEditor.learningActions}
+                    onChangeSelectedNodeType={
+                      workspaceEditor.switchSelectedNodeType
+                    }
+                    onChildInsertTypeChange={
+                      workspaceEditor.setSelectedChildInsertType
+                    }
+                    onDeleteNode={workspaceEditor.deleteSelection}
+                    onInsertChildNode={workspaceEditor.insertChildAtSelection}
+                    onInsertSiblingNode={workspaceEditor.insertSiblingAtSelection}
+                    onLiftNode={workspaceEditor.liftSelection}
+                    onLowerNode={workspaceEditor.lowerSelection}
+                    onRunLearningAction={workspaceEditor.runLearningAction}
+                    onSiblingInsertTypeChange={
+                      workspaceEditor.setSelectedSiblingInsertType
+                    }
+                    selectedChildInsertType={
+                      workspaceEditor.selectedChildInsertType
+                    }
+                    selectedNodeTitle={workspaceEditor.selectedNode?.title ?? null}
+                    selectedNodeType={workspaceEditor.selectedNode?.type ?? null}
+                    selectedNodeTypeSwitchOptions={
+                      workspaceEditor.selectedNodeTypeSwitchOptions
+                    }
+                    selectedSiblingInsertType={
+                      workspaceEditor.selectedSiblingInsertType
+                    }
+                    siblingInsertOptions={workspaceEditor.siblingInsertOptions}
+                  />
+                  {workspaceEditor.operationError ? (
+                    <p className="workspace-errorText" role="alert">
+                      {workspaceEditor.operationError}
+                    </p>
+                  ) : null}
+                </SectionCard>
+              </div>
             </div>
           ) : null}
         </aside>
@@ -385,6 +380,7 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
 
               return (
                 <button
+                  aria-label={panel.label}
                   aria-pressed={isActive && !isRightRailCollapsed}
                   className="workspace-toolRailButton"
                   data-active={isActive}
@@ -497,11 +493,12 @@ function ModuleRailTrack({
       data-expanded={isExpanded ? 'true' : 'false'}
     >
       <button
-        className="workspace-collapsedRailAction"
+        aria-label={isExpanded ? '切换模块轨为收起' : '切换模块轨为展开'}
+        className="workspace-collapsedRailAction workspace-moduleRailToggle"
         onClick={onToggle}
         type="button"
       >
-        模块
+        <span className="workspace-moduleRailToggleLabel">模块</span>
       </button>
       <span className="workspace-collapsedRailCount">{modules.length}</span>
       {!isExpanded ? (
@@ -523,10 +520,7 @@ function ModuleRailTrack({
           ))}
         </div>
       ) : (
-        <span
-          aria-hidden="true"
-          className="workspace-collapsedRailCurrent"
-        >
+        <span aria-hidden="true" className="workspace-collapsedRailCurrent">
           {getModuleGlyph(
             modules.find((moduleNode) => moduleNode.id === currentModuleId)?.title ?? '',
             0,
@@ -534,7 +528,8 @@ function ModuleRailTrack({
         </span>
       )}
       <button
-        className="workspace-collapsedRailAction"
+        aria-label="新建模块"
+        className="workspace-collapsedRailAction workspace-moduleRailCreate"
         disabled={isInteractionLocked}
         onClick={onCreateModule}
         type="button"

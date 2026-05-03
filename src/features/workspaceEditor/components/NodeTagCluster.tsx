@@ -11,6 +11,7 @@ import {
   resolveBuiltinTags,
   type NodeTree,
 } from '../../nodeDomain';
+import type { WorkspaceTagVisibilityMode } from '../workspaceEditorTypes';
 import {
   getEditorTagColor,
   getEditorTagName,
@@ -22,6 +23,7 @@ type NodeTagClusterProps = {
   nodeId: string;
   onActivateTagRail: (tagId: string) => void;
   onToggleTag: (nodeId: string, tagId: string) => void;
+  tagVisibilityMode: WorkspaceTagVisibilityMode;
   tree: NodeTree;
 };
 
@@ -31,6 +33,7 @@ export default function NodeTagCluster({
   nodeId,
   onActivateTagRail,
   onToggleTag,
+  tagVisibilityMode,
   tree,
 }: NodeTagClusterProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -51,6 +54,9 @@ export default function NodeTagCluster({
     [node.tagIds, tree],
   );
   const showInlineAddEntry = isVisible && !isInteractionLocked;
+  const showTagChips =
+    activeTags.length > 0 &&
+    (tagVisibilityMode === 'always' || isVisible || isPopoverOpen);
 
   useEffect(() => {
     setIsPopoverOpen(false);
@@ -78,39 +84,63 @@ export default function NodeTagCluster({
     };
   }, [isPopoverOpen]);
 
-  if (activeTags.length === 0 && !showInlineAddEntry) {
+  if (!showTagChips && !showInlineAddEntry) {
     return null;
   }
 
   return (
-    <div className="workspace-nodeTagCluster" ref={clusterRef}>
-      {activeTags.map((tag, index) => (
-        <button
-          aria-label={`标签 ${tag.name}`}
-          className="workspace-nodeTagChip"
-          data-editor-tag-kind={tag.name}
-          data-testid={`editor-tag-chip-${nodeId}-${tag.id}`}
-          key={tag.id}
-          onClick={(event) => {
-            event.stopPropagation();
-          }}
-          onDoubleClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onActivateTagRail(tag.id);
-          }}
-          style={
-            {
-              '--tag-accent': tag.color,
-              '--tag-index': String(index),
-            } as CSSProperties
-          }
-          title={`双击查看“${tag.name}”分布`}
-          type="button"
-        >
-          {tag.name}
-        </button>
-      ))}
+    <div
+      className="workspace-nodeTagCluster"
+      data-tag-visibility={tagVisibilityMode}
+      ref={clusterRef}
+    >
+      {showTagChips
+        ? activeTags.map((tag, index) => (
+            <span
+              className="workspace-nodeTagChip"
+              data-editor-tag-kind={tag.name}
+              key={tag.id}
+              style={
+                {
+                  '--tag-accent': tag.color,
+                  '--tag-index': String(index),
+                } as CSSProperties
+              }
+            >
+              <button
+                aria-label={`标签 ${tag.name}`}
+                className="workspace-nodeTagChipButton"
+                data-testid={`editor-tag-chip-${nodeId}-${tag.id}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                }}
+                onDoubleClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onActivateTagRail(tag.id);
+                }}
+                title={`双击查看“${tag.name}”分布`}
+                type="button"
+              >
+                {tag.name}
+              </button>
+              <button
+                aria-label={`移除标签 ${tag.name}`}
+                className="workspace-nodeTagRemoveButton"
+                data-editor-tag-remove-position="trailing"
+                data-testid={`editor-tag-remove-${nodeId}-${tag.id}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleTag(node.id, tag.id);
+                }}
+                title={`移除标签 ${tag.name}`}
+                type="button"
+              >
+                ×
+              </button>
+            </span>
+          ))
+        : null}
       {showInlineAddEntry ? (
         <div className="workspace-nodeTagEntry">
           <button
@@ -123,6 +153,7 @@ export default function NodeTagCluster({
               event.stopPropagation();
               setIsPopoverOpen((previousState) => !previousState);
             }}
+            title="添加标签"
             type="button"
           >
             +
@@ -133,9 +164,9 @@ export default function NodeTagCluster({
               data-testid={`editor-tag-popover-${nodeId}`}
               role="dialog"
             >
-              <p className="workspace-nodeTagPopoverTitle">添加标签</p>
+              <p className="workspace-nodeTagPopoverTitle">选择标签</p>
               <p className="workspace-nodeTagPopoverHint">
-                选择标签种类，单击后立即附加到当前节点。
+                单击立即附加到当前节点。
               </p>
               <div className="workspace-nodeTagPopoverList">
                 {builtinTags.map((tag, index) => {

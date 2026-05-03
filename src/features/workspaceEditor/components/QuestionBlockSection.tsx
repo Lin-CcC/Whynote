@@ -219,6 +219,7 @@ export default function QuestionBlockSection({
         selectedNodeId={selectedNodeId}
         showSemanticNotes={showSemanticNotes}
         supplementalActions={inlineActions}
+        tagVisibilityMode={workspaceViewState.tagVisibilityMode}
         tree={tree}
       />
     );
@@ -427,6 +428,7 @@ export default function QuestionBlockSection({
           registerNodeElement={registerNodeElement}
           selectedNodeId={selectedNodeId}
           showSemanticNotes={showSemanticNotes}
+          tagVisibilityMode={workspaceViewState.tagVisibilityMode}
           tree={tree}
         />
         {answerGroup.latestEvaluationNode
@@ -531,6 +533,7 @@ export default function QuestionBlockSection({
           registerNodeElement={registerNodeElement}
           selectedNodeId={selectedNodeId}
           showSemanticNotes={showSemanticNotes}
+          tagVisibilityMode={workspaceViewState.tagVisibilityMode}
           tree={tree}
         />
         {summaryGroup.latestCheckNode
@@ -597,6 +600,7 @@ export default function QuestionBlockSection({
         registerNodeElement={registerNodeElement}
         selectedNodeId={selectedNodeId}
         showSemanticNotes={showSemanticNotes}
+        tagVisibilityMode={workspaceViewState.tagVisibilityMode}
         tree={tree}
       />
       {isCollapsed

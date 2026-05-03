@@ -17,6 +17,7 @@ export const DEFAULT_WORKSPACE_VIEW_STATE: WorkspaceViewState = {
   mainViewMode: 'document',
   rightRailMode: 'collapsed',
   structureMapFocusTarget: null,
+  tagVisibilityMode: 'hover',
   toolPanel: 'resources',
 };
 
@@ -74,6 +75,8 @@ export function normalizeWorkspaceViewState(value: unknown): WorkspaceViewState 
     structureMapFocusTarget: normalizeStructureMapFocusTarget(
       source.structureMapFocusTarget,
     ),
+    tagVisibilityMode:
+      source.tagVisibilityMode === 'always' ? 'always' : 'hover',
     toolPanel: normalizeToolPanelId(source.toolPanel),
   };
 }
