@@ -131,6 +131,8 @@ export function useWorkspaceEditor({
   const onSnapshotChangeRef = useRef(onSnapshotChange);
   const pendingSnapshotRef = useRef<WorkspaceSnapshot | null>(null);
   const nodeElementMapRef = useRef(new Map<string, HTMLElement>());
+  const hasInitializedSelectionFocusRef = useRef(false);
+  const lastFocusedSelectionIdRef = useRef<string | null>(null);
 
   const moduleNodes = getModuleNodes(tree);
   const selectedNode =
@@ -204,8 +206,22 @@ export function useWorkspaceEditor({
 
   useEffect(() => {
     if (!selectedNodeId) {
+      lastFocusedSelectionIdRef.current = null;
+      hasInitializedSelectionFocusRef.current = true;
       return;
     }
+
+    if (!hasInitializedSelectionFocusRef.current) {
+      hasInitializedSelectionFocusRef.current = true;
+      lastFocusedSelectionIdRef.current = selectedNodeId;
+      return;
+    }
+
+    if (selectedNodeId === lastFocusedSelectionIdRef.current) {
+      return;
+    }
+
+    lastFocusedSelectionIdRef.current = selectedNodeId;
 
     const nodeElement = nodeElementMapRef.current.get(selectedNodeId);
     const activeElement = document.activeElement;
@@ -215,7 +231,7 @@ export function useWorkspaceEditor({
     }
 
     nodeElement.focus();
-  }, [selectedNodeId, tree]);
+  }, [selectedNodeId]);
 
   useEffect(() => {
     onSelectionChangeRef.current?.({
