@@ -38,7 +38,7 @@ export type DocumentNodeSectionProps = {
   nodeId: string;
   onActivateTagRail: (tagId: string) => void;
   onSelectNode: (nodeId: string) => void;
-  onToggleNodeTag: (tagId: string) => void;
+  onToggleNodeTag: (nodeId: string, tagId: string) => void;
   onToggleBodyCollapsed?: () => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;

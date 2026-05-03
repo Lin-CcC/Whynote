@@ -96,7 +96,12 @@ export interface WorkspaceViewState {
 
 export type WorkspaceMainViewMode = 'document' | 'structure-map';
 export type WorkspaceRailMode = 'collapsed' | 'expanded';
-export type WorkspaceToolPanelId = 'resources' | 'export' | 'ai' | 'settings';
+export type WorkspaceToolPanelId =
+  | 'resources'
+  | 'references'
+  | 'export'
+  | 'ai'
+  | 'settings';
 
 export interface StructureMapFocusTarget {
   kind: 'plan-step' | 'question-cluster';

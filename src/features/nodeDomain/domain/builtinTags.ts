@@ -4,6 +4,31 @@ import type { NodeTree, Tag } from './nodeTypes';
 
 export const BUILTIN_TAG_DEFINITIONS = [
   {
+    color: '#0f766e',
+    id: 'tag-step',
+    name: '步骤',
+  },
+  {
+    color: '#2563eb',
+    id: 'tag-key-point',
+    name: '关键节点',
+  },
+  {
+    color: '#d97706',
+    id: 'tag-definition',
+    name: '定义',
+  },
+  {
+    color: '#db2777',
+    id: 'tag-example',
+    name: '例子',
+  },
+  {
+    color: '#dc2626',
+    id: 'tag-controversy',
+    name: '争议点',
+  },
+  {
     color: '#b45309',
     id: 'tag-important',
     name: '重要',

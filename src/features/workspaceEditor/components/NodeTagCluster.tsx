@@ -21,7 +21,7 @@ type NodeTagClusterProps = {
   isVisible: boolean;
   nodeId: string;
   onActivateTagRail: (tagId: string) => void;
-  onToggleTag: (tagId: string) => void;
+  onToggleTag: (nodeId: string, tagId: string) => void;
   tree: NodeTree;
 };
 
@@ -134,6 +134,9 @@ export default function NodeTagCluster({
               role="dialog"
             >
               <p className="workspace-nodeTagPopoverTitle">添加标签</p>
+              <p className="workspace-nodeTagPopoverHint">
+                选择标签种类，单击后立即附加到当前节点。
+              </p>
               <div className="workspace-nodeTagPopoverList">
                 {builtinTags.map((tag, index) => {
                   const isActive = node.tagIds.includes(tag.id);
@@ -146,7 +149,8 @@ export default function NodeTagCluster({
                       key={tag.id}
                       onClick={(event) => {
                         event.stopPropagation();
-                        onToggleTag(tag.id);
+                        setIsPopoverOpen(false);
+                        onToggleTag(node.id, tag.id);
                       }}
                       style={
                         {

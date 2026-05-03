@@ -28,6 +28,7 @@ import WorkspaceRuntimeAiConfigCard from './components/WorkspaceRuntimeAiConfigC
 import WorkspaceRuntimeJudgmentHintCallout from './components/WorkspaceRuntimeJudgmentHintCallout';
 import {
   WorkspaceRuntimeExportToolPanel,
+  WorkspaceRuntimeReferencesToolPanel,
   WorkspaceRuntimeResourcesToolPanel,
 } from './components/WorkspaceRuntimeResourceToolPanels';
 import WorkspaceRuntimeStatusCard from './components/WorkspaceRuntimeStatusCard';
@@ -345,7 +346,27 @@ export default function WorkspaceRuntimeScreen({
   function renderRightToolPanels(
     context: WorkspaceEditorRenderContext,
   ): WorkspaceEditorToolPanel[] {
+    const selectedNodeReferenceCount =
+      context.selectedNodeId && context.tree.nodes[context.selectedNodeId]
+        ? context.tree.nodes[context.selectedNodeId].referenceIds.length
+        : 0;
+
     return [
+      {
+        content: (
+          <WorkspaceRuntimeReferencesToolPanel
+            onFocusResourceNode={setActiveResourceNodeId}
+            selectedEditorNodeId={context.selectedNodeId}
+            tree={context.tree}
+          />
+        ),
+        countLabel:
+          selectedNodeReferenceCount > 0
+            ? String(selectedNodeReferenceCount)
+            : undefined,
+        id: 'references',
+        label: '引用',
+      },
       {
         content: (
           <WorkspaceRuntimeResourcesToolPanel
