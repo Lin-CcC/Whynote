@@ -17,10 +17,16 @@ import type {
 } from './workspaceEditorTypes';
 import './workspaceEditor.css';
 
+const FALLBACK_WORKSPACE_VIEW_STATE = {
+  ...DEFAULT_WORKSPACE_VIEW_STATE,
+  leftRailMode: 'expanded',
+  rightRailMode: 'expanded',
+} as const;
+
 export default function WorkspaceEditor(props: WorkspaceEditorProps) {
   const workspaceEditor = useWorkspaceEditor(props);
   const workspaceViewState =
-    props.workspaceViewState ?? DEFAULT_WORKSPACE_VIEW_STATE;
+    props.workspaceViewState ?? FALLBACK_WORKSPACE_VIEW_STATE;
   const handleWorkspaceViewStateChange =
     props.onWorkspaceViewStateChange ?? (() => {});
   const previousWorkbenchRailsRef = useRef<{

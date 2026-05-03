@@ -1326,6 +1326,8 @@
   gap: 0.85rem;
   min-height: 4.4rem;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .workspace-structureMapButton[data-draggable='true'] {
@@ -1358,7 +1360,9 @@
 }
 
 .workspace-structureMapTitleButton {
-  cursor: pointer;
+  cursor: inherit;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .workspace-structureMapTitleInput {

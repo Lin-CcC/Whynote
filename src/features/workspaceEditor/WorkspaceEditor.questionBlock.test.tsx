@@ -1780,9 +1780,12 @@ test('drags from the node surface while keeping icon zones out of drag start', a
   fireEvent.dragEnd(answerGroupButton);
 
   fireEvent.pointerDown(titleButton as HTMLButtonElement);
-  const titleDragAttempt = createEvent.dragStart(titleButton as HTMLButtonElement);
-  fireEvent(titleButton as HTMLButtonElement, titleDragAttempt);
-  expect(titleDragAttempt.defaultPrevented).toBe(false);
+  fireEvent.dragStart(answerGroupButton);
+
+  await waitFor(() => {
+    expect(answerGroupButton).toHaveAttribute('data-dragging', 'true');
+  });
+  fireEvent.dragEnd(answerGroupButton);
 
   fireEvent.pointerDown(menuButton);
   const actionDragAttempt = createEvent.dragStart(answerGroupButton);
@@ -2185,6 +2188,45 @@ test('structure-map local controls do not trigger extra scrollIntoView jumps', a
   }
 });
 
+test('clicking a structure-map node does not trigger an extra scrollIntoView jump', async () => {
+  const originalScrollIntoView = Element.prototype.scrollIntoView;
+  const scrollIntoViewSpy = vi.fn();
+
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: scrollIntoViewSpy,
+  });
+
+  renderQuestionBlockEditor({
+    initialSnapshot: createStructureMapClusterSnapshot(),
+    initialSelectedNodeId: 'question-main',
+    initialWorkspaceViewState: createWorkspaceViewState({
+      mainViewMode: 'structure-map',
+    }),
+  });
+
+  const answerGroupItem = await screen.findByTestId(
+    'structure-map-item-answer-group:answer-first',
+  );
+  const initialCallCount = scrollIntoViewSpy.mock.calls.length;
+
+  fireEvent.click(answerGroupItem);
+
+  await waitFor(() => {
+    expect(answerGroupItem).toHaveAttribute('data-selected', 'true');
+  });
+  expect(scrollIntoViewSpy).toHaveBeenCalledTimes(initialCallCount);
+
+  if (originalScrollIntoView) {
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: originalScrollIntoView,
+    });
+  } else {
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  }
+});
+
 test('keeps structure-map node controls quiet by default and reveals icon actions on hover or active state', async () => {
   renderQuestionBlockEditor({
     initialSelectedNodeId: 'question-main',
@@ -2442,7 +2484,7 @@ function renderQuestionBlockEditor(
   },
 ) {
   const {
-    initialWorkspaceViewState = DEFAULT_WORKSPACE_VIEW_STATE,
+    initialWorkspaceViewState = createWorkspaceViewState(),
     onViewStateChange,
     ...workspaceEditorProps
   } = options ?? {};
@@ -2494,6 +2536,8 @@ function createWorkspaceViewState(
 ): WorkspaceViewState {
   return {
     ...DEFAULT_WORKSPACE_VIEW_STATE,
+    leftRailMode: 'expanded',
+    rightRailMode: 'expanded',
     ...overrides,
   };
 }
