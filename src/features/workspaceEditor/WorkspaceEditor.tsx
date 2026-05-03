@@ -100,6 +100,9 @@ export default function WorkspaceEditor(props: WorkspaceEditorProps) {
                 currentModuleId={workspaceEditor.currentModuleId}
                 isInteractionLocked={props.isInteractionLocked ?? false}
                 onCreateModule={workspaceEditor.createModule}
+                onDeleteStructureMapNode={workspaceEditor.deleteNodeById}
+                onInsertStructureMapChildNode={workspaceEditor.insertChildAtNode}
+                onInsertStructureMapSiblingNode={workspaceEditor.insertSiblingAtNode}
                 onMoveStructureMapNode={workspaceEditor.moveStructureMapNode}
                 onOpenDocumentNode={(nodeId) => {
                   updateWorkspaceViewState((state) => ({

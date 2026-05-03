@@ -5,7 +5,6 @@ import {
   type DragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
-  type ReactNode,
 } from 'react';
 
 import {
@@ -29,14 +28,19 @@ import {
   type StructureMapSectionItem,
 } from '../../nodeDomain';
 import type {
+  EditorActionAvailability,
   StructureMapFocusTarget,
   WorkspaceViewState,
 } from '../workspaceEditorTypes';
+import { getActionAvailability } from '../hooks/useWorkspaceEditor';
 
 type StructureMapMainViewProps = {
   currentModuleId: string | null;
   isInteractionLocked: boolean;
   onCreateModule: () => void;
+  onDeleteStructureMapNode: (nodeId: string) => void;
+  onInsertStructureMapChildNode: (nodeId: string) => void;
+  onInsertStructureMapSiblingNode: (nodeId: string) => void;
   onMoveStructureMapNode: (request: StructureMapMoveRequest) => void;
   onOpenDocumentNode: (nodeId: string) => void;
   onRenameStructureMapNode: (nodeId: string, title: string) => void;
@@ -120,9 +124,11 @@ type StructureMapIconAction = {
 };
 
 type StructureMapMenuAction = {
+  disabled?: boolean;
   id: string;
   label: string;
   onClick: () => void;
+  tone?: 'danger' | 'default';
 };
 
 type StructureMapStatusBadge = {
@@ -136,6 +142,7 @@ type StructureMapRenderProps = {
   dragState: DragState | null;
   isInteractionLocked: boolean;
   onCancelTitleEditing: () => void;
+  onDeleteStructureMapNode: (nodeId: string) => void;
   onDragEnd: () => void;
   onInvalidDrop: (feedback: DropFeedback) => void;
   onDragStart: (nodeId: string) => void;
@@ -144,6 +151,8 @@ type StructureMapRenderProps = {
     siblingNodeIds: string[],
   ) => void;
   onDropZoneEnter: (dropZoneId: string | null) => void;
+  onInsertStructureMapChildNode: (nodeId: string) => void;
+  onInsertStructureMapSiblingNode: (nodeId: string) => void;
   onOpenDocumentNode: (nodeId: string) => void;
   onSelectStructureMapNode: (nodeId: string) => void;
   onStartTitleEditing: (nodeId: string, itemId: string, title: string) => void;
@@ -168,6 +177,9 @@ export default function StructureMapMainView({
   currentModuleId,
   isInteractionLocked,
   onCreateModule,
+  onDeleteStructureMapNode,
+  onInsertStructureMapChildNode,
+  onInsertStructureMapSiblingNode,
   onMoveStructureMapNode,
   onOpenDocumentNode,
   onRenameStructureMapNode,
@@ -600,11 +612,14 @@ export default function StructureMapMainView({
                 dragState={dragState}
                 isInteractionLocked={isInteractionLocked}
                 onCancelTitleEditing={handleCancelTitleEditing}
+                onDeleteStructureMapNode={onDeleteStructureMapNode}
                 onDragEnd={handleDragEnd}
                 onInvalidDrop={handleInvalidDrop}
                 onDragStart={handleDragStart}
                 onDropRequest={handleDropRequest}
                 onDropZoneEnter={setActiveDropZoneId}
+                onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+                onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
                 onOpenDocumentNode={onOpenDocumentNode}
                 onSelectStructureMapNode={onSelectStructureMapNode}
                 onStartTitleEditing={handleStartTitleEditing}
@@ -655,11 +670,14 @@ function SectionNode({
   dragState,
   isInteractionLocked,
   onCancelTitleEditing,
+  onDeleteStructureMapNode,
   onDragEnd,
   onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
+  onInsertStructureMapChildNode,
+  onInsertStructureMapSiblingNode,
   onOpenDocumentNode,
   onSelectStructureMapNode,
   onStartTitleEditing,
@@ -689,10 +707,12 @@ function SectionNode({
     structureMapFocusTarget?.kind === 'plan-step' &&
     structureMapFocusTarget.nodeId === section.planStep.id;
   const itemId = getStructureMapSelectionId(section.anchor);
+  const nodeActionAvailability = getActionAvailability(tree, section.planStep.id);
 
   return (
     <div className="workspace-structureMapPanelBody">
       <StructureMapNodeCard
+        actionAvailability={nodeActionAvailability}
         anchor={section.anchor}
         dragNodeId={section.planStep.id}
         dragPermission={section.drag}
@@ -720,8 +740,12 @@ function SectionNode({
         }}
         kindLabel="步骤"
         onCancelTitleEditing={onCancelTitleEditing}
+        onDeleteStructureMapNode={onDeleteStructureMapNode}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
+        onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+        onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
+        onOpenDocumentNode={onOpenDocumentNode}
         onSelectStructureMapNode={onSelectStructureMapNode}
         onStartTitleEditing={onStartTitleEditing}
         onSubmitTitleEditing={onSubmitTitleEditing}
@@ -776,11 +800,14 @@ function SectionNode({
                 isInteractionLocked={isInteractionLocked}
                 item={item}
                 onCancelTitleEditing={onCancelTitleEditing}
+                onDeleteStructureMapNode={onDeleteStructureMapNode}
                 onDragEnd={onDragEnd}
                 onInvalidDrop={onInvalidDrop}
                 onDragStart={onDragStart}
                 onDropRequest={onDropRequest}
                 onDropZoneEnter={onDropZoneEnter}
+                onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+                onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
                 onOpenDocumentNode={onOpenDocumentNode}
                 onSelectStructureMapNode={onSelectStructureMapNode}
                 onStartTitleEditing={onStartTitleEditing}
@@ -832,6 +859,10 @@ function SectionItemNode(
 ) {
   if (props.item.kind === 'scaffold-summary') {
     const itemId = getStructureMapSelectionId(props.item.node.anchor);
+    const nodeActionAvailability = getActionAvailability(
+      props.tree,
+      props.item.node.node.id,
+    );
 
     return (
       <div
@@ -840,20 +871,25 @@ function SectionItemNode(
         data-testid={`structure-map-scaffold-${props.item.node.node.id}`}
       >
         <StructureMapNodeCard
+          actionAvailability={nodeActionAvailability}
           anchor={props.item.node.anchor}
           dragNodeId={props.item.node.node.id}
           dragPermission={props.item.node.drag}
-        dragState={props.dragState}
-        isCurrentAnswer={false}
-        isEditingTitle={props.titleEditingState?.itemId === itemId}
-        isInteractionLocked={props.isInteractionLocked}
-        kindLabel="铺垫"
-        onCancelTitleEditing={props.onCancelTitleEditing}
-        onDragEnd={props.onDragEnd}
-        onDragStart={props.onDragStart}
-        onSelectStructureMapNode={props.onSelectStructureMapNode}
-        onStartTitleEditing={props.onStartTitleEditing}
-        onSubmitTitleEditing={props.onSubmitTitleEditing}
+          dragState={props.dragState}
+          isCurrentAnswer={false}
+          isEditingTitle={props.titleEditingState?.itemId === itemId}
+          isInteractionLocked={props.isInteractionLocked}
+          kindLabel="铺垫"
+          onCancelTitleEditing={props.onCancelTitleEditing}
+          onDeleteStructureMapNode={props.onDeleteStructureMapNode}
+          onDragEnd={props.onDragEnd}
+          onDragStart={props.onDragStart}
+          onInsertStructureMapChildNode={props.onInsertStructureMapChildNode}
+          onInsertStructureMapSiblingNode={props.onInsertStructureMapSiblingNode}
+          onOpenDocumentNode={props.onOpenDocumentNode}
+          onSelectStructureMapNode={props.onSelectStructureMapNode}
+          onStartTitleEditing={props.onStartTitleEditing}
+          onSubmitTitleEditing={props.onSubmitTitleEditing}
           onTitleEditingDraftChange={props.onTitleEditingDraftChange}
           selectedItemId={props.selectedItemId}
           structureRole="scaffold-summary"
@@ -878,11 +914,14 @@ function QuestionBlockNode({
   isInteractionLocked,
   node,
   onCancelTitleEditing,
+  onDeleteStructureMapNode,
   onDragEnd,
   onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
+  onInsertStructureMapChildNode,
+  onInsertStructureMapSiblingNode,
   onOpenDocumentNode,
   onSelectStructureMapNode,
   onStartTitleEditing,
@@ -931,6 +970,7 @@ function QuestionBlockNode({
     structureMapFocusTarget.nodeId === node.question.id;
   const itemId = getStructureMapSelectionId(node.anchor);
   const collapseTooltip = isCollapsed ? '展开问题簇' : '收起问题簇';
+  const nodeActionAvailability = getActionAvailability(tree, node.question.id);
 
   return (
     <div
@@ -958,6 +998,7 @@ function QuestionBlockNode({
               data-structure-node="question-hub"
             >
               <StructureMapNodeCard
+                actionAvailability={nodeActionAvailability}
                 anchor={node.anchor}
                 dragNodeId={node.question.id}
                 dragPermission={node.drag}
@@ -992,6 +1033,10 @@ function QuestionBlockNode({
                 kindLabel="问题"
                 onDragEnd={onDragEnd}
                 onDragStart={onDragStart}
+                onDeleteStructureMapNode={onDeleteStructureMapNode}
+                onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+                onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
+                onOpenDocumentNode={onOpenDocumentNode}
                 onSelectStructureMapNode={onSelectStructureMapNode}
                 onStartTitleEditing={onStartTitleEditing}
                 onSubmitTitleEditing={onSubmitTitleEditing}
@@ -1038,11 +1083,14 @@ function QuestionBlockNode({
                   isInteractionLocked={isInteractionLocked}
                   node={node}
                   onCancelTitleEditing={onCancelTitleEditing}
+                  onDeleteStructureMapNode={onDeleteStructureMapNode}
                   onDragEnd={onDragEnd}
                   onInvalidDrop={onInvalidDrop}
                   onDragStart={onDragStart}
                   onDropRequest={onDropRequest}
                   onDropZoneEnter={onDropZoneEnter}
+                  onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+                  onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
                   onOpenDocumentNode={onOpenDocumentNode}
                   onSelectStructureMapNode={onSelectStructureMapNode}
                   onStartTitleEditing={onStartTitleEditing}
@@ -1077,11 +1125,14 @@ function QuestionBlockNode({
                 isInteractionLocked={isInteractionLocked}
                 node={node}
                 onCancelTitleEditing={onCancelTitleEditing}
+                onDeleteStructureMapNode={onDeleteStructureMapNode}
                 onDragEnd={onDragEnd}
                 onInvalidDrop={onInvalidDrop}
                 onDragStart={onDragStart}
                 onDropRequest={onDropRequest}
                 onDropZoneEnter={onDropZoneEnter}
+                onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+                onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
                 onOpenDocumentNode={onOpenDocumentNode}
                 onSelectStructureMapNode={onSelectStructureMapNode}
                 onStartTitleEditing={onStartTitleEditing}
@@ -1121,11 +1172,14 @@ function QuestionEntryGroup({
   isInteractionLocked,
   node,
   onCancelTitleEditing,
+  onDeleteStructureMapNode,
   onDragEnd,
   onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
+  onInsertStructureMapChildNode,
+  onInsertStructureMapSiblingNode,
   onOpenDocumentNode,
   onSelectStructureMapNode,
   onStartTitleEditing,
@@ -1246,11 +1300,14 @@ function QuestionEntryGroup({
               entry={entry}
               isInteractionLocked={isInteractionLocked}
               onCancelTitleEditing={onCancelTitleEditing}
+              onDeleteStructureMapNode={onDeleteStructureMapNode}
               onDragEnd={onDragEnd}
               onInvalidDrop={onInvalidDrop}
               onDragStart={onDragStart}
               onDropRequest={onDropRequest}
               onDropZoneEnter={onDropZoneEnter}
+              onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+              onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
               onOpenDocumentNode={onOpenDocumentNode}
               onSelectStructureMapNode={onSelectStructureMapNode}
               onStartTitleEditing={onStartTitleEditing}
@@ -1323,11 +1380,14 @@ function QuestionEntryNode({
   entry,
   isInteractionLocked,
   onCancelTitleEditing,
+  onDeleteStructureMapNode,
   onDragEnd,
   onInvalidDrop,
   onDragStart,
   onDropRequest,
   onDropZoneEnter,
+  onInsertStructureMapChildNode,
+  onInsertStructureMapSiblingNode,
   onOpenDocumentNode,
   onSelectStructureMapNode,
   onStartTitleEditing,
@@ -1349,8 +1409,11 @@ function QuestionEntryNode({
   entry: StructureMapQuestionEntry;
 }) {
   if (entry.kind === 'answer-group') {
+    const nodeActionAvailability = getActionAvailability(tree, entry.group.node.id);
+
     return (
       <SupportingGroupNode
+        actionAvailability={nodeActionAvailability}
         anchor={entry.group.anchor}
         dragNodeId={entry.group.node.id}
         dragPermission={entry.group.drag}
@@ -1360,8 +1423,12 @@ function QuestionEntryNode({
         kindLabel="回答"
         metaBadges={getAnswerGroupMetaBadges(entry.group)}
         onCancelTitleEditing={onCancelTitleEditing}
+        onDeleteStructureMapNode={onDeleteStructureMapNode}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
+        onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+        onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
+        onOpenDocumentNode={onOpenDocumentNode}
         onSelectStructureMapNode={onSelectStructureMapNode}
         onStartTitleEditing={onStartTitleEditing}
         onSubmitTitleEditing={onSubmitTitleEditing}
@@ -1375,8 +1442,11 @@ function QuestionEntryNode({
   }
 
   if (entry.kind === 'manual-summary-group') {
+    const nodeActionAvailability = getActionAvailability(tree, entry.group.node.id);
+
     return (
       <SupportingGroupNode
+        actionAvailability={nodeActionAvailability}
         anchor={entry.group.anchor}
         dragNodeId={entry.group.node.id}
         dragPermission={entry.group.drag}
@@ -1386,8 +1456,12 @@ function QuestionEntryNode({
         kindLabel="手写总结"
         metaBadges={getManualSummaryGroupMetaBadges(entry.group)}
         onCancelTitleEditing={onCancelTitleEditing}
+        onDeleteStructureMapNode={onDeleteStructureMapNode}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
+        onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+        onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
+        onOpenDocumentNode={onOpenDocumentNode}
         onSelectStructureMapNode={onSelectStructureMapNode}
         onStartTitleEditing={onStartTitleEditing}
         onSubmitTitleEditing={onSubmitTitleEditing}
@@ -1408,11 +1482,14 @@ function QuestionEntryNode({
       isInteractionLocked={isInteractionLocked}
       node={entry.node}
       onCancelTitleEditing={onCancelTitleEditing}
+      onDeleteStructureMapNode={onDeleteStructureMapNode}
       onDragEnd={onDragEnd}
       onInvalidDrop={onInvalidDrop}
       onDragStart={onDragStart}
       onDropRequest={onDropRequest}
       onDropZoneEnter={onDropZoneEnter}
+      onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+      onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
       onOpenDocumentNode={onOpenDocumentNode}
       onSelectStructureMapNode={onSelectStructureMapNode}
       onStartTitleEditing={onStartTitleEditing}
@@ -1434,6 +1511,7 @@ function QuestionEntryNode({
 }
 
 function SupportingGroupNode({
+  actionAvailability,
   anchor,
   dragNodeId,
   dragPermission,
@@ -1443,8 +1521,12 @@ function SupportingGroupNode({
   kindLabel,
   metaBadges,
   onCancelTitleEditing,
+  onDeleteStructureMapNode,
   onDragEnd,
   onDragStart,
+  onInsertStructureMapChildNode,
+  onInsertStructureMapSiblingNode,
+  onOpenDocumentNode,
   onSelectStructureMapNode,
   onStartTitleEditing,
   onSubmitTitleEditing,
@@ -1454,6 +1536,7 @@ function SupportingGroupNode({
   titleEditingState,
   title,
 }: {
+  actionAvailability: EditorActionAvailability;
   anchor: StructureMapAnchor;
   dragNodeId: string;
   dragPermission: StructureMapQuestionBlockNode['drag'];
@@ -1463,8 +1546,12 @@ function SupportingGroupNode({
   kindLabel: string;
   metaBadges: string[];
   onCancelTitleEditing: () => void;
+  onDeleteStructureMapNode: (nodeId: string) => void;
   onDragEnd: () => void;
   onDragStart: (nodeId: string) => void;
+  onInsertStructureMapChildNode: (nodeId: string) => void;
+  onInsertStructureMapSiblingNode: (nodeId: string) => void;
+  onOpenDocumentNode: (nodeId: string) => void;
   onSelectStructureMapNode: (nodeId: string) => void;
   onStartTitleEditing: (nodeId: string, itemId: string, title: string) => void;
   onSubmitTitleEditing: () => void;
@@ -1484,6 +1571,7 @@ function SupportingGroupNode({
       data-testid={`structure-map-supporting-${anchor.nodeId}`}
     >
       <StructureMapNodeCard
+        actionAvailability={actionAvailability}
         anchor={anchor}
         dragNodeId={dragNodeId}
         dragPermission={dragPermission}
@@ -1493,8 +1581,12 @@ function SupportingGroupNode({
         isInteractionLocked={isInteractionLocked}
         kindLabel={kindLabel}
         onCancelTitleEditing={onCancelTitleEditing}
+        onDeleteStructureMapNode={onDeleteStructureMapNode}
         onDragEnd={onDragEnd}
         onDragStart={onDragStart}
+        onInsertStructureMapChildNode={onInsertStructureMapChildNode}
+        onInsertStructureMapSiblingNode={onInsertStructureMapSiblingNode}
+        onOpenDocumentNode={onOpenDocumentNode}
         onSelectStructureMapNode={onSelectStructureMapNode}
         onStartTitleEditing={onStartTitleEditing}
         onSubmitTitleEditing={onSubmitTitleEditing}
@@ -1519,90 +1611,8 @@ function SupportingGroupNode({
   );
 }
 
-function StructureMapButton({
-  anchor,
-  dragNodeId,
-  dragPermission,
-  dragState,
-  isCurrentAnswer,
-  isInteractionLocked,
-  kindLabel,
-  onDragEnd,
-  onDragStart,
-  onOpenDocumentNode,
-  isSelectedOverride = false,
-  selectedItemId,
-  structureRole,
-  title,
-}: {
-  anchor: StructureMapAnchor;
-  dragNodeId: string;
-  dragPermission: StructureMapPresentationModel['drag'];
-  dragState: DragState | null;
-  isCurrentAnswer: boolean;
-  isInteractionLocked: boolean;
-  kindLabel: string;
-  onDragEnd: () => void;
-  onDragStart: (nodeId: string) => void;
-  onOpenDocumentNode: (nodeId: string) => void;
-  isSelectedOverride?: boolean;
-  selectedItemId: string | null;
-  structureRole: StructureRole;
-  title: string;
-}) {
-  const itemId = getStructureMapSelectionId(anchor);
-  const isDragging = dragState?.nodeId === dragNodeId;
-  const isSelected = isSelectedOverride || selectedItemId === itemId;
-
-  return (
-    <button
-      aria-current={isSelected ? 'true' : undefined}
-      className="workspace-structureMapButton"
-      data-draggable={dragPermission.canDrag}
-      data-dragging={isDragging}
-      data-kind={itemId.split(':')[0]}
-      data-selected={isSelected}
-      data-structure-role={structureRole}
-      data-testid={`structure-map-item-${itemId}`}
-      disabled={isInteractionLocked}
-      draggable={!isInteractionLocked && dragPermission.canDrag}
-      onClick={() => onOpenDocumentNode(anchor.nodeId)}
-      onDragEnd={onDragEnd}
-      onDragStart={(event) => {
-        if (!dragPermission.canDrag) {
-          event.preventDefault();
-          return;
-        }
-
-        if (event.dataTransfer) {
-          event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData('text/plain', dragNodeId);
-        }
-        onDragStart(dragNodeId);
-      }}
-      type="button"
-    >
-      <span className="workspace-structureMapLabel">{kindLabel}</span>
-      <span className="workspace-structureMapText">{title}</span>
-      {dragPermission.canDrag ? (
-        <span
-          aria-hidden="true"
-          className="workspace-structureMapDragHint"
-          data-drag-hint={isDragging ? 'dragging' : 'ready'}
-        >
-          {isDragging ? '拖动中' : '可拖动'}
-        </span>
-      ) : null}
-      {isCurrentAnswer ? (
-        <span className="workspace-structureMapBadge">当前回答</span>
-      ) : null}
-    </button>
-  );
-}
-
-void StructureMapButton;
-
 function StructureMapNodeCard({
+  actionAvailability,
   anchor,
   collapseAction,
   dragNodeId,
@@ -1617,8 +1627,12 @@ function StructureMapNodeCard({
   kindLabel,
   menuActions = [],
   onCancelTitleEditing,
+  onDeleteStructureMapNode,
   onDragEnd,
   onDragStart,
+  onInsertStructureMapChildNode,
+  onInsertStructureMapSiblingNode,
+  onOpenDocumentNode,
   onSelectStructureMapNode,
   onStartTitleEditing,
   onSubmitTitleEditing,
@@ -1630,6 +1644,7 @@ function StructureMapNodeCard({
   title,
   titleEditingDraft,
 }: {
+  actionAvailability: EditorActionAvailability;
   anchor: StructureMapAnchor;
   collapseAction?: StructureMapIconAction;
   dragNodeId: string;
@@ -1644,8 +1659,12 @@ function StructureMapNodeCard({
   kindLabel: string;
   menuActions?: StructureMapMenuAction[];
   onCancelTitleEditing: () => void;
+  onDeleteStructureMapNode: (nodeId: string) => void;
   onDragEnd: () => void;
   onDragStart: (nodeId: string) => void;
+  onInsertStructureMapChildNode: (nodeId: string) => void;
+  onInsertStructureMapSiblingNode: (nodeId: string) => void;
+  onOpenDocumentNode: (nodeId: string) => void;
   onSelectStructureMapNode: (nodeId: string) => void;
   onStartTitleEditing: (nodeId: string, itemId: string, title: string) => void;
   onSubmitTitleEditing: () => void;
@@ -1681,6 +1700,34 @@ function StructureMapNodeCard({
           label: '编辑标题',
           onClick: () => onStartTitleEditing(dragNodeId, itemId, title),
         },
+        ...(actionAvailability.canInsertChild
+          ? [
+              {
+                id: 'insert-child',
+                label: '添加子节点',
+                onClick: () => onInsertStructureMapChildNode(anchor.nodeId),
+              },
+            ]
+          : []),
+        ...(actionAvailability.canInsertSibling
+          ? [
+              {
+                id: 'insert-sibling',
+                label: '添加同级节点',
+                onClick: () => onInsertStructureMapSiblingNode(anchor.nodeId),
+              },
+            ]
+          : []),
+        ...(actionAvailability.canDelete
+          ? [
+              {
+                id: 'delete-node',
+                label: '删除节点',
+                onClick: () => onDeleteStructureMapNode(anchor.nodeId),
+                tone: 'danger' as const,
+              },
+            ]
+          : []),
         ...menuActions,
       ];
 
@@ -1748,6 +1795,30 @@ function StructureMapNodeCard({
       !isDragExcludedTarget(event.target);
   }
 
+  function handleSurfaceDragStart(event: DragEvent<HTMLElement>) {
+    if (!dragPermission.canDrag || !dragStartAllowedRef.current) {
+      event.preventDefault();
+      return;
+    }
+
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', dragNodeId);
+      const transparentDragPreview = getTransparentDragPreviewImage();
+
+      if (transparentDragPreview) {
+        event.dataTransfer.setDragImage(transparentDragPreview, 0, 0);
+      }
+    }
+
+    onDragStart(dragNodeId);
+  }
+
+  function handleSurfaceDragEnd() {
+    dragStartAllowedRef.current = false;
+    onDragEnd();
+  }
+
   return (
     <div
       aria-current={isSelected ? 'true' : undefined}
@@ -1778,28 +1849,8 @@ function StructureMapNodeCard({
 
         onSelectStructureMapNode(anchor.nodeId);
       }}
-      onDragEnd={() => {
-        dragStartAllowedRef.current = false;
-        onDragEnd();
-      }}
-      onDragStart={(event) => {
-        if (!dragPermission.canDrag || !dragStartAllowedRef.current) {
-          event.preventDefault();
-          return;
-        }
-
-        if (event.dataTransfer) {
-          event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData('text/plain', dragNodeId);
-          const transparentDragPreview = getTransparentDragPreviewImage();
-
-          if (transparentDragPreview) {
-            event.dataTransfer.setDragImage(transparentDragPreview, 0, 0);
-          }
-        }
-
-        onDragStart(dragNodeId);
-      }}
+      onDragEnd={handleSurfaceDragEnd}
+      onDragStart={handleSurfaceDragStart}
       onFocusCapture={() => setIsFocusWithin(true)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -1831,15 +1882,20 @@ function StructureMapNodeCard({
         ) : (
           <button
             className="workspace-structureMapTitleButton"
-            data-structure-node-drag-excluded="true"
             data-structure-node-editable="title"
             data-structure-node-title-zone="true"
             disabled={isInteractionLocked}
-            draggable={false}
-            onClick={() => onSelectStructureMapNode(anchor.nodeId)}
-            onDoubleClick={() =>
-              onStartTitleEditing(dragNodeId, itemId, title)
-            }
+            draggable={!isInteractionLocked && dragPermission.canDrag}
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectStructureMapNode(anchor.nodeId);
+            }}
+            onDoubleClick={(event) => {
+              event.stopPropagation();
+              onStartTitleEditing(dragNodeId, itemId, title);
+            }}
+            onDragEnd={handleSurfaceDragEnd}
+            onDragStart={handleSurfaceDragStart}
             type="button"
           >
             <span className="workspace-structureMapText">{title}</span>
@@ -1864,6 +1920,24 @@ function StructureMapNodeCard({
         data-structure-node-action-visibility={actionVisibility}
         data-structure-step-actions={hasInlineStepActions ? 'inline' : undefined}
       >
+        {!isEditingTitle ? (
+          <button
+            aria-label="在文档中查看"
+            className="workspace-structureMapNodeIconButton"
+            data-structure-node-action-style="icon"
+            data-testid={`structure-map-open-document-${itemId}`}
+            disabled={isInteractionLocked}
+            draggable={false}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenDocumentNode(anchor.nodeId);
+            }}
+            title="在文档中查看"
+            type="button"
+          >
+            <StructureMapActionIcon icon="document" />
+          </button>
+        ) : null}
         {!isEditingTitle && focusAction ? (
           <button
             aria-label={focusAction.label}
@@ -1920,6 +1994,8 @@ function StructureMapNodeCard({
                     {resolvedMenuActions.map((action) => (
                       <button
                         className="workspace-nodeActionPopoverButton"
+                        data-tone={action.tone ?? 'default'}
+                        disabled={action.disabled === true}
                         key={action.id}
                         onClick={(event) => {
                           event.stopPropagation();
@@ -2124,173 +2200,6 @@ function StructureMapActionIcon({
       );
   }
 }
-
-function StructureMapNodeCardLegacy({
-  actionButtons,
-  anchor,
-  dragNodeId,
-  dragPermission,
-  dragState,
-  hasInlineClusterActions = false,
-  hasInlineStepActions = false,
-  isCurrentAnswer,
-  isEditingTitle,
-  isInteractionLocked,
-  kindLabel,
-  onCancelTitleEditing,
-  onDragEnd,
-  onDragStart,
-  onOpenDocumentNode,
-  onSelectStructureMapNode,
-  onStartTitleEditing,
-  onSubmitTitleEditing,
-  onTitleEditingDraftChange,
-  isSelectedOverride = false,
-  selectedItemId,
-  structureRole,
-  title,
-  titleEditingDraft,
-}: {
-  actionButtons?: ReactNode;
-  anchor: StructureMapAnchor;
-  dragNodeId: string;
-  dragPermission: StructureMapPresentationModel['drag'];
-  dragState: DragState | null;
-  hasInlineClusterActions?: boolean;
-  hasInlineStepActions?: boolean;
-  isCurrentAnswer: boolean;
-  isEditingTitle: boolean;
-  isInteractionLocked: boolean;
-  kindLabel: string;
-  onCancelTitleEditing: () => void;
-  onDragEnd: () => void;
-  onDragStart: (nodeId: string) => void;
-  onOpenDocumentNode: (nodeId: string) => void;
-  onSelectStructureMapNode: (nodeId: string) => void;
-  onStartTitleEditing: (nodeId: string, itemId: string, title: string) => void;
-  onSubmitTitleEditing: () => void;
-  onTitleEditingDraftChange: (draft: string) => void;
-  isSelectedOverride?: boolean;
-  selectedItemId: string | null;
-  structureRole: StructureRole;
-  title: string;
-  titleEditingDraft: string | null;
-}) {
-  const itemId = getStructureMapSelectionId(anchor);
-  const isDragging = dragState?.nodeId === dragNodeId;
-  const isSelected = isSelectedOverride || selectedItemId === itemId;
-
-  function handleTitleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      onSubmitTitleEditing();
-      return;
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      onCancelTitleEditing();
-    }
-  }
-
-  return (
-    <div
-      aria-current={isSelected ? 'true' : undefined}
-      className="workspace-structureMapButton"
-      data-draggable={dragPermission.canDrag}
-      data-dragging={isDragging}
-      data-kind={itemId.split(':')[0]}
-      data-selected={isSelected}
-      data-structure-node-editable="title"
-      data-structure-node-editing={isEditingTitle}
-      data-structure-role={structureRole}
-      data-testid={`structure-map-item-${itemId}`}
-    >
-      <div className="workspace-structureMapButtonMain">
-        <span className="workspace-structureMapLabel">{kindLabel}</span>
-        {isEditingTitle ? (
-          <input
-            aria-label={`${title || kindLabel} 标题`}
-            autoFocus
-            className="workspace-structureMapTitleInput"
-            data-structure-node-editable="title"
-            onBlur={onSubmitTitleEditing}
-            onChange={(event) => onTitleEditingDraftChange(event.target.value)}
-            onKeyDown={handleTitleKeyDown}
-            type="text"
-            value={titleEditingDraft ?? title}
-          />
-        ) : (
-          <button
-            className="workspace-structureMapTitleButton"
-            data-structure-node-editable="title"
-            disabled={isInteractionLocked}
-            onClick={() => onSelectStructureMapNode(anchor.nodeId)}
-            onDoubleClick={() =>
-              onStartTitleEditing(dragNodeId, itemId, title)
-            }
-            type="button"
-          >
-            <span className="workspace-structureMapText">{title}</span>
-          </button>
-        )}
-        {isCurrentAnswer ? (
-          <span className="workspace-structureMapBadge">当前回答</span>
-        ) : null}
-      </div>
-      <div
-        className="workspace-structureMapNodeActions"
-        data-structure-cluster-actions={hasInlineClusterActions ? 'inline' : undefined}
-        data-structure-step-actions={hasInlineStepActions ? 'inline' : undefined}
-      >
-        <button
-          className="workspace-structureMapNodeActionButton"
-          disabled={isInteractionLocked}
-          onClick={() => onOpenDocumentNode(anchor.nodeId)}
-          type="button"
-        >
-          文档
-        </button>
-        {actionButtons}
-        {dragPermission.canDrag ? (
-          <button
-            aria-label={`拖动${kindLabel}`}
-            className="workspace-structureMapDragHandle"
-            data-drag-hint={isDragging ? 'dragging' : 'ready'}
-            data-structure-drag-handle="true"
-            data-testid={`structure-map-drag-handle-${itemId}`}
-            disabled={isInteractionLocked}
-            draggable={!isInteractionLocked}
-            onDragEnd={onDragEnd}
-            onDragStart={(event) => {
-              if (!dragPermission.canDrag) {
-                event.preventDefault();
-                return;
-              }
-
-              if (event.dataTransfer) {
-                event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/plain', dragNodeId);
-                const transparentDragPreview = getTransparentDragPreviewImage();
-
-                if (transparentDragPreview) {
-                  event.dataTransfer.setDragImage(transparentDragPreview, 0, 0);
-                }
-              }
-
-              onDragStart(dragNodeId);
-            }}
-            type="button"
-          >
-            {isDragging ? '拖动中' : '拖动'}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-void StructureMapNodeCardLegacy;
 
 function getTransparentDragPreviewImage() {
   if (typeof Image === 'undefined') {

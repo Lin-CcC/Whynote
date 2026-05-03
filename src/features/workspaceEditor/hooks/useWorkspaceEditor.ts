@@ -469,6 +469,45 @@ export function useWorkspaceEditor({
     );
   }
 
+  function insertChildAtNode(nodeId: string) {
+    if (isInteractionLocked || !tree.nodes[nodeId]) {
+      return;
+    }
+
+    const parentNode = getNodeOrThrow(tree, nodeId);
+    const nextNodeType =
+      selectedChildInsertType ??
+      getPreferredChildInsertType(tree, nodeId) ??
+      getDefaultChildType(parentNode.type);
+
+    if (!nextNodeType) {
+      return;
+    }
+
+    const nextNode = createEditorNode(nextNodeType, parentNode.id, {
+      judgmentKind: nextNodeType === 'judgment' ? 'manual' : undefined,
+      summaryKind:
+        nextNodeType === 'summary'
+          ? parentNode.type === 'plan-step'
+            ? 'scaffold'
+            : 'manual'
+          : undefined,
+    });
+
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.insertChildNode(tree, parentNode.id, nextNode);
+
+        return {
+          nextTree,
+          nextSelectedNodeId: nextNode.id,
+          preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
+        };
+      },
+      '结构操作失败，请检查当前节点。',
+    );
+  }
+
   function insertSiblingAtSelection() {
     if (isInteractionLocked) {
       return;
@@ -491,6 +530,50 @@ export function useWorkspaceEditor({
     const nextNodeType =
       selectedSiblingInsertType ??
       getPreferredSiblingInsertType(tree, selectedNodeId) ??
+      selectedTreeNode.type;
+    const siblingParentNode = getNodeOrThrow(tree, selectedTreeNode.parentId);
+    const nextNode = createEditorNode(nextNodeType, selectedTreeNode.parentId, {
+      judgmentKind: nextNodeType === 'judgment' ? 'manual' : undefined,
+      summaryKind:
+        nextNodeType === 'summary'
+          ? siblingParentNode.type === 'plan-step'
+            ? 'scaffold'
+            : 'manual'
+          : undefined,
+    });
+
+    runStructuralOperation(
+      () => {
+        const nextTree = operations.insertSiblingNode(
+          tree,
+          selectedTreeNode.id,
+          nextNode,
+        );
+
+        return {
+          nextTree,
+          nextSelectedNodeId: nextNode.id,
+          preferredModuleId: resolveModuleId(nextTree, nextNode.id, currentModuleId),
+        };
+      },
+      '结构操作失败，请检查当前节点。',
+    );
+  }
+
+  function insertSiblingAtNode(nodeId: string) {
+    if (isInteractionLocked || !tree.nodes[nodeId]) {
+      return;
+    }
+
+    const selectedTreeNode = getNodeOrThrow(tree, nodeId);
+
+    if (selectedTreeNode.type === 'theme-root' || selectedTreeNode.parentId === null) {
+      return;
+    }
+
+    const nextNodeType =
+      selectedSiblingInsertType ??
+      getPreferredSiblingInsertType(tree, nodeId) ??
       selectedTreeNode.type;
     const siblingParentNode = getNodeOrThrow(tree, selectedTreeNode.parentId);
     const nextNode = createEditorNode(nextNodeType, selectedTreeNode.parentId, {
@@ -945,7 +1028,9 @@ export function useWorkspaceEditor({
     setCurrentAnswer,
     workspaceTitle: initialSnapshot.workspace.title,
     insertChildAtSelection,
+    insertChildAtNode,
     insertSiblingAtSelection,
+    insertSiblingAtNode,
     runLearningAction,
     deleteSelection,
     liftSelection,
