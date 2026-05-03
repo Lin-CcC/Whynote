@@ -374,6 +374,67 @@ test('persists the main view mode in workspace local view state across remounts'
   });
 });
 
+test('persists workbench rail state and global tool selection across remounts', async () => {
+  const dependencies = await createPreloadedDependencies(
+    createRuntimeQuestionBlockSnapshot(),
+  );
+  const firstRender = render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+
+  await screen.findByTestId('workspace-document-shell');
+
+  const workbench = screen.getByText('WhyNote').closest('[data-workspace-left-rail]');
+  const toolTrack = workbench?.querySelector('.workspace-rightRailTrack');
+
+  expect(workbench).not.toBeNull();
+  expect(toolTrack).not.toBeNull();
+  expect(within(toolTrack as HTMLElement).getByRole('button', { name: /资料/ })).toBeInTheDocument();
+  expect(within(toolTrack as HTMLElement).getByRole('button', { name: /导出/ })).toBeInTheDocument();
+  expect(within(toolTrack as HTMLElement).getByRole('button', { name: /AI 配置/ })).toBeInTheDocument();
+  expect(within(toolTrack as HTMLElement).getByRole('button', { name: /设置/ })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: /收起模块栏/ }));
+  fireEvent.click(
+    within(toolTrack as HTMLElement).getByRole('button', { name: /AI 配置/ }),
+  );
+
+  await waitFor(() => {
+    expect(workbench).toHaveAttribute('data-workspace-left-rail', 'collapsed');
+    expect(workbench).toHaveAttribute('data-workspace-right-rail', 'expanded');
+    expect(workbench).toHaveAttribute('data-workspace-tool-panel', 'ai');
+  });
+
+  expect(
+    workbench?.querySelector('.workspace-rightRailDrawer [data-editor-tag-entry="inline-add"]'),
+  ).toBeNull();
+  expect(
+    (
+      dependencies.localPreferenceStorage.loadUiPreferences()?.values
+        .workspaceViews as Record<string, unknown>
+    )?.['workspace-runtime-question-block'],
+  ).toEqual(
+    expect.objectContaining({
+      leftRailMode: 'collapsed',
+      rightRailMode: 'expanded',
+      toolPanel: 'ai',
+    }),
+  );
+
+  firstRender.unmount();
+
+  render(<WorkspaceRuntimeScreen dependencies={dependencies} />);
+  await screen.findByTestId('workspace-document-shell');
+
+  const remountedWorkbench = screen
+    .getByText('WhyNote')
+    .closest('[data-workspace-left-rail]');
+
+  await waitFor(() => {
+    expect(remountedWorkbench).toHaveAttribute('data-workspace-left-rail', 'collapsed');
+    expect(remountedWorkbench).toHaveAttribute('data-workspace-right-rail', 'expanded');
+    expect(remountedWorkbench).toHaveAttribute('data-workspace-tool-panel', 'ai');
+  });
+});
+
 test('persists structure-map collapse and manual focus in workspace local view state across remounts', async () => {
   const dependencies = await createPreloadedDependencies(
     createRuntimeQuestionBlockSnapshot(),

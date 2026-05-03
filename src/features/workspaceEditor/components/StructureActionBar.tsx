@@ -11,6 +11,9 @@ type StructureActionBarProps = {
   interactionLockReason: string | null;
   isInteractionLocked: boolean;
   learningActions: LearningActionOption[];
+  onChangeSelectedNodeType: (
+    nodeType: 'question' | 'answer' | 'summary' | 'judgment',
+  ) => void;
   onChildInsertTypeChange: (nodeType: EditorInsertTypeOption['value']) => void;
   onDeleteNode: () => void;
   onInsertChildNode: () => void;
@@ -20,10 +23,21 @@ type StructureActionBarProps = {
   onRunLearningAction: (actionId: LearningActionId) => void;
   onSiblingInsertTypeChange: (nodeType: EditorInsertTypeOption['value']) => void;
   selectedChildInsertType: string | null;
-  selectedSiblingInsertType: string | null;
   selectedNodeTitle: string | null;
+  selectedNodeType: string | null;
+  selectedNodeTypeSwitchOptions: (
+    'question' | 'answer' | 'summary' | 'judgment'
+  )[];
+  selectedSiblingInsertType: string | null;
   siblingInsertOptions: EditorInsertTypeOption[];
 };
+
+const TYPE_SWITCH_OPTIONS = [
+  { label: '问题', value: 'question' },
+  { label: '回答', value: 'answer' },
+  { label: '总结', value: 'summary' },
+  { label: '判断', value: 'judgment' },
+] as const;
 
 export default function StructureActionBar({
   actionAvailability,
@@ -31,6 +45,7 @@ export default function StructureActionBar({
   interactionLockReason,
   isInteractionLocked,
   learningActions,
+  onChangeSelectedNodeType,
   onChildInsertTypeChange,
   onDeleteNode,
   onInsertChildNode,
@@ -40,8 +55,10 @@ export default function StructureActionBar({
   onRunLearningAction,
   onSiblingInsertTypeChange,
   selectedChildInsertType,
-  selectedSiblingInsertType,
   selectedNodeTitle,
+  selectedNodeType,
+  selectedNodeTypeSwitchOptions,
+  selectedSiblingInsertType,
   siblingInsertOptions,
 }: StructureActionBarProps) {
   const currentNodeContextText =
@@ -49,7 +66,10 @@ export default function StructureActionBar({
       ? interactionLockReason
       : selectedNodeTitle
         ? `当前节点：${selectedNodeTitle}`
-        : '先从结构视图或文本主视图中选中一个节点。';
+        : '先从结构视图或主编辑区选中一个节点。';
+  const allowedContentLabel =
+    childInsertOptions.map((option) => option.label).join('、') || '无';
+  const canSwitchNodeType = selectedNodeType !== null;
 
   return (
     <section className="workspace-section">
@@ -84,7 +104,7 @@ export default function StructureActionBar({
         </div>
       ) : (
         <p className="workspace-helpText">
-          当前节点没有直接学习动作。需要细调树结构时，可使用下方高级结构操作。
+          当前节点没有直接学习动作。需要微调结构时，再使用下面的结构辅助区。
         </p>
       )}
       <div
@@ -93,13 +113,52 @@ export default function StructureActionBar({
       >
         <div className="workspace-sectionHeader">
           <div>
-            <p className="workspace-kicker">高级结构操作</p>
+            <p className="workspace-kicker">结构辅助</p>
             <h3 className="workspace-subsectionTitle">需要时再精调树结构</h3>
           </div>
         </div>
+        <dl className="workspace-inspectorList">
+          <div>
+            <dt>当前可接内容</dt>
+            <dd className="workspace-inspectorClamp" title={allowedContentLabel}>
+              {allowedContentLabel}
+            </dd>
+          </div>
+        </dl>
         <p className="workspace-helpText">
-          这里保留子节点 / 同级、升降级和删除，供你在学习动作之外做精细重排。
+          这里只保留插入、提升、降低、删除和安全类型切换，作为学习动作之外的结构微调入口。
         </p>
+        <div className="workspace-tagSection">
+          <p className="workspace-kicker">节点类型</p>
+          <p className="workspace-tagMeta">
+            {canSwitchNodeType
+              ? '只开放叶子节点的安全切换，只会在当前父节点允许的类型之间切换。'
+              : '先选中一个节点，再使用安全类型切换。'}
+          </p>
+          <div className="workspace-typeSwitchList">
+            {TYPE_SWITCH_OPTIONS.map((option) => {
+              const isCurrentType = selectedNodeType === option.value;
+              const isAllowed = selectedNodeTypeSwitchOptions.includes(option.value);
+
+              return (
+                <button
+                  aria-label={
+                    isCurrentType ? `当前类型：${option.label}` : `切换为${option.label}`
+                  }
+                  aria-pressed={isCurrentType}
+                  className="workspace-typeSwitchButton"
+                  data-active={isCurrentType}
+                  disabled={!canSwitchNodeType || !isAllowed || isInteractionLocked}
+                  key={option.value}
+                  onClick={() => onChangeSelectedNodeType(option.value)}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="workspace-actionGrid">
           <div className="workspace-actionField">
             <label className="workspace-actionLabel" htmlFor="workspace-insert-child-type">

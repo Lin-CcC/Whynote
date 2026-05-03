@@ -22,6 +22,7 @@ import {
   buildDocumentNodePresentation,
   PLAN_STEP_STATUS_LABELS,
 } from './documentNodePresentation';
+import NodeTagCluster from './NodeTagCluster';
 import PlanStepStatusMenu from './PlanStepStatusMenu';
 
 export type DocumentNodeSectionProps = {
@@ -35,7 +36,9 @@ export type DocumentNodeSectionProps = {
   isInteractionLocked: boolean;
   keepHeaderVisibleWhenBodyCollapsed?: boolean;
   nodeId: string;
+  onActivateTagRail: (tagId: string) => void;
   onSelectNode: (nodeId: string) => void;
+  onToggleNodeTag: (tagId: string) => void;
   onToggleBodyCollapsed?: () => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
@@ -58,7 +61,9 @@ export default function DocumentNodeSection({
   isInteractionLocked,
   keepHeaderVisibleWhenBodyCollapsed = false,
   nodeId,
+  onActivateTagRail,
   onSelectNode,
+  onToggleNodeTag,
   onToggleBodyCollapsed,
   onUpdateNode,
   registerNodeElement,
@@ -351,6 +356,14 @@ export default function DocumentNodeSection({
                     {badge.label}
                   </span>
                 ))}
+                <NodeTagCluster
+                  isInteractionLocked={isInteractionLocked}
+                  isVisible={titleControlVisible}
+                  nodeId={node.id}
+                  onActivateTagRail={onActivateTagRail}
+                  onToggleTag={onToggleNodeTag}
+                  tree={tree}
+                />
               </div>
             ) : null}
             <div className="workspace-nodeTitleRow">

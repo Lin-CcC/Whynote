@@ -12,8 +12,12 @@ export const DEFAULT_WORKSPACE_VIEW_STATE: WorkspaceViewState = {
   collapsedStructureMapClusterIds: [],
   collapsedStructureMapFollowUpIds: [],
   expandedHistorySectionIds: [],
+  focusMode: false,
+  leftRailMode: 'expanded',
   mainViewMode: 'document',
+  rightRailMode: 'collapsed',
   structureMapFocusTarget: null,
+  toolPanel: 'resources',
 };
 
 export function readWorkspaceViewState(
@@ -60,11 +64,17 @@ export function normalizeWorkspaceViewState(value: unknown): WorkspaceViewState 
     expandedHistorySectionIds: normalizeStringArray(
       source.expandedHistorySectionIds,
     ),
+    focusMode: source.focusMode === true,
+    leftRailMode:
+      source.leftRailMode === 'collapsed' ? 'collapsed' : 'expanded',
     mainViewMode:
       source.mainViewMode === 'structure-map' ? 'structure-map' : 'document',
+    rightRailMode:
+      source.rightRailMode === 'expanded' ? 'expanded' : 'collapsed',
     structureMapFocusTarget: normalizeStructureMapFocusTarget(
       source.structureMapFocusTarget,
     ),
+    toolPanel: normalizeToolPanelId(source.toolPanel),
   };
 }
 
@@ -90,6 +100,17 @@ export function writeWorkspaceViewState(
       workspaceViews: nextWorkspaceViews,
     },
   };
+}
+
+function normalizeToolPanelId(value: unknown): WorkspaceViewState['toolPanel'] {
+  switch (value) {
+    case 'export':
+    case 'ai':
+    case 'settings':
+      return value;
+    default:
+      return 'resources';
+  }
 }
 
 export function getAnswerHistorySectionId(answerNodeId: string) {

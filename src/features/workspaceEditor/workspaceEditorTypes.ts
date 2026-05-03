@@ -86,11 +86,17 @@ export interface WorkspaceViewState {
   collapsedStructureMapClusterIds: string[];
   collapsedStructureMapFollowUpIds: string[];
   expandedHistorySectionIds: string[];
+  focusMode: boolean;
+  leftRailMode: WorkspaceRailMode;
   mainViewMode: WorkspaceMainViewMode;
+  rightRailMode: WorkspaceRailMode;
   structureMapFocusTarget: StructureMapFocusTarget | null;
+  toolPanel: WorkspaceToolPanelId;
 }
 
 export type WorkspaceMainViewMode = 'document' | 'structure-map';
+export type WorkspaceRailMode = 'collapsed' | 'expanded';
+export type WorkspaceToolPanelId = 'resources' | 'export' | 'ai' | 'settings';
 
 export interface StructureMapFocusTarget {
   kind: 'plan-step' | 'question-cluster';
@@ -154,6 +160,13 @@ export interface WorkspaceEditorToolbarSection {
   title: string;
 }
 
+export interface WorkspaceEditorToolPanel {
+  content: ReactNode;
+  countLabel?: string;
+  id: WorkspaceToolPanelId;
+  label: string;
+}
+
 export interface WorkspaceEditorProps {
   initialSnapshot?: WorkspaceSnapshot;
   initialModuleId?: string;
@@ -179,6 +192,9 @@ export interface WorkspaceEditorProps {
   renderRightPanelExtra?: (
     context: WorkspaceEditorRenderContext,
   ) => ReactNode;
+  renderRightToolPanels?: (
+    context: WorkspaceEditorRenderContext,
+  ) => WorkspaceEditorToolPanel[];
   renderNodeInlineActions?: (
     context: WorkspaceEditorNodeRenderContext,
   ) => ReactNode;

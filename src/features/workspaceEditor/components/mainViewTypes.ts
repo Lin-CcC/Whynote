@@ -31,9 +31,11 @@ export interface MainViewNodeProps {
     actionId: LearningActionId,
   ) => void;
   onSelectNode: (nodeId: string) => void;
+  onToggleNodeTag: (tagId: string) => void;
   onSetCurrentAnswer: (questionNodeId: string, answerNodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   onWorkspaceViewStateChange: (state: WorkspaceViewState) => void;
+  onActivateTagRail: (tagId: string) => void;
   registerNodeElement: (nodeId: string, element: HTMLElement | null) => void;
   renderNodeInlineActions?: (
     context: WorkspaceEditorNodeRenderContext,

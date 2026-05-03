@@ -40,8 +40,10 @@ export default function QuestionBlockSection({
   onInsertAnswerForQuestion,
   onInsertFollowUpQuestion,
   onInsertSummaryForNode,
+  onActivateTagRail,
   onSelectNode,
   onSetCurrentAnswer,
+  onToggleNodeTag,
   onUpdateNode,
   onWorkspaceViewStateChange,
   registerNodeElement,
@@ -208,7 +210,9 @@ export default function QuestionBlockSection({
         isInteractionLocked={isInteractionLocked}
         key={node.id}
         nodeId={node.id}
+        onActivateTagRail={onActivateTagRail}
         onSelectNode={onSelectNode}
+        onToggleNodeTag={onToggleNodeTag}
         onToggleBodyCollapsed={() => toggleNodeBody(node.id)}
         onUpdateNode={onUpdateNode}
         registerNodeElement={registerNodeElement}
@@ -415,7 +419,9 @@ export default function QuestionBlockSection({
           depth={depth + 1}
           isInteractionLocked={isInteractionLocked}
           nodeId={answerGroup.answer.id}
+          onActivateTagRail={onActivateTagRail}
           onSelectNode={onSelectNode}
+          onToggleNodeTag={onToggleNodeTag}
           onToggleBodyCollapsed={() => toggleNodeBody(answerGroup.answer.id)}
           onUpdateNode={onUpdateNode}
           registerNodeElement={registerNodeElement}
@@ -517,7 +523,9 @@ export default function QuestionBlockSection({
           depth={depth + 1}
           isInteractionLocked={isInteractionLocked}
           nodeId={summaryGroup.summary.id}
+          onActivateTagRail={onActivateTagRail}
           onSelectNode={onSelectNode}
+          onToggleNodeTag={onToggleNodeTag}
           onToggleBodyCollapsed={() => toggleNodeBody(summaryGroup.summary.id)}
           onUpdateNode={onUpdateNode}
           registerNodeElement={registerNodeElement}
@@ -582,7 +590,9 @@ export default function QuestionBlockSection({
         isInteractionLocked={isInteractionLocked}
         keepHeaderVisibleWhenBodyCollapsed={true}
         nodeId={question.id}
+        onActivateTagRail={onActivateTagRail}
         onSelectNode={onSelectNode}
+        onToggleNodeTag={onToggleNodeTag}
         onUpdateNode={onUpdateNode}
         registerNodeElement={registerNodeElement}
         selectedNodeId={selectedNodeId}

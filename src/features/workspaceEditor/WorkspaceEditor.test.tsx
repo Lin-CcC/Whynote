@@ -10,9 +10,11 @@
 import { useState } from 'react';
 
 import {
+  attachTagToNode,
   createNode,
   createWorkspaceSnapshot,
   deleteNode,
+  ensureBuiltinTags,
   insertChildNode,
   insertSiblingNode,
   liftNode,
@@ -136,6 +138,137 @@ test('renders the global view switch inside the floating bottom-left dock instea
       'workspace-main-view-switch',
     ),
   ).not.toBeInTheDocument();
+});
+
+test('collapses and expands the left rail, right rail, and focus mode workbench states', () => {
+  renderWorkspaceEditorWithViewState({});
+
+  const workbench = screen.getByText('WhyNote').closest('[data-workspace-left-rail]');
+
+  expect(workbench).toHaveAttribute('data-workspace-left-rail', 'expanded');
+  expect(workbench).toHaveAttribute('data-workspace-right-rail', 'collapsed');
+  expect(workbench).toHaveAttribute('data-workspace-focus-mode', 'false');
+
+  fireEvent.click(screen.getByRole('button', { name: '收起模块栏' }));
+  expect(workbench).toHaveAttribute('data-workspace-left-rail', 'collapsed');
+
+  fireEvent.click(screen.getByRole('button', { name: '展开工具栏' }));
+  expect(workbench).toHaveAttribute('data-workspace-right-rail', 'expanded');
+
+  fireEvent.click(screen.getByRole('button', { name: '进入专注' }));
+  expect(workbench).toHaveAttribute('data-workspace-focus-mode', 'true');
+  expect(workbench).toHaveAttribute('data-workspace-left-rail', 'collapsed');
+  expect(workbench).toHaveAttribute('data-workspace-right-rail', 'collapsed');
+
+  fireEvent.click(screen.getByRole('button', { name: '退出专注' }));
+  expect(workbench).toHaveAttribute('data-workspace-focus-mode', 'false');
+  expect(workbench).toHaveAttribute('data-workspace-left-rail', 'collapsed');
+  expect(workbench).toHaveAttribute('data-workspace-right-rail', 'expanded');
+});
+
+test('shows the inline tag add entry only for the active or hovered editor node', async () => {
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-tag-rail"
+      initialSelectedNodeId="question-tag-rail"
+      initialSnapshot={createTaggedRailSnapshot()}
+    />,
+  );
+
+  const questionNode = screen.getByTestId('editor-node-question-tag-rail');
+  const answerNode = screen.getByTestId('editor-node-answer-tag-rail');
+
+  expect(
+    within(questionNode).getByTestId('editor-tag-entry-question-tag-rail'),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByTestId('editor-tag-entry-answer-tag-rail'),
+  ).not.toBeInTheDocument();
+
+  fireEvent.mouseEnter(answerNode);
+
+  expect(
+    within(answerNode).getByTestId('editor-tag-entry-answer-tag-rail'),
+  ).toBeInTheDocument();
+
+  fireEvent.mouseLeave(answerNode);
+
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('editor-tag-entry-answer-tag-rail'),
+    ).not.toBeInTheDocument();
+  });
+});
+
+test('adds tags from the inline editor entry and opens a single-tag square marker rail', async () => {
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-tag-rail"
+      initialSelectedNodeId="question-tag-rail"
+      initialSnapshot={createTaggedRailSnapshot()}
+    />,
+  );
+
+  const stepNode = screen.getByTestId('editor-node-step-tag-rail');
+
+  fireEvent.click(stepNode);
+  fireEvent.mouseEnter(stepNode);
+  fireEvent.click(screen.getByTestId('editor-tag-entry-step-tag-rail'));
+
+  const tagPopover = await screen.findByTestId('editor-tag-popover-step-tag-rail');
+  const firstTagButton = within(tagPopover).getAllByRole('button')[0];
+
+  fireEvent.click(firstTagButton);
+
+  const tagChip = await screen.findByTestId('editor-tag-chip-step-tag-rail-tag-important');
+
+  fireEvent.doubleClick(tagChip);
+
+  const editorCanvas = stepNode.closest('[data-editor-tag-rail]');
+
+  expect(editorCanvas).toHaveAttribute('data-editor-tag-rail', 'true');
+  expect(editorCanvas).toHaveAttribute('data-editor-tag-rail-mode', 'single-tag');
+  expect(screen.getByTestId('editor-tag-rail-track')).toBeInTheDocument();
+
+  const marker = screen.getByTestId('editor-tag-marker-step-tag-rail');
+
+  expect(marker.closest('[data-editor-tag-marker-shape="square"]')).not.toBeNull();
+  expect(marker).toHaveAttribute('data-editor-tag-marker-kind', '重要');
+});
+
+test('collapses, closes, and navigates from the editor tag rail markers', async () => {
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-tag-rail"
+      initialSelectedNodeId="question-tag-rail"
+      initialSnapshot={createTaggedRailSnapshot()}
+    />,
+  );
+
+  fireEvent.doubleClick(
+    await screen.findByTestId('editor-tag-chip-question-tag-rail-tag-important'),
+  );
+
+  fireEvent.click(screen.getByTestId('editor-tag-marker-answer-tag-rail'));
+
+  await waitFor(() => {
+    expect(screen.getByTestId('editor-node-answer-tag-rail')).toHaveAttribute(
+      'data-node-selected',
+      'true',
+    );
+  });
+
+  fireEvent.click(screen.getByTestId('editor-tag-rail-toggle'));
+  expect(
+    screen
+      .getByTestId('editor-tag-rail-toggle')
+      .closest('[data-editor-tag-rail-collapsed]'),
+  ).toHaveAttribute('data-editor-tag-rail-collapsed', 'true');
+
+  fireEvent.click(screen.getByTestId('editor-tag-rail-close'));
+  await waitFor(() => {
+    expect(screen.queryByTestId('editor-tag-rail-track')).not.toBeInTheDocument();
+  });
 });
 
 test('renders a map-global status toolbar while keeping question focus controls inline', async () => {
@@ -2485,6 +2618,75 @@ function createStructureMapChromeSnapshot(): WorkspaceSnapshot {
       updatedAt: '2026-05-03T00:00:00.000Z',
     }),
   );
+
+  return {
+    ...snapshot,
+    tree,
+  };
+}
+
+function createTaggedRailSnapshot(): WorkspaceSnapshot {
+  const snapshot = createWorkspaceSnapshot({
+    title: '标签分布',
+    workspaceId: 'workspace-tag-rail',
+    rootId: 'theme-tag-rail',
+    createdAt: '2026-05-03T10:00:00.000Z',
+    updatedAt: '2026-05-03T10:00:00.000Z',
+  });
+
+  let tree = ensureBuiltinTags(snapshot.tree);
+
+  tree = insertChildNode(
+    tree,
+    snapshot.workspace.rootNodeId,
+    createNode({
+      type: 'module',
+      id: 'module-tag-rail',
+      title: '标签模块',
+      content: '',
+      createdAt: '2026-05-03T10:00:00.000Z',
+      updatedAt: '2026-05-03T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'module-tag-rail',
+    createNode({
+      type: 'plan-step',
+      id: 'step-tag-rail',
+      title: '标签步骤',
+      content: '',
+      status: 'doing',
+      createdAt: '2026-05-03T10:00:00.000Z',
+      updatedAt: '2026-05-03T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'step-tag-rail',
+    createNode({
+      type: 'question',
+      id: 'question-tag-rail',
+      title: '标签问题',
+      content: '双击标签后打开分布 rail。',
+      createdAt: '2026-05-03T10:00:00.000Z',
+      updatedAt: '2026-05-03T10:00:00.000Z',
+    }),
+  );
+  tree = insertChildNode(
+    tree,
+    'question-tag-rail',
+    createNode({
+      type: 'answer',
+      id: 'answer-tag-rail',
+      title: '标签回答',
+      content: '用于测试 rail marker 跳转。',
+      createdAt: '2026-05-03T10:01:00.000Z',
+      updatedAt: '2026-05-03T10:01:00.000Z',
+    }),
+  );
+  tree = attachTagToNode(tree, 'question-tag-rail', 'tag-important');
+  tree = attachTagToNode(tree, 'answer-tag-rail', 'tag-important');
 
   return {
     ...snapshot,

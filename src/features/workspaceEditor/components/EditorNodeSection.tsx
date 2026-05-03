@@ -111,7 +111,9 @@ export default function EditorNodeSection(props: MainViewNodeProps) {
       }
       isInteractionLocked={props.isInteractionLocked}
       nodeId={node.id}
+      onActivateTagRail={props.onActivateTagRail}
       onSelectNode={props.onSelectNode}
+      onToggleNodeTag={props.onToggleNodeTag}
       onToggleBodyCollapsed={
         supportsNodeBodyCollapse(node) ? toggleNodeBodyCollapsed : undefined
       }
