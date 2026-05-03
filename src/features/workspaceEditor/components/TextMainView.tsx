@@ -105,6 +105,7 @@ export default function TextMainView({
   const activeQuestionBlockId = findNearestQuestionNodeId(tree, selectedNodeId);
   const lastAutoExpandedSelectionIdRef = useRef<string | null>(null);
   const lastFocusedSelectionIdRef = useRef<string | null>(null);
+  const hasInitializedSelectedNodeFocusRef = useRef(false);
   const [activeTagRailTagId, setActiveTagRailTagId] = useState<string | null>(null);
   const [isTagRailCollapsed, setIsTagRailCollapsed] = useState(false);
 
@@ -129,6 +130,13 @@ export default function TextMainView({
   useEffect(() => {
     if (!selectedNodeId) {
       lastFocusedSelectionIdRef.current = null;
+      hasInitializedSelectedNodeFocusRef.current = true;
+      return;
+    }
+
+    if (!hasInitializedSelectedNodeFocusRef.current) {
+      hasInitializedSelectedNodeFocusRef.current = true;
+      lastFocusedSelectionIdRef.current = selectedNodeId;
       return;
     }
 

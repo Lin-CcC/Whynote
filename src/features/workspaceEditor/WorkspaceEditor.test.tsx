@@ -8,6 +8,7 @@
   within,
 } from '@testing-library/react';
 import { useState } from 'react';
+import { vi } from 'vitest';
 
 import {
   attachTagToNode,
@@ -141,7 +142,13 @@ test('renders the global view switch inside the floating bottom-left dock instea
 });
 
 test('collapses and expands the left rail, right rail, and focus mode workbench states', () => {
-  renderWorkspaceEditorWithViewState({});
+  renderWorkspaceEditorWithViewState({
+    initialWorkspaceViewState: {
+      ...DEFAULT_WORKSPACE_VIEW_STATE,
+      leftRailMode: 'collapsed',
+      rightRailMode: 'collapsed',
+    },
+  });
 
   const workbench = screen.getByText('WhyNote').closest('[data-workspace-left-rail]');
 
@@ -232,6 +239,45 @@ test('adds tags from the inline editor entry and opens a single-tag square marke
 
   expect(marker.closest('[data-editor-tag-marker-shape="square"]')).not.toBeNull();
   expect(marker).toHaveAttribute('data-editor-tag-marker-kind', '重要');
+});
+
+test('adding a tag on a hovered unselected node does not scroll back to the previously selected node', async () => {
+  const originalScrollIntoView = Element.prototype.scrollIntoView;
+  const scrollIntoViewSpy = vi.fn();
+
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: scrollIntoViewSpy,
+  });
+
+  render(
+    <WorkspaceEditor
+      initialModuleId="module-tag-rail"
+      initialSelectedNodeId="question-tag-rail"
+      initialSnapshot={createTaggedRailSnapshot()}
+    />,
+  );
+
+  const stepNode = screen.getByTestId('editor-node-step-tag-rail');
+  const initialCallCount = scrollIntoViewSpy.mock.calls.length;
+
+  fireEvent.mouseEnter(stepNode);
+  fireEvent.click(screen.getByTestId('editor-tag-entry-step-tag-rail'));
+
+  const tagPopover = await screen.findByTestId('editor-tag-popover-step-tag-rail');
+  fireEvent.click(within(tagPopover).getByRole('button', { name: '重要' }));
+
+  await screen.findByTestId('editor-tag-chip-step-tag-rail-tag-important');
+  expect(scrollIntoViewSpy).toHaveBeenCalledTimes(initialCallCount);
+
+  if (originalScrollIntoView) {
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: originalScrollIntoView,
+    });
+  } else {
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
+  }
 });
 
 test('renders the remove tag affordance after the tag label inside the chip', async () => {
@@ -2402,7 +2448,11 @@ function renderWorkspaceEditorWithViewState(
   },
 ) {
   const {
-    initialWorkspaceViewState = DEFAULT_WORKSPACE_VIEW_STATE,
+    initialWorkspaceViewState = {
+      ...DEFAULT_WORKSPACE_VIEW_STATE,
+      leftRailMode: 'expanded',
+      rightRailMode: 'expanded',
+    },
     ...workspaceEditorProps
   } = props;
 

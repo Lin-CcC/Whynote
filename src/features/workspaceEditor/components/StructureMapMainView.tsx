@@ -200,7 +200,6 @@ export default function StructureMapMainView({
     string | null
   >(null);
   const structureMapShellRef = useRef<HTMLDivElement | null>(null);
-  const lastAutoScrollTargetTestIdRef = useRef<string | null>(null);
 
   if (!currentModuleId || !tree.nodes[currentModuleId]) {
     return (
@@ -259,12 +258,6 @@ export default function StructureMapMainView({
     structureMapFocusTarget,
     workspaceViewState,
   );
-  const visibleSelectionTestId = getVisibleStructureMapSelectionTestId(
-    tree,
-    selectedItemId,
-    selectionContext,
-    workspaceViewState,
-  );
   const mapStatus = dragState
     ? {
         text: '拖动中：蓝色提示表示可落点，红色提示表示当前落点不允许。',
@@ -284,23 +277,14 @@ export default function StructureMapMainView({
 
   useEffect(() => {
     const shell = structureMapShellRef.current;
-    const targetTestId = forcedScrollTargetTestId ?? visibleSelectionTestId;
 
-    if (!shell || !targetTestId) {
+    if (!shell || !forcedScrollTargetTestId) {
       return;
     }
-
-    if (
-      forcedScrollTargetTestId === null &&
-      lastAutoScrollTargetTestIdRef.current === targetTestId
-    ) {
-      return;
-    }
-
-    lastAutoScrollTargetTestIdRef.current = targetTestId;
-    const targetElement = findElementByTestId(shell, targetTestId);
+    const targetElement = findElementByTestId(shell, forcedScrollTargetTestId);
 
     if (!targetElement) {
+      setForcedScrollTargetTestId(null);
       return;
     }
 
@@ -309,12 +293,13 @@ export default function StructureMapMainView({
         block: 'nearest',
         inline: 'nearest',
       });
+      setForcedScrollTargetTestId(null);
     });
 
     return () => {
       window.cancelAnimationFrame(frameId);
     };
-  }, [forcedScrollTargetTestId, visibleSelectionTestId]);
+  }, [forcedScrollTargetTestId]);
 
   useEffect(() => {
     if (!moveFeedback) {
@@ -1878,7 +1863,7 @@ function StructureMapNodeCard({
             data-structure-node-editable="title"
             data-structure-node-title-zone="true"
             disabled={isInteractionLocked}
-            draggable={!isInteractionLocked && dragPermission.canDrag}
+            draggable={false}
             onClick={(event) => {
               event.stopPropagation();
               onSelectStructureMapNode(anchor.nodeId);
@@ -1887,8 +1872,6 @@ function StructureMapNodeCard({
               event.stopPropagation();
               onStartTitleEditing(dragNodeId, itemId, title);
             }}
-            onDragEnd={handleSurfaceDragEnd}
-            onDragStart={handleSurfaceDragStart}
             type="button"
           >
             <span className="workspace-structureMapText">{title}</span>
@@ -2659,60 +2642,6 @@ function findQuestionBlockNode(
     if (nestedMatch) {
       return nestedMatch;
     }
-  }
-
-  return null;
-}
-
-function getVisibleStructureMapSelectionTestId(
-  tree: NodeTree,
-  selectedItemId: string | null,
-  selectionContext: StructureMapSelectionContext,
-  workspaceViewState: WorkspaceViewState,
-) {
-  if (
-    selectionContext.planStepNodeId &&
-    workspaceViewState.collapsedStructureMapStepIds.includes(
-      selectionContext.planStepNodeId,
-    )
-  ) {
-    return `structure-map-panel-${selectionContext.planStepNodeId}`;
-  }
-
-  const collapsedQuestionNodeId = findCollapsedQuestionClusterNodeId(
-    tree,
-    selectionContext.questionNodeId,
-    workspaceViewState,
-  );
-
-  if (collapsedQuestionNodeId) {
-    return `structure-map-question-${collapsedQuestionNodeId}`;
-  }
-
-  return selectedItemId === null ? null : `structure-map-item-${selectedItemId}`;
-}
-
-function findCollapsedQuestionClusterNodeId(
-  tree: NodeTree,
-  questionNodeId: string | null,
-  workspaceViewState: WorkspaceViewState,
-) {
-  if (!questionNodeId) {
-    return null;
-  }
-
-  let currentNode: NodeTree['nodes'][string] | undefined = tree.nodes[questionNodeId];
-
-  while (currentNode) {
-    if (
-      workspaceViewState.collapsedStructureMapClusterIds.includes(currentNode.id) ||
-      workspaceViewState.collapsedStructureMapFollowUpIds.includes(currentNode.id)
-    ) {
-      return currentNode.id;
-    }
-
-    currentNode =
-      currentNode.parentId === null ? undefined : tree.nodes[currentNode.parentId];
   }
 
   return null;
