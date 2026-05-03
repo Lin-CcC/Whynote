@@ -572,7 +572,7 @@
 
 .workspace-mainPanel,
 .workspace-mainViewShell {
-  align-items: center;
+  align-items: stretch;
 }
 
 .workspace-mainViewShell {
@@ -3060,7 +3060,17 @@
 .workspace-mainViewContent {
   min-height: 100%;
   display: flex;
-  justify-content: center;
+  justify-content: stretch;
+  width: 100%;
+}
+
+.workspace-mainPanel > *,
+.workspace-mainViewContent > *,
+.workspace-editorCanvas,
+.workspace-editorCanvasMain,
+.workspace-structureMapShell {
+  width: 100%;
+  max-width: none;
 }
 
 .workspace-mainViewModeDock {
