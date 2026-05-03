@@ -51,8 +51,12 @@ export function readCompleteWorkspaceViewStateForExport(
     collapsedStructureMapFollowUpIds: [],
     collapsedStructureMapStepIds: [],
     expandedHistorySectionIds,
+    focusMode: false,
+    leftRailMode: 'expanded',
     mainViewMode: 'document',
+    rightRailMode: 'collapsed',
     structureMapFocusTarget: null,
+    toolPanel: 'resources',
   };
 }
 

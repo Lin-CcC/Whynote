@@ -31,6 +31,7 @@ import {
   getAnswerHistorySectionId,
   getSummaryHistorySectionId,
 } from '../utils/workspaceViewState';
+import EditorTagRail from './EditorTagRail';
 import EditorNodeSection from './EditorNodeSection';
 
 type TextMainViewProps = {
@@ -55,6 +56,7 @@ type TextMainViewProps = {
     actionId: LearningActionId,
   ) => void;
   onSelectNode: (nodeId: string) => void;
+  onToggleNodeTag: (tagId: string) => void;
   onSetCurrentAnswer: (questionNodeId: string, answerNodeId: string) => void;
   onUpdateNode: (nodeId: string, patch: NodeContentPatch) => void;
   onWorkspaceViewStateChange: (state: WorkspaceViewState) => void;
@@ -89,6 +91,7 @@ export default function TextMainView({
   onRunLearningAction,
   onRunLearningActionForNode,
   onSelectNode,
+  onToggleNodeTag,
   onSetCurrentAnswer,
   onUpdateNode,
   onWorkspaceViewStateChange,
@@ -101,6 +104,8 @@ export default function TextMainView({
 }: TextMainViewProps) {
   const activeQuestionBlockId = findNearestQuestionNodeId(tree, selectedNodeId);
   const lastAutoExpandedSelectionIdRef = useRef<string | null>(null);
+  const [activeTagRailTagId, setActiveTagRailTagId] = useState<string | null>(null);
+  const [isTagRailCollapsed, setIsTagRailCollapsed] = useState(false);
 
   useEffect(() => {
     if (selectedNodeId === lastAutoExpandedSelectionIdRef.current) {
@@ -149,6 +154,13 @@ export default function TextMainView({
     };
   }, [selectedNodeId, tree, workspaceViewState]);
 
+  useEffect(() => {
+    if (activeTagRailTagId && !tree.tags[activeTagRailTagId]) {
+      setActiveTagRailTagId(null);
+      setIsTagRailCollapsed(false);
+    }
+  }, [activeTagRailTagId, tree.tags]);
+
   if (!currentModuleId || !tree.nodes[currentModuleId]) {
     return (
       <div className="workspace-mainPanel">
@@ -184,64 +196,99 @@ export default function TextMainView({
 
   const currentModule = getNodeOrThrow(tree, currentModuleId);
   const moduleChildNodes = getChildNodes(tree, currentModule.id);
+  const isTagRailVisible =
+    activeTagRailTagId !== null && Boolean(tree.tags[activeTagRailTagId]);
 
   return (
     <div className="workspace-mainPanel">
       <div
-        className="workspace-documentShell"
-        data-layout="single-column"
-        data-testid="workspace-document-shell"
+        className="workspace-editorCanvas"
+        data-editor-tag-rail={isTagRailVisible ? 'true' : 'false'}
+        data-editor-tag-rail-collapsed={isTagRailCollapsed ? 'true' : 'false'}
+        data-editor-tag-rail-mode="single-tag"
       >
-        <ModuleDocumentSurface
-          currentModule={currentModule}
-          interactionLockReason={interactionLockReason}
-          isInteractionLocked={isInteractionLocked}
-          onSelectNode={onSelectNode}
-          onUpdateNode={onUpdateNode}
-          registerNodeElement={registerNodeElement}
-          selectedNodeId={selectedNodeId}
-          tree={tree}
-        />
-        <div
-          className="workspace-documentBody"
-          data-testid="workspace-document-body"
-        >
-          {moduleChildNodes.map((childNode) => (
-            <EditorNodeSection
-              activeQuestionBlockId={activeQuestionBlockId}
-              depth={1}
+        <div className="workspace-editorCanvasMain">
+          <div
+            className="workspace-documentShell"
+            data-layout="single-column"
+            data-testid="workspace-document-shell"
+          >
+            <ModuleDocumentSurface
+              currentModule={currentModule}
+              interactionLockReason={interactionLockReason}
               isInteractionLocked={isInteractionLocked}
-              key={childNode.id}
-              nodeId={childNode.id}
-              showSemanticNotes={showSemanticNotes}
-              onDeleteNode={onDeleteNode}
-              onDeleteNodeById={onDeleteNodeById}
-              onDirectAnswerQuestion={onDirectAnswerQuestion}
-              onEvaluateAnswer={onEvaluateAnswer}
-              onEvaluateSummary={onEvaluateSummary}
-              onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
-              onGenerateSummary={onGenerateSummary}
-              onInsertAnswerForQuestion={onInsertAnswerForQuestion}
-              onInsertFollowUpQuestion={onInsertFollowUpQuestion}
-              onInsertSummaryForNode={onInsertSummaryForNode}
-              onRunLearningAction={onRunLearningAction}
-              onRunLearningActionForNode={onRunLearningActionForNode}
               onSelectNode={onSelectNode}
-              onSetCurrentAnswer={onSetCurrentAnswer}
               onUpdateNode={onUpdateNode}
-              onWorkspaceViewStateChange={onWorkspaceViewStateChange}
               registerNodeElement={registerNodeElement}
-              renderNodeInlineActions={renderNodeInlineActions}
-              renderNodeToolbarSections={renderNodeToolbarSections}
               selectedNodeId={selectedNodeId}
               tree={tree}
-              workspaceViewState={workspaceViewState}
             />
-          ))}
+            <div
+              className="workspace-documentBody"
+              data-testid="workspace-document-body"
+            >
+              {moduleChildNodes.map((childNode) => (
+                <EditorNodeSection
+                  activeQuestionBlockId={activeQuestionBlockId}
+                  depth={1}
+                  isInteractionLocked={isInteractionLocked}
+                  key={childNode.id}
+                  nodeId={childNode.id}
+                  showSemanticNotes={showSemanticNotes}
+                  onActivateTagRail={handleActivateTagRail}
+                  onDeleteNode={onDeleteNode}
+                  onDeleteNodeById={onDeleteNodeById}
+                  onDirectAnswerQuestion={onDirectAnswerQuestion}
+                  onEvaluateAnswer={onEvaluateAnswer}
+                  onEvaluateSummary={onEvaluateSummary}
+                  onGenerateFollowUpQuestion={onGenerateFollowUpQuestion}
+                  onGenerateSummary={onGenerateSummary}
+                  onInsertAnswerForQuestion={onInsertAnswerForQuestion}
+                  onInsertFollowUpQuestion={onInsertFollowUpQuestion}
+                  onInsertSummaryForNode={onInsertSummaryForNode}
+                  onRunLearningAction={onRunLearningAction}
+                  onRunLearningActionForNode={onRunLearningActionForNode}
+                  onSelectNode={onSelectNode}
+                  onSetCurrentAnswer={onSetCurrentAnswer}
+                  onToggleNodeTag={onToggleNodeTag}
+                  onUpdateNode={onUpdateNode}
+                  onWorkspaceViewStateChange={onWorkspaceViewStateChange}
+                  registerNodeElement={registerNodeElement}
+                  renderNodeInlineActions={renderNodeInlineActions}
+                  renderNodeToolbarSections={renderNodeToolbarSections}
+                  selectedNodeId={selectedNodeId}
+                  tree={tree}
+                  workspaceViewState={workspaceViewState}
+                />
+              ))}
+            </div>
+          </div>
         </div>
+        {isTagRailVisible && activeTagRailTagId ? (
+          <EditorTagRail
+            currentModuleId={currentModule.id}
+            isCollapsed={isTagRailCollapsed}
+            onClose={() => {
+              setActiveTagRailTagId(null);
+              setIsTagRailCollapsed(false);
+            }}
+            onSelectNode={onSelectNode}
+            onToggleCollapsed={() => {
+              setIsTagRailCollapsed((previousState) => !previousState);
+            }}
+            selectedNodeId={selectedNodeId}
+            tagId={activeTagRailTagId}
+            tree={tree}
+          />
+        ) : null}
       </div>
     </div>
   );
+
+  function handleActivateTagRail(tagId: string) {
+    setActiveTagRailTagId(tagId);
+    setIsTagRailCollapsed(false);
+  }
 }
 
 type ModuleDocumentSurfaceProps = {

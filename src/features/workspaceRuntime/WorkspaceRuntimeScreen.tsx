@@ -2,9 +2,14 @@ import { useState } from 'react';
 
 import AppLayout from '../../ui/AppLayout';
 import SectionCard from '../../ui/SectionCard';
-import { findNearestQuestionNodeId, getModuleScopeId, getNodeOrThrow } from '../nodeDomain';
-import ResourcesSearchExportPanel from '../resourcesSearchExport/ResourcesSearchExportPanel';
+import {
+  createWorkspaceSnapshot,
+  findNearestQuestionNodeId,
+  getModuleScopeId,
+  getNodeOrThrow,
+} from '../nodeDomain';
 import WorkspaceEditor from '../workspaceEditor/WorkspaceEditor';
+import SelectedNodeInspector from '../workspaceEditor/components/SelectedNodeInspector';
 import { resolveLearningActionPlacement } from '../workspaceEditor/utils/learningActions';
 import {
   readWorkspaceViewState,
@@ -16,10 +21,15 @@ import type {
   WorkspaceEditorNodeRenderContext,
   WorkspaceEditorRenderContext,
   WorkspaceEditorSelectionState,
+  WorkspaceEditorToolPanel,
 } from '../workspaceEditor/workspaceEditorTypes';
 import WorkspaceRuntimeActionCard from './components/WorkspaceRuntimeActionCard';
 import WorkspaceRuntimeAiConfigCard from './components/WorkspaceRuntimeAiConfigCard';
 import WorkspaceRuntimeJudgmentHintCallout from './components/WorkspaceRuntimeJudgmentHintCallout';
+import {
+  WorkspaceRuntimeExportToolPanel,
+  WorkspaceRuntimeResourcesToolPanel,
+} from './components/WorkspaceRuntimeResourceToolPanels';
 import WorkspaceRuntimeStatusCard from './components/WorkspaceRuntimeStatusCard';
 import { useWorkspaceRuntime } from './hooks/useWorkspaceRuntime';
 import { createDefaultWorkspaceRuntimeDependencies } from './services/createDefaultWorkspaceRuntimeDependencies';
@@ -50,14 +60,33 @@ export default function WorkspaceRuntimeScreen({
   const [activeResourceNodeId, setActiveResourceNodeId] = useState<string | null>(
     null,
   );
+  const [editorSelection, setEditorSelection] = useState<{
+    currentModuleId: string | null;
+    selectedNodeId: string | null;
+  }>({
+    currentModuleId: null,
+    selectedNodeId: null,
+  });
   const [activeJudgmentHintNodeId, setActiveJudgmentHintNodeId] = useState<
     string | null
   >(null);
   const runtime = useWorkspaceRuntime(resolvedDependencies);
+  const fallbackSnapshot = createWorkspaceSnapshot({
+    title: 'WhyNote',
+    workspaceId: 'workspace-runtime-fallback',
+    rootId: 'theme-runtime-fallback',
+  });
   const workspaceViewState = readWorkspaceViewState(
     uiPreferences,
     runtime.snapshot?.workspace.id ?? null,
   );
+  const toolPanelTree = runtime.snapshot?.tree ?? fallbackSnapshot.tree;
+  const toolPanelWorkspaceId =
+    runtime.snapshot?.workspace.id ?? fallbackSnapshot.workspace.id;
+  const toolPanelWorkspaceTitle =
+    runtime.snapshot?.workspace.title ?? fallbackSnapshot.workspace.title;
+  const toolPanelCurrentModuleId =
+    editorSelection.currentModuleId ?? runtime.initialModuleId ?? null;
   const resourceMetadataByNodeId = Object.fromEntries(
     runtime.resourceMetadataRecords.map((record) => [record.nodeId, record]),
   );
@@ -148,7 +177,7 @@ export default function WorkspaceRuntimeScreen({
       renderLeftPanelExtra={renderLeftPanelExtra}
       renderNodeInlineActions={renderNodeInlineActions}
       renderNodeToolbarSections={renderNodeToolbarSections}
-      renderRightPanelExtra={renderRightPanelExtra}
+      renderRightToolPanels={renderRightToolPanels}
       workspaceViewState={workspaceViewState}
     />
   );
@@ -313,65 +342,107 @@ export default function WorkspaceRuntimeScreen({
     ];
   }
 
-  function renderRightPanelExtra(context: WorkspaceEditorRenderContext) {
-    return (
-      <>
-        <ResourcesSearchExportPanel
-          activeResourceNodeId={activeResourceNodeId}
-          currentModuleId={context.currentModuleId}
-          onApplyTreeChange={context.applyTreeChange}
-          onClearResourceFocus={() => {
-            setActiveResourceNodeId(null);
-          }}
-          onFocusResourceNode={setActiveResourceNodeId}
-          onResolveResourceSummary={runtime.resolveResourceSummary}
-          onSelectEditorNode={(nodeId) => {
-            setActiveResourceNodeId(null);
-            context.selectNode(nodeId);
-          }}
-          onUpsertResourceMetadata={runtime.upsertResourceMetadata}
-          resourceMetadataByNodeId={resourceMetadataByNodeId}
-          selectedEditorNodeId={context.selectedNodeId}
-          tree={context.tree}
-          uiPreferences={uiPreferences}
-          workspaceId={workspaceSnapshot.workspace.id}
-          workspaceTitle={context.workspaceTitle}
-        />
-        <WorkspaceRuntimeStatusCard
-          activeAiActionLabel={runtime.activeAiActionLabel}
-          aiError={runtime.aiError}
-          completionSuggestion={runtime.completionSuggestion}
-          isAiRunning={runtime.isAiRunning}
-          isInitializing={runtime.isInitializing}
-          loadError={runtime.loadError}
-          runtimeMessage={runtime.runtimeMessage}
-          saveError={runtime.saveError}
-          saveStatus={runtime.saveStatus}
-        />
-        <WorkspaceRuntimeAiConfigCard
-          aiConfig={runtime.aiConfig}
-          aiPresetDraftName={runtime.aiPresetDraftName}
-          aiPresets={runtime.aiPresets}
-          aiSelectedPresetId={runtime.aiSelectedPresetId}
-          aiSelectedTemplateId={runtime.aiSelectedTemplateId}
-          onDeleteAiPreset={runtime.deleteAiPreset}
-          onAiConfigChange={runtime.handleAiConfigChange}
-          onAiPresetChange={runtime.handleAiPresetChange}
-          onAiPresetDraftNameChange={runtime.handleAiPresetDraftNameChange}
-          onAiTemplateChange={runtime.handleAiTemplateChange}
-          onOverwriteAiPreset={runtime.overwriteAiPreset}
-          onRenameAiPreset={runtime.renameAiPreset}
-          onSaveAiConfig={runtime.saveAiConfig}
-          onSaveAiPreset={runtime.saveAiPreset}
-        />
-      </>
-    );
+  function renderRightToolPanels(
+    context: WorkspaceEditorRenderContext,
+  ): WorkspaceEditorToolPanel[] {
+    return [
+      {
+        content: (
+          <WorkspaceRuntimeResourcesToolPanel
+            activeResourceNodeId={activeResourceNodeId}
+            currentModuleId={context.currentModuleId}
+            onApplyTreeChange={context.applyTreeChange}
+            onClearResourceFocus={() => {
+              setActiveResourceNodeId(null);
+            }}
+            onFocusResourceNode={setActiveResourceNodeId}
+            onResolveResourceSummary={runtime.resolveResourceSummary}
+            onSelectEditorNode={(nodeId) => {
+              setActiveResourceNodeId(null);
+              context.selectNode(nodeId);
+            }}
+            onUpsertResourceMetadata={runtime.upsertResourceMetadata}
+            resourceMetadataByNodeId={resourceMetadataByNodeId}
+            selectedEditorNodeId={context.selectedNodeId}
+            tree={context.tree}
+            uiPreferences={uiPreferences}
+            workspaceId={workspaceSnapshot.workspace.id}
+            workspaceTitle={context.workspaceTitle}
+          />
+        ),
+        countLabel: String(runtime.resourceMetadataRecords.length),
+        id: 'resources',
+        label: '资料',
+      },
+      {
+        content: (
+          <WorkspaceRuntimeExportToolPanel
+            currentModuleId={toolPanelCurrentModuleId}
+            tree={toolPanelTree}
+            uiPreferences={uiPreferences}
+            workspaceId={toolPanelWorkspaceId}
+            workspaceTitle={toolPanelWorkspaceTitle}
+          />
+        ),
+        id: 'export',
+        label: '导出',
+      },
+      {
+        content: (
+          <WorkspaceRuntimeAiConfigCard
+            aiConfig={runtime.aiConfig}
+            aiPresetDraftName={runtime.aiPresetDraftName}
+            aiPresets={runtime.aiPresets}
+            aiSelectedPresetId={runtime.aiSelectedPresetId}
+            aiSelectedTemplateId={runtime.aiSelectedTemplateId}
+            onDeleteAiPreset={runtime.deleteAiPreset}
+            onAiConfigChange={runtime.handleAiConfigChange}
+            onAiPresetChange={runtime.handleAiPresetChange}
+            onAiPresetDraftNameChange={runtime.handleAiPresetDraftNameChange}
+            onAiTemplateChange={runtime.handleAiTemplateChange}
+            onOverwriteAiPreset={runtime.overwriteAiPreset}
+            onRenameAiPreset={runtime.renameAiPreset}
+            onSaveAiConfig={runtime.saveAiConfig}
+            onSaveAiPreset={runtime.saveAiPreset}
+          />
+        ),
+        countLabel: String(runtime.aiPresets.length),
+        id: 'ai',
+        label: 'AI 配置',
+      },
+      {
+        content: (
+          <>
+            <WorkspaceRuntimeStatusCard
+              activeAiActionLabel={runtime.activeAiActionLabel}
+              aiError={runtime.aiError}
+              completionSuggestion={runtime.completionSuggestion}
+              isAiRunning={runtime.isAiRunning}
+              isInitializing={runtime.isInitializing}
+              loadError={runtime.loadError}
+              runtimeMessage={runtime.runtimeMessage}
+              saveError={runtime.saveError}
+              saveStatus={runtime.saveStatus}
+            />
+            <SelectedNodeInspector
+              currentModuleId={context.currentModuleId}
+              selectedNodeId={context.selectedNodeId}
+              tree={context.tree}
+              workspaceTitle={context.workspaceTitle}
+            />
+          </>
+        ),
+        id: 'settings',
+        label: '设置',
+      },
+    ];
   }
 
   function handleEditorSelectionChange(
     selection: WorkspaceEditorSelectionState,
   ) {
     setActiveResourceNodeId(null);
+    setEditorSelection(selection);
     runtime.handleSelectionChange(selection);
   }
 
