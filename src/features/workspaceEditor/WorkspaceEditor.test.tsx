@@ -145,12 +145,12 @@ test('collapses and expands the left rail, right rail, and focus mode workbench 
 
   const workbench = screen.getByText('WhyNote').closest('[data-workspace-left-rail]');
 
-  expect(workbench).toHaveAttribute('data-workspace-left-rail', 'expanded');
+  expect(workbench).toHaveAttribute('data-workspace-left-rail', 'collapsed');
   expect(workbench).toHaveAttribute('data-workspace-right-rail', 'collapsed');
   expect(workbench).toHaveAttribute('data-workspace-focus-mode', 'false');
 
-  fireEvent.click(screen.getByRole('button', { name: '收起模块栏' }));
-  expect(workbench).toHaveAttribute('data-workspace-left-rail', 'collapsed');
+  fireEvent.click(screen.getByRole('button', { name: '展开模块栏' }));
+  expect(workbench).toHaveAttribute('data-workspace-left-rail', 'expanded');
 
   fireEvent.click(screen.getByRole('button', { name: '展开工具栏' }));
   expect(workbench).toHaveAttribute('data-workspace-right-rail', 'expanded');
@@ -162,7 +162,7 @@ test('collapses and expands the left rail, right rail, and focus mode workbench 
 
   fireEvent.click(screen.getByRole('button', { name: '退出专注' }));
   expect(workbench).toHaveAttribute('data-workspace-focus-mode', 'false');
-  expect(workbench).toHaveAttribute('data-workspace-left-rail', 'collapsed');
+  expect(workbench).toHaveAttribute('data-workspace-left-rail', 'expanded');
   expect(workbench).toHaveAttribute('data-workspace-right-rail', 'expanded');
 });
 
