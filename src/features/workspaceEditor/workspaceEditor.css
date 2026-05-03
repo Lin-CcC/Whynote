@@ -3173,8 +3173,8 @@
   --workspace-rail-track-width: 4.5rem;
   --workspace-left-drawer-width: min(20rem, calc(100vw - 8rem));
   --workspace-right-drawer-width: min(24rem, calc(100vw - 8rem));
-  --workspace-editor-shell-max-width: 94rem;
-  --workspace-editor-shell-padding-inline: clamp(0rem, 0.35vw, 0.3rem);
+  --workspace-editor-shell-max-width: 999rem;
+  --workspace-editor-shell-padding-inline: 0;
   --workspace-left-drawer-reserved: 0rem;
   --workspace-right-drawer-reserved: 0rem;
 }
@@ -3287,12 +3287,12 @@
 }
 
 .workspace-workbench[data-workspace-focus-mode='true'] {
-  --workspace-editor-shell-max-width: 104rem;
+  --workspace-editor-shell-max-width: 999rem;
   --workspace-editor-shell-padding-inline: 0;
 }
 
 .workspace-workbench[data-workspace-left-rail='collapsed'][data-workspace-right-rail='collapsed'] {
-  --workspace-editor-shell-max-width: 94rem;
+  --workspace-editor-shell-max-width: 999rem;
 }
 
 .workspace-workbench[data-workspace-left-rail='expanded'] {
@@ -3308,12 +3308,12 @@
 }
 
 .workspace-workbench[data-workspace-left-rail='expanded'][data-workspace-right-rail='expanded'] {
-  --workspace-editor-shell-max-width: 86rem;
+  --workspace-editor-shell-max-width: 999rem;
 }
 
 .workspace-workbench[data-workspace-left-rail='collapsed'][data-workspace-right-rail='expanded'],
 .workspace-workbench[data-workspace-left-rail='expanded'][data-workspace-right-rail='collapsed'] {
-  --workspace-editor-shell-max-width: 100rem;
+  --workspace-editor-shell-max-width: 999rem;
 }
 
 .workspace-nodeTagPopover {
