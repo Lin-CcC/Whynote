@@ -4,6 +4,8 @@ import type {
   WorkspaceViewState,
 } from '../workspaceEditorTypes';
 
+const WORKSPACE_VIEW_LAYOUT_VERSION = 2;
+
 export const DEFAULT_WORKSPACE_VIEW_STATE: WorkspaceViewState = {
   collapsedPlanStepIds: [],
   collapsedQuestionBlockIds: [],
@@ -13,7 +15,7 @@ export const DEFAULT_WORKSPACE_VIEW_STATE: WorkspaceViewState = {
   collapsedStructureMapFollowUpIds: [],
   expandedHistorySectionIds: [],
   focusMode: false,
-  leftRailMode: 'expanded',
+  leftRailMode: 'collapsed',
   mainViewMode: 'document',
   rightRailMode: 'collapsed',
   structureMapFocusTarget: null,
@@ -46,6 +48,8 @@ export function normalizeWorkspaceViewState(value: unknown): WorkspaceViewState 
   }
 
   const source = value as Record<string, unknown>;
+  const hasCurrentLayoutPreference =
+    source.layoutVersion === WORKSPACE_VIEW_LAYOUT_VERSION;
 
   return {
     collapsedPlanStepIds: normalizeStringArray(source.collapsedPlanStepIds),
@@ -67,7 +71,9 @@ export function normalizeWorkspaceViewState(value: unknown): WorkspaceViewState 
     ),
     focusMode: source.focusMode === true,
     leftRailMode:
-      source.leftRailMode === 'collapsed' ? 'collapsed' : 'expanded',
+      source.leftRailMode === 'expanded' && hasCurrentLayoutPreference
+        ? 'expanded'
+        : 'collapsed',
     mainViewMode:
       source.mainViewMode === 'structure-map' ? 'structure-map' : 'document',
     rightRailMode:
@@ -93,7 +99,10 @@ export function writeWorkspaceViewState(
     !Array.isArray(previousWorkspaceViews)
       ? (previousWorkspaceViews as Record<string, PreferenceValue>)
       : {}),
-    [workspaceId]: workspaceViewState as unknown as PreferenceValue,
+    [workspaceId]: {
+      ...(workspaceViewState as unknown as Record<string, PreferenceValue>),
+      layoutVersion: WORKSPACE_VIEW_LAYOUT_VERSION,
+    },
   };
 
   return {

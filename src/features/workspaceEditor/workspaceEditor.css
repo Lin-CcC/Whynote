@@ -4081,3 +4081,145 @@
   width: 0.96rem;
   height: 0.96rem;
 }
+
+/* Final layout authority: rails own their actual width, main canvas fills the rest */
+.workspace-workbench {
+  --workspace-left-slot-width: var(--workspace-rail-track-width);
+  --workspace-right-slot-width: var(--workspace-rail-track-width);
+}
+
+.workspace-workbench[data-workspace-left-rail='expanded'] {
+  --workspace-left-slot-width: calc(
+    var(--workspace-rail-track-width) + 0.72rem + var(--workspace-left-drawer-width)
+  );
+}
+
+.workspace-workbench[data-workspace-right-rail='expanded'] {
+  --workspace-right-slot-width: calc(
+    var(--workspace-rail-track-width) + 0.72rem + var(--workspace-right-drawer-width)
+  );
+}
+
+.workspace-workbenchBody {
+  grid-template-columns:
+    var(--workspace-left-slot-width)
+    minmax(0, 1fr)
+    var(--workspace-right-slot-width) !important;
+}
+
+.workspace-leftRail,
+.workspace-rightRail {
+  position: relative;
+  min-width: 0;
+  overflow: visible;
+}
+
+.workspace-leftRail {
+  width: var(--workspace-left-slot-width) !important;
+  min-width: var(--workspace-left-slot-width) !important;
+}
+
+.workspace-rightRail {
+  width: var(--workspace-right-slot-width) !important;
+  min-width: var(--workspace-right-slot-width) !important;
+}
+
+.workspace-moduleRailTrack {
+  width: var(--workspace-rail-track-width);
+  min-width: var(--workspace-rail-track-width);
+}
+
+.workspace-rightRailTrack {
+  width: var(--workspace-rail-track-width);
+  min-width: var(--workspace-rail-track-width);
+  margin-left: auto;
+}
+
+.workspace-leftRailDrawer {
+  position: absolute;
+  top: 0;
+  left: calc(var(--workspace-rail-track-width) + 0.72rem);
+  width: var(--workspace-left-drawer-width);
+  height: 100%;
+}
+
+.workspace-rightRailDrawer {
+  position: absolute;
+  top: 0;
+  right: calc(var(--workspace-rail-track-width) + 0.72rem);
+  width: var(--workspace-right-drawer-width);
+}
+
+.workspace-workbench[data-workspace-left-rail='collapsed'] .workspace-leftRailDrawer,
+.workspace-workbench[data-workspace-right-rail='collapsed'] .workspace-rightRailDrawer {
+  display: none;
+}
+
+.workspace-workbenchMain {
+  min-width: 0;
+  padding-inline: 0 !important;
+}
+
+.workspace-mainPanel,
+.workspace-mainViewShell,
+.workspace-mainViewContent,
+.workspace-editorCanvas,
+.workspace-editorCanvasMain,
+.workspace-documentShell,
+.workspace-structureMapShell {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+}
+
+.workspace-documentShell,
+.workspace-structureMapShell {
+  margin-inline: 0 !important;
+}
+
+.workspace-mainViewContent > .workspace-mainPanel > .workspace-documentShell,
+.workspace-mainViewContent > .workspace-mainPanel > .workspace-structureMapShell {
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+}
+
+.workspace-mainViewModeDock {
+  left: calc(
+    1rem + var(--workspace-left-slot-width) + var(--workspace-shell-gap) + 0.25rem
+  ) !important;
+  bottom: 1rem;
+  transform: none !important;
+}
+
+@media (max-width: 1100px) {
+  .workspace-workbench {
+    --workspace-left-slot-width: 100%;
+    --workspace-right-slot-width: 100%;
+  }
+
+  .workspace-workbenchBody {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .workspace-leftRail,
+  .workspace-rightRail {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .workspace-leftRailDrawer,
+  .workspace-rightRailDrawer {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: auto;
+    margin-top: 0.72rem;
+  }
+
+  .workspace-mainViewModeDock {
+    left: 1rem !important;
+    width: calc(100% - 2rem);
+    max-width: max-content;
+  }
+}
