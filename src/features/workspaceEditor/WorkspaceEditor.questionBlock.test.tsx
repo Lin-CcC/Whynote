@@ -1787,6 +1787,14 @@ test('drags from the node surface while keeping icon zones out of drag start', a
   });
   fireEvent.dragEnd(answerGroupButton);
 
+  fireEvent.pointerDown(titleButton as HTMLButtonElement);
+  fireEvent.dragStart(titleButton as HTMLButtonElement);
+
+  await waitFor(() => {
+    expect(answerGroupButton).toHaveAttribute('data-dragging', 'true');
+  });
+  fireEvent.dragEnd(titleButton as HTMLButtonElement);
+
   fireEvent.pointerDown(menuButton);
   const actionDragAttempt = createEvent.dragStart(answerGroupButton);
   fireEvent(answerGroupButton, actionDragAttempt);
