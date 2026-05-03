@@ -3059,6 +3059,8 @@
 
 .workspace-mainViewContent {
   min-height: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .workspace-mainViewModeDock {
@@ -3169,10 +3171,10 @@
 /* Overlay rail refinement */
 .workspace-workbench {
   --workspace-rail-track-width: 4.5rem;
-  --workspace-left-drawer-width: min(22rem, calc(100vw - 8rem));
+  --workspace-left-drawer-width: min(20rem, calc(100vw - 8rem));
   --workspace-right-drawer-width: min(24rem, calc(100vw - 8rem));
-  --workspace-editor-shell-max-width: 76rem;
-  --workspace-editor-shell-padding-inline: clamp(0rem, 0.5vw, 0.4rem);
+  --workspace-editor-shell-max-width: 94rem;
+  --workspace-editor-shell-padding-inline: clamp(0rem, 0.35vw, 0.3rem);
   --workspace-left-drawer-reserved: 0rem;
   --workspace-right-drawer-reserved: 0rem;
 }
@@ -3268,6 +3270,7 @@
 
 .workspace-documentShell {
   width: min(100%, var(--workspace-editor-shell-max-width));
+  margin-inline: auto;
 }
 
 .workspace-workbench[data-workspace-focus-mode='true'] .workspace-workbenchBody {
@@ -3284,12 +3287,12 @@
 }
 
 .workspace-workbench[data-workspace-focus-mode='true'] {
-  --workspace-editor-shell-max-width: 96rem;
+  --workspace-editor-shell-max-width: 104rem;
   --workspace-editor-shell-padding-inline: 0;
 }
 
 .workspace-workbench[data-workspace-left-rail='collapsed'][data-workspace-right-rail='collapsed'] {
-  --workspace-editor-shell-max-width: 88rem;
+  --workspace-editor-shell-max-width: 94rem;
 }
 
 .workspace-workbench[data-workspace-left-rail='expanded'] {
@@ -3304,9 +3307,13 @@
   );
 }
 
+.workspace-workbench[data-workspace-left-rail='expanded'][data-workspace-right-rail='expanded'] {
+  --workspace-editor-shell-max-width: 86rem;
+}
+
 .workspace-workbench[data-workspace-left-rail='collapsed'][data-workspace-right-rail='expanded'],
 .workspace-workbench[data-workspace-left-rail='expanded'][data-workspace-right-rail='collapsed'] {
-  --workspace-editor-shell-max-width: 81rem;
+  --workspace-editor-shell-max-width: 100rem;
 }
 
 .workspace-nodeTagPopover {
